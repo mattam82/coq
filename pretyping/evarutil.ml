@@ -52,8 +52,9 @@ let nf_env_evar sigma env =
     push_rel_context rel' (reset_with_named_context (val_of_named_context nc') env)
 
 let nf_evar_info evc info =
+  
   { info with
-    evar_concl = Reductionops.nf_evar evc info.evar_concl;
+    evar_concl = Reductionops.nf_evar evc (evar_concl info);
     evar_hyps = map_named_val (Reductionops.nf_evar evc) info.evar_hyps;
     evar_body = match info.evar_body with
       | Evar_empty -> Evar_empty

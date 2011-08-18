@@ -111,21 +111,22 @@ type evar_body =
   | Evar_empty
   | Evar_defined of constr
 
-type evar_info = {
-  evar_concl : constr;
-  evar_hyps : named_context_val;
-  evar_body : evar_body;
-  evar_filter : bool list;
-  evar_source : hole_kind located;
-  evar_extra : Store.t }
+type evar_context = named_context * rel_context
+type evar_context_val = named_context_val * rel_context_val
+
+val empty_evar_context_val : evar_context_val
+
+type evar_info
 
 val eq_evar_info : evar_info -> evar_info -> bool
 
-val make_evar : named_context_val -> types -> evar_info
+val make_evar : evar_context_val -> types -> evar_info
 val evar_concl : evar_info -> constr
-val evar_context : evar_info -> named_context
-val evar_filtered_context : evar_info -> named_context
-val evar_hyps : evar_info -> named_context_val
+val evar_context : evar_info -> evar_context
+val evar_filtered_context : evar_info -> evar_context
+
+val evar_hyps : evar_info -> evar_context_val
+
 val evar_body : evar_info -> evar_body
 val evar_filter : evar_info -> bool list
 val evar_unfiltered_env :  evar_info -> env

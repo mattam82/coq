@@ -34,9 +34,14 @@ val pre_env : env -> Pre_env.env
 val env_of_pre_env : Pre_env.env -> env
 
 type named_context_val
+
 val eq_named_context_val : named_context_val -> named_context_val -> bool
 
 val empty_env : env
+
+type rel_context_val
+
+val eq_rel_context_val : rel_context_val -> rel_context_val -> bool
 
 val universes     : env -> Univ.universes
 val rel_context   : env -> rel_context
@@ -60,6 +65,10 @@ val push_rec_types   : rec_declaration -> env -> env
    raises [Not_found] if the index points out of the context *)
 val lookup_rel    : int -> env -> rel_declaration
 val evaluable_rel : int -> env -> bool
+val rel_context_of_val : rel_context_val -> rel_context
+val empty_rel_context_val : rel_context_val
+val rel_vals_of_val : rel_context_val -> Pre_env.rel_vals
+val val_of_rel_context : rel_context -> rel_context_val
 
 (** {6 Recurrence on [rel_context] } *)
 

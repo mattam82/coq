@@ -43,17 +43,39 @@ type evar_body =
   | Evar_empty
   | Evar_defined of constr
 
+type evar_context = named_context * rel_context
+type evar_context_val = named_context_val * rel_context_val
+
+let empty_evar_context_val = empty_named_context_val, empty_rel_context_val
+
 type evar_info = {
   evar_concl : constr;
   evar_hyps : named_context_val;
+  evar_rels : rel_context_val;
   evar_body : evar_body;
   evar_filter : bool list;
   evar_source : hole_kind located;
   evar_extra : Store.t }
 
-let make_evar hyps ccl = {
+let map_evar_body f = function
+  | Evar_empty -> Evar_empty
+  | Evar_defined c -> Evar_defined (f c)
+
+let map_evar_context_val f (hyps, rels) =
+  val_of_named_context (map_named_context f (named_context_of_val hyps)),
+  val_of_rel_context (map_rel_context f (rel_context_of_val rels))
+
+let map_evar_info f evi =
+  let (hyps, rels) = map_evar_context_val f (evi.evar_hyps, evi.evar_rels) in
+  { evi with 
+    evar_hyps = hyps; evar_rels = rels;
+    evar_concl = f evi.evar_concl;
+    evar_body = map_evar_body f evi.evar_body }
+
+let make_evar (hyps, rels) ccl = {
   evar_concl = ccl;
   evar_hyps = hyps;
+  evar_rels = rels;
   evar_body = Evar_empty;
   evar_filter = List.map (fun _ -> true) (named_context_of_val hyps);
   evar_source = (dummy_loc,InternalHole);
@@ -61,21 +83,29 @@ let make_evar hyps ccl = {
 }
 
 let evar_concl evi = evi.evar_concl
-let evar_hyps evi = evi.evar_hyps
-let evar_context evi = named_context_of_val evi.evar_hyps
+let evar_hyps evi = evi.evar_hyps, evi.evar_rels
+let evar_named_context evi = named_context_of_val evi.evar_hyps
+let evar_rel_context evi = rel_context_of_val evi.evar_rels
+let evar_context evi = evar_named_context evi, evar_rel_context evi
 let evar_body evi = evi.evar_body
 let evar_filter evi = evi.evar_filter
 let evar_unfiltered_env evi = Global.env_of_context evi.evar_hyps
 let evar_filtered_context evi =
-  snd (list_filter2 (fun b c -> b) (evar_filter evi,evar_context evi))
+  snd (list_filter2 (fun b c -> b) (evar_filter evi, evar_named_context evi)), 
+  evar_rel_context evi
+
 let evar_env evi =
-  List.fold_right push_named (evar_filtered_context evi)
-    (reset_context (Global.env()))
+  let (hyps, rels) = evar_filtered_context evi in
+  let hypsenv = 
+    List.fold_right push_named hyps
+      (reset_context (Global.env()))
+  in List.fold_right push_rel rels hypsenv
 
 let eq_evar_info ei1 ei2 =
   ei1 == ei2 ||
     eq_constr ei1.evar_concl ei2.evar_concl &&
-    eq_named_context_val (ei1.evar_hyps) (ei2.evar_hyps) &&
+    eq_named_context_val ei1.evar_hyps ei2.evar_hyps &&
+    eq_rel_context_val ei1.evar_rels ei2.evar_rels &&
     ei1.evar_body = ei2.evar_body
 
 (* spiwack: Revised hierarchy :
@@ -182,8 +212,10 @@ module EvarInfoMap = struct
     in
       instrec (sign,args)
 
-  let instantiate_evar sign c args =
-    let inst = instantiate_sign_including_let sign args in
+  let instantiate_evar (hyps, rels) c args =
+    let relargs, hypsargs = array_chop (List.length rels) args in
+    let c = substna relargs 0 c in
+    let inst = instantiate_sign_including_let hyps (Array.to_list hypsargs) in
       if is_id_inst inst then
 	c
       else
@@ -197,14 +229,14 @@ module EvarInfoMap = struct
       with Not_found ->
 	anomaly ("Evar "^(string_of_existential n)^" was not declared") in
     let hyps = evar_filtered_context info in
-      instantiate_evar hyps info.evar_concl (Array.to_list args)
+      instantiate_evar hyps info.evar_concl args
 
   let existential_value sigma (n,args) =
     let info = find sigma n in
     let hyps = evar_filtered_context info in
       match evar_body info with
 	| Evar_defined c ->
-	    instantiate_evar hyps c (Array.to_list args)
+	    instantiate_evar hyps c args
 	| Evar_empty ->
 	    raise NotInstantiatedEvar
 
@@ -449,6 +481,7 @@ let evar_declare hyps evk ty ?(src=(dummy_loc,InternalHole)) ?filter evd =
   { evd with
     evars = EvarMap.add_undefined evd.evars evk
       {evar_hyps = hyps;
+       evar_rels = empty_rel_context_val; (* FIXME *)
        evar_concl = ty;
        evar_body = Evar_empty;
        evar_filter = filter;
@@ -749,25 +782,29 @@ let pr_meta_map mmap =
   in
   prlist pr_meta_binding (metamap_to_list mmap)
 
-let pr_decl ((id,b,_),ok) =
+let pr_decl pr_id ((id,b,_),ok) =
   match b with
   | None -> if ok then pr_id id else (str "{" ++ pr_id id ++ str "}")
   | Some c -> str (if ok then "(" else "{") ++ pr_id id ++ str ":=" ++
       print_constr c ++ str (if ok then ")" else "}")
 
 let pr_evar_info evi =
+  let (hyps, rels) = evar_context evi in
   let phyps =
     try
-      let decls = List.combine (evar_context evi) (evar_filter evi) in
-      prlist_with_sep pr_spc pr_decl (List.rev decls)
+      let decls = List.combine hyps (evar_filter evi) in
+      prlist_with_sep pr_spc (pr_decl pr_id) (List.rev decls)
     with Invalid_argument _ -> str "Ill-formed filtered context" in
+  let prels = 
+    prlist_with_sep pr_spc (pr_decl pr_name) (List.map (fun x -> x, true) rels)
+  in
   let pty = print_constr evi.evar_concl in
   let pb =
     match evi.evar_body with
       | Evar_empty -> mt ()
       | Evar_defined c -> spc() ++ str"=> "  ++ print_constr c
   in
-  hov 2 (str"["  ++ phyps ++ spc () ++ str"|- "  ++ pty ++ pb ++ str"]")
+  hov 2 (str"["  ++ phyps ++ spc () ++ prels ++ spc () ++ str"|- "  ++ pty ++ pb ++ str"]")
 
 let compute_evar_dependency_graph (sigma:evar_map) =
   (* Compute the map binding ev to the evars whose body depends on ev *)

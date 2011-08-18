@@ -31,6 +31,7 @@ open Pre_env
 (* The type of environments. *)
 
 type named_context_val = Pre_env.named_context_val
+type rel_context_val = Pre_env.rel_context_val
 
 type env = Pre_env.env
 
@@ -59,6 +60,13 @@ let evaluable_rel n env =
   match lookup_rel n env with
   | (_,Some _,_) -> true
   | _ -> false
+
+let rel_context_of_val = fst
+let rel_vals_of_val = snd
+let empty_rel_context_val = [], []
+
+let val_of_named_context ctxt =
+  List.fold_right push_rel_context_val ctxt empty_rel_context_val
 
 let nb_rel env = env.env_nb_rel
 
@@ -110,6 +118,9 @@ let lookup_named_val id (ctxt,_) = Sign.lookup_named id ctxt
 
 let eq_named_context_val c1 c2 =
    c1 == c2 || named_context_equal (named_context_of_val c1) (named_context_of_val c2)
+
+let eq_rel_context_val c1 c2 =
+   c1 == c2 || eq_rel_context (named_context_of_val c1) (named_context_of_val c2)
 
 (* A local const is evaluable if it is defined  *)
 

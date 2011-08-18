@@ -683,6 +683,8 @@ let eq_named_declaration (i1, c1, t1) (i2, c2, t2) =
 let eq_rel_declaration (n1, c1, t1) (n2, c2, t2) =
   n1 = n2 && Option.Misc.compare eq_constr c1 c2 && eq_constr t1 t2
 
+let eq_rel_context = list_equal eq_rel_declaration 
+
 (***************************************************************************)
 (*     Type of local contexts (telescopes)                                 *)
 (***************************************************************************)
@@ -832,6 +834,9 @@ let substn_many lamv n c =
 let substkey = Profile.declare_profile "substn_many";;
 let substn_many lamv n c = Profile.profile3 substkey substn_many lamv n c;;
 *)
+
+let substna laml n = 
+  substn_many (Array.map make_substituend laml) n
 
 let substnl laml n =
   substn_many (Array.map make_substituend (Array.of_list laml)) n

@@ -166,16 +166,7 @@ let sort_dependencies evl =
     | [] -> List.rev list
   in aux evl Intset.empty []
 
-let map_evar_body f = function
-  | Evar_empty -> Evar_empty
-  | Evar_defined c -> Evar_defined (f c)
-
 open Environ
-      
-let map_evar_info f evi =
-  { evi with evar_hyps = val_of_named_context (map_named_context f (named_context_of_val evi.evar_hyps));
-    evar_concl = f evi.evar_concl;
-    evar_body = map_evar_body f evi.evar_body }
     
 let eterm_obligations env name isevars evm fs ?status t ty = 
   (* 'Serialize' the evars *)

@@ -43,6 +43,7 @@ type val_kind =
     | VKnone
 
 type lazy_val = val_kind ref
+type rel_vals = lazy_val list
 
 type named_vals = (identifier * lazy_val) list
 
@@ -51,12 +52,13 @@ type env = {
   env_named_context : named_context;
   env_named_vals    : named_vals;
   env_rel_context   : rel_context;
-  env_rel_val       : lazy_val list;
+  env_rel_val       : rel_vals;
   env_nb_rel        : int;
   env_stratification : stratification;
   retroknowledge : Retroknowledge.retroknowledge }
 
 type named_context_val = named_context * named_vals
+type rel_context_val = rel_context * rel_vals
 
 let empty_named_context_val = [],[]
 

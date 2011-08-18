@@ -365,6 +365,9 @@ val eq_rel_declaration :
 (** In [rel_context], more recent declaration is on top *)
 type rel_context = rel_declaration list
 
+val eq_rel_context :
+  rel_context -> rel_context -> bool
+
 val empty_rel_context : rel_context
 val add_rel_decl : rel_declaration -> rel_context -> rel_context
 
@@ -554,6 +557,7 @@ val lift : int -> constr -> constr
 (** [substnl [a1;...;an] k c] substitutes in parallel [a1],...,[an]
     for respectively [Rel(k+1)],...,[Rel(k+n)] in [c]; it relocates
     accordingly indexes in [a1],...,[an] *)
+val substna : constr array -> int -> constr -> constr
 val substnl : constr list -> int -> constr -> constr
 val substl : constr list -> constr -> constr
 val subst1 : constr -> constr -> constr
