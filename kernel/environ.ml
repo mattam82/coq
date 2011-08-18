@@ -64,8 +64,7 @@ let evaluable_rel n env =
 let rel_context_of_val = fst
 let rel_vals_of_val = snd
 let empty_rel_context_val = [], []
-
-let val_of_named_context ctxt =
+let val_of_rel_context ctxt = 
   List.fold_right push_rel_context_val ctxt empty_rel_context_val
 
 let nb_rel env = env.env_nb_rel
@@ -73,6 +72,11 @@ let nb_rel env = env.env_nb_rel
 let push_rel = push_rel
 
 let push_rel_context ctxt x = Sign.fold_rel_context push_rel ctxt ~init:x
+
+let push_rel_context_val = push_rel_context_val
+
+let val_of_named_context ctxt =
+  List.fold_right push_rel_context_val ctxt empty_rel_context_val
 
 let push_rec_types (lna,typarray,_) env =
   let ctxt = array_map2_i (fun i na t -> (na, None, lift i t)) lna typarray in

@@ -63,6 +63,8 @@ val nb_rel         : env -> int
 val push_rel       : rel_declaration -> env -> env
 val lookup_rel_val : int -> env -> lazy_val
 val env_of_rel     : int -> env -> env
+val push_rel_context_val  :
+    rel_declaration -> rel_context_val -> rel_context_val
 
 (** Named context *)
 

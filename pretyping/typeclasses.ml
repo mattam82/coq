@@ -134,7 +134,7 @@ let rec is_class_type evd c =
   | _ -> class_of_constr c <> None
 
 let is_class_evar evd evi =
-  is_class_type evd evi.Evd.evar_concl
+  is_class_type evd (evar_concl evi)
 
 (*
  * classes persistent object
@@ -392,15 +392,15 @@ let resolvable = Store.field ()
 open Store.Field
 
 let is_resolvable evi =
-  assert (evi.evar_body = Evar_empty);
-  Option.default true (resolvable.get evi.evar_extra)
+  assert (evar_body evi = Evar_empty);
+  Option.default true (resolvable.get (evar_extra evi))
 
 let mark_unresolvable_undef evi =
-  let t = resolvable.set false evi.evar_extra in
-  { evi with evar_extra = t }
+  let t = resolvable.set false (evar_extra evi) in
+    evar_set_extra evi t
 
 let mark_unresolvable evi =
-  assert (evi.evar_body = Evar_empty);
+  assert (evar_body evi = Evar_empty);
   mark_unresolvable_undef evi
 
 let mark_unresolvables sigma =

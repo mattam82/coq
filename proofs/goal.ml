@@ -47,9 +47,9 @@ let descendent gl e =
 open Store.Field
 let rec advance sigma g =
   let evi = Evd.find sigma g.content in
-  if Option.default false (Evarutil.cleared.get evi.Evd.evar_extra) then
+  if Option.default false (Evarutil.cleared.get (Evd.evar_extra evi)) then
     let v = 
-      match evi.Evd.evar_body with 
+      match Evd.evar_body evi with 
       | Evd.Evar_defined c -> c
       | _ -> Util.anomaly "Some goal is marked as 'cleared' but is uninstantiated"
     in
@@ -57,7 +57,7 @@ let rec advance sigma g =
     let g' = { g with content = e } in
     advance sigma g'
   else
-    match evi.Evd.evar_body with
+    match Evd.evar_body evi with
     | Evd.Evar_defined _ -> None
     | _ -> Some g
 
@@ -81,7 +81,7 @@ type 'a sensitive =
    as an optimisation (it shouldn't change during the evaluation). *)
 let eval t env defs gl =
   let info = content defs gl in
-  let env = Environ.reset_with_named_context (Evd.evar_hyps info) env in
+  let env = Evd.evar_env info in (* MS: Not sure *)
   let rdefs = ref defs in
   let r = t env rdefs gl info in
   ( r , !rdefs )
@@ -244,8 +244,8 @@ let refine step env rdefs gl info =
 
 (*** Cleaning  goals ***)
 
-let clear ids env rdefs gl info =
-  let hyps = Evd.evar_hyps info in
+let clear ids env rdefs gl info = (* FIXME *)
+  let hyps, rels = Evd.evar_hyps info in
   let concl = Evd.evar_concl info in
   let (hyps,concl) = Evarutil.clear_hyps_in_evi rdefs hyps concl ids in
   let cleared_env = Environ.reset_with_named_context hyps env in
@@ -295,7 +295,7 @@ let remove_hyp_body env sigma id =
 
 let clear_body idents env rdefs gl info =
   let info = content !rdefs gl in
-  let full_env = Environ.reset_with_named_context (Evd.evar_hyps info) env in
+  let full_env = Evd.evar_env info in
   let aux env id = 
      let env' = remove_hyp_body env !rdefs id in
        recheck_typability (None,id) env' !rdefs (Evd.evar_concl info);

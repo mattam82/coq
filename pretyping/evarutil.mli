@@ -48,7 +48,7 @@ val new_type_evar :
 val new_evar_instance :
  named_context_val -> evar_map -> types -> ?src:loc * hole_kind -> ?filter:bool list -> constr list -> evar_map * constr
 
-val make_pure_subst : evar_info -> constr array -> (identifier * constr) list
+val make_pure_subst : evar_info -> constr array -> constr array * (identifier * constr) list
 
 (** {6 Instantiate evars} *)
 
@@ -105,7 +105,7 @@ val solve_pattern_eqn : env -> constr list -> constr -> constr
     contained in the object, including defined evars *)
 
 val evars_of_term : constr -> Intset.t
-val evars_of_named_context : named_context -> Intset.t
+val evars_of_context : ('a * constr option * types) list -> Intset.t
 val evars_of_evar_info : evar_info -> Intset.t
 
 (** The following functions return the set of undefined evars
@@ -114,7 +114,7 @@ val evars_of_evar_info : evar_info -> Intset.t
     [nf_evar]. *)
 
 val undefined_evars_of_term : evar_map -> constr -> Intset.t
-val undefined_evars_of_named_context : evar_map -> named_context -> Intset.t
+val undefined_evars_of_context : evar_map -> ('a * constr option * types) list -> Intset.t
 val undefined_evars_of_evar_info : evar_map -> evar_info -> Intset.t
 
 (** {6 Value/Type constraints} *)

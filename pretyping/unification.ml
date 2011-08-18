@@ -868,11 +868,11 @@ let w_merge env with_types flags (evd,metas,evars) =
 	      
   and mimick_undefined_evar evd flags hdc nargs sp =
     let ev = Evd.find_undefined evd sp in
-    let sp_env = Global.env_of_context ev.evar_hyps in
+    let sp_env = evar_env ev in
     let (evd', c) = applyHead sp_env evd nargs hdc in
     let (evd'',mc,ec) =
       unify_0 sp_env evd' CUMUL flags
-        (get_type_of sp_env evd' c) ev.evar_concl in
+        (get_type_of sp_env evd' c) (evar_concl ev) in
     let evd''' = w_merge_rec evd'' mc ec [] in
     if evd' == evd'''
     then Evd.define sp c evd'''

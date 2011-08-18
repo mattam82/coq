@@ -368,8 +368,9 @@ let substl_with_function subst constr =
                   decr cnt;
                   evd := Evd.add !evd !cnt
                     (Evd.make_evar
-                      (val_of_named_context
-                        [(vfx,None,dummy);(vfun,None,dummy)])
+                      ((val_of_named_context
+                        [(vfx,None,dummy);(vfun,None,dummy)]),
+		       empty_rel_context_val)
                       dummy);
                   minargs := Intmap.add !cnt min !minargs;
                   lift k (mkEvar(!cnt,[|fx;ref|]))

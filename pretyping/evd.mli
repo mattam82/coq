@@ -118,6 +118,7 @@ val empty_evar_context_val : evar_context_val
 
 type evar_info
 
+val map_evar_info : (constr -> constr) -> evar_info -> evar_info
 val eq_evar_info : evar_info -> evar_info -> bool
 
 val make_evar : evar_context_val -> types -> evar_info
@@ -126,11 +127,16 @@ val evar_context : evar_info -> evar_context
 val evar_filtered_context : evar_info -> evar_context
 
 val evar_hyps : evar_info -> evar_context_val
+val evar_named_context : evar_info -> named_context
 
 val evar_body : evar_info -> evar_body
 val evar_filter : evar_info -> bool list
 val evar_unfiltered_env :  evar_info -> env
 val evar_env :  evar_info -> env
+val evar_kind : evar_info -> hole_kind located
+val evar_extra : evar_info -> Store.t
+val evar_set_extra : evar_info -> Store.t -> evar_info
+
 
 (*** Unification state ***)
 type evar_map

@@ -89,6 +89,9 @@ let evar_rel_context evi = rel_context_of_val evi.evar_rels
 let evar_context evi = evar_named_context evi, evar_rel_context evi
 let evar_body evi = evi.evar_body
 let evar_filter evi = evi.evar_filter
+let evar_extra evi = evi.evar_extra
+let evar_kind evi = evi.evar_source
+let evar_set_extra evi extra = { evi with evar_extra = extra }
 let evar_unfiltered_env evi = Global.env_of_context evi.evar_hyps
 let evar_filtered_context evi =
   snd (list_filter2 (fun b c -> b) (evar_filter evi, evar_named_context evi)), 

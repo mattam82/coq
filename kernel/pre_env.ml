@@ -83,6 +83,9 @@ let empty_env = {
 
 let nb_rel env = env.env_nb_rel
 
+let push_rel_context_val d (ctxt, vals) =
+  (d :: ctxt, ref VKnone :: vals)
+
 let push_rel d env =
   let rval = ref VKnone in
     { env with
@@ -100,6 +103,7 @@ let env_of_rel n env =
     env_rel_val = Util.list_skipn n env.env_rel_val;
     env_nb_rel = env.env_nb_rel - n
   }
+
 
 (* Named context *)
 

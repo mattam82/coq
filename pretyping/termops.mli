@@ -42,6 +42,7 @@ val push_named_rec_types : name array * types array * 'a -> env -> env
 val lookup_rel_id : identifier -> rel_context -> int * constr option * types
 
 (** builds argument lists matching a block of binders or a context *)
+(* rel_vect n m = [Rel (n+m);...;Rel(n+1)] *)
 val rel_vect : int -> int -> constr array
 val rel_list : int -> int -> constr list
 val extended_rel_list : int -> rel_context -> constr list

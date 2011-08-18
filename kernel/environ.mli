@@ -69,6 +69,7 @@ val rel_context_of_val : rel_context_val -> rel_context
 val empty_rel_context_val : rel_context_val
 val rel_vals_of_val : rel_context_val -> Pre_env.rel_vals
 val val_of_rel_context : rel_context -> rel_context_val
+val push_rel_context_val : rel_declaration -> rel_context_val -> rel_context_val
 
 (** {6 Recurrence on [rel_context] } *)
 

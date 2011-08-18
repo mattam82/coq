@@ -562,10 +562,12 @@ let first_order_unification ts env evd (ev1,l1) (term2,l2) =
 
 let choose_less_dependent_instance evk evd term args =
   let evi = Evd.find_undefined evd evk in
-  let subst = make_pure_subst evi args in
-  let subst' = List.filter (fun (id,c) -> eq_constr c term) subst in
-  if subst' = [] then error "Too complex unification problem." else
-  Evd.define evk (mkVar (fst (List.hd subst'))) evd
+  let args, subst = make_pure_subst evi args in
+  let subst' = list_map_filter (fun (id,c) -> if eq_constr c term then Some (mkVar id) else None) subst in
+  let subst'' = list_map_filter_i (fun i c -> if eq_constr c term then Some (mkRel i) else None) (Array.to_list args) in
+  let subst''' = subst'' @ subst' in
+  if subst''' = [] then error "Too complex unification problem." else
+  Evd.define evk (List.hd subst''') evd
 
 let apply_conversion_problem_heuristic ts env evd pbty t1 t2 =
   let t1 = apprec_nohdbeta ts env evd (whd_head_evar evd t1) in
@@ -600,7 +602,7 @@ let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
       let evd', b = apply_conversion_problem_heuristic ts env evd pbty t1 t2 in
 	if b then evd' else Pretype_errors.error_cannot_unify env evd (t1, t2))
     evd pbs in
-    Evd.fold_undefined (fun ev ev_info evd' -> match ev_info.evar_source with
+    Evd.fold_undefined (fun ev ev_info evd' -> match evar_kind ev_info with
 			  |_,ImpossibleCase -> 
 			     Evd.define ev (j_type (coq_unit_judge ())) evd'
 			  |_ -> evd') heuristic_solved_evd heuristic_solved_evd
