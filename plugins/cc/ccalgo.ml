@@ -91,7 +91,7 @@ module PafMap=Map.Make(struct
 			 let compare=Pervasives.compare end)
 
 type cinfo=
-    {ci_constr: constructor; (* inductive type *)
+    {ci_constr: pconstructor; (* inductive type *)
      ci_arity: int;     (* # args *)
      ci_nhyps: int}     (* # projectable args *)
 
@@ -104,12 +104,12 @@ type term=
 
 let rec term_equal t1 t2 =
   match t1, t2 with
-    | Symb c1, Symb c2 -> eq_constr c1 c2
+    | Symb c1, Symb c2 -> eq_constr_nounivs c1 c2
     | Product (s1, t1), Product (s2, t2) -> s1 = s2 && t1 = t2
     | Eps i1, Eps i2 -> Id.compare i1 i2 = 0
     | Appli (t1, u1), Appli (t2, u2) -> term_equal t1 t2 && term_equal u1 u2
-    | Constructor {ci_constr=c1; ci_arity=i1; ci_nhyps=j1},
-      Constructor {ci_constr=c2; ci_arity=i2; ci_nhyps=j2} ->
+    | Constructor {ci_constr=(c1,u1); ci_arity=i1; ci_nhyps=j1}, (* FIXME check eq? *)
+      Constructor {ci_constr=(c2,u2); ci_arity=i2; ci_nhyps=j2} ->
       i1 = i2 && j1 = j2 && eq_constructor c1 c2
     | _ -> t1 = t2
 
@@ -120,7 +120,7 @@ let rec hash_term = function
   | Product (s1, s2) -> combine3 2 (Hashtbl.hash s1) (Hashtbl.hash s2)
   | Eps i -> combine 3 (Hashtbl.hash i)
   | Appli (t1, t2) -> combine3 4 (hash_term t1) (hash_term t2)
-  | Constructor {ci_constr=c; ci_arity=i; ci_nhyps=j} -> combine4 5 (Hashtbl.hash c) i j
+  | Constructor {ci_constr=(c,u); ci_arity=i; ci_nhyps=j} -> combine4 5 (Hashtbl.hash c) i j
 
 type ccpattern =
     PApp of term * ccpattern list (* arguments are reversed *)
@@ -361,14 +361,14 @@ let _B_ = Name (Id.of_string "A")
 let _body_ =  mkProd(Anonymous,mkRel 2,mkRel 2)
 
 let cc_product s1 s2 =
-  mkLambda(_A_,mkSort(Termops.new_sort_in_family s1),
-	   mkLambda(_B_,mkSort(Termops.new_sort_in_family s2),_body_))
+  mkLambda(_A_,mkSort(Universes.new_sort_in_family s1),
+	   mkLambda(_B_,mkSort(Universes.new_sort_in_family s2),_body_))
 
 let rec constr_of_term = function
     Symb s->s
   | Product(s1,s2) -> cc_product s1 s2
   | Eps id -> mkVar id
-  | Constructor cinfo -> mkConstruct cinfo.ci_constr
+  | Constructor cinfo -> mkConstructU cinfo.ci_constr
   | Appli (s1,s2)->
       make_app [(constr_of_term s2)] s1
 and make_app l=function
@@ -378,15 +378,15 @@ and make_app l=function
 let rec canonize_name c =
   let func =  canonize_name in
     match kind_of_term c with
-      | Const kn ->
+      | Const (kn,u) ->
 	  let canon_const = constant_of_kn (canonical_con kn) in 
-	    (mkConst canon_const)
-      | Ind (kn,i) ->
+	    (mkConstU (canon_const,u))
+      | Ind ((kn,i),u) ->
 	  let canon_mind = mind_of_kn (canonical_mind kn) in
-	    (mkInd (canon_mind,i))
-      | Construct ((kn,i),j) ->
+	    (mkIndU ((canon_mind,i),u))
+      | Construct (((kn,i),j),u) ->
 	  let canon_mind = mind_of_kn (canonical_mind kn) in
-	    mkConstruct ((canon_mind,i),j) 
+	    mkConstructU (((canon_mind,i),j),u)
       | Prod (na,t,ct) ->
 	  mkProd (na,func t, func ct)
       | Lambda (na,t,ct) ->

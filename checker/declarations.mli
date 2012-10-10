@@ -17,15 +17,6 @@ type engagement = ImpredicativeSet
 
 (* Constants *)
 
-type polymorphic_arity = {
-  poly_param_levels : Univ.universe option list;
-  poly_level : Univ.universe;
-}
-
-type constant_type =
-  | NonPolymorphicType of constr
-  | PolymorphicArity of rel_context * polymorphic_arity
-
 type constr_substituted
 val force_constr : constr_substituted -> constr
 val from_val : constr -> constr_substituted
@@ -54,10 +45,12 @@ type constant_def =
   | Def of constr_substituted
   | OpaqueDef of lazy_constr
 
+(** Local variables and graph *)
+
 type constant_body = {
     const_hyps : section_context; (* New: younger hyp at top *)
     const_body : constant_def;
-    const_type : constant_type;
+    const_type : constr;
     const_body_code : to_patch_substituted;
     const_constraints : Univ.constraints;
     const_native_name : native_name ref;
@@ -81,14 +74,10 @@ val mk_paths : recarg -> wf_paths list array -> wf_paths
 val dest_recarg : wf_paths -> recarg
 val dest_subterms : wf_paths -> wf_paths list array
 
-type monomorphic_inductive_arity = {
+type inductive_arity = {
   mind_user_arity : constr;
   mind_sort : sorts;
 }
-
-type inductive_arity =
-| Monomorphic of monomorphic_inductive_arity
-| Polymorphic of polymorphic_arity
 
 type one_inductive_body = {
 

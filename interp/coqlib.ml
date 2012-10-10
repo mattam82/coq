@@ -29,7 +29,7 @@ let find_reference locstr dir s =
   with Not_found -> anomaly ~label:locstr (str "cannot find " ++ Libnames.pr_path sp)
 
 let coq_reference locstr dir s = find_reference locstr ("Coq"::dir) s
-let coq_constant locstr dir s = constr_of_global (coq_reference locstr dir s)
+let coq_constant locstr dir s = Universes.constr_of_global (coq_reference locstr dir s)
 
 let gen_reference = coq_reference
 let gen_constant = coq_constant
@@ -48,7 +48,7 @@ let gen_constant_in_modules locstr dirs s =
   let all = List.uniquize (List.map_filter global_of_extended all) in
   let these = List.filter (has_suffix_in_dirs dirs) all in
   match these with
-    | [x] -> constr_of_global x
+    | [x] -> Universes.constr_of_global x
     | [] ->
 	anomaly ~label:locstr (str ("cannot find "^s^
 	" in module"^(if List.length dirs > 1 then "s " else " ")) ++
@@ -86,6 +86,7 @@ let check_required_library d =
 let init_reference dir s = gen_reference "Coqlib" ("Init"::dir) s
 
 let init_constant dir s = gen_constant "Coqlib" ("Init"::dir) s
+let init_constant_ dir s = coq_reference "Coqlib" ("Init"::dir) s
 
 let logic_constant dir s = gen_constant "Coqlib" ("Logic"::dir) s
 
@@ -246,6 +247,32 @@ let build_coq_eq_data () =
   trans = Lazy.force coq_eq_trans;
   congr = Lazy.force coq_eq_congr }
 
+let make_dirpath dir = 
+  Names.make_dirpath (List.map id_of_string dir)
+
+let lazy_init_constant_in env dir id ctx = 
+  let c = init_constant_ dir id in
+  let pc, ctx' = Universes.fresh_global_instance env c in
+    pc, Univ.union_universe_context_set ctx ctx'
+
+let seq_ctx ma f = fun ctx ->
+  let a, ctx' = ma ctx in f a ctx'
+let ret_ctx a = fun ctx -> a, ctx
+    
+let build_coq_eq_data_in env =
+  let _ = check_required_library logic_module_name in
+  let f id = lazy_init_constant_in env ["Logic"] id in
+  let record = 
+    seq_ctx (f "eq") (fun eq ->
+    seq_ctx (f "eq_refl") (fun eq_refl ->
+    seq_ctx (f "eq_sym") (fun eq_sym ->
+    seq_ctx (f "eq_ind") (fun eq_ind ->
+    seq_ctx (f "eq_trans") (fun eq_trans ->
+    seq_ctx (f "f_equal") (fun eq_congr ->
+    ret_ctx {eq = eq; ind = eq_ind; refl = eq_refl; 
+	     sym = eq_sym; trans = eq_trans; congr = eq_congr}))))))
+  in record Univ.empty_universe_context_set
+
 let build_coq_eq () = Lazy.force coq_eq_eq
 let build_coq_eq_refl () = Lazy.force coq_eq_refl
 let build_coq_eq_sym () = Lazy.force coq_eq_sym
@@ -278,7 +305,7 @@ let build_coq_jmeq_data () =
   congr = Lazy.force coq_jmeq_congr }
 
 let join_jmeq_types eq =
-  mkLambda(Name (Id.of_string "A"),Termops.new_Type(),
+  mkLambda(Name (Id.of_string "A"),Universes.new_Type (Global.current_dirpath ()),
   mkLambda(Name (Id.of_string "x"),mkRel 1,
   mkApp (eq,[|mkRel 2;mkRel 1;mkRel 2|])))
 

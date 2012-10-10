@@ -31,6 +31,11 @@ let conv_leq_vecti env v1 v2 =
     v1
     v2
 
+let univ_check_constraints (ctx,univ) (x, cst) =
+  (* TODO: simply check inclusion of cst in ctx *)
+  let univ' = merge_constraints cst univ in
+    x, (ctx, univ')
+
 (* This should be a type (a priori without intension to be an assumption) *)
 let type_judgment env j =
   match kind_of_term(whd_betadeltaiota env j.uj_type) with
@@ -67,9 +72,10 @@ let judge_of_prop_contents = function
 (* Type of Type(i). *)
 
 let judge_of_type u =
-  let uu = super u in
-  { uj_val = mkType u;
-    uj_type = mkType uu }
+  let uu = Universe.super u in
+  let ctx = universe_context_set_of_set (Universe.levels u) in
+    ({ uj_val = mkType u;
+       uj_type = mkType uu }, ctx)
 
 (*s Type of a de Bruijn index. *)
 
@@ -109,53 +115,19 @@ let check_hyps_inclusion env c sign =
 
 (* Make a type polymorphic if an arity *)
 
-let extract_level env p =
-  let _,c = dest_prod_assum env p in
-  match kind_of_term c with Sort (Type u) -> Some u | _ -> None
-
-let extract_context_levels env l =
-  let fold l (_, b, p) = match b with
-  | None -> extract_level env p :: l
-  | _ -> l
-  in
-  List.fold_left fold [] l
-
-let make_polymorphic_if_constant_for_ind env {uj_val = c; uj_type = t} =
-  let params, ccl = dest_prod_assum env t in
-  match kind_of_term ccl with
-  | Sort (Type u) when isInd (fst (decompose_app (whd_betadeltaiota env c))) ->
-      let param_ccls = extract_context_levels env params in
-      let s = { poly_param_levels = param_ccls; poly_level = u} in
-      PolymorphicArity (params,s)
-  | _ ->
-      NonPolymorphicType t
-
 (* Type of constants *)
 
-let type_of_constant_knowing_parameters env t paramtyps =
-  match t with
-  | NonPolymorphicType t -> t
-  | PolymorphicArity (sign,ar) ->
-      let ctx = List.rev sign in
-      let ctx,s = instantiate_universes env ctx ar paramtyps in
-      mkArity (List.rev ctx,s)
+let type_of_constant env cst = constant_type env cst
+let type_of_constant_in env cst = constant_type_in env cst
+let type_of_constant_knowing_parameters env t _ = t
 
-let type_of_constant_type env t =
-  type_of_constant_knowing_parameters env t [||]
-
-let type_of_constant env cst =
-  type_of_constant_type env (constant_type env cst)
-
-let judge_of_constant_knowing_parameters env cst jl =
-  let c = mkConst cst in
+let judge_of_constant env (_,u as cst) =
+  let ctx = universe_context_set_of_ulist u in
+  let c = mkConstU cst in
   let cb = lookup_constant cst env in
   let _ = check_hyps_inclusion env c cb.const_hyps in
-  let paramstyp = Array.map (fun j -> j.uj_type) jl in
-  let t = type_of_constant_knowing_parameters env cb.const_type paramstyp in
-  make_judge c t
-
-let judge_of_constant env cst =
-  judge_of_constant_knowing_parameters env cst [||]
+  let ty, cu = type_of_constant env cst in
+    (make_judge c ty, add_constraints_ctx ctx cu)
 
 (* Type of a lambda-abstraction. *)
 
@@ -192,8 +164,8 @@ let judge_of_apply env funj argjv =
           | Prod (_,c1,c2) ->
 	      (try
 		let c = conv_leq false env hj.uj_type c1 in
-		let cst' = union_constraints cst c in
-		apply_rec (n+1) (subst1 hj.uj_val c2) cst' restjl
+		let ctx' = union_constraints cst c in
+		apply_rec (n+1) (subst1 hj.uj_val c2) ctx' restjl
 	      with NotConvertible ->
 		error_cant_apply_bad_type env
 		  (n,c1, hj.uj_type)
@@ -223,14 +195,14 @@ let sort_of_product env domsort rangsort =
           rangsort
         | _ ->
           (* Rule is (Type_i,Set,Type_i) in the Set-predicative calculus *)
-          Type (sup u1 type0_univ)
+          Type (Universe.sup Universe.type0 u1)
         end
     (* Product rule (Prop,Type_i,Type_i) *)
-    | (Prop Pos,  Type u2)  -> Type (sup type0_univ u2)
+    | (Prop Pos,  Type u2)  -> Type (Universe.sup Universe.type0 u2)
     (* Product rule (Prop,Type_i,Type_i) *)
     | (Prop Null, Type _)  -> rangsort
     (* Product rule (Type_i,Type_i,Type_i) *)
-    | (Type u1, Type u2) -> Type (sup u1 u2)
+    | (Type u1, Type u2) -> Type (Universe.sup u1 u2)
 
 (* [judge_of_product env name (typ1,s1) (typ2,s2)] implements the rule
 
@@ -274,7 +246,7 @@ let judge_of_cast env cj k tj =
     in
     { uj_val = c;
       uj_type = expected_type },
-    cst
+      cst
   with NotConvertible ->
     error_actual_type env cj expected_type
 
@@ -292,50 +264,57 @@ let judge_of_cast env cj k tj =
    the App case of execute; from this constraints, the expected
    dynamic constraints of the form u<=v are enforced *)
 
-let judge_of_inductive_knowing_parameters env ind jl =
-  let c = mkInd ind in
+(* let judge_of_inductive_knowing_parameters env ind jl = *)
+(*   let c = mkInd ind in *)
+(*   let (mib,mip) = lookup_mind_specif env ind in *)
+(*   check_args env c mib.mind_hyps; *)
+(*   let paramstyp = Array.map (fun j -> j.uj_type) jl in *)
+(*   let t =  in *)
+(*   make_judge c t *)
+
+let judge_of_inductive env (ind,u as indu) =
+  let c = mkIndU indu in
   let (mib,mip) = lookup_mind_specif env ind in
   check_hyps_inclusion env c mib.mind_hyps;
-  let paramstyp = Array.map (fun j -> j.uj_type) jl in
-  let t = Inductive.type_of_inductive_knowing_parameters env mip paramstyp in
-  make_judge c t
-
-let judge_of_inductive env ind =
-  judge_of_inductive_knowing_parameters env ind [||]
+  let ctx = universe_context_set_of_ulist u in
+  let t,cst = Inductive.constrained_type_of_inductive env ((mib,mip),u) in
+    (make_judge c t, Univ.add_constraints_ctx ctx cst)
 
 (* Constructors. *)
 
-let judge_of_constructor env c =
-  let constr = mkConstruct c in
+let judge_of_constructor env (c,u as cu) =
+  let constr = mkConstructU cu in
   let _ =
     let ((kn,_),_) = c in
     let mib = lookup_mind kn env in
     check_hyps_inclusion env constr mib.mind_hyps in
   let specif = lookup_mind_specif env (inductive_of_constructor c) in
-  make_judge constr (type_of_constructor c specif)
+  let ctx = universe_context_set_of_ulist u in
+  let t,cst = constrained_type_of_constructor cu specif in
+    (make_judge constr t, Univ.add_constraints_ctx ctx cst)
 
 (* Case. *)
 
-let check_branch_types env ind cj (lfj,explft) =
+let check_branch_types env (ind,u) cj (lfj,explft) =
   try conv_leq_vecti env (Array.map j_type lfj) explft
   with
       NotConvertibleVect i ->
-        error_ill_formed_branch env cj.uj_val (ind,i+1) lfj.(i).uj_type explft.(i)
+        error_ill_formed_branch env cj.uj_val ((ind,i+1),u) lfj.(i).uj_type explft.(i)
     | Invalid_argument _ ->
         error_number_branches env cj (Array.length explft)
 
 let judge_of_case env ci pj cj lfj =
-  let indspec =
+  let (pind, _ as indspec) =
     try find_rectype env cj.uj_type
     with Not_found -> error_case_not_inductive env cj in
-  let _ = check_case_info env (fst indspec) ci in
+  let _ = check_case_info env pind ci in
   let (bty,rslty,univ) =
     type_case_branches env indspec pj cj.uj_val in
-  let univ' = check_branch_types env (fst indspec) cj (lfj,bty) in
+  let univ' = check_branch_types env pind cj (lfj,bty) in
   ({ uj_val  = mkCase (ci, (*nf_betaiota*) pj.uj_val, cj.uj_val,
                        Array.map j_val lfj);
      uj_type = rslty },
-  union_constraints univ univ')
+   (union_constraints univ univ'))
 
 (* Fixpoints. *)
 
@@ -356,8 +335,11 @@ let type_fixpoint env lna lar vdefj =
 (* This combinator adds the universe constraints both in the local
    graph and in the universes of the environment. This is to ensure
    that the infered local graph is satisfiable. *)
-let univ_combinator (cst,univ) (j,c') =
-  (j,(union_constraints cst c', merge_constraints c' univ))
+let univ_combinator (ctx,univ) (j,ctx') =
+  (j,(union_universe_context_set ctx ctx', merge_constraints (snd ctx') univ))
+
+let univ_combinator_cst (ctx,univ) (j,cst) =
+  (j,(union_universe_context_set ctx (Univ.LSet.empty, cst), merge_constraints cst univ))
 
 (* The typing machine. *)
     (* ATTENTION : faudra faire le typage du contexte des Const,
@@ -370,7 +352,7 @@ let rec execute env cstr cu =
 	(judge_of_prop_contents c, cu)
 
     | Sort (Type u) ->
-	(judge_of_type u, cu)
+       univ_combinator cu (judge_of_type u)
 
     | Rel n ->
 	(judge_of_relative env n, cu)
@@ -379,24 +361,24 @@ let rec execute env cstr cu =
 	(judge_of_variable env id, cu)
 
     | Const c ->
-        (judge_of_constant env c, cu)
+        univ_combinator cu (judge_of_constant env c)
 
     (* Lambda calculus operators *)
     | App (f,args) ->
         let (jl,cu1) = execute_array env args cu in
 	let (j,cu2) =
-	  match kind_of_term f with
-	    | Ind ind ->
-		(* Sort-polymorphism of inductive types *)
-		judge_of_inductive_knowing_parameters env ind jl, cu1
-	    | Const cst ->
-		(* Sort-polymorphism of constant *)
-		judge_of_constant_knowing_parameters env cst jl, cu1
-	    | _ ->
-		(* No sort-polymorphism *)
+	  (* match kind_of_term f with *)
+	  (*   | Ind ind -> *)
+	  (* 	(\* Sort-polymorphism of inductive types *\) *)
+	  (* 	judge_of_inductive_knowing_parameters env ind jl, cu1 *)
+	  (*   | Const cst -> *)
+	  (* 	(\* Sort-polymorphism of constant *\) *)
+	  (* 	judge_of_constant_knowing_parameters env cst jl, cu1 *)
+	  (*   | _ -> *)
+	  (* 	(\* No sort-polymorphism *\) *)
 		execute env f cu1
 	in
-	univ_combinator cu2 (judge_of_apply env j jl)
+	univ_combinator_cst cu2 (judge_of_apply env j jl)
 
     | Lambda (name,c1,c2) ->
         let (varj,cu1) = execute_type env c1 cu in
@@ -414,7 +396,7 @@ let rec execute env cstr cu =
         let (j1,cu1) = execute env c1 cu in
         let (j2,cu2) = execute_type env c2 cu1 in
         let (_,cu3) =
-	  univ_combinator cu2 (judge_of_cast env j1 DEFAULTcast j2) in
+	  univ_check_constraints cu2 (judge_of_cast env j1 DEFAULTcast j2) in
         let env1 = push_rel (name,Some j1.uj_val,j2.utj_val) env in
         let (j',cu4) = execute env1 c3 cu3 in
         (judge_of_letin env name j1 j2 j', cu4)
@@ -422,21 +404,21 @@ let rec execute env cstr cu =
     | Cast (c,k, t) ->
         let (cj,cu1) = execute env c cu in
         let (tj,cu2) = execute_type env t cu1 in
-	univ_combinator cu2
+	univ_combinator_cst cu2
           (judge_of_cast env cj k tj)
 
     (* Inductive types *)
     | Ind ind ->
-	(judge_of_inductive env ind, cu)
+       univ_combinator cu (judge_of_inductive env ind)
 
     | Construct c ->
-	(judge_of_constructor env c, cu)
+       univ_combinator cu (judge_of_constructor env c)
 
     | Case (ci,p,c,lf) ->
         let (cj,cu1) = execute env c cu in
         let (pj,cu2) = execute env p cu1 in
         let (lfj,cu3) = execute_array env lf cu2 in
-        univ_combinator cu3
+        univ_combinator_cst cu3
           (judge_of_case env ci pj cj lfj)
 
     | Fix ((vn,i as vni),recdef) ->
@@ -470,49 +452,48 @@ and execute_recdef env (names,lar,vdef) i cu =
   let vdefv = Array.map j_val vdefj in
   let cst = type_fixpoint env1 names lara vdefj in
   univ_combinator cu2
-    ((lara.(i),(names,lara,vdefv)),cst)
+    ((lara.(i),(names,lara,vdefv)), (Univ.LSet.empty, cst))
 
 and execute_array env = Array.fold_map' (execute env)
 
 (* Derived functions *)
 let infer env constr =
-  let (j,(cst,_)) =
-    execute env constr (empty_constraint, universes env) in
-  assert (eq_constr j.uj_val constr);
-  (j, cst)
+  let univs = (empty_universe_context_set, universes env) in
+  let (j,(cst,_)) = execute env constr univs in
+    assert (eq_constr j.uj_val constr);
+    j, cst
 
 let infer_type env constr =
-  let (j,(cst,_)) =
-    execute_type env constr (empty_constraint, universes env) in
-  (j, cst)
+  let univs = (empty_universe_context_set, universes env) in
+  let (j,(cst,_)) = execute_type env constr univs in
+    j, cst
 
 let infer_v env cv =
-  let (jv,(cst,_)) =
-    execute_array env cv (empty_constraint, universes env) in
-  (jv, cst)
+  let univs = (empty_universe_context_set, universes env) in
+  let (jv,(cst,_)) = execute_array env cv univs in
+    jv, cst
 
 (* Typing of several terms. *)
 
 let infer_local_decl env id = function
   | LocalDef c ->
-      let (j,cst) = infer env c in
+      let j, cst = infer env c in
       (Name id, Some j.uj_val, j.uj_type), cst
   | LocalAssum c ->
-      let (j,cst) = infer env c in
+      let j, cst = infer env c in
       (Name id, None, assumption_of_judgment env j), cst
 
 let infer_local_decls env decls =
   let rec inferec env = function
   | (id, d) :: l ->
-      let env, l, cst1 = inferec env l in
-      let d, cst2 = infer_local_decl env id d in
-      push_rel d env, add_rel_decl d l, union_constraints cst1 cst2
-  | [] -> env, empty_rel_context, empty_constraint in
+      let (env, l), ctx = inferec env l in
+      let d, ctx' = infer_local_decl env id d in
+	(push_rel d env, add_rel_decl d l), union_universe_context_set ctx' ctx
+  | [] -> (env, empty_rel_context), empty_universe_context_set in
   inferec env decls
 
 (* Exported typing functions *)
 
 let typing env c =
-  let (j,cst) = infer env c in
-  let _ = add_constraints cst env in
-  j
+  let j, cst = infer env c in
+    j, cst

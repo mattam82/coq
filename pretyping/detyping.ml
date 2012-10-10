@@ -70,10 +70,7 @@ module PrintingInductiveMake =
   struct
     type t = inductive
     let encode = Test.encode
-    let subst subst (kn, ints as obj) =
-      let kn' = subst_ind subst kn in
-	if kn' == kn then obj else
-	  kn', ints
+    let subst subst obj = subst_ind subst obj
     let printer ind = pr_global_env Id.Set.empty (IndRef ind)
     let key = ["Printing";Test.field]
     let title = Test.title
@@ -367,7 +364,7 @@ let detype_sort = function
   | Type u ->
     GType
       (if !print_universes
-       then Some (Pp.string_of_ppcmds (Univ.pr_uni u))
+       then Some (Pp.string_of_ppcmds (Univ.Universe.pr u))
        else None)
 
 type binder_kind = BProd | BLambda | BLetIn
@@ -377,6 +374,8 @@ type binder_kind = BProd | BLambda | BLetIn
 
 let detype_anonymous = ref (fun loc n -> anomaly ~label:"detype" (Pp.str "index to an anonymous variable"))
 let set_detype_anonymous f = detype_anonymous := f
+
+let option_of_list l = match l with [] -> None | _ -> Some l
 
 let rec detype (isgoal:bool) avoid env t =
   match kind_of_term (collapse_appl t) with
@@ -392,7 +391,7 @@ let rec detype (isgoal:bool) avoid env t =
 	GEvar (dl, n, None)
     | Var id ->
 	(try
-	  let _ = Global.lookup_named id in GRef (dl, VarRef id)
+	  let _ = Global.lookup_named id in GRef (dl, VarRef id,None)
 	 with _ ->
 	  GVar (dl, id))
     | Sort s -> GSort (dl,detype_sort s)
@@ -413,14 +412,14 @@ let rec detype (isgoal:bool) avoid env t =
     | App (f,args) ->
 	GApp (dl,detype isgoal avoid env f,
               Array.map_to_list (detype isgoal avoid env) args)
-    | Const sp -> GRef (dl, ConstRef sp)
+    | Const (sp,u) -> GRef (dl, ConstRef sp, option_of_list u)
     | Evar (ev,cl) ->
         GEvar (dl, ev,
                Some (List.map (detype isgoal avoid env) (Array.to_list cl)))
-    | Ind ind_sp ->
-	GRef (dl, IndRef ind_sp)
-    | Construct cstr_sp ->
-	GRef (dl, ConstructRef cstr_sp)
+    | Ind (ind_sp,u) ->
+	GRef (dl, IndRef ind_sp, option_of_list u)
+    | Construct (cstr_sp,u) ->
+	GRef (dl, ConstructRef cstr_sp, option_of_list u)
     | Case (ci,p,c,bl) ->
 	let comp = computable p (ci.ci_pp_info.ind_nargs) in
 	detype_case comp (detype isgoal avoid env)
@@ -585,14 +584,14 @@ let rec subst_cases_pattern subst pat =
   match pat with
   | PatVar _ -> pat
   | PatCstr (loc,((kn,i),j),cpl,n) ->
-      let kn' = subst_ind subst kn
+      let kn' = subst_mind subst kn
       and cpl' = List.smartmap (subst_cases_pattern subst) cpl in
 	if kn' == kn && cpl' == cpl then pat else
 	  PatCstr (loc,((kn',i),j),cpl',n)
 
 let rec subst_glob_constr subst raw =
   match raw with
-  | GRef (loc,ref) ->
+  | GRef (loc,ref,u) ->
       let ref',t = subst_global subst ref in
 	if ref' == ref then raw else
          detype false [] [] t
@@ -629,7 +628,7 @@ let rec subst_glob_constr subst raw =
         let (n,topt) = x in
         let topt' = Option.smartmap
           (fun (loc,(sp,i),y as t) ->
-            let sp' = subst_ind subst sp in
+            let sp' = subst_mind subst sp in
             if sp == sp' then t else (loc,(sp',i),y)) topt in
         if a == a' && topt == topt' then y else (a',(n,topt'))) rl
       and branches' = List.smartmap

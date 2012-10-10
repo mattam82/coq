@@ -111,9 +111,9 @@ let rec head_pattern_bound t =
     | PCoFix _ -> anomaly ~label:"head_pattern_bound" (Pp.str "not a type")
 
 let head_of_constr_reference c = match kind_of_term c with
-  | Const sp -> ConstRef sp
-  | Construct sp -> ConstructRef sp
-  | Ind sp -> IndRef sp
+  | Const (sp,_) -> ConstRef sp
+  | Construct (sp,_) -> ConstructRef sp
+  | Ind (sp,_) -> IndRef sp
   | Var id -> VarRef id
   | _ -> anomaly (Pp.str "Not a rigid reference")
 
@@ -144,9 +144,9 @@ let pattern_of_constr sigma t =
           with
             | Some n -> PSoApp (n,Array.to_list (Array.map pattern_of_constr a))
             | None -> PApp (pattern_of_constr f,Array.map (pattern_of_constr) a))
-    | Const sp         -> PRef (ConstRef (constant_of_kn(canonical_con sp)))
-    | Ind sp        -> PRef (canonical_gr (IndRef sp))
-    | Construct sp -> PRef (canonical_gr (ConstructRef sp))
+    | Const (sp,u)  -> PRef (ConstRef (constant_of_kn(canonical_con sp)))
+    | Ind (sp,u)    -> PRef (canonical_gr (IndRef sp))
+    | Construct (sp,u) -> PRef (canonical_gr (ConstructRef sp))
     | Evar (evk,ctxt as ev) ->
         (match snd (Evd.evar_source evk sigma) with
           | Evar_kinds.MatchingVar (b,id) ->
@@ -270,7 +270,7 @@ let rec subst_pattern subst pat =
 	  PIf (c',c1',c2')
   | PCase (cip,typ,c,branches) ->
       let ind = cip.cip_ind in
-      let ind' = Option.smartmap (Inductiveops.subst_inductive subst) ind in
+      let ind' = Option.smartmap (subst_ind subst) ind in
       let cip' = if ind' == ind then cip else { cip with cip_ind = ind' } in
       let typ' = subst_pattern subst typ in
       let c' = subst_pattern subst c in
@@ -304,7 +304,7 @@ let rec pat_of_raw metas vars = function
        with Not_found -> PVar id)
   | GPatVar (_,(false,n)) ->
       metas := n::!metas; PMeta (Some n)
-  | GRef (_,gr) ->
+  | GRef (_,gr,_) ->
       PRef (canonical_gr gr)
   (* Hack pour ne pas réécrire une interprétation complète des patterns*)
   | GApp (_, GPatVar (_,(true,n)), cl) ->

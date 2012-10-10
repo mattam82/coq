@@ -104,8 +104,8 @@ let free_vars_of_constr_expr c ?(bound=Id.Set.empty) l =
     else l
   in
   let rec aux bdvars l c = match c with
-    | CRef (Ident (loc,id)) -> found loc id bdvars l
-    | CNotation (_, "{ _ : _ | _ }", (CRef (Ident (_, id)) :: _, [], [])) when not (Id.Set.mem id bdvars) ->
+    | CRef (Ident (loc,id),_) -> found loc id bdvars l
+    | CNotation (_, "{ _ : _ | _ }", (CRef (Ident (_, id),_) :: _, [], [])) when not (Id.Set.mem id bdvars) ->
 	Topconstr.fold_constr_expr_with_binders (fun a l -> Id.Set.add a l) aux (Id.Set.add id bdvars) l c
     | c -> Topconstr.fold_constr_expr_with_binders (fun a l -> Id.Set.add a l) aux bdvars l c
   in aux bound l c
@@ -255,19 +255,19 @@ let combine_params avoid fn applied needed =
 let combine_params_freevar =
   fun avoid (_, (na, _, _)) ->
     let id' = next_name_away_from na avoid in
-      (CRef (Ident (Loc.ghost, id')), Id.Set.add id' avoid)
+      (CRef (Ident (Loc.ghost, id'),None), Id.Set.add id' avoid)
 
 let destClassApp cl =
   match cl with
-    | CApp (loc, (None, CRef ref), l) -> loc, ref, List.map fst l
-    | CAppExpl (loc, (None, ref), l) -> loc, ref, l
-    | CRef ref -> loc_of_reference ref, ref, []
+    | CApp (loc, (None, CRef (ref,_)), l) -> loc, ref, List.map fst l
+    | CAppExpl (loc, (None, ref,_), l) -> loc, ref, l
+    | CRef (ref,_) -> loc_of_reference ref, ref, []
     | _ -> raise Not_found
 
 let destClassAppExpl cl =
   match cl with
-    | CApp (loc, (None, CRef ref), l) -> loc, ref, l
-    | CRef ref -> loc_of_reference ref, ref, []
+    | CApp (loc, (None, CRef (ref,_)), l) -> loc, ref, l
+    | CRef (ref,_) -> loc_of_reference ref, ref, []
     | _ -> raise Not_found
 
 let implicit_application env ?(allow_partial=true) f ty =
@@ -299,7 +299,7 @@ let implicit_application env ?(allow_partial=true) f ty =
 	    end;
 	  let pars = List.rev (List.combine ci rd) in
 	  let args, avoid = combine_params avoid f par pars in
-	    CAppExpl (loc, (None, id), args), avoid
+	    CAppExpl (loc, (None, id, None), args), avoid
 	in c, avoid
 
 let implicits_of_glob_constr ?(with_products=true) l =

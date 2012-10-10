@@ -43,7 +43,7 @@ module SearchBlacklist =
 
 let print_constructors indsp fn env nconstr =
   for i = 1 to nconstr do
-    fn (ConstructRef (indsp,i)) env (Inductiveops.type_of_constructor env (indsp,i))
+    fn (ConstructRef (indsp,i)) env (fst (Inductiveops.type_of_constructor_in_ctx env (indsp,i)))
   done
 
 let rec head_const c = match kind_of_term c with
@@ -64,18 +64,18 @@ let gen_crible refopt (fn : global_reference -> env -> constr -> unit) =
            begin match refopt with
            | None ->
              fn (VarRef id) env typ
-           | Some r when eq_constr (head_const typ) (constr_of_global r) ->
+           | Some r when Globnames.is_global r (head_const typ) ->
 	     fn (VarRef id) env typ
            | _ -> ()
            end
 	 with Not_found -> (* we are in a section *) ())
     | "CONSTANT" ->
 	let cst = Global.constant_of_delta_kn kn in
-	let typ = Typeops.type_of_constant env cst in
+	let typ,ctx = Environ.constant_type_in_ctx env cst in
         begin match refopt with
         | None ->
           fn (ConstRef cst) env typ
-        | Some r when eq_constr (head_const typ) (constr_of_global r) ->
+        | Some r when Globnames.is_global r (head_const typ) ->
           fn (ConstRef cst) env typ
         | _ -> ()
         end
@@ -190,7 +190,7 @@ let raw_search search_function extra_filter display_function pat =
   let env = Global.env() in
   List.iter
     (fun (gr,_,_) ->
-       let typ = Global.type_of_global gr in
+       let typ = Global.type_of_global_unsafe gr in
        if extra_filter gr env typ then
 	 display_function gr env typ
     ) (search_function pat)

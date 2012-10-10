@@ -101,8 +101,8 @@ open Dn
 let constr_val_discr t =
   let c, l = decomp t in
     match kind_of_term c with
-    | Ind ind_sp -> Label(GRLabel (IndRef ind_sp),l)
-    | Construct cstr_sp -> Label(GRLabel (ConstructRef cstr_sp),l)
+    | Ind (ind_sp,u) -> Label(GRLabel (IndRef ind_sp),l)
+    | Construct (cstr_sp,u) -> Label(GRLabel (ConstructRef cstr_sp),l)
     | Var id -> Label(GRLabel (VarRef id),l)
     | Const _ -> Everything
     | _ -> Nothing
@@ -110,9 +110,9 @@ let constr_val_discr t =
 let constr_val_discr_st (idpred,cpred) t =
   let c, l = decomp t in
     match kind_of_term c with
-    | Const c -> if Cpred.mem c cpred then Everything else Label(GRLabel (ConstRef c),l)
-    | Ind ind_sp -> Label(GRLabel (IndRef ind_sp),l)
-    | Construct cstr_sp -> Label(GRLabel (ConstructRef cstr_sp),l)
+    | Const (c,_) -> if Cpred.mem c cpred then Everything else Label(GRLabel (ConstRef c),l)
+    | Ind (ind_sp,_) -> Label(GRLabel (IndRef ind_sp),l)
+    | Construct (cstr_sp,_) -> Label(GRLabel (ConstructRef cstr_sp),l)
     | Var id when not (Id.Pred.mem id idpred) -> Label(GRLabel (VarRef id),l)
     | Prod (n, d, c) -> Label(ProdLabel, [d; c])
     | Lambda (n, d, c) -> Label(LambdaLabel, [d; c] @ l)

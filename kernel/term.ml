@@ -61,7 +61,7 @@ type sorts =
 
 let prop_sort = Prop Null
 let set_sort = Prop Pos
-let type1_sort = Type type1_univ
+let type1_sort = Type Universe.type1
 
 let sorts_ord s1 s2 =
   if s1 == s2 then 0 else
@@ -79,8 +79,12 @@ let sorts_ord s1 s2 =
 let sorts_eq s1 s2 = Int.equal (sorts_ord s1 s2) 0
 
 let is_prop_sort = function
-| Prop Null -> true
-| _ -> false
+  | Prop Null -> true
+  | _ -> false
+
+let is_set_sort = function
+  | Prop Pos -> true
+  | _ -> false
 
 type sorts_family = InProp | InSet | InType
 
@@ -88,6 +92,16 @@ let family_of_sort = function
   | Prop Null -> InProp
   | Prop Pos -> InSet
   | Type _ -> InType
+
+let univ_of_sort = function
+  | Type u -> u
+  | Prop Pos -> Universe.type0
+  | Prop Null -> Universe.type0m
+
+let sort_of_univ u =
+  if is_type0m_univ u then Prop Null
+  else if is_type0_univ u then Prop Pos
+  else Type u
 
 (********************************************************************)
 (*       Constructions as implemented                               *)
@@ -102,6 +116,12 @@ type ('constr, 'types) pfixpoint =
     (int array * int) * ('constr, 'types) prec_declaration
 type ('constr, 'types) pcofixpoint =
     int * ('constr, 'types) prec_declaration
+type 'a puniverses = 'a * universe list
+
+(** Simply type aliases *)
+type pconstant = constant puniverses
+type pinductive = inductive puniverses
+type pconstructor = constructor puniverses
 
 (* [Var] is used for named variables and [Rel] for variables as
    de Bruijn indices. *)
@@ -116,9 +136,9 @@ type ('constr, 'types) kind_of_term =
   | Lambda    of Name.t * 'types * 'constr
   | LetIn     of Name.t * 'constr * 'types * 'constr
   | App       of 'constr * 'constr array
-  | Const     of constant
-  | Ind       of inductive
-  | Construct of constructor
+  | Const     of pconstant
+  | Ind       of pinductive
+  | Construct of pconstructor
   | Case      of case_info * 'constr * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
@@ -179,21 +199,28 @@ let mkApp (f, a) =
       | _ -> App (f, a)
 
 (* Constructs a constant *)
-let mkConst c = Const c
+let mkConst c = Const (c, [])
+let mkConstU c = Const c
 
 (* Constructs an existential variable *)
 let mkEvar e = Evar e
 
 (* Constructs the ith (co)inductive type of the block named kn *)
-let mkInd m = Ind m
+let mkInd m = Ind (m, [])
+let mkIndU m = Ind m
 
 (* Constructs the jth constructor of the ith (co)inductive type of the
    block named kn. The array of terms correspond to the variables
    introduced in the section *)
-let mkConstruct c = Construct c
+let mkConstruct c = Construct (c, [])
+let mkConstructU c = Construct c
+let mkConstructUi ((ind,u),i) = Construct ((ind,i),u)
 
 (* Constructs the term <p>Case c of c1 | c2 .. | cn end *)
 let mkCase (ci, p, c, ac) = Case (ci, p, c, ac)
+
+let out_punivs (a, _) = a
+let map_puniverses f (x,u) = (f x, u)
 
 (* If recindxs = [|i1,...in|]
       funnames = [|f1,...fn|]
@@ -322,7 +349,7 @@ let rec is_Type c = match kind_of_term c with
 
 let is_small = function
   | Prop _ -> true
-  | _ -> false
+  | Type u -> is_small_univ u
 
 let iskind c = isprop c or is_Type c
 
@@ -575,13 +602,12 @@ let map_constr_with_binders g f l c = match kind_of_term c with
    application associativity, binders name and Cases annotations are
    not taken into account *)
 
-
-let compare_constr f t1 t2 =
+let compare_constr eq_universes eq_sorts f t1 t2 =
   match kind_of_term t1, kind_of_term t2 with
   | Rel n1, Rel n2 -> Int.equal n1 n2
   | Meta m1, Meta m2 -> Int.equal m1 m2
   | Var id1, Var id2 -> Id.equal id1 id2
-  | Sort s1, Sort s2 -> Int.equal (sorts_ord s1 s2) 0
+  | Sort s1, Sort s2 -> eq_sorts s1 s2
   | Cast (c1,_,_), _ -> f c1 t2
   | _, Cast (c2,_,_) -> f t1 c2
   | Prod (_,t1,c1), Prod (_,t2,c2) -> f t1 t2 && f c1 c2
@@ -593,9 +619,9 @@ let compare_constr f t1 t2 =
     Int.equal (Array.length l1) (Array.length l2) &&
       f c1 c2 && Array.equal f l1 l2
   | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 && Array.equal f l1 l2
-  | Const c1, Const c2 -> eq_constant c1 c2
-  | Ind c1, Ind c2 -> eq_ind c1 c2
-  | Construct c1, Construct c2 -> eq_constructor c1 c2
+  | Const (c1,u1), Const (c2,u2) -> eq_constant c1 c2 && eq_universes u1 u2
+  | Ind (c1,u1), Ind (c2,u2) -> eq_ind c1 c2 && eq_universes u1 u2
+  | Construct (c1,u1), Construct (c2,u2) -> eq_constructor c1 c2 && eq_universes u1 u2
   | Case (_,p1,c1,bl1), Case (_,p2,c2,bl2) ->
       f p1 p2 & f c1 c2 && Array.equal f bl1 bl2
   | Fix ((ln1, i1),(_,tl1,bl1)), Fix ((ln2, i2),(_,tl2,bl2)) ->
@@ -605,16 +631,153 @@ let compare_constr f t1 t2 =
       Int.equal ln1 ln2 && Array.equal f tl1 tl2 && Array.equal f bl1 bl2
   | _ -> false
 
+let compare_constr_leq eq_universes eq_sorts leq_sorts eq leq t1 t2 =
+  match kind_of_term t1, kind_of_term t2 with
+  | Rel n1, Rel n2 -> Int.equal n1 n2
+  | Meta m1, Meta m2 -> Int.equal m1 m2
+  | Var id1, Var id2 -> Int.equal (id_ord id1 id2) 0
+  | Sort s1, Sort s2 -> leq_sorts s1 s2
+  | Cast (c1,_,_), _ -> leq c1 t2
+  | _, Cast (c2,_,_) -> leq t1 c2
+  | Prod (_,t1,c1), Prod (_,t2,c2) -> eq t1 t2 && leq c1 c2
+  | Lambda (_,t1,c1), Lambda (_,t2,c2) -> eq t1 t2 && eq c1 c2
+  | LetIn (_,b1,t1,c1), LetIn (_,b2,t2,c2) -> eq b1 b2 && eq t1 t2 && leq c1 c2
+  | App (c1,l1), _ when isCast c1 -> leq (mkApp (pi1 (destCast c1),l1)) t2
+  | _, App (c2,l2) when isCast c2 -> leq t1 (mkApp (pi1 (destCast c2),l2))
+  | App (c1,l1), App (c2,l2) ->
+    Int.equal (Array.length l1) (Array.length l2) &&
+      eq c1 c2 && Array.equal eq l1 l2
+  | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 && Array.equal eq l1 l2
+  | Const (c1,u1), Const (c2,u2) -> eq_constant c1 c2 && eq_universes u1 u2
+  | Ind (c1,u1), Ind (c2,u2) -> eq_ind c1 c2 && eq_universes u1 u2
+  | Construct (c1,u1), Construct (c2,u2) -> eq_constructor c1 c2 && eq_universes u1 u2
+  | Case (_,p1,c1,bl1), Case (_,p2,c2,bl2) ->
+      eq p1 p2 & eq c1 c2 && Array.equal eq bl1 bl2
+  | Fix ((ln1, i1),(_,tl1,bl1)), Fix ((ln2, i2),(_,tl2,bl2)) ->
+      Int.equal i1 i2 && Array.equal Int.equal ln1 ln2
+      && Array.equal eq tl1 tl2 && Array.equal eq bl1 bl2
+  | CoFix(ln1,(_,tl1,bl1)), CoFix(ln2,(_,tl2,bl2)) ->
+      Int.equal ln1 ln2 && Array.equal eq tl1 tl2 && Array.equal eq bl1 bl2
+  | _ -> false
+
 (*******************************)
 (*  alpha conversion functions *)
 (*******************************)
 
 (* alpha conversion : ignore print names and casts *)
 
+let eq_sorts s1 s2 = Int.equal (sorts_ord s1 s2) 0
+
 let rec eq_constr m n =
-  (m == n) || compare_constr eq_constr m n
+  (m == n) || compare_constr UList.eq eq_sorts eq_constr m n
 
 let eq_constr m n = eq_constr m n (* to avoid tracing a recursive fun *)
+
+let eq_constr_univs m n =
+  if m == n then true, Constraint.empty
+  else 
+    let cstrs = ref Constraint.empty in
+    let eq_univs l l' = 
+      try cstrs := Univ.enforce_eq l l' !cstrs; true
+      with _ -> false
+    in
+    let eq_universes l l' = 
+      try List.for_all2 eq_univs l l'
+      with Invalid_argument _ -> anomaly (Pp.str"Ill-formed universe instance")
+    in
+    let eq_sorts s1 s2 = 
+      try cstrs := Univ.enforce_eq (univ_of_sort s1) (univ_of_sort s2) !cstrs; true
+      with _ -> false
+    in
+    let rec eq_constr' m n = 
+      m == n ||	compare_constr eq_universes eq_sorts eq_constr' m n
+    in
+    let res = compare_constr eq_universes eq_sorts eq_constr' m n in
+      res, !cstrs
+
+let leq_constr_univs m n =
+  if m == n then true, Constraint.empty
+  else 
+    let cstrs = ref Constraint.empty in
+    let eq_univs l l' = 
+      try cstrs := Univ.enforce_eq l l' !cstrs; true
+      with _ -> false
+    in
+    let eq_universes l l' = 
+      try List.for_all2 eq_univs l l'
+      with Invalid_argument _ -> anomaly (Pp.str"Ill-formed universe instance")
+    in
+    let eq_sorts s1 s2 = 
+      try cstrs := Univ.enforce_eq (univ_of_sort s1) (univ_of_sort s2) !cstrs; true
+      with _ -> false
+    in
+    let leq_sorts s1 s2 = 
+      try cstrs := Univ.enforce_leq (univ_of_sort s1) (univ_of_sort s2) !cstrs; true
+      with _ -> false
+    in
+    let rec eq_constr' m n = 
+      m == n ||	compare_constr eq_universes eq_sorts eq_constr' m n
+    in
+    let rec compare_leq m n =
+      compare_constr_leq eq_universes eq_sorts leq_sorts eq_constr' leq_constr' m n
+    and leq_constr' m n = m == n || compare_leq m n in
+    let res = compare_leq m n in
+      res, !cstrs
+
+let eq_constr_universes m n =
+  if m == n then true, UniverseConstraints.empty
+  else 
+    let cstrs = ref UniverseConstraints.empty in
+    let eq_univs l l' = 
+      cstrs := Univ.UniverseConstraints.add (l,Univ.ULub,l') !cstrs; true
+    in
+    let eq_universes l l' = 
+      try List.for_all2 eq_univs l l'
+      with Invalid_argument _ -> anomaly (Pp.str"Ill-formed universe instance")
+    in
+    let eq_sorts s1 s2 = 
+      cstrs := Univ.UniverseConstraints.add (univ_of_sort s1, Univ.UEq, univ_of_sort s2) !cstrs;
+      true
+    in
+    let rec eq_constr' m n = 
+      m == n ||	compare_constr eq_universes eq_sorts eq_constr' m n
+    in
+    let res = compare_constr eq_universes eq_sorts eq_constr' m n in
+      res, !cstrs
+
+let leq_constr_universes m n =
+  if m == n then true, UniverseConstraints.empty
+  else 
+    let cstrs = ref UniverseConstraints.empty in
+    let eq_univs l l' = 
+      cstrs := Univ.UniverseConstraints.add (l,Univ.ULub,l') !cstrs; true
+    in
+    let eq_universes l l' = 
+      try List.for_all2 eq_univs l l'
+      with Invalid_argument _ -> anomaly (Pp.str"Ill-formed universe instance")
+    in
+    let eq_sorts s1 s2 = 
+      cstrs := Univ.UniverseConstraints.add (univ_of_sort s1,Univ.UEq,univ_of_sort s2) !cstrs; true
+    in
+    let leq_sorts s1 s2 = 
+      cstrs := Univ.UniverseConstraints.add (univ_of_sort s1,Univ.ULe,univ_of_sort s2) !cstrs; true
+    in
+    let rec eq_constr' m n = 
+      m == n ||	compare_constr eq_universes eq_sorts eq_constr' m n
+    in
+    let rec compare_leq m n =
+      compare_constr_leq eq_universes eq_sorts leq_sorts eq_constr' leq_constr' m n
+    and leq_constr' m n = m == n || compare_leq m n in
+    let res = compare_leq m n in
+      res, !cstrs
+
+let always_true _ _ = true
+
+let rec eq_constr_nounivs m n =
+  (m == n) || compare_constr always_true always_true eq_constr_nounivs m n
+
+(** Strict equality of universe instances. *)
+let compare_constr = compare_constr UList.eq eq_sorts
 
 let constr_ord_int f t1 t2 =
   let (=?) f g i1 i2 j1 j2=
@@ -640,9 +803,9 @@ let constr_ord_int f t1 t2 =
     | App (c1,l1), App (c2,l2) -> (f =? (Array.compare f)) c1 c2 l1 l2
     | Evar (e1,l1), Evar (e2,l2) ->
 	((-) =? (Array.compare f)) e1 e2 l1 l2
-    | Const c1, Const c2 -> con_ord c1 c2
-    | Ind ind1, Ind ind2 -> ind_ord ind1 ind2
-    | Construct ct1, Construct ct2 -> constructor_ord ct1 ct2
+    | Const (c1,u1), Const (c2,u2) -> con_ord c1 c2
+    | Ind (ind1, u1), Ind (ind2, u2) -> ind_ord ind1 ind2
+    | Construct (ct1,u1), Construct (ct2,u2) -> constructor_ord ct1 ct2
     | Case (_,p1,c1,bl1), Case (_,p2,c2,bl2) ->
 	((f =? f) ==? (Array.compare f)) p1 p2 c1 c2 bl1 bl2
     | Fix (ln1,(_,tl1,bl1)), Fix (ln2,(_,tl2,bl2)) ->
@@ -1138,6 +1301,70 @@ let strip_lam_assum t = snd (decompose_lam_assum t)
 let strip_lam t = snd (decompose_lam t)
 let strip_lam_n n t = snd (decompose_lam_n n t)
 
+let subst_univs_puniverses subst =
+  if Univ.is_empty_subst subst then fun c -> c
+  else 
+    let fn = Univ.make_subst subst in
+    let f = CList.smartmap (Univ.subst_univs_universe fn) in
+      fun ((c, u) as x) -> let u' = f u in if u' == u then x else (c, u')
+
+let subst_univs_constr subst c =
+  if Univ.is_empty_subst subst then c
+  else 
+    let fn = Univ.make_subst subst in
+    let f = CList.smartmap (Univ.subst_univs_universe fn) in
+    let changed = ref false in
+    let rec aux t = 
+      match kind_of_term t with
+      | Const (c, u) -> 
+        let u' = f u in 
+	  if u' == u then t
+	  else (changed := true; mkConstU (c, u'))
+      | Ind (i, u) ->
+        let u' = f u in 
+	  if u' == u then t
+	  else (changed := true; mkIndU (i, u'))
+      | Construct (c, u) ->
+         let u' = f u in 
+	   if u' == u then t
+	   else (changed := true; mkConstructU (c, u'))
+      | Sort (Type u) -> 
+         let u' = subst_univs_universe fn u in
+	   if u' == u then t else 
+	     (changed := true; mkSort (sort_of_univ u'))
+      | _ -> map_constr aux t
+    in 
+    let c' = aux c in
+      if !changed then c' else c
+
+let subst_univs_level_constr subst c =
+  if Univ.is_empty_level_subst subst then c
+  else 
+    let f = CList.smartmap (Univ.subst_univs_level_universe subst) in
+    let changed = ref false in
+    let rec aux t = 
+      match kind_of_term t with
+      | Const (c, u) -> 
+        let u' = f u in 
+	  if u' == u then t
+	  else (changed := true; mkConstU (c, u'))
+      | Ind (i, u) ->
+        let u' = f u in 
+	  if u' == u then t
+	  else (changed := true; mkIndU (i, u'))
+      | Construct (c, u) ->
+         let u' = f u in 
+	   if u' == u then t
+	   else (changed := true; mkConstructU (c, u'))
+      | Sort (Type u) -> 
+         let u' = subst_univs_level_universe subst u in
+	   if u' == u then t else 
+	     (changed := true; mkSort (sort_of_univ u'))
+      | _ -> map_constr aux t
+    in 
+    let c' = aux c in
+      if !changed then c' else c
+
 (***************************)
 (* Arities                 *)
 (***************************)
@@ -1218,6 +1445,15 @@ let array_eqeq t1 t2 =
      (Int.equal i (Array.length t1)) || (t1.(i) == t2.(i) && aux (i + 1))
    in aux 0)
 
+let list_eqeq u1 u2 =
+  u1 == u2 ||
+  (let rec aux l r =
+     match l, r with
+     | u1 :: l1, u2 :: l2 -> u1 == u2 && (l1 == l2 || aux l1 l2)
+     | [], [] -> true
+     | _, _ -> false
+   in aux u1 u2)
+
 let equals_constr t1 t2 =
   match t1, t2 with
     | Rel n1, Rel n2 -> n1 == n2
@@ -1231,10 +1467,10 @@ let equals_constr t1 t2 =
       n1 == n2 & b1 == b2 & t1 == t2 & c1 == c2
     | App (c1,l1), App (c2,l2) -> c1 == c2 & array_eqeq l1 l2
     | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 & array_eqeq l1 l2
-    | Const c1, Const c2 -> c1 == c2
-    | Ind (sp1,i1), Ind (sp2,i2) -> sp1 == sp2 && Int.equal i1 i2
-    | Construct ((sp1,i1),j1), Construct ((sp2,i2),j2) ->
-      sp1 == sp2 && Int.equal i1 i2 && Int.equal j1 j2
+    | Const (c1,u1), Const (c2,u2) -> c1 == c2 && list_eqeq u1 u2
+    | Ind ((sp1,i1),u1), Ind ((sp2,i2),u2) -> sp1 == sp2 & Int.equal i1 i2 & list_eqeq u1 u2
+    | Construct (((sp1,i1),j1),u1), Construct (((sp2,i2),j2),u2) ->
+      sp1 == sp2 & Int.equal i1 i2 & Int.equal j1 j2 & list_eqeq u1 u2
     | Case (ci1,p1,c1,bl1), Case (ci2,p2,c2,bl2) ->
       ci1 == ci2 & p1 == p2 & c1 == c2 & array_eqeq bl1 bl2
     | Fix ((ln1, i1),(lna1,tl1,bl1)), Fix ((ln2, i2),(lna2,tl2,bl2)) ->
@@ -1309,9 +1545,9 @@ let hcons_term (sh_sort,sh_ci,sh_construct,sh_ind,sh_con,sh_na,sh_id) =
 	(t, combinesmall 8 (combine (Hashtbl.hash e) hl))
       | Const c ->
 	(Const (sh_con c), combinesmall 9 (Hashtbl.hash c))
-      | Ind ((kn,i) as ind) ->
+      | Ind ((kn,i),u as ind) ->
 	(Ind (sh_ind ind), combinesmall 10 (combine (Hashtbl.hash kn) i))
-      | Construct (((kn,i),j) as c)->
+      | Construct ((((kn,i),j),u) as c)->
 	(Construct (sh_construct c), combinesmall 11 (combine3 (Hashtbl.hash kn) i j))
       | Case (ci,p,c,bl) ->
 	let p, hp = sh_rec p
@@ -1366,11 +1602,11 @@ let rec hash_constr t =
       combinesmall 7 (combine (hash_term_array l) (hash_constr c))
     | Evar (e,l) ->
       combinesmall 8 (combine (Hashtbl.hash e) (hash_term_array l))
-    | Const c ->
+    | Const (c,u) ->
       combinesmall 9 (Hashtbl.hash c)	(* TODO: proper hash function for constants *)
-    | Ind (kn,i) ->
+    | Ind ((kn,i),u) ->
       combinesmall 10 (combine (Hashtbl.hash kn) i)
-    | Construct ((kn,i),j) ->
+    | Construct (((kn,i),j),u) ->
       combinesmall 11 (combine3 (Hashtbl.hash kn) i j)
     | Case (_ , p, c, bl) ->
       combinesmall 12 (combine3 (hash_constr c) (hash_constr p) (hash_term_array bl))
@@ -1419,6 +1655,10 @@ module Hcaseinfo =
 
 let hcons_sorts = Hashcons.simple_hcons Hsorts.generate hcons_univ
 let hcons_caseinfo = Hashcons.simple_hcons Hcaseinfo.generate hcons_ind
+
+let hcons_construct (c,u) = (hcons_construct c, UList.hcons u)
+let hcons_ind (i,u) = (hcons_ind i, UList.hcons u)
+let hcons_con (c,u) = (hcons_con c, UList.hcons u)
 
 let hcons_constr =
   hcons_term

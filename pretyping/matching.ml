@@ -140,9 +140,18 @@ let merge_binding allow_bound_rels stk n cT subst =
   constrain n c subst
 
 let matches_core convert allow_partial_app allow_bound_rels pat c =
-  let conv = match convert with
-    | None -> eq_constr
-    | Some (env,sigma) -> is_conv env sigma in
+  let convref ref c = 
+    match ref, kind_of_term c with
+    | VarRef id, Var id' -> Names.id_eq id id'
+    | ConstRef c, Const (c',_) -> Names.eq_constant c c'
+    | IndRef i, Ind (i', _) -> Names.eq_ind i i'
+    | ConstructRef c, Construct (c',u) -> Names.eq_constructor c c'
+    | _, _ -> (match convert with 
+               | None -> false
+	       | Some (env,sigma) -> 
+	         let sigma,c' = Evd.fresh_global Evd.univ_flexible_alg env sigma ref in
+		   is_conv env sigma c' c)
+  in
   let rec sorec stk subst p t =
     let cT = strip_outer_cast t in
     match p,kind_of_term cT with
@@ -166,7 +175,7 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
 
       | PVar v1, Var v2 when Id.equal v1 v2 -> subst
 
-      | PRef ref, _ when conv (constr_of_global ref) cT -> subst
+      | PRef ref, _ when convref ref cT -> subst
 
       | PRel n1, Rel n2 when Int.equal n1 n2 -> subst
 

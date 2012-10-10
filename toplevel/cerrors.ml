@@ -73,7 +73,7 @@ let rec process_vernac_interp_error exn = match exn with
 	str " because" ++ spc() ++ Univ.pr_uni v ++
 	  prlist (fun (r,v) -> spc() ++ pr_rel r ++ str" " ++ Univ.pr_uni v)
 	  p ++
-	  (if Univ.Universe.equal (snd (List.last p)) u then mt() else
+	  (if Univ.Universe.eq (snd (List.last p)) u then mt() else
 	      (spc() ++ str "= " ++ Univ.pr_uni u)) in
     let msg =
       if !Constrextern.print_universes then

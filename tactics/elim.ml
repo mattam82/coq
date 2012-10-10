@@ -103,7 +103,7 @@ let head_in gls indl t =
   with Not_found -> false
 
 let decompose_these c l gls =
-  let indl = (*List.map inductive_of*) l in
+  let indl = List.map (fun x -> x, []) l in
   general_decompose (fun (_,t) -> head_in gls indl t) c gls
 
 let decompose_nonrec c gls =

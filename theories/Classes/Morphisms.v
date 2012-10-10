@@ -106,8 +106,7 @@ Ltac f_equiv :=
     assert (H : (Rx==>R)%signature f f');
     unfold Rx in *; clear Rx; [ f_equiv | apply H; clear H; try reflexivity ]
   | |- ?R ?f ?f' =>
-    try reflexivity;
-    change (Proper R f); eauto with typeclass_instances; fail
+    solve [change (Proper R f); eauto with typeclass_instances | reflexivity ]
   | _ => idtac
  end.
 

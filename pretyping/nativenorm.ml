@@ -55,7 +55,7 @@ let find_rectype_a env c =
 (* Instantiate inductives and parameters in constructor type *)
 
 let type_constructor mind mib typ params = 
-  let s = ind_subst mind mib in
+  let s = ind_subst mind mib [] (* FIXME *)in
   let ctyp = substl s typ in
   let nparams = Array.length params in
   if Int.equal nparams 0 then ctyp
@@ -63,20 +63,20 @@ let type_constructor mind mib typ params =
     let _,ctyp = decompose_prod_n nparams ctyp in   
     substl (List.rev (Array.to_list params)) ctyp
 
-let construct_of_constr_notnative const env tag (mind, _ as ind) allargs =
+let construct_of_constr_notnative const env tag (mind, _ as ind) u allargs =
   let mib,mip = lookup_mind_specif env ind in
   let nparams = mib.mind_nparams in
   let i = invert_tag const tag mip.mind_reloc_tbl in
   let params = Array.sub allargs 0 nparams in
   let ctyp = type_constructor mind mib (mip.mind_nf_lc.(i-1)) params in
-  (mkApp(mkConstruct(ind,i), params), ctyp)
+  (mkApp(mkConstructU((ind,i),u), params), ctyp)
  
 
 let construct_of_constr const env tag typ =
   let t, l = app_type env typ in
   match kind_of_term t with
-  | Ind ind -> 
-      construct_of_constr_notnative const env tag ind l
+  | Ind (ind,u) -> 
+      construct_of_constr_notnative const env tag ind u l
   | _ -> assert false
 
 let construct_of_constr_const env tag typ = 
@@ -98,9 +98,9 @@ let build_branches_type env (mind,_ as _ind) mib mip params dep p =
     let codom = 
       let papp = mkApp(lift (List.length decl) p,crealargs) in
       if dep then
-	let cstr = ith_constructor_of_inductive ind (i+1) in
+	let cstr = ith_constructor_of_inductive (fst ind) (i+1) in
         let relargs = Array.init carity (fun i -> mkRel (carity-i)) in
-	let dep_cstr = mkApp(mkApp(mkConstruct cstr,params),relargs) in
+	let dep_cstr = mkApp(mkApp(mkConstructU (cstr,snd ind),params),relargs) in
 	mkApp(papp,[|dep_cstr|])
       else papp
     in 
@@ -251,17 +251,17 @@ and nf_atom_type env atom =
       let n = (nb_rel env - i) in
       mkRel n, type_of_rel env n
   | Aconstant cst ->
-      mkConst cst, Typeops.type_of_constant env cst
+      mkConst cst, fst (Typeops.type_of_constant env (cst,[])) (* FIXME *)
   | Aind ind ->
-      mkInd ind, Inductiveops.type_of_inductive env ind 
+      mkInd ind, Inductiveops.type_of_inductive env (ind,[])
   | Asort s ->
       mkSort s, type_of_sort s
   | Avar id ->
       mkVar id, type_of_var env id
   | Acase(ans,accu,p,bs) ->
       let a,ta = nf_accu_type env accu in
-      let (mind,_ as ind),allargs = find_rectype_a env ta in
-      let (mib,mip) = Inductive.lookup_mind_specif env ind in
+      let ((mind,_),u as ind),allargs = find_rectype_a env ta in
+      let (mib,mip) = Inductive.lookup_mind_specif env (fst ind) in
       let nparams = mib.mind_nparams in
       let params,realargs = Array.chop nparams allargs in
       let pT = 
@@ -270,7 +270,7 @@ and nf_atom_type env atom =
       let pT = whd_betadeltaiota env pT in
       let dep, p = nf_predicate env ind mip params p pT in
       (* Calcul du type des branches *)
-      let btypes = build_branches_type env ind mib mip params dep p in
+      let btypes = build_branches_type env (fst ind) mib mip params dep p in
       (* calcul des branches *)
       let bsw = branch_of_switch (nb_rel env) ans bs in
       let mkbranch i v =
@@ -324,7 +324,7 @@ and  nf_predicate env ind mip params v pT =
       let n = mip.mind_nrealargs in
       let rargs = Array.init n (fun i -> mkRel (n-i)) in
       let params = if Int.equal n 0 then params else Array.map (lift n) params in
-      let dom = mkApp(mkInd ind,Array.append params rargs) in
+      let dom = mkApp(mkIndU ind,Array.append params rargs) in
       let body = nf_type (push_rel (name,None,dom) env) vb in
       true, mkLambda(name,dom,body)
   | _, _ -> false, nf_type env v

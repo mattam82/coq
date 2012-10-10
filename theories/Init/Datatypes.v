@@ -159,7 +159,7 @@ Definition option_map (A B:Type) (f:A->B) o :=
 
 (** [sum A B], written [A + B], is the disjoint sum of [A] and [B] *)
 
-Inductive sum (A B:Type) : Type :=
+Polymorphic Inductive sum (A B:Type) : Type :=
   | inl : A -> sum A B
   | inr : B -> sum A B.
 
@@ -171,7 +171,7 @@ Arguments inr {A B} _ , A [B] _.
 (** [prod A B], written [A * B], is the product of [A] and [B];
     the pair [pair A B a b] of [a] and [b] is abbreviated [(a,b)] *)
 
-Inductive prod (A B:Type) : Type :=
+Polymorphic Inductive prod (A B:Type) : Type :=
   pair : A -> B -> prod A B.
 
 Add Printing Let prod.
@@ -182,11 +182,12 @@ Notation "( x , y , .. , z )" := (pair .. (pair x y) .. z) : core_scope.
 Arguments pair {A B} _ _.
 
 Section projections.
-  Variables A B : Type.
-  Definition fst (p:A * B) := match p with
+  Context {A : Type} {B : Type}.
+
+  Polymorphic Definition fst (p:A * B) := match p with
 				| (x, y) => x
                               end.
-  Definition snd (p:A * B) := match p with
+  Polymorphic Definition snd (p:A * B) := match p with
 				| (x, y) => y
                               end.
 End projections.
@@ -217,7 +218,7 @@ Definition prod_curry (A B C:Type) (f:A -> B -> C)
 
 (** Polymorphic lists and some operations *)
 
-Inductive list (A : Type) : Type :=
+Polymorphic Inductive list (A : Type) : Type :=
  | nil : list A
  | cons : A -> list A -> list A.
 
@@ -228,7 +229,7 @@ Bind Scope list_scope with list.
 
 Local Open Scope list_scope.
 
-Definition length (A : Type) : list A -> nat :=
+Polymorphic Definition length (A : Type) : list A -> nat :=
   fix length l :=
   match l with
    | nil => O
@@ -237,12 +238,13 @@ Definition length (A : Type) : list A -> nat :=
 
 (** Concatenation of two lists *)
 
-Definition app (A : Type) : list A -> list A -> list A :=
+Polymorphic Definition app (A : Type) : list A -> list A -> list A :=
   fix app l m :=
   match l with
    | nil => m
    | a :: l1 => a :: app l1 m
   end.
+
 
 Infix "++" := app (right associativity, at level 60) : list_scope.
 
@@ -310,6 +312,7 @@ Defined.
 
 Definition CompSpec {A} (eq lt : A->A->Prop)(x y:A) : comparison -> Prop :=
  CompareSpec (eq x y) (lt x y) (lt y x).
+
 Definition CompSpecT {A} (eq lt : A->A->Prop)(x y:A) : comparison -> Type :=
  CompareSpecT (eq x y) (lt x y) (lt y x).
 Hint Unfold CompSpec CompSpecT.

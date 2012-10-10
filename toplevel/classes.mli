@@ -41,6 +41,8 @@ val declare_instance_constant :
   Impargs.manual_explicitation list -> (** implicits *)
   ?hook:(Globnames.global_reference -> unit) ->
   Id.t -> (** name *)
+  bool -> (* polymorphic *)
+  Univ.universe_context -> (* Universes *)
   Term.constr -> (** body *)
   Term.types -> (** type *)
   Names.Id.t
@@ -48,6 +50,7 @@ val declare_instance_constant :
 val new_instance :
   ?abstract:bool -> (** Not abstract by default. *)
   ?global:bool -> (** Not global by default. *)
+  polymorphic ->
   local_binder list ->
   typeclass_constraint ->
   constr_expr option ->

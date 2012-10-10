@@ -21,7 +21,7 @@ open Environ
     disable "Prop-polymorphism", cf comment in [inductive.ml] *)
 
 val get_type_of :
-  ?polyprop:bool -> ?refresh:bool -> env -> evar_map -> constr -> types
+  ?polyprop:bool -> env -> evar_map -> constr -> types
 
 val get_sort_of :
   ?polyprop:bool -> env -> evar_map -> types -> sorts

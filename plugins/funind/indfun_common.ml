@@ -121,8 +121,8 @@ let const_of_id id =
 let def_of_const t =
    match (Term.kind_of_term t) with
     Term.Const sp ->
-      (try (match Declareops.body_of_constant (Global.lookup_constant sp) with
-             | Some c -> Lazyconstr.force c
+      (try (match Environ.constant_opt_value_in (Global.env()) sp with
+             | Some c -> c
 	     | _ -> assert false)
        with _ -> assert false)
     |_ -> assert false
@@ -148,15 +148,17 @@ open Declare
 
 let definition_message = Declare.definition_message
 
-let save with_clean id const (locality,kind) hook =
+let save with_clean id const (locality,p,kind) hook =
   let {const_entry_body = pft;
        const_entry_secctx = _;
        const_entry_type = tpo;
-       const_entry_opaque = opacity } = const in
+       const_entry_opaque = opacity;
+       const_entry_universes = univs} = const in
   let l,r = match locality with
     | Local when Lib.sections_are_opened () ->
         let k = Kindops.logical_kind_of_goal_kind kind in
-	let c = SectionLocalDef (pft, tpo, opacity) in
+	let ctx = Univ.universe_context_set_of_universe_context univs in
+	let c = SectionLocalDef (((pft, tpo), ctx), opacity) in
 	let _ = declare_variable id (Lib.cwd(), c, k) in
 	(Local, VarRef id)
     | Local ->
@@ -190,7 +192,8 @@ let get_proof_clean do_reduce =
 let with_full_print f a =
   let old_implicit_args = Impargs.is_implicit_args ()
   and old_strict_implicit_args =  Impargs.is_strict_implicit_args ()
-  and old_contextual_implicit_args = Impargs.is_contextual_implicit_args () in
+  and old_contextual_implicit_args = Impargs.is_contextual_implicit_args () 
+  in
   let old_rawprint = !Flags.raw_print in
   Flags.raw_print := true;
   Impargs.make_implicit_args false;
@@ -271,8 +274,8 @@ let cache_Function (_,finfos) =
 
 let load_Function _  = cache_Function
 let subst_Function (subst,finfos) =
-  let do_subst_con c = fst (Mod_subst.subst_con subst c)
-  and do_subst_ind (kn,i) = (Mod_subst.subst_ind subst kn,i)
+  let do_subst_con c = Mod_subst.subst_constant subst c
+  and do_subst_ind i = Mod_subst.subst_ind subst i
   in
   let function_constant' = do_subst_con finfos.function_constant in
   let graph_ind' = do_subst_ind finfos.graph_ind in
@@ -341,7 +344,7 @@ open Term
 let pr_info f_info =
   str "function_constant := " ++ Printer.pr_lconstr (mkConst f_info.function_constant)++ fnl () ++
     str "function_constant_type := " ++
-    (try Printer.pr_lconstr (Global.type_of_global (ConstRef f_info.function_constant)) with _ -> mt ()) ++ fnl () ++
+    (try Printer.pr_lconstr (Global.type_of_global_unsafe (ConstRef f_info.function_constant)) with _ -> mt ()) ++ fnl () ++
     str "equation_lemma := " ++ (Option.fold_right (fun v acc -> Printer.pr_lconstr (mkConst v)) f_info.equation_lemma (mt ()) ) ++ fnl () ++
     str "completeness_lemma :=" ++ (Option.fold_right (fun v acc -> Printer.pr_lconstr (mkConst v)) f_info.completeness_lemma (mt ()) ) ++ fnl () ++
     str "correctness_lemma := " ++ (Option.fold_right (fun v acc -> Printer.pr_lconstr (mkConst v)) f_info.correctness_lemma (mt ()) ) ++ fnl () ++

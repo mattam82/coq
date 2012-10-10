@@ -10,6 +10,7 @@ open Names
 open Term
 open Declarations
 open Sign
+open Univ
 
 (** Unsafe environments. We define here a datatype for environments.
    Since typing is not yet defined, it is not possible to check the
@@ -45,6 +46,7 @@ val named_context_val : env -> named_context_val
 
 
 val engagement    : env -> engagement option
+val is_impredicative_set : env -> bool
 
 (** is the local context empty *)
 val empty_context : env -> bool
@@ -129,9 +131,21 @@ val evaluable_constant : constant -> env -> bool
 type const_evaluation_result = NoBody | Opaque
 exception NotEvaluableConst of const_evaluation_result
 
-val constant_value     : env -> constant -> constr
-val constant_type      : env -> constant -> constant_type
-val constant_opt_value : env -> constant -> constr option
+val constant_value : env -> constant puniverses -> constr constrained
+val constant_type : env -> constant puniverses -> types constrained
+val constant_type_in_ctx : env -> constant -> types Univ.in_universe_context
+
+val constant_opt_value : env -> constant puniverses -> (constr * Univ.constraints) option
+val constant_value_and_type : env -> constant puniverses -> 
+  types option * constr * Univ.constraints
+
+(* These functions should be called under the invariant that [env] 
+   already contains the constraints corresponding to the constant 
+   application. *)
+val constant_value_in : env -> constant puniverses -> constr
+val constant_type_in : env -> constant puniverses -> types
+val constant_opt_value_in : env -> constant puniverses -> constr option
+
 
 (** {5 Inductive types } *)
 
@@ -154,6 +168,8 @@ val lookup_modtype : module_path -> env -> module_type_body
 (** {5 Universe constraints } *)
 
 val add_constraints : Univ.constraints -> env -> env
+
+val push_constraints_to_env : 'a Univ.constrained -> env -> env
 
 val set_engagement : engagement -> env -> env
 

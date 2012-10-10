@@ -67,23 +67,31 @@ val understand_ltac : ?resolve_classes:bool ->
 (** Standard call to get a constr from a glob_constr, resolving implicit args *)
 
 val understand : evar_map -> env -> ?expected_type:Term.types ->
-  glob_constr -> constr
+  glob_constr -> constr Univ.in_universe_context_set
 
 (** Idem but the glob_constr is intended to be a type *)
 
-val understand_type : evar_map -> env -> glob_constr -> constr
+val understand_type : evar_map -> env -> glob_constr -> constr Univ.in_universe_context_set
 
 (** A generalization of the two previous case *)
 
 val understand_gen : typing_constraint -> evar_map -> env ->
-  glob_constr -> constr
+  glob_constr -> constr Univ.in_universe_context_set
 
 (** Idem but returns the judgment of the understood term *)
 
-val understand_judgment : evar_map -> env -> glob_constr -> unsafe_judgment
+val understand_judgment : evar_map -> env -> type_constraint -> 
+  glob_constr -> unsafe_judgment Evd.in_evar_universe_context
+
+val understand_type_judgment : evar_map -> env -> 
+  glob_constr -> unsafe_type_judgment Evd.in_evar_universe_context
 
 (** Idem but do not fail on unresolved evars *)
-val understand_judgment_tcc : evar_map ref -> env -> glob_constr -> unsafe_judgment
+val understand_judgment_tcc : evar_map ref -> env -> type_constraint -> 
+  glob_constr -> unsafe_judgment
+
+val understand_type_judgment_tcc : evar_map ref -> env -> 
+  glob_constr -> unsafe_type_judgment
 
 (**/**)
 (** Internal of Pretyping... *)
@@ -106,7 +114,7 @@ val pretype_gen :
 val constr_in : constr -> Dyn.t
 val constr_out : Dyn.t -> constr
 
-val interp_sort : glob_sort -> sorts
+val interp_sort : evar_map -> glob_sort -> evar_map * sorts
 val interp_elimination_sort : glob_sort -> sorts_family
 
 (** Last chance for solving evars, possibly using external solver *)

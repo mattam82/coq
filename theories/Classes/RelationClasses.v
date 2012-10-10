@@ -38,9 +38,10 @@ Proof. reflexivity. Qed.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
+Definition relation' (A : Type) := A -> A -> Prop.
 
 Class Reflexive {A} (R : relation A) :=
-  reflexivity : forall x, R x x.
+  reflexivity : forall x : A, R x x.
 
 Class Irreflexive {A} (R : relation A) :=
   irreflexivity : Reflexive (complement R).

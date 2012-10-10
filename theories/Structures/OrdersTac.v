@@ -29,7 +29,7 @@ Set Implicit Arguments.
     [le x y -> le y z -> le x z].
 *)
 
-Inductive ord := OEQ | OLT | OLE.
+Inductive ord : Set := OEQ | OLT | OLE.
 Definition trans_ord o o' :=
  match o, o' with
  | OEQ, _ => o'

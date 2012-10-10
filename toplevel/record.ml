@@ -26,15 +26,21 @@ open Constrexpr_ops
 (********** definition d'un record (structure) **************)
 
 let interp_evars evdref env impls k typ =
-  let typ' = intern_gen Pretyping.IsType ~impls !evdref env typ in
+  let typ' = intern_gen k ~impls !evdref env typ in
   let imps = Implicit_quantifiers.implicits_of_glob_constr typ' in
     imps, Pretyping.understand_tcc_evars evdref env k typ'
 
+let interp_type_evars evdref env impls typ =
+  let typ' = intern_gen Pretyping.IsType ~impls !evdref env typ in
+  let imps = Implicit_quantifiers.implicits_of_glob_constr typ' in
+    imps, Pretyping.understand_type_judgment_tcc evdref env typ'
+
 let interp_fields_evars evars env impls_env nots l =
   List.fold_left2
-    (fun (env, uimpls, params, impls) no ((loc, i), b, t) ->
-      let impl, t' = interp_evars evars env impls Pretyping.IsType t in
+    (fun (env, uimpls, params, univ, impls) no ((loc, i), b, t) ->
+      let impl, {utj_val = t'; utj_type = s} = interp_type_evars evars env impls t in
       let b' = Option.map (fun x -> snd (interp_evars evars env impls (Pretyping.OfType (Some t')) x)) b in
+      let univ = if b = None then Univ.sup (univ_of_sort s) univ else univ in
       let impls =
 	match i with
 	| Anonymous -> impls
@@ -42,8 +48,8 @@ let interp_fields_evars evars env impls_env nots l =
       in
       let d = (i,b',t') in
       List.iter (Metasyntax.set_notation_for_interpretation impls) no;
-      (push_rel d env, impl :: uimpls, d::params, impls))
-    (env, [], [], impls_env) nots l
+      (push_rel d env, impl :: uimpls, d::params, univ, impls))
+    (env, [], [], Univ.type0m_univ, impls_env) nots l
 
 let binder_of_decl = function
   | Vernacexpr.AssumExpr(n,t) -> (n,None,t)
@@ -51,9 +57,9 @@ let binder_of_decl = function
 
 let binders_of_decls = List.map binder_of_decl
 
-let typecheck_params_and_fields id t ps nots fs =
+let typecheck_params_and_fields def id t ps nots fs =
   let env0 = Global.env () in
-  let evars = ref Evd.empty in
+  let evars = ref (Evd.from_env ~ctx:(Univ.empty_universe_context_set) env0) in
   let _ = 
     let error bk (loc, name) = 
       match bk, name with
@@ -66,20 +72,44 @@ let typecheck_params_and_fields id t ps nots fs =
 	   | LocalRawAssum (ls, bk, ce) -> List.iter (error bk) ls) ps
   in 
   let impls_env, ((env1,newps), imps) = interp_context_evars evars env0 ps in
-  let fullarity = it_mkProd_or_LetIn (Option.cata (fun x -> x) (Termops.new_Type ()) t) newps in
+  (* let _ = evars := Evd.abstract_undefined_variables !evars in *)
+  let t' = match t with 
+    | Some t -> 
+       let env = push_rel_context newps env0 in
+       let _, {utj_val = s; utj_type = s'} = interp_type_evars evars env 
+	 empty_internalization_env t in
+       let sred = Reductionops.whd_betadeltaiota env !evars s in
+	 (match kind_of_term sred with
+	 | Sort s' -> 
+	   (match Evd.is_sort_variable !evars s' with
+	   | Some (l, _) -> evars := Evd.make_flexible_variable !evars true (* (not def) *) l; sred
+	   | None -> s)
+	 | _ -> user_err_loc (constr_loc t,"", str"Sort expected."))
+    | None -> 
+      let uvarkind = if (* not def *) true then Evd.univ_flexible_alg else Evd.univ_flexible in
+	mkSort (Evarutil.evd_comb0 (Evd.new_sort_variable uvarkind) evars)
+  in
+  let fullarity = it_mkProd_or_LetIn t' newps in
   let env_ar = push_rel_context newps (push_rel (Name id,None,fullarity) env0) in
-  let env2,impls,newfs,data =
+  let env2,impls,newfs,univ,data =
     interp_fields_evars evars env_ar impls_env nots (binders_of_decls fs)
   in
-  let evars = Evarconv.consider_remaining_unif_problems env_ar !evars in
+  let evars = 
+    let ty = mkSort (Type univ) in
+      try Evarconv.the_conv_x_leq env_ar ty t' !evars 
+      with Reduction.NotConvertible ->
+        Pretype_errors.error_cannot_unify env_ar !evars (ty, t')
+  in
+  let evars = Evarconv.consider_remaining_unif_problems env_ar evars in
   let evars = Typeclasses.resolve_typeclasses env_ar evars in
-  let sigma =  evars in
-  let newps = Evarutil.nf_rel_context_evar sigma newps in
-  let newfs = Evarutil.nf_rel_context_evar sigma newfs in
+  let evars, nf = Evarutil.nf_evars_and_universes evars in
+  let newps = Sign.map_rel_context nf newps in
+  let newfs = Sign.map_rel_context nf newfs in
+  let arity = nf t' in
   let ce t = Evarutil.check_evars env0 Evd.empty evars t in
     List.iter (fun (n, b, t) -> Option.iter ce b; ce t) (List.rev newps);
     List.iter (fun (n, b, t) -> Option.iter ce b; ce t) (List.rev newfs);
-    imps, newps, impls, newfs
+    Evd.universe_context evars, arity, imps, newps, impls, newfs
 
 let degenerate_decl (na,b,t) =
   let id = match na with
@@ -156,20 +186,23 @@ let subst_projection fid l c =
     raise (NotDefinable (MissingProj (fid,List.rev !bad_projs)));
   c''
 
-let instantiate_possibly_recursive_type indsp paramdecls fields =
+let instantiate_possibly_recursive_type indu paramdecls fields =
   let subst = List.map_i (fun i _ -> mkRel i) 1 paramdecls in
-  Termops.substl_rel_context (subst@[mkInd indsp]) fields
+  Termops.substl_rel_context (subst@[mkIndU indu]) fields
 
 (* We build projections *)
 let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls fields =
   let env = Global.env() in
   let (mib,mip) = Global.lookup_inductive indsp in
   let paramdecls = mib.mind_params_ctxt in
-  let r = mkInd indsp in
+  let poly = mib.mind_polymorphic and ctx = mib.mind_universes in
+  let u = if poly then Univ.UList.of_llist (fst ctx) else [] in
+  let indu = indsp, u in
+  let r = mkIndU (indsp,u) in
   let rp = applist (r, Termops.extended_rel_list 0 paramdecls) in
   let paramargs = Termops.extended_rel_list 1 paramdecls in (*def in [[params;x:rp]]*)
   let x = match name with Some n -> Name n | None -> Namegen.named_hd (Global.env()) r Anonymous in
-  let fields = instantiate_possibly_recursive_type indsp paramdecls fields in
+  let fields = instantiate_possibly_recursive_type indu paramdecls fields in
   let lifted_fields = Termops.lift_rel_context 1 fields in
   let (_,kinds,sp_projs,_) =
     List.fold_left3
@@ -201,6 +234,8 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
 		    const_entry_body = proj;
                     const_entry_secctx = None;
                     const_entry_type = Some projtyp;
+		    const_entry_polymorphic = poly;
+		    const_entry_universes = ctx;
                     const_entry_opaque = false;
 		    const_entry_inline_code = false } in
 		  let k = (DefinitionEntry cie,IsDefinition kind) in
@@ -210,11 +245,11 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
                 with Type_errors.TypeError (ctx,te) ->
                   raise (NotDefinable (BadTypedProj (fid,ctx,te))) in
 	      let refi = ConstRef kn in
-	      let constr_fi = mkConst kn in
+	      let constr_fi = mkConstU (kn, u) in
 	      Impargs.maybe_declare_manual_implicits false refi impls;
 	      if coe then begin
 	        let cl = Class.class_of_global (IndRef indsp) in
-	        Class.try_add_new_coercion_with_source refi Global ~source:cl
+	        Class.try_add_new_coercion_with_source refi Global poly ~source:cl
 	      end;
 	      let proj_args = (*Rel 1 refers to "x"*) paramargs@[mkRel 1] in
 	      let constr_fip = applist (constr_fi,proj_args) in
@@ -242,7 +277,7 @@ let structure_signature ctx =
 
 open Typeclasses
 
-let declare_structure finite infer id idbuild paramimpls params arity fieldimpls fields
+let declare_structure finite infer poly ctx id idbuild paramimpls params arity fieldimpls fields
     ?(kind=StructureComponent) ?name is_coe coers sign =
   let nparams = List.length params and nfields = List.length fields in
   let args = Termops.extended_rel_list nfields params in
@@ -260,20 +295,23 @@ let declare_structure finite infer id idbuild paramimpls params arity fieldimpls
   begin match  finite with
   | BiFinite ->
       if Termops.dependent (mkRel (nparams+1)) (it_mkProd_or_LetIn mkProp fields) then
-	error "Records declared with the keyword Record or Structure cannot be recursive. You can, however, define recursive records using the Inductive or CoInductive command."
+	error ("Records declared with the keyword Record or Structure cannot be recursive." ^
+               "You can, however, define recursive records using the Inductive or CoInductive command.")
   | _ -> ()
   end;
   let mie =
     { mind_entry_params = List.map degenerate_decl params;
       mind_entry_record = true;
       mind_entry_finite = finite != CoFinite;
-      mind_entry_inds = [mie_ind] } in
+      mind_entry_inds = [mie_ind];
+      mind_entry_polymorphic = poly;
+      mind_entry_universes = ctx } in
   let kn = Command.declare_mutual_inductive_with_eliminations KernelVerbose mie [(paramimpls,[])] in
   let rsp = (kn,0) in (* This is ind path of idstruc *)
   let cstr = (rsp,1) in
   let kinds,sp_projs = declare_projections rsp ~kind ?name coers fieldimpls fields in
   let build = ConstructRef cstr in
-  if is_coe then Class.try_add_new_coercion build Global;
+  if is_coe then Class.try_add_new_coercion build Global poly;
   Recordops.declare_structure(rsp,cstr,List.rev kinds,List.rev sp_projs);
   if infer then
     Evd.fold (fun ev evi () -> Recordops.declare_method (ConstructRef cstr) ev sign) sign ();
@@ -288,7 +326,7 @@ let implicits_of_context ctx =
     in ExplByPos (i, explname), (true, true, true))
     1 (List.rev (Anonymous :: (List.map pi1 ctx)))
 
-let declare_class finite def infer id idbuild paramimpls params arity fieldimpls fields
+let declare_class finite def infer poly ctx id idbuild paramimpls params arity fieldimpls fields
     ?(kind=StructureComponent) ?name is_coe coers priorities sign =
   let fieldimpls =
     (* Make the class and all params implicits in the projections *)
@@ -300,24 +338,29 @@ let declare_class finite def infer id idbuild paramimpls params arity fieldimpls
     match fields with
     | [(Name proj_name, _, field)] when def ->
 	let class_body = it_mkLambda_or_LetIn field params in
-	let class_type = Option.map (fun ar -> it_mkProd_or_LetIn ar params) arity in
+	let _class_type = it_mkProd_or_LetIn arity params in
 	let class_entry =
 	  { const_entry_body = class_body;
             const_entry_secctx = None;
-	    const_entry_type = class_type;
+	    const_entry_type = None;
+	    const_entry_polymorphic = poly;
+	    const_entry_universes = ctx;
 	    const_entry_opaque = false;
 	    const_entry_inline_code = false }
 	in
 	let cst = Declare.declare_constant (snd id)
 	  (DefinitionEntry class_entry, IsDefinition Definition)
 	in
-	let inst_type = appvectc (mkConst cst) (Termops.rel_vect 0 (List.length params)) in
+	let cstu = (cst, if poly then Univ.UList.of_llist (fst ctx) else []) in
+	let inst_type = appvectc (mkConstU cstu) (Termops.rel_vect 0 (List.length params)) in
 	let proj_type = it_mkProd_or_LetIn (mkProd(Name (snd id), inst_type, lift 1 field)) params in
 	let proj_body = it_mkLambda_or_LetIn (mkLambda (Name (snd id), inst_type, mkRel 1)) params in
 	let proj_entry =
 	  { const_entry_body = proj_body;
             const_entry_secctx = None;
 	    const_entry_type = Some proj_type;
+	    const_entry_polymorphic = poly;
+	    const_entry_universes = ctx;
 	    const_entry_opaque = false;
 	    const_entry_inline_code = false }
 	in
@@ -328,17 +371,22 @@ let declare_class finite def infer id idbuild paramimpls params arity fieldimpls
 	Impargs.declare_manual_implicits false cref [paramimpls];
 	Impargs.declare_manual_implicits false (ConstRef proj_cst) [List.hd fieldimpls];
 	Classes.set_typeclass_transparency (EvalConstRef cst) false false;
-	if infer then Evd.fold (fun ev evi _ -> Recordops.declare_method (ConstRef cst) ev sign) sign ();
-	let sub = match List.hd coers with Some b -> Some ((if b then Backward else Forward), List.hd priorities) | None -> None in
+	if infer then 
+	  Evd.fold (fun ev evi _ -> Recordops.declare_method (ConstRef cst) ev sign) sign ();
+	let sub = match List.hd coers with
+	  | Some b -> Some ((if b then Backward else Forward), List.hd priorities) 
+	  | None -> None 
+	in
 	  cref, [Name proj_name, sub, Some proj_cst]
     | _ ->
 	let idarg = Namegen.next_ident_away (snd id) (Termops.ids_of_context (Global.env())) in
-	let ind = declare_structure BiFinite infer (snd id) idbuild paramimpls
-	  params (Option.default (Termops.new_Type ()) arity) fieldimpls fields
+	let ind = declare_structure BiFinite infer poly ctx (snd id) idbuild paramimpls
+	  params arity fieldimpls fields
 	  ~kind:Method ~name:idarg false (List.map (fun _ -> false) fields) sign
 	in
 	let coers = List.map2 (fun coe pri -> 
-			       Option.map (fun b -> if b then Backward, pri else Forward, pri) coe) 
+			       Option.map (fun b -> 
+			         if b then Backward, pri else Forward, pri) coe) 
 	  coers priorities 
 	in
 	  IndRef ind, (List.map3 (fun (id, _, _) b y -> (id, b, y))
@@ -347,7 +395,7 @@ let declare_class finite def infer id idbuild paramimpls params arity fieldimpls
   let ctx_context =
     List.map (fun (na, b, t) ->
       match Typeclasses.class_of_constr t with
-      | Some (_, (cl, _)) -> Some (cl.cl_impl, true) (*List.exists (fun (_, n) -> n = na) supnames)*)
+      | Some (_, ((cl,_), _)) -> Some (cl.cl_impl, true) (*FIXME: ignore universes?*)
       | None -> None)
       params, params
   in
@@ -362,20 +410,13 @@ let declare_class finite def infer id idbuild paramimpls params arity fieldimpls
 (*       k.cl_projs coers priorities; *)
   add_class k; impl
 
-let interp_and_check_sort sort =
-  Option.map (fun sort ->
-    let env = Global.env() and sigma = Evd.empty in
-    let s = interp_constr sigma env sort in
-    if isSort (Reductionops.whd_betadeltaiota env sigma s) then s
-    else user_err_loc (constr_loc sort,"", str"Sort expected.")) sort
-
 open Vernacexpr
 open Autoinstance
 
 (* [fs] corresponds to fields and [ps] to parameters; [coers] is a
    list telling if the corresponding fields must me declared as coercions 
    or subinstances *)
-let definition_structure (kind,finite,infer,(is_coe,(loc,idstruc)),ps,cfs,idbuild,s) =
+let definition_structure (kind,poly,finite,infer,(is_coe,(loc,idstruc)),ps,cfs,idbuild,s) =
   let cfs,notations = List.split cfs in
   let cfs,priorities = List.split cfs in
   let coers,fs = List.split cfs in
@@ -389,22 +430,22 @@ let definition_structure (kind,finite,infer,(is_coe,(loc,idstruc)),ps,cfs,idbuil
   if isnot_class && List.exists (fun opt -> not (Option.is_empty opt)) priorities then
     error "Priorities only allowed for type class substructures";
   (* Now, younger decl in params and fields is on top *)
-  let sc = interp_and_check_sort s in
-  let implpars, params, implfs, fields =
+  let ctx, arity, implpars, params, implfs, fields =
     States.with_state_protection (fun () ->
-      typecheck_params_and_fields idstruc sc ps notations fs) () in
+      typecheck_params_and_fields (kind = Class true) idstruc s ps notations fs) () in
   let sign = structure_signature (fields@params) in
     match kind with
     | Class def ->
-	let gr = declare_class finite def infer (loc,idstruc) idbuild
-	  implpars params sc implfs fields is_coe coers priorities sign in
+	let gr = declare_class finite def infer poly ctx (loc,idstruc) idbuild
+	  implpars params arity implfs fields is_coe coers priorities sign in
 	if infer then search_record declare_class_instance gr sign;
 	gr
     | _ ->
-	let arity = Option.default (Termops.new_Type ()) sc in
 	let implfs = List.map
-	  (fun impls -> implpars @ Impargs.lift_implicits (succ (List.length params)) impls) implfs in
-	let ind = declare_structure finite infer idstruc idbuild implpars params arity implfs 
+	  (fun impls -> implpars @ Impargs.lift_implicits
+	    (succ (List.length params)) impls) implfs in
+	let ind = declare_structure finite infer poly ctx idstruc 
+	  idbuild implpars params arity implfs 
 	  fields is_coe (List.map (fun coe -> not (Option.is_empty coe)) coers) sign in
 	if infer then search_record declare_record_instance (ConstructRef (ind,1)) sign;
 	IndRef ind

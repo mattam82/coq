@@ -48,12 +48,27 @@ let subst_clenv sub clenv =
     evd = subst_evar_defs_light sub clenv.evd;
     env = clenv.env }
 
+let map_clenv sub clenv =
+  { templval = map_fl sub clenv.templval;
+    templtyp = map_fl sub clenv.templtyp;
+    evd = cmap sub clenv.evd;
+    env = clenv.env }
+
 let clenv_nf_meta clenv c = nf_meta clenv.evd c
 let clenv_term clenv c = meta_instance clenv.evd c
 let clenv_meta_type clenv mv = Typing.meta_type clenv.evd mv
 let clenv_value clenv = meta_instance clenv.evd clenv.templval
 let clenv_type clenv = meta_instance clenv.evd clenv.templtyp
 
+let refresh_undefined_univs clenv =
+  match kind_of_term clenv.templval.rebus with
+  | Var _ -> clenv, Univ.empty_level_subst
+  | App (f, args) when isVar f -> clenv, Univ.empty_level_subst
+  | _ ->  
+    let evd', subst = Evd.refresh_undefined_universes clenv.evd in
+    let map_freelisted f = { f with rebus = subst_univs_level_constr subst f.rebus } in
+      { clenv with evd = evd'; templval = map_freelisted clenv.templval;
+	templtyp = map_freelisted clenv.templtyp }, subst
 
 let clenv_hnf_constr ce t = hnf_constr (cl_env ce) (cl_sigma ce) t
 

@@ -44,7 +44,7 @@ type cbv_value =
   | LAM of int * (Name.t * constr) list * constr * cbv_value subs
   | FIXP of fixpoint * cbv_value subs * cbv_value array
   | COFIXP of cofixpoint * cbv_value subs * cbv_value array
-  | CONSTR of constructor * cbv_value array
+  | CONSTR of constructor puniverses * cbv_value array
 
 (* type of terms with a hole. This hole can appear only under App or Case.
  *   TOP means the term is considered without context
@@ -106,7 +106,7 @@ let contract_cofixp env (i,(_,_,bds as bodies)) =
 let make_constr_ref n = function
   | RelKey p -> mkRel (n+p)
   | VarKey id -> mkVar id
-  | ConstKey cst -> mkConst cst
+  | ConstKey cst -> mkConstU cst
 
 (* Adds an application list. Collapse APPs! *)
 let stack_app appl stack =
@@ -135,7 +135,7 @@ open RedFlags
 let red_set_ref flags = function
   | RelKey _ -> red_set flags fDELTA
   | VarKey id -> red_set flags (fVAR id)
-  | ConstKey sp -> red_set flags (fCONST sp)
+  | ConstKey (sp,_) -> red_set flags (fCONST sp)
 
 (* Transfer application lists from a value to the stack
  * useful because fixpoints may be totally applied in several times.
@@ -278,14 +278,14 @@ and cbv_stack_term info stack env t =
         cbv_stack_term info stk envf redfix
 
     (* constructor in a Case -> IOTA *)
-    | (CONSTR((sp,n),[||]), APP(args,CASE(_,br,ci,env,stk)))
+    | (CONSTR(((sp,n),u),[||]), APP(args,CASE(_,br,ci,env,stk)))
             when red_set (info_flags info) fIOTA ->
 	let cargs =
           Array.sub args ci.ci_npar (Array.length args - ci.ci_npar) in
         cbv_stack_term info (stack_app cargs stk) env br.(n-1)
 
     (* constructor of arity 0 in a Case -> IOTA *)
-    | (CONSTR((_,n),[||]), CASE(_,br,_,env,stk))
+    | (CONSTR(((_,n),u),[||]), CASE(_,br,_,env,stk))
             when red_set (info_flags info) fIOTA ->
                     cbv_stack_term info stk env br.(n-1)
 
@@ -347,7 +347,7 @@ and cbv_norm_value info = function (* reduction under binders *)
 				(subs_liftn (Array.length lty) env)) bds)),
          Array.map (cbv_norm_value info) args)
   | CONSTR (c,args) ->
-      mkApp(mkConstruct c, Array.map (cbv_norm_value info) args)
+      mkApp(mkConstructU c, Array.map (cbv_norm_value info) args)
 
 (* with profiling *)
 let cbv_norm infos constr =

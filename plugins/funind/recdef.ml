@@ -59,6 +59,8 @@ let (declare_fun : Id.t -> logical_kind -> constr -> global_reference) =
     let ce = {const_entry_body = value;
               const_entry_secctx = None;
 	      const_entry_type = None;
+	      const_entry_polymorphic = (*FIXME*)false;
+	      const_entry_universes = Univ.empty_universe_context;
           const_entry_opaque = false;
           const_entry_inline_code = false} in
       ConstRef(declare_constant f_id (DefinitionEntry ce, kind));;
@@ -68,12 +70,12 @@ let defined () = Lemmas.save_named false
 let def_of_const t =
    match (kind_of_term t) with
     Const sp ->
-      (try (match body_of_constant (Global.lookup_constant sp) with
-             | Some c -> Lazyconstr.force c
+      (try (match constant_opt_value_in (Global.env()) sp with
+             | Some c -> c
 	     | _ -> assert false)
        with _ ->
 	 anomaly (str "Cannot find definition of constant " ++
-		    (Id.print (Label.to_id (con_label sp))))
+		    (Id.print (Label.to_id (con_label (fst sp)))))
       )
      |_ -> assert false
 
@@ -82,6 +84,7 @@ let type_of_const t =
     Const sp -> Typeops.type_of_constant (Global.env()) sp
     |_ -> assert false
 
+let constr_of_global = Universes.constr_of_global
 
 let constant sl s = constr_of_global (find_reference sl s)
 
@@ -187,7 +190,7 @@ let (value_f:constr list -> global_reference -> constr) =
     let glob_body =
       GCases
 	(d0,RegularStyle,None,
-	 [GApp(d0, GRef(d0,fterm), List.rev_map (fun x_id -> GVar(d0, x_id)) rev_x_id_l),
+	 [GApp(d0, GRef(d0,fterm,None), List.rev_map (fun x_id -> GVar(d0, x_id)) rev_x_id_l),
 	  (Anonymous,None)],
 	 [d0, [v_id], [PatCstr(d0,(destIndRef
 				     (delayed_force coq_sig_ref),1),
@@ -196,7 +199,7 @@ let (value_f:constr list -> global_reference -> constr) =
 			       Anonymous)],
 	  GVar(d0,v_id)])
     in
-    let body = understand Evd.empty env glob_body in
+    let body = fst (understand Evd.empty env glob_body)(*FIXME*) in
     it_mkLambda_or_LetIn body context
 
 let (declare_f : Id.t -> logical_kind -> constr list -> global_reference -> global_reference) =
@@ -1251,7 +1254,7 @@ let open_new_goal (build_proof:tactic -> tactic -> unit) using_lemmas ref_ goal_
   let na = next_global_ident_away name [] in
   if Termops.occur_existential gls_type then
     Errors.error "\"abstract\" cannot handle existentials";
-  let hook _ _ =
+  let hook _ _ _ =
     let opacity =
       let na_ref = Libnames.Ident (Loc.ghost,na) in
       let na_global = Nametab.global na_ref in
@@ -1311,9 +1314,9 @@ let open_new_goal (build_proof:tactic -> tactic -> unit) using_lemmas ref_ goal_
   in
   start_proof
     na
-    (Decl_kinds.Global, Decl_kinds.Proof Decl_kinds.Lemma)
+    (Decl_kinds.Global, false, Decl_kinds.Proof Decl_kinds.Lemma)
     sign
-    gls_type
+    (gls_type, Univ.empty_universe_context_set) (* FIXME *)
     hook ;
   if Indfun_common.is_strict_tcc  ()
   then
@@ -1330,7 +1333,7 @@ let open_new_goal (build_proof:tactic -> tactic -> unit) using_lemmas ref_ goal_
 	 	     (fun c ->
 	 		tclTHENSEQ
 	 		  [intros;
-	 		   h_simplest_apply (interp_constr Evd.empty (Global.env()) c);
+	 		   h_simplest_apply (fst (interp_constr Evd.empty (Global.env()) c)(*FIXME*));
 	 		   tclCOMPLETE Auto.default_auto
 	 		  ]
 	 	     )
@@ -1359,8 +1362,9 @@ let com_terminate
   let start_proof (tac_start:tactic) (tac_end:tactic) =
     let (evmap, env) = Lemmas.get_current_context() in
     start_proof thm_name
-      (Global, Proof Lemma) (Environ.named_context_val env)
-      (compute_terminate_type nb_args fonctional_ref) hook;
+      (Global, (*FIXME*)false, Proof Lemma) (Environ.named_context_val env)
+      (compute_terminate_type nb_args fonctional_ref, (*FIXME*) Univ.empty_universe_context_set)
+    hook;
 
     by (observe_tac (str "starting_tac") tac_start);
     by (observe_tac (str "whole_start") (whole_start tac_end nb_args is_mes fonctional_ref
@@ -1384,7 +1388,7 @@ let start_equation (f:global_reference) (term_f:global_reference)
   (cont_tactic:Id.t list -> tactic) g =
   let ids = pf_ids_of_hyps g in
   let terminate_constr = constr_of_global term_f in
-  let nargs = nb_prod (type_of_const terminate_constr) in
+  let nargs = nb_prod (fst (type_of_const terminate_constr)) (*FIXME*) in
   let x = n_x_id ids nargs in
   tclTHENLIST [
     h_intros x;
@@ -1406,8 +1410,8 @@ let (com_eqn : int -> Id.t ->
     let (evmap, env) = Lemmas.get_current_context() in
     let f_constr = constr_of_global f_ref in
     let equation_lemma_type = subst1 f_constr equation_lemma_type in
-    (start_proof eq_name (Global, Proof Lemma)
-       (Environ.named_context_val env) equation_lemma_type (fun _ _ -> ());
+    (start_proof eq_name (Global, false, Proof Lemma)
+       (Environ.named_context_val env) (equation_lemma_type,(*FIXME*)Univ.empty_universe_context_set) (fun _ _ _ -> ());
      by
        (start_equation f_ref terminate_ref
 	  (fun  x ->
@@ -1446,12 +1450,12 @@ let (com_eqn : int -> Id.t ->
 let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num eq
     generate_induction_principle using_lemmas : unit =
   let previous_label = Lib.current_command_label () in
-  let function_type = interp_constr Evd.empty (Global.env()) type_of_f in
+  let function_type,ctx = interp_constr Evd.empty (Global.env()) type_of_f in
   let env = push_named (function_name,None,function_type) (Global.env()) in
   (* Pp.msgnl (str "function type := " ++ Printer.pr_lconstr function_type);  *)
   let equation_lemma_type = 
     nf_betaiotazeta
-      (interp_gen (OfType None) Evd.empty env ~impls:rec_impls eq) 
+      (fst (*FIXME*) (interp_gen (OfType None) Evd.empty env ~impls:rec_impls eq) )
   in
  (* Pp.msgnl (str "lemma type := " ++ Printer.pr_lconstr equation_lemma_type ++ fnl ()); *)
   let res_vars,eq' = decompose_prod equation_lemma_type in
@@ -1475,15 +1479,15 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
   let functional_ref = declare_fun functional_id (IsDefinition Decl_kinds.Definition) res in
   let env_with_pre_rec_args = push_rel_context(List.map (function (x,t) -> (x,None,t)) pre_rec_args) env in  
   let relation =
-    interp_constr
+    fst (*FIXME*)(interp_constr
       Evd.empty
       env_with_pre_rec_args
-      r
+      r)
   in
   let tcc_lemma_name = add_suffix function_name "_tcc" in
   let tcc_lemma_constr = ref None in
   (* let _ = Pp.msgnl (str "relation := " ++ Printer.pr_lconstr_env env_with_pre_rec_args relation) in *)
-  let hook _ _ = 
+  let hook _ _ _ = 
     let term_ref = Nametab.locate (qualid_of_ident term_id) in
     let f_ref = declare_f function_name (IsProof Lemma) arg_types term_ref in
     let _ = Table.extraction_inline true [Ident (Loc.ghost,term_id)] in 

@@ -50,8 +50,8 @@ let add_cache_hook f = cache_hook := f
 (** Declaration of section variables and local definitions *)
 
 type section_variable_entry =
-  | SectionLocalDef of constr * types option * bool (* opacity *)
-  | SectionLocalAssum of types * bool (* Implicit status *)
+  | SectionLocalDef of (constr * types option) Univ.in_universe_context_set * bool (** opacity *)
+  | SectionLocalAssum of types Univ.in_universe_context_set * bool (** Implicit status *)
 
 type variable_declaration = DirPath.t * section_variable_entry * logical_kind
 
@@ -62,18 +62,18 @@ let cache_variable ((sp,_),o) =
   (* Constr raisonne sur les noms courts *)
   if variable_exists id then
     alreadydeclared (pr_id id ++ str " already exists");
-  let impl,opaq,cst = match d with (* Fails if not well-typed *)
-    | SectionLocalAssum (ty, impl) ->
+  let impl,opaq,ctx,cst = match d with (* Fails if not well-typed *)
+    | SectionLocalAssum ((ty,ctx), impl) ->
         let cst = Global.push_named_assum (id,ty) in
 	let impl = if impl then Implicit else Explicit in
-	impl, true, cst
-    | SectionLocalDef (c,t,opaq) ->
+	impl, true, ctx, cst
+    | SectionLocalDef (((c,t),ctx),opaq) ->
         let cst = Global.push_named_def (id,c,t) in
-        Explicit, opaq, cst in
+        Explicit, opaq, ctx, cst in
   Nametab.push (Nametab.Until 1) (restrict_path 0 sp) (VarRef id);
-  add_section_variable id impl;
+  add_section_variable id impl ctx;
   Dischargedhypsmap.set_discharged_hyps sp [];
-  add_variable_data id (p,opaq,cst,mk)
+  add_variable_data id (p,opaq,ctx,cst,mk)
 
 let discharge_variable (_,o) = match o with
   | Inr (id,_) -> Some (Inl (variable_constraints id))
@@ -130,7 +130,8 @@ let cache_constant ((sp,kn),(cdt,dhyps,kind)) =
   let kn' = Global.add_constant dir id cdt in
   assert (eq_constant kn' (constant_of_kn kn));
   Nametab.push (Nametab.Until 1) sp (ConstRef (constant_of_kn kn));
-  add_section_constant kn' (Global.lookup_constant kn').const_hyps;
+  let cst = Global.lookup_constant kn' in
+  add_section_constant cst.const_polymorphic kn' cst.const_hyps;
   Dischargedhypsmap.set_discharged_hyps sp dhyps;
   add_constant_kind (constant_of_kn kn) kind;
   !cache_hook sp
@@ -144,12 +145,13 @@ let discharge_constant ((sp,kn),(cdt,dhyps,kind)) =
   let con = constant_of_kn kn in
   let cb = Global.lookup_constant con in
   let repl = replacement_context () in
-  let sechyps = section_segment_of_constant con in
-  let recipe = { d_from=cb; d_modlist=repl; d_abstract=named_of_variable_context sechyps } in
+  let sechyps,uctx = section_segment_of_constant con in
+  let recipe = { d_from=cb; d_modlist=repl; d_abstract=(named_of_variable_context sechyps,uctx) } in
   Some (GlobalRecipe recipe,(discharged_hyps kn sechyps)@dhyps,kind)
 
 (* Hack to reduce the size of .vo: we keep only what load/open needs *)
-let dummy_constant_entry = ConstantEntry (ParameterEntry (None,mkProp,None))
+let dummy_constant_entry = 
+  ConstantEntry (ParameterEntry (None,(mkProp,Univ.empty_universe_context_set),None))
 
 let dummy_constant (ce,_,mk) = dummy_constant_entry,[],mk
 
@@ -181,11 +183,13 @@ let declare_constant ?(internal = UserVerbose) id (cd,kind) =
   kn
 
 let declare_definition ?(internal=UserVerbose) ?(opaque=false) ?(kind=Decl_kinds.Definition)
-  id ?types body =
+  ?(poly=false) id ?types (body,ctx) =
   let cb = 
     { Entries.const_entry_body = body;
       const_entry_type = types;
       const_entry_opaque = opaque;
+      const_entry_polymorphic = poly;
+      const_entry_universes = Univ.context_of_universe_context_set ctx;
       const_entry_inline_code = false;
       const_entry_secctx = None }
   in
@@ -237,7 +241,8 @@ let cache_inductive ((sp,kn),(dhyps,mie)) =
   let _,dir,_ = repr_kn kn in
   let kn' = Global.add_mind dir id mie in
   assert (eq_mind kn' (mind_of_kn kn));
-  add_section_kn kn' (Global.lookup_mind kn').mind_hyps;
+  let mind = Global.lookup_mind kn' in
+  add_section_kn mind.mind_polymorphic kn' mind.mind_hyps;
   Dischargedhypsmap.set_discharged_hyps sp dhyps;
   List.iter (fun (sp, ref) -> Nametab.push (Nametab.Until 1) sp ref) names;
   List.iter (fun (sp,_) -> !cache_hook sp) (inductive_names sp kn mie)
@@ -247,9 +252,9 @@ let discharge_inductive ((sp,kn),(dhyps,mie)) =
   let mind = Global.mind_of_delta_kn kn in
   let mie = Global.lookup_mind mind in
   let repl = replacement_context () in
-  let sechyps = section_segment_of_mutual_inductive mind in
+  let sechyps,uctx = section_segment_of_mutual_inductive mind in
   Some (discharged_hyps kn sechyps,
-        Discharge.process_inductive (named_of_variable_context sechyps) repl mie)
+        Discharge.process_inductive (named_of_variable_context sechyps,uctx) repl mie)
 
 let dummy_one_inductive_entry mie = {
   mind_entry_typename = mie.mind_entry_typename;
@@ -263,7 +268,9 @@ let dummy_inductive_entry (_,m) = ([],{
   mind_entry_params = [];
   mind_entry_record = false;
   mind_entry_finite = true;
-  mind_entry_inds = List.map dummy_one_inductive_entry m.mind_entry_inds })
+  mind_entry_inds = List.map dummy_one_inductive_entry m.mind_entry_inds;
+  mind_entry_polymorphic = false;
+  mind_entry_universes = Univ.empty_universe_context })
 
 type inductive_obj = Dischargedhypsmap.discharged_hyps * mutual_inductive_entry
 

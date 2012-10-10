@@ -386,6 +386,19 @@ let tactic_list_tactic tac gls =
 (* Change evars *)
 let tclEVARS sigma gls = tclIDTAC {gls with sigma=sigma}
 
+(* Push universe context *)
+let tclPUSHCONTEXT rigid ctx tac gl = 
+  tclTHEN (tclEVARS (Evd.merge_context_set rigid (project gl) ctx)) tac gl
+
+let tclPUSHEVARUNIVCONTEXT ctx gl = 
+  tclEVARS (Evd.merge_universe_context (project gl) ctx) gl
+
+let tclPUSHCONSTRAINTS cst gl = 
+  tclEVARS (Evd.add_constraints (project gl) cst) gl
+
+let tclPUSHUNIVERSECONSTRAINTS cst gl = 
+  tclEVARS (Evd.add_universe_constraints (project gl) cst) gl
+
 (* Pretty-printers. *)
 
 let pp_info = ref (fun _ _ _ -> assert false)

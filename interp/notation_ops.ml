@@ -106,7 +106,7 @@ let glob_constr_of_notation_constr_with_binders loc g f e = function
   | NSort x -> GSort (loc,x)
   | NHole x  -> GHole (loc,x)
   | NPatVar n -> GPatVar (loc,(false,n))
-  | NRef x -> GRef (loc,x)
+  | NRef x -> GRef (loc,x,None)
 
 let glob_constr_of_notation_constr loc x =
   let rec aux () x =
@@ -146,7 +146,7 @@ let split_at_recursive_part c =
 let on_true_do b f c = if b then (f c; b) else b
 
 let compare_glob_constr f add t1 t2 = match t1,t2 with
-  | GRef (_,r1), GRef (_,r2) -> eq_gr r1 r2
+  | GRef (_,r1,_), GRef (_,r2,_) -> eq_gr r1 r2
   | GVar (_,v1), GVar (_,v2) -> on_true_do (Id.equal v1 v2) add (Name v1)
   | GApp (_,f1,l1), GApp (_,f2,l2) -> f f1 f2 && List.for_all2eq f l1 l2
   | GLambda (_,na1,bk1,ty1,c1), GLambda (_,na2,bk2,ty2,c2)
@@ -288,7 +288,7 @@ let notation_constr_and_vars_of_glob_constr a =
   | GCast (_,c,k) -> NCast (aux c,Miscops.map_cast_type aux k)
   | GSort (_,s) -> NSort s
   | GHole (_,w) -> NHole w
-  | GRef (_,r) -> NRef r
+  | GRef (_,r,_) -> NRef r
   | GPatVar (_,(_,n)) -> NPatVar n
   | GEvar _ ->
       error "Existential variables not allowed in notations."
@@ -353,7 +353,7 @@ let rec subst_pat subst pat =
   match pat with
   | PatVar _ -> pat
   | PatCstr (loc,((kn,i),j),cpl,n) ->
-      let kn' = subst_ind subst kn
+      let kn' = subst_mind subst kn
       and cpl' = List.smartmap (subst_pat subst) cpl in
         if kn' == kn && cpl' == cpl then pat else
           PatCstr (loc,((kn',i),j),cpl',n)
@@ -409,7 +409,7 @@ let rec subst_notation_constr subst bound raw =
         (fun (a,(n,signopt) as x) ->
 	  let a' = subst_notation_constr subst bound a in
 	  let signopt' = Option.map (fun ((indkn,i),nal as z) ->
-	    let indkn' = subst_ind subst indkn in
+	    let indkn' = subst_mind subst indkn in
 	    if indkn == indkn' then z else ((indkn',i),nal)) signopt in
 	  if a' == a && signopt' == signopt then x else (a',(n,signopt')))
         rl
@@ -635,7 +635,7 @@ let rec match_ inner u alp (tmetas,blmetas as metas) sigma a1 a2 =
 
   (* Matching compositionally *)
   | GVar (_,id1), NVar id2 when alpha_var id1 id2 alp -> sigma
-  | GRef (_,r1), NRef r2 when (eq_gr r1 r2) -> sigma
+  | GRef (_,r1,_), NRef r2 when (eq_gr r1 r2) -> sigma
   | GPatVar (_,(_,n1)), NPatVar n2 when Id.equal n1 n2 -> sigma
   | GApp (loc,f1,l1), NApp (f2,l2) ->
       let n1 = List.length l1 and n2 = List.length l2 in

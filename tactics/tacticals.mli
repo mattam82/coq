@@ -113,7 +113,7 @@ val onClauseLR : (Id.t option -> tactic) -> clause -> tactic
 (** {6 Elimination tacticals. } *)
 
 type branch_args = {
-  ity        : inductive;   (** the type we were eliminating on *)
+  ity        : pinductive;   (** the type we were eliminating on *)
   largs      : constr list; (** its arguments *)
   branchnum  : int;         (** the branch number *)
   pred       : constr;      (** the predicate we used *)
@@ -144,10 +144,13 @@ val elimination_sort_of_goal : goal sigma -> sorts_family
 val elimination_sort_of_hyp  : Id.t -> goal sigma -> sorts_family
 val elimination_sort_of_clause : Id.t option -> goal sigma -> sorts_family
 
+val pf_with_evars :  (goal sigma -> Evd.evar_map * 'a) -> ('a -> tactic) -> tactic
+val pf_constr_of_global : Globnames.global_reference -> (constr -> tactic) -> tactic
+
 val general_elim_then_using :
-  (inductive -> goal sigma -> constr) -> rec_flag ->
+  (pinductive -> goal sigma -> Evd.evar_map * constr) -> rec_flag ->
   intro_pattern_expr located option -> (branch_args -> tactic) ->
-    constr option -> (arg_bindings * arg_bindings) -> inductive -> clausenv ->
+    constr option -> (arg_bindings * arg_bindings) -> pinductive -> clausenv ->
     tactic
 
 val elimination_then_using :
@@ -161,12 +164,12 @@ val elimination_then :
 val case_then_using :
   intro_pattern_expr located option -> (branch_args -> tactic) ->
     constr option -> (arg_bindings * arg_bindings) ->
-      inductive -> clausenv -> tactic
+      pinductive -> clausenv -> tactic
 
 val case_nodep_then_using :
   intro_pattern_expr located option -> (branch_args -> tactic) ->
     constr option -> (arg_bindings * arg_bindings) ->
-      inductive -> clausenv -> tactic
+      pinductive -> clausenv -> tactic
 
 val simple_elimination_then :
   (branch_args -> tactic) -> constr -> tactic

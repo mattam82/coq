@@ -12,7 +12,7 @@ open Tacmach
 open Equality
 
 (** Rewriting rules before tactic interpretation *)
-type raw_rew_rule = Loc.t * Term.constr * bool * Tacexpr.raw_tactic_expr
+type raw_rew_rule = Loc.t * Term.constr Univ.in_universe_context_set * bool * Tacexpr.raw_tactic_expr
 
 (** To add rewriting rules to a base *)
 val add_rew_rules : string -> raw_rew_rule list -> unit
@@ -28,6 +28,7 @@ val autorewrite_in : ?conds:conditions -> Names.Id.t -> tactic -> string list ->
 type rew_rule = { rew_lemma: constr;
 		  rew_type: types;
 		  rew_pat: constr;
+		  rew_ctx: Univ.universe_context_set;
 		  rew_l2r: bool;
 		  rew_tac: glob_tactic_expr }
 

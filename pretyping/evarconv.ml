@@ -43,9 +43,9 @@ let not_purely_applicative_stack args =
 
 let eval_flexible_term ts env c =
   match kind_of_term c with
-  | Const c ->
+  | Const (c,u as cu) ->
       if is_transparent_constant ts c
-      then constant_opt_value env c
+      then constant_opt_value_in env cu
       else None
   | Rel n ->
       (try let (_,v,_) = lookup_rel n env in Option.map (lift n) v
@@ -235,6 +235,14 @@ let exact_ise_stack2 env evd f sk1 sk2 =
     ise_exact (ise_stack2 false env evd f) sk1 sk2
   else UnifFailure (evd, (* Dummy *) NotSameHead)
 
+let eq_puniverses evd f (x,u) (y,v) =
+  if f x y then 
+    let evdref = ref evd in
+      try List.iter2 (fun x y -> evdref := Evd.has_lub !evdref x y) u v;
+	  Success !evdref
+      with _ -> UnifFailure (evd, NotSameHead)
+  else UnifFailure (evd, NotSameHead)
+
 let rec evar_conv_x ts env evd pbty term1 term2 =
   let term1 = whd_head_evar evd term1 in
   let term2 = whd_head_evar evd term2 in
@@ -242,15 +250,16 @@ let rec evar_conv_x ts env evd pbty term1 term2 =
      could have found, we do it only if the terms are free of evar.
      Note: incomplete heuristic... *)
   let ground_test =
-    if is_ground_term evd term1 && is_ground_term evd term2 then
-      if is_trans_fconv pbty ts env evd term1 term2 then
-        Some true
-      else if is_ground_env evd env then Some false
-      else None
-    else None in
+    if is_ground_term evd term1 && is_ground_term evd term2 then (
+      let evd, b = trans_fconv pbty ts env evd term1 term2 in
+	if b then Some (evd, true)
+	else if is_ground_env evd env then Some (evd, false)
+	else None)
+    else None
+  in
   match ground_test with
-    | Some true -> Success evd
-    | Some false -> UnifFailure (evd,ConversionFailed (env,term1,term2))
+    | Some (evd, true) -> Success evd
+    | Some (evd, false) -> UnifFailure (evd,ConversionFailed (env,term1,term2))
     | None ->
 	(* Until pattern-unification is used consistently, use nohdbeta to not
 	   destroy beta-redexes that can be used for 1st-order unification *)
@@ -372,9 +381,18 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	ise_try evd [f1; f2]
 
 	| _, _ ->
-	let f1 i =
-	  if eq_constr term1 term2 then
-	    exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2
+	let f1 i = 
+	  let b,univs = 
+	    if pbty = CONV then eq_constr_universes term1 term2 
+	    else leq_constr_universes term1 term2 
+	  in
+	  if b then
+	    let i, b =
+	      try Evd.add_universe_constraints i univs, true
+	      with Univ.UniverseInconsistency _ -> (i,false)
+	    in
+	      if b then exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2
+	      else UnifFailure (i, NotSameHead)
 	  else
 	     UnifFailure (i,NotSameHead)
 	and f2 i =
@@ -395,7 +413,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	    (* false (* immediate solution without Canon Struct *)*)
             | Lambda _ -> assert (match args with [] -> true | _ -> false); true
             | LetIn (_,b,_,c) -> is_unnamed
-	      (fst (whd_betaiota_deltazeta_for_iota_state
+	     (fst (whd_betaiota_deltazeta_for_iota_state
 		      ts env i Cst_stack.empty (subst1 b c, args)))
             | Case _| Fix _| App _| Cast _ -> assert false in
           let rhs_is_stuck_and_unnamed () =
@@ -537,14 +555,14 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	         evar_conv_x ts (push_rel (n,None,c) env) i pbty c'1 c'2)]
 
 	| Ind sp1, Ind sp2 ->
-	    if eq_ind sp1 sp2 then
-              exact_ise_stack2 env evd (evar_conv_x ts) sk1 sk2
-            else UnifFailure (evd,NotSameHead)
+	     ise_and evd
+	       [(fun i -> eq_puniverses i eq_ind sp1 sp2);
+		(fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2)]
 
 	| Construct sp1, Construct sp2 ->
-	    if eq_constructor sp1 sp2 then
-              exact_ise_stack2 env evd (evar_conv_x ts) sk1 sk2
-            else UnifFailure (evd,NotSameHead)
+	     ise_and evd
+	       [(fun i -> eq_puniverses i eq_constructor sp1 sp2);
+		(fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2)]
 
 	| Fix ((li1, i1),(_,tys1,bds1 as recdef1)), Fix ((li2, i2),(_,tys2,bds2)) -> (* Partially applied fixs *)
 	  if Int.equal i1 i2 && Array.equal Int.equal li1 li2 then

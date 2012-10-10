@@ -30,17 +30,17 @@ exception ParameterWithoutEquality of constant
 exception NonSingletonProp of inductive
 
 val beq_scheme_kind : mutual scheme_kind
-val build_beq_scheme : mutual_inductive -> constr array
+val build_beq_scheme : mutual_inductive -> constr array Evd.in_evar_universe_context
 
 (** {6 Build equivalence between boolean equality and Leibniz equality } *)
 
 val lb_scheme_kind : mutual scheme_kind
-val make_lb_scheme : mutual_inductive -> constr array
+val make_lb_scheme : mutual_inductive -> constr array Evd.in_evar_universe_context
 
 val bl_scheme_kind : mutual scheme_kind
-val make_bl_scheme : mutual_inductive -> constr array
+val make_bl_scheme : mutual_inductive -> constr array Evd.in_evar_universe_context
 
 (** {6 Build decidability of equality } *)
 
 val eq_dec_scheme_kind : mutual scheme_kind
-val make_eq_decidability : mutual_inductive -> constr array
+val make_eq_decidability : mutual_inductive -> constr array Evd.in_evar_universe_context

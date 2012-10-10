@@ -74,21 +74,33 @@ GEXTEND Gram
     [ [ IDENT "Time"; v = vernac -> VernacTime v
       | IDENT "Timeout"; n = natural; v = vernac -> VernacTimeout(n,v)
       | IDENT "Fail"; v = vernac -> VernacFail v
-      | locality; v = vernac_aux -> v ] ]
+      | locality; polymorphism; program; v = vernac_aux -> v ] ]
+  ;  
+  polymorphism:
+    [ [ IDENT "Polymorphic" -> Flags.make_polymorphic_flag true
+      | IDENT "Monomorphic" -> Flags.make_polymorphic_flag false
+      | -> () ] ]
+  ;
+  program: 
+    [ [ IDENT "Program" -> Flags.program_cmd := true
+      | -> () ] ]
   ;
   vernac_aux:
     (* Better to parse "." here: in case of failure (e.g. in coerce_to_var), *)
     (* "." is still in the stream and discard_to_dot works correctly         *)
-    [ [ IDENT "Program"; g = gallina; "." -> Flags.program_cmd := true; g
-      | IDENT "Program"; g = gallina_ext; "." -> Flags.program_cmd := true; g
-      | g = gallina; "." -> Flags.program_cmd := false; g
-      | g = gallina_ext; "." -> Flags.program_cmd := false; g
+    [ [ g = gallina_or_ext -> g
       | c = command; "." -> c
       | c = syntax; "." -> c
       | "["; l = LIST1 located_vernac; "]"; "." -> VernacList l
       | c = subprf -> c
     ] ]
   ;
+  gallina_or_ext:
+  [ [ g = gallina; "." -> g
+    | g = gallina_ext; "." -> g
+    ] ]
+  ;
+
   vernac_aux: LAST
     [ [ prfcom = default_command_entry -> prfcom ] ]
   ;
@@ -142,6 +154,10 @@ let test_plurial_form_types = function
    (strbrk "Keywords Implicit Types expect more than one type")
   | _ -> ()
 
+let add_polymorphism (l,k) = (l, Flags.use_polymorphic_flag (), k)
+
+let use_poly = Flags.use_polymorphic_flag
+
 (* Gallina declarations *)
 GEXTEND Gram
   GLOBAL: gallina gallina_ext thm_token def_body of_type_with_opt_coercion
@@ -152,21 +168,23 @@ GEXTEND Gram
     [ [ thm = thm_token; id = identref; bl = binders; ":"; c = lconstr;
         l = LIST0
           [ "with"; id = identref; bl = binders; ":"; c = lconstr ->
-            (Some id,(bl,c,None)) ] ->
-          VernacStartTheoremProof (thm,(Some id,(bl,c,None))::l, false)
+          (Some id,(bl,c,None)) ] ->
+          VernacStartTheoremProof (thm, use_poly (),
+				   (Some id,(bl,c,None))::l, false)
       | stre = assumption_token; nl = inline; bl = assum_list ->
-	  VernacAssumption (stre, nl, bl)
+	  VernacAssumption (add_polymorphism stre, nl, bl)
       | stre = assumptions_token; nl = inline; bl = assum_list ->
 	  test_plurial_form bl;
-	  VernacAssumption (stre, nl, bl)
-      | d = def_token; id = identref; b = def_body ->
-          VernacDefinition (d, id, b)
+	  VernacAssumption (add_polymorphism stre, nl, bl)
+      | (l,k) = def_token; id = identref; b = def_body ->
+	  let poly = use_poly () in
+          VernacDefinition ((l, poly, k), id, b)
       (* Gallina inductive declarations *)
       | f = finite_token;
         indl = LIST1 inductive_definition SEP "with" ->
 	  let (k,f) = f in
 	  let indl=List.map (fun ((a,b,c,d),e) -> ((a,b,c,k,d),e)) indl in
-          VernacInductive (f,false,indl)
+          VernacInductive (use_poly (), f,false,indl)
       | "Fixpoint"; recs = LIST1 rec_definition SEP "with" ->
           VernacFixpoint recs
       | "CoFixpoint"; corecs = LIST1 corec_definition SEP "with" ->
@@ -175,6 +193,7 @@ GEXTEND Gram
       | IDENT "Combined"; IDENT "Scheme"; id = identref; IDENT "from";
 	l = LIST1 identref SEP "," -> VernacCombinedScheme (id, l) ] ]
   ;
+
   gallina_ext:
     [ [ b = record_token; infer = infer_token; oc = opt_coercion; name = identref;
         ps = binders;
@@ -182,7 +201,8 @@ GEXTEND Gram
 	cfs = [ ":="; l = constructor_list_or_record_decl -> l
 	  | -> RecordDecl (None, []) ] ->
 	  let (recf,indf) = b in
-	    VernacInductive (indf,infer,[((oc,name),ps,s,recf,cfs),[]])
+	    VernacInductive (use_poly (),
+			     indf,infer,[((oc,name),ps,s,recf,cfs),[]])
   ] ]
   ;
   thm_token:
@@ -533,33 +553,39 @@ GEXTEND Gram
           d = def_body ->
           let s = coerce_reference_to_id qid in
 	  VernacDefinition
-	    ((Global,CanonicalStructure),(Loc.ghost,s),d)
+	    (add_polymorphism (Global,CanonicalStructure),(Loc.ghost,s),d)
 
       (* Coercions *)
       | IDENT "Coercion"; qid = global; d = def_body ->
           let s = coerce_reference_to_id qid in
-	  VernacDefinition ((use_locality_exp (),Coercion),(Loc.ghost,s),d)
+	  let poly = use_poly () in
+	  VernacDefinition ((use_locality_exp (),poly,Coercion),
+			    (Loc.ghost,s),d)
+
       | IDENT "Coercion"; IDENT "Local"; qid = global; d = def_body ->
-           let s = coerce_reference_to_id qid in
-	  VernacDefinition ((enforce_locality_exp true,Coercion),(Loc.ghost,s),d)
+          let s = coerce_reference_to_id qid in
+	  let poly = use_poly () in
+	  VernacDefinition ((enforce_locality_exp true, poly, Coercion),
+			    (Loc.ghost,s),d)
       | IDENT "Identity"; IDENT "Coercion"; IDENT "Local"; f = identref;
          ":"; s = class_rawexpr; ">->"; t = class_rawexpr ->
-	   VernacIdentityCoercion (enforce_locality_exp true, f, s, t)
+	   VernacIdentityCoercion (enforce_locality_exp true, use_poly (),
+				   f, s, t)
       | IDENT "Identity"; IDENT "Coercion"; f = identref; ":";
          s = class_rawexpr; ">->"; t = class_rawexpr ->
-	   VernacIdentityCoercion (use_locality_exp (), f, s, t)
+	   VernacIdentityCoercion (use_locality_exp (), use_poly (), f, s, t)
       | IDENT "Coercion"; IDENT "Local"; qid = global; ":";
 	 s = class_rawexpr; ">->"; t = class_rawexpr ->
-	  VernacCoercion (enforce_locality_exp true, AN qid, s, t)
+	  VernacCoercion (enforce_locality_exp true, use_poly (), AN qid, s, t)
       | IDENT "Coercion"; IDENT "Local"; ntn = by_notation; ":";
 	 s = class_rawexpr; ">->"; t = class_rawexpr ->
-	  VernacCoercion (enforce_locality_exp true, ByNotation ntn, s, t)
+	  VernacCoercion (enforce_locality_exp true, use_poly (), ByNotation ntn, s, t)
       | IDENT "Coercion"; qid = global; ":"; s = class_rawexpr; ">->";
          t = class_rawexpr ->
-	  VernacCoercion (use_locality_exp (), AN qid, s, t)
+	  VernacCoercion (use_locality_exp (), use_poly (), AN qid, s, t)
       | IDENT "Coercion"; ntn = by_notation; ":"; s = class_rawexpr; ">->";
          t = class_rawexpr ->
-	  VernacCoercion (use_locality_exp (), ByNotation ntn, s, t)
+	  VernacCoercion (use_locality_exp (), use_poly (), ByNotation ntn, s, t)
 
       | IDENT "Context"; c = binders ->
 	  VernacContext c
@@ -569,7 +595,7 @@ GEXTEND Gram
 	 pri = OPT [ "|"; i = natural -> i ] ;
 	 props = [ ":="; "{"; r = record_declaration; "}" -> Some r |
 	     ":="; c = lconstr -> Some c | -> None ] ->
-	   VernacInstance (false, not (use_section_locality ()),
+	   VernacInstance (false, not (use_section_locality ()), use_poly (),
 			   snd namesup, (fst namesup, expl, t), props, pri)
 
       | IDENT "Existing"; IDENT "Instance"; id = global ->
@@ -717,7 +743,7 @@ GEXTEND Gram
       | IDENT "Declare"; IDENT "Instance"; namesup = instance_name; ":";
 	 expl = [ "!" -> Decl_kinds.Implicit | -> Decl_kinds.Explicit ] ; t = operconstr LEVEL "200";
 	 pri = OPT [ "|"; i = natural -> i ] ->
-	   VernacInstance (true, not (use_section_locality ()),
+	   VernacInstance (true, not (use_section_locality ()), false,
 			   snd namesup, (fst namesup, expl, t),
 			   None, pri)
 

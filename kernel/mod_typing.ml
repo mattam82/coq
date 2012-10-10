@@ -95,21 +95,22 @@ and check_with_def env sign (idl,c) mp equiv =
 	      (* In the spirit of subtyping.check_constant, we accept
                  any implementations of parameters and opaques terms,
 	         as long as they have the right type *)
+	      (* FIXME: unsure how to deal with constraints here *)
 	      let def,cst = match cb.const_body with
 		| Undef _ | OpaqueDef _ ->
 		    let (j,cst1) = Typeops.infer env' c in
-		    let typ = Typeops.type_of_constant_type env' cb.const_type in
-		    let cst2 = Reduction.conv_leq env' j.uj_type typ in
+		    let typ = cb.const_type (* FIXME *) in
+		    let cst3 = Reduction.conv_leq env' j.uj_type typ in
 		    let cst =
-		      union_constraints
-			(union_constraints cb.const_constraints cst1)
-			cst2
+		      union_constraints (snd cst1) cst3
 		    in
 		    let def = Def (Lazyconstr.from_val j.uj_val) in
 		    def,cst
 		| Def cs ->
 		    let cst1 = Reduction.conv env' c (Lazyconstr.force cs) in
-		    let cst = union_constraints cb.const_constraints cst1 in
+		    let cst = 
+		      if cb.const_polymorphic then cst1
+		      else union_constraints (snd cb.const_universes) cst1 in
 		    let def = Def (Lazyconstr.from_val c) in
 		    def,cst
 	      in
@@ -117,8 +118,7 @@ and check_with_def env sign (idl,c) mp equiv =
 		{ cb with
 		  const_body = def;
 		  const_body_code =
-		    Cemitcodes.from_val (compile_constant_body env' def);
-		  const_constraints = cst }
+		    Cemitcodes.from_val (compile_constant_body env' def) }
 	      in
 	      SEBstruct(before@(l,SFBconst(cb'))::after),cb',cst
       | _ ->
@@ -376,14 +376,16 @@ let rec add_struct_expr_constraints env = function
 	  (add_struct_expr_constraints env meb1)
 	  meb2)
   | SEBwith(meb,With_definition_body(_,cb))->
-      Environ.add_constraints cb.const_constraints
+  (* FIXME probably wrong *)
+      Environ.push_constraints_to_env cb.const_universes
 	(add_struct_expr_constraints env meb)
   | SEBwith(meb,With_module_body(_,_))->
       add_struct_expr_constraints env meb
 		
 and add_struct_elem_constraints env = function 
-  | SFBconst cb -> Environ.add_constraints cb.const_constraints env
-  | SFBmind mib -> Environ.add_constraints mib.mind_constraints env
+(* FIXME *)
+  | SFBconst cb -> Environ.push_constraints_to_env cb.const_universes env
+  | SFBmind mib -> Environ.push_constraints_to_env mib.mind_universes env
   | SFBmodule mb -> add_module_constraints env mb
   | SFBmodtype mtb -> add_modtype_constraints env mtb
 
@@ -421,7 +423,8 @@ let rec struct_expr_constraints cst = function
 	meb2
   | SEBwith(meb,With_definition_body(_,cb))->
       struct_expr_constraints
-        (Univ.union_constraints cb.const_constraints cst) meb
+      (* FIXME *)
+        (Univ.union_constraints (constraints_of cb.const_universes) cst) meb
   | SEBwith(meb,With_module_body(_,_))->
       struct_expr_constraints  cst meb	
 		

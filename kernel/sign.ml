@@ -85,3 +85,6 @@ let push_named_to_rel_context hyps ctxt =
 	(n+1), (map_rel_declaration (substn_vars n s) d)::ctxt
     | [] -> 1, hyps in
   snd (subst ctxt)
+
+let subst_univs_context s = 
+  map_rel_context (subst_univs_constr s)

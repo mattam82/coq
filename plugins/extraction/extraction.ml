@@ -196,10 +196,10 @@ let oib_equal o1 o2 =
   Id.compare o1.mind_typename o2.mind_typename = 0 &&
   List.equal eq_rel_declaration o1.mind_arity_ctxt o2.mind_arity_ctxt &&
   begin match o1.mind_arity, o2.mind_arity with
-  | Monomorphic {mind_user_arity=c1; mind_sort=s1},
-    Monomorphic {mind_user_arity=c2; mind_sort=s2} ->
+  | {mind_user_arity=c1; mind_sort=s1},
+    {mind_user_arity=c2; mind_sort=s2} ->
       eq_constr c1 c2 && s1 = s2
-  | ma1, ma2 -> ma1 = ma2 end &&
+  end &&
   o1.mind_consnames = o2.mind_consnames
 
 let mib_equal m1 m2 =
@@ -211,7 +211,7 @@ let mib_equal m1 m2 =
   m1.mind_nparams = m2.mind_nparams &&
   m1.mind_nparams_rec = m2.mind_nparams_rec &&
   List.equal eq_rel_declaration m1.mind_params_ctxt m2.mind_params_ctxt &&
-  m1.mind_constraints = m2.mind_constraints
+  m1.mind_universes = m2.mind_universes
 
 (*S Extraction of a type. *)
 
@@ -266,10 +266,10 @@ let rec extract_type env db j c args =
 	       if n > List.length db then Tunknown
 	       else let n' = List.nth db (n-1) in
 	       if n' = 0 then Tunknown else Tvar n')
-    | Const kn ->
+    | Const (kn,u as c) ->
 	let r = ConstRef kn in
 	let cb = lookup_constant kn env in
-	let typ = Typeops.type_of_constant_type env cb.const_type in
+	let typ,_ = Typeops.type_of_constant env c in
 	(match flag_of_type env typ with
 	   | (Logic,_) -> assert false (* Cf. logical cases above *)
 	   | (Info, TypeScheme) ->
@@ -294,7 +294,7 @@ let rec extract_type env db j c args =
 		      (* We try to reduce. *)
 		      let newc = applist (Lazyconstr.force lbody, args) in
 		      extract_type env db j newc []))
-    | Ind (kn,i) ->
+    | Ind ((kn,i),u) ->
 	let s = (extract_ind env kn).ind_packets.(i).ip_sign in
 	extract_type_app env db (IndRef (kn,i),s) args
     | Case _ | Fix _ | CoFix _ -> Tunknown
@@ -376,7 +376,9 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
     let packets =
       Array.mapi
 	(fun i mip ->
-	   let ar = Inductive.type_of_inductive env (mib,mip) in
+	   let (ind,u), ctx = 
+	     Universes.fresh_inductive_instance env (kn,i) in
+	   let ar = Inductive.type_of_inductive env ((mib,mip),u) in
 	   let info = (fst (flag_of_type env ar) = Info) in
 	   let s,v = if info then type_sign_vl env ar else [],[] in
 	   let t = Array.make (Array.length mip.mind_nf_lc) [] in
@@ -385,21 +387,21 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	     ip_logical = not info;
 	     ip_sign = s;
 	     ip_vars = v;
-	     ip_types = t })
+	     ip_types = t }, u)
 	mib.mind_packets
     in
 
     add_ind kn mib
       {ind_kind = Standard;
        ind_nparams = npar;
-       ind_packets = packets;
+       ind_packets = Array.map fst packets;
        ind_equiv = equiv
       };
     (* Second pass: we extract constructors *)
     for i = 0 to mib.mind_ntypes - 1 do
-      let p = packets.(i) in
+      let p,u = packets.(i) in
       if not p.ip_logical then
-	let types = arities_of_constructors env (kn,i) in
+	let types = arities_of_constructors env ((kn,i),u) in
 	for j = 0 to Array.length types - 1 do
 	  let t = snd (decompose_prod_n npar types.(j)) in
 	  let prods,head = dest_prod epar t in
@@ -421,7 +423,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	if is_custom r then raise (I Standard);
 	if not mib.mind_finite then raise (I Coinductive);
 	if mib.mind_ntypes <> 1 then raise (I Standard);
-	let p = packets.(0) in
+	let p,u = packets.(0) in
 	if p.ip_logical then raise (I Standard);
 	if Array.length p.ip_types <> 1 then raise (I Standard);
 	let typ = p.ip_types.(0) in
@@ -464,7 +466,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	(* If so, we use this information. *)
 	begin try
 	  let n = nb_default_params env
-            (Inductive.type_of_inductive env (mib,mip0))
+            (Inductive.type_of_inductive env ((mib,mip0),u))
 	  in
 	  let check_proj kn = if Cset.mem kn !projs then add_projection n kn in
 	  List.iter (Option.iter check_proj) (lookup_projections ip)
@@ -475,7 +477,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
     in
     let i = {ind_kind = ind_info;
 	     ind_nparams = npar;
-	     ind_packets = packets;
+	     ind_packets = Array.map fst packets;
 	     ind_equiv = equiv }
     in
     add_ind kn mib i;
@@ -510,7 +512,7 @@ and mlt_env env r = match r with
 	   | _ -> None
        with Not_found ->
 	 let cb = Environ.lookup_constant kn env in
-	 let typ = Typeops.type_of_constant_type env cb.const_type in
+	 let typ = cb.const_type (* FIXME not sure if we should instantiate univs here *) in
 	 match cb.const_body with
 	   | Undef _ | OpaqueDef _ -> None
 	   | Def l_body ->
@@ -538,7 +540,7 @@ let record_constant_type env kn opt_typ =
     lookup_type kn
   with Not_found ->
     let typ = match opt_typ with
-      | None -> Typeops.type_of_constant env kn
+      | None -> (lookup_constant kn env).const_type
       | Some typ -> typ
     in let mlt = extract_type env [] 1 typ []
     in let schema = (type_maxvar mlt, mlt)
@@ -593,10 +595,10 @@ let rec extract_term env mle mlt c args =
 	with NotDefault d ->
 	  let mle' = Mlenv.push_std_type mle (Tdummy d) in
 	  ast_pop (extract_term env' mle' mlt c2 args'))
-    | Const kn ->
-	extract_cst_app env mle mlt kn args
-    | Construct cp ->
-	extract_cons_app env mle mlt cp args
+    | Const (kn,u) ->
+	extract_cst_app env mle mlt kn u args
+    | Construct (cp,u) ->
+	extract_cons_app env mle mlt cp u args
     | Rel n ->
 	(* As soon as the expected [mlt] for the head is known, *)
 	(* we unify it with an fresh copy of the stored type of [Rel n]. *)
@@ -644,7 +646,7 @@ and make_mlargs env e s args typs =
 
 (*s Extraction of a constant applied to arguments. *)
 
-and extract_cst_app env mle mlt kn args =
+and extract_cst_app env mle mlt kn u args =
   (* First, the [ml_schema] of the constant, in expanded version. *)
   let nb,t = record_constant_type env kn None in
   let schema = nb, expand env t in
@@ -716,7 +718,7 @@ and extract_cst_app env mle mlt kn args =
    they are fixed, and thus are not used for the computation.
    \end{itemize} *)
 
-and extract_cons_app env mle mlt (((kn,i) as ip,j) as cp) args =
+and extract_cons_app env mle mlt (((kn,i) as ip,j) as cp) u args =
   (* First, we build the type of the constructor, stored in small pieces. *)
   let mi = extract_ind env kn in
   let params_nb = mi.ind_nparams in
@@ -958,7 +960,7 @@ let extract_fixpoint env vkn (fi,ti,ci) =
 
 let extract_constant env kn cb =
   let r = ConstRef kn in
-  let typ = Typeops.type_of_constant_type env cb.const_type in
+  let typ = cb.const_type in
   let warn_info () = if not (is_custom r) then add_info_axiom r in
   let warn_log () = if not (constant_has_body cb) then add_log_axiom r
   in
@@ -1005,7 +1007,7 @@ let extract_constant env kn cb =
 
 let extract_constant_spec env kn cb =
   let r = ConstRef kn in
-  let typ = Typeops.type_of_constant_type env cb.const_type in
+  let typ = cb.const_type in
   match flag_of_type env typ with
     | (Logic, TypeScheme) -> Stype (r, [], Some (Tdummy Ktype))
     | (Logic, Default) -> Sval (r, Tdummy Kother)
@@ -1023,7 +1025,7 @@ let extract_constant_spec env kn cb =
 	Sval (r, type_expunge env t)
 
 let extract_with_type env cb =
-  let typ = Typeops.type_of_constant_type env cb.const_type in
+  let typ =  cb.const_type in
   match flag_of_type env typ with
     | (Info, TypeScheme) ->
 	let s,vl = type_sign_vl env typ in

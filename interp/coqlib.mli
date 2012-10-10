@@ -119,6 +119,8 @@ type coq_eq_data = {
   congr: constr }
 
 val build_coq_eq_data : coq_eq_data delayed
+val build_coq_eq_data_in : Environ.env -> coq_eq_data Univ.in_universe_context_set
+
 val build_coq_identity_data : coq_eq_data delayed
 val build_coq_jmeq_data : coq_eq_data delayed
 

@@ -416,8 +416,8 @@ let make_projectable_subst aliases sigma evi args =
               let a',args = decompose_app_vect a in
               match kind_of_term a' with
               | Construct cstr ->
-                  let l = try Constrmap.find cstr cstrs with Not_found -> [] in
-                  Constrmap.add cstr ((args,id)::l) cstrs
+                  let l = try Constrmap.find (fst cstr) cstrs with Not_found -> [] in
+                  Constrmap.add (fst cstr) ((args,id)::l) cstrs
               | _ -> cstrs in
             (rest,Id.Map.add id [a,normalize_alias_opt aliases a,id] all,cstrs)
         | Some c, a::rest ->
@@ -947,7 +947,7 @@ exception CannotProject of bool list option
 let rec is_constrainable_in k (ev,(fv_rels,fv_ids) as g) t =
   let f,args = decompose_app_vect t in
   match kind_of_term f with
-  | Construct (ind,_) ->
+  | Construct ((ind,_),u) ->
       let params,_ = Array.chop (Inductiveops.inductive_nparams ind) args in
       Array.for_all (is_constrainable_in k g) params
   | Ind _ -> Array.for_all (is_constrainable_in k g) args
@@ -1047,6 +1047,23 @@ let check_evar_instance evd evk1 body conv_algo =
   match conv_algo evenv evd Reduction.CUMUL ty evi.evar_concl with
   | Success evd -> evd
   | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
+
+let refresh_universes dir evd t =
+  let evdref = ref evd in
+  let modified = ref false in
+  let rec refresh t = match kind_of_term t with
+    | Sort (Type u) when Univ.universe_level u = None ->
+      (modified := true;
+       (* s' will appear in the term, it can't be algebraic *)
+       let s' = evd_comb0 (new_sort_variable Evd.univ_flexible) evdref in
+	 evdref :=
+	   (if dir then set_leq_sort !evdref s' (Type u) else
+	     set_leq_sort !evdref (Type u) s');
+         mkSort s')
+    | Prod (na,u,v) -> mkProd (na,u,refresh v)
+    | _ -> t in
+  let t' = refresh t in
+  if !modified then !evdref, t' else evd, t
 
 (* Solve pbs ?e[t1..tn] = ?e[u1..un] which arise often in fixpoint
  * definitions. We try to unify the ti with the ui pairwise. The pairs
@@ -1230,7 +1247,7 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
         match
           let c,args = decompose_app_vect t in
           match kind_of_term c with
-          | Construct cstr when noccur_between 1 k t ->
+          | Construct (cstr,u) when noccur_between 1 k t ->
             (* This is common case when inferring the return clause of match *)
             (* (currently rudimentary: we do not treat the case of multiple *)
             (*  possible inversions; we do not treat overlap with a possible *)
@@ -1291,7 +1308,7 @@ and evar_define conv_algo ?(choose=false) env evd (evk,argsv as ev) rhs =
     (* so we recheck acyclicity *)
     if occur_evar evk body then raise (OccurCheckIn (evd',body));
     (* needed only if an inferred type *)
-    let body = refresh_universes body in
+    let evd', body = refresh_universes false evd' body in
 (* Cannot strictly type instantiations since the unification algorithm
  * does not unify applications from left to right.
  * e.g problem f x == g y yields x==y and f==g (in that order)

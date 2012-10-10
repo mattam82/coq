@@ -20,9 +20,9 @@ open Environ
    only a coinductive type.
    They raise [Not_found] if not convertible to a recursive type. *)
 
-val find_rectype     : env -> types -> inductive * constr list
-val find_inductive   : env -> types -> inductive * constr list
-val find_coinductive : env -> types -> inductive * constr list
+val find_rectype     : env -> types -> pinductive * constr list
+val find_inductive   : env -> types -> pinductive * constr list
+val find_coinductive : env -> types -> pinductive * constr list
 
 type mind_specif = mutual_inductive_body * one_inductive_body
 
@@ -32,23 +32,34 @@ type mind_specif = mutual_inductive_body * one_inductive_body
 val lookup_mind_specif : env -> inductive -> mind_specif
 
 (** {6 Functions to build standard types related to inductive } *)
-val ind_subst : mutual_inductive -> mutual_inductive_body -> constr list
+val ind_subst : mutual_inductive -> mutual_inductive_body -> universe_list -> constr list
 
-val type_of_inductive : env -> mind_specif -> types
+val make_inductive_subst : mutual_inductive_body -> universe_list -> universe_subst
+
+val instantiate_inductive_constraints : mutual_inductive_body -> universe_subst -> constraints
+
+val constrained_type_of_inductive : env -> mind_specif puniverses -> types constrained
+
+val type_of_inductive : env -> mind_specif puniverses -> types
+
+val type_of_inductive_knowing_parameters : env -> ?polyprop:bool -> mind_specif puniverses -> types array -> types
 
 val elim_sorts : mind_specif -> sorts_family list
 
 (** Return type as quoted by the user *)
-val type_of_constructor : constructor -> mind_specif -> types
+
+val constrained_type_of_constructor : pconstructor -> mind_specif -> types constrained
+val type_of_constructor : pconstructor -> mind_specif -> types
+val type_of_constructor_in_ctx : constructor -> mind_specif -> types in_universe_context
 
 (** Return constructor types in normal form *)
-val arities_of_constructors : inductive -> mind_specif -> types array
+val arities_of_constructors : pinductive -> mind_specif -> types array
 
 (** Return constructor types in user form *)
-val type_of_constructors : inductive -> mind_specif -> types array
+val type_of_constructors : pinductive -> mind_specif -> types array
 
 (** Transforms inductive specification into types (in nf) *)
-val arities_of_specif : mutual_inductive -> mind_specif -> types array
+val arities_of_specif : mutual_inductive puniverses -> mind_specif -> types array
 
 val inductive_params : mind_specif -> int
 
@@ -60,11 +71,11 @@ val inductive_params : mind_specif -> int
    the universe constraints generated.
  *)
 val type_case_branches :
-  env -> inductive * constr list -> unsafe_judgment -> constr
+  env -> pinductive * constr list -> unsafe_judgment -> constr
     -> types array * types * constraints
 
 val build_branches_type :
-  inductive -> mutual_inductive_body * one_inductive_body ->
+  pinductive -> mutual_inductive_body * one_inductive_body ->
     constr list -> constr -> types array
 
 (** Return the arity of an inductive type *)
@@ -74,7 +85,7 @@ val inductive_sort_family : one_inductive_body -> sorts_family
 
 (** Check a [case_info] actually correspond to a Case expression on the
    given inductive type. *)
-val check_case_info : env -> inductive -> case_info -> unit
+val check_case_info : env -> pinductive -> case_info -> unit
 
 (** {6 Guard conditions for fix and cofix-points. } *)
 val check_fix : env -> fixpoint -> unit
@@ -91,13 +102,7 @@ val check_cofix : env -> cofixpoint -> unit
 
 exception SingletonInductiveBecomesProp of Id.t
 
-val type_of_inductive_knowing_parameters : ?polyprop:bool ->
-  env -> one_inductive_body -> types array -> types
-
 val max_inductive_sort : sorts array -> universe
-
-val instantiate_universes : env -> rel_context ->
-    polymorphic_arity -> types array -> rel_context * sorts
 
 (** {6 Debug} *)
 

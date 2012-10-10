@@ -260,6 +260,9 @@ let interp_fresh_ident = interp_ident_gen true
 let pf_interp_ident id gl = interp_ident_gen false id (pf_env gl)
 let pf_interp_fresh_ident id gl = interp_ident_gen true id (pf_env gl)
 
+let interp_global ist gl gr = 
+  Evd.fresh_global Evd.univ_flexible (pf_env gl) (project gl) gr
+
 (* Interprets an optional identifier which must be fresh *)
 let interp_fresh_name ist env = function
   | Anonymous -> Anonymous
@@ -370,7 +373,7 @@ let interp_reference ist env = function
 let pf_interp_reference ist gl = interp_reference ist (pf_env gl)
 
 let coerce_to_inductive = function
-  | VConstr ([],c) when isInd c -> destInd c
+  | VConstr ([],c) when isInd c -> fst (destInd c)
   | _ -> raise (CannotCoerceTo "an inductive type")
 
 let interp_inductive ist = function
@@ -379,7 +382,7 @@ let interp_inductive ist = function
 
 let coerce_to_evaluable_ref env v =
   let ev = match v with
-    | VConstr ([],c) when isConst c -> EvalConstRef (destConst c)
+    | VConstr ([],c) when isConst c -> EvalConstRef (fst (destConst c))
     | VConstr ([],c) when isVar c -> EvalVarRef (destVar c)
     | VIntroPattern (IntroIdentifier id) when List.mem id (ids_of_context env)
 	-> EvalVarRef id
@@ -463,7 +466,8 @@ let interp_fresh_id ist env l =
 
 let pf_interp_fresh_id ist gl = interp_fresh_id ist (pf_env gl)
 
-let interp_gen kind ist allow_patvar expand_evar fail_evar use_classes env sigma (c,ce) =
+let interp_gen kind ist allow_patvar expand_evar fail_evar use_classes 
+  env sigma (c,ce) =
   let (ltacvars,unbndltacvars as vars) = extract_ltac_constr_values ist env in
   let c = match ce with
   | None -> c
@@ -480,6 +484,12 @@ let interp_gen kind ist allow_patvar expand_evar fail_evar use_classes env sigma
     catch_error trace 
       (understand_ltac ~resolve_classes:use_classes expand_evar sigma env vars kind) c 
   in
+  (* let evdc =  *)
+  (*   (\* Resolve universe constraints right away. *\) *)
+  (*   let (evd, c) = evdc in *)
+  (*   let evd', f = Evarutil.nf_evars_and_universes evd in *)
+  (*     evd, f c *)
+  (* in *)
   let (evd,c) =
     if expand_evar then
       solve_remaining_evars fail_evar use_classes
@@ -804,7 +814,7 @@ let interp_induction_arg ist gl arg =
 	if Tactics.is_quantified_hypothesis id gl then
           ElimOnIdent (loc,id)
 	else
-          let c = (GVar (loc,id),Some (CRef (Ident (loc,id)))) in
+          let c = (GVar (loc,id),Some (CRef (Ident (loc,id),None))) in
           let (sigma,c) = interp_constr ist env sigma c in
           ElimOnConstr (sigma,(c,NoBindings))
 
@@ -902,7 +912,7 @@ type 'a extended_matching_result =
       e_sub : bound_ident_map * extended_patvar_map;
       e_nxt : unit -> 'a extended_matching_result }
 
-(* Tries to match one hypothesis pattern with a list of hypotheses *)
+(* Trieso to match one hypothesis pattern with a list of hypotheses *)
 let apply_one_mhyp_context ist env gl lmatch (hypname,patv,pat) lhyps =
   let get_id_couple id = function
     | Name idpat -> [idpat,VConstr ([],mkVar id)]
@@ -944,7 +954,7 @@ let apply_one_mhyp_context ist env gl lmatch (hypname,patv,pat) lhyps =
               with
                 | PatternMatchingFailure -> apply_one_mhyp_context_rec tl in
             match_next_pattern (fun () ->
-	      let hyp = if Option.is_empty b then hyp else refresh_universes_strict hyp in
+	      let hyp = if Option.is_empty b then hyp else (* refresh_universes_strict  *)hyp in
 	      match_pat lmatch hyp pat) ()
 	| Some patv ->
 	    match b with
@@ -963,7 +973,7 @@ let apply_one_mhyp_context ist env gl lmatch (hypname,patv,pat) lhyps =
                             match_next_pattern_in_body s1.e_nxt () in
                     match_next_pattern_in_typ
                       (fun () ->
-			let hyp = refresh_universes_strict hyp in
+			let hyp = (* refresh_universes_strict *) hyp in
 			match_pat s1.e_sub hyp pat) ()
                   with PatternMatchingFailure -> apply_one_mhyp_context_rec tl
                 in
@@ -1092,7 +1102,7 @@ and interp_tacarg ist gl arg =
         let (sigma,fv) = interp_ltac_reference loc true ist gl f in
 	let (sigma,largs) =
 	  List.fold_right begin fun a (sigma',acc) ->
-	    let (sigma', a_interp) = interp_tacarg ist gl a in
+	    let (sigma', a_interp) = interp_tacarg ist { gl with sigma=sigma'} a in
 	    sigma' , a_interp::acc
 	  end l (sigma,[])
 	in
@@ -1843,10 +1853,14 @@ and interp_atomic ist gl tac =
     | VarArgType ->
         mk_hyp_value ist gl (out_gen globwit_var x)
     | RefArgType ->
-        VConstr ([],constr_of_global
-          (pf_interp_reference ist gl (out_gen globwit_ref x)))
+        let (sigma,c) =
+          interp_global ist gl (pf_interp_reference ist gl (out_gen globwit_ref x))
+	in evdref := sigma;
+	  VConstr ([], c)
     | SortArgType ->
-        VConstr ([],mkSort (interp_sort (out_gen globwit_sort x)))
+        let (sigma,s) = interp_sort !evdref (out_gen globwit_sort x) in
+	evdref := sigma;
+        VConstr ([],mkSort s)
     | ConstrArgType ->
         let (sigma,v) = mk_constr_value ist gl (out_gen globwit_constr x) in
 	evdref := sigma;
@@ -1965,7 +1979,6 @@ let hide_interp t ot gl =
   match ot with
   | None -> t gl
   | Some t' -> (tclTHEN t t') gl
-
 
 (***************************************************************************)
 (* Other entry points *)

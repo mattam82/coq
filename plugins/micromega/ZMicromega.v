@@ -317,7 +317,7 @@ Qed.
 
 Require Import QArith.
 
-Inductive ZArithProof : Type :=
+Inductive ZArithProof : Set :=
 | DoneProof
 | RatProof : ZWitness -> ZArithProof -> ZArithProof
 | CutProof : ZWitness -> ZArithProof -> ZArithProof

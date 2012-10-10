@@ -144,7 +144,7 @@ let tag_hypothesis,tag_of_hyp, hyp_of_tag =
 let hide_constr,find_constr,clear_tables,dump_tables =
   let l = ref ([]:(constr * (Id.t * Id.t * bool)) list) in
   (fun h id eg b -> l := (h,(id,eg,b)):: !l),
-  (fun h -> try List.assoc_f eq_constr h !l with Not_found -> failwith "find_contr"),
+  (fun h -> try List.assoc_f (fun c c' -> eq_constr_nounivs c c') h !l with Not_found -> failwith "find_contr"),
   (fun () -> l := []),
   (fun () -> !l)
 
@@ -316,7 +316,7 @@ let coq_iff = lazy (constant "iff")
 
 (* For unfold *)
 let evaluable_ref_of_constr s c = match kind_of_term (Lazy.force c) with
-  | Const kn when Tacred.is_evaluable (Global.env()) (EvalConstRef kn) ->
+  | Const (kn,u) when Tacred.is_evaluable (Global.env()) (EvalConstRef kn) ->
       EvalConstRef kn
   | _ -> anomaly ~label:"Coq_omega" (Pp.str (s^" is not an evaluable constant"))
 
@@ -402,11 +402,11 @@ let destructurate_prop t =
     | _, [_;_] when eq_constr c (Lazy.force coq_lt) -> Kapp (Lt,args)
     | _, [_;_] when eq_constr c (Lazy.force coq_ge) -> Kapp (Ge,args)
     | _, [_;_] when eq_constr c (Lazy.force coq_gt) -> Kapp (Gt,args)
-    | Const sp, args ->
+    | Const (sp,_), args ->
 	Kapp (Other (string_of_path (path_of_global (ConstRef sp))),args)
-    | Construct csp , args ->
+    | Construct (csp,_) , args ->
 	Kapp (Other (string_of_path (path_of_global (ConstructRef csp))), args)
-    | Ind isp, args ->
+    | Ind (isp,_), args ->
 	Kapp (Other (string_of_path (path_of_global (IndRef isp))),args)
     | Var id,[] -> Kvar id
     | Prod (Anonymous,typ,body), [] -> Kimp(typ,body)

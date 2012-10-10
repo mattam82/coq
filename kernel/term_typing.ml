@@ -22,65 +22,67 @@ open Environ
 open Entries
 open Typeops
 
-let constrain_type env j cst1 = function
-  | None ->
-      make_polymorphic_if_constant_for_ind env j, cst1
+let constrain_type env j ctx poly = function
+  | None -> j.uj_type, ctx
   | Some t ->
-      let (tj,cst2) = infer_type env t in
-      let (_,cst3) = judge_of_cast env j DEFAULTcast tj in
-      assert (eq_constr t tj.utj_val);
-      let cstrs = union_constraints (union_constraints cst1 cst2) cst3 in
-      NonPolymorphicType t, cstrs
+      let tj, ctx' = infer_type env t in
+      let ctx = union_universe_context_set ctx ctx' in
+      let j, cst = judge_of_cast env j DEFAULTcast tj in
+	(* TODO*)
+	check_consistent_constraints ctx cst;
+	assert (eq_constr t tj.utj_val);
+	t, add_constraints_ctx ctx cst
 
-let local_constrain_type env j cst1 = function
+let local_constrain_type env j = function
   | None ->
-      j.uj_type, cst1
+      j.uj_type
   | Some t ->
-      let (tj,cst2) = infer_type env t in
-      let (_,cst3) = judge_of_cast env j DEFAULTcast tj in
+      let (tj,ctx) = infer_type env t in
+      let (_,cst) = judge_of_cast env j DEFAULTcast tj in
       assert (eq_constr t tj.utj_val);
-      t, union_constraints (union_constraints cst1 cst2) cst3
+      check_consistent_constraints ctx cst;
+      t
 
 let translate_local_def env (b,topt) =
-  let (j,cst) = infer env b in
-  let (typ,cst) = local_constrain_type env j cst topt in
-    (j.uj_val,typ,cst)
+  let (j,ctx) = infer env b in
+  let typ = local_constrain_type env j topt in
+    (j.uj_val,typ,ctx)
 
 let translate_local_assum env t =
   let (j,cst) = infer env t in
   let t = Typeops.assumption_of_judgment env j in
     (t,cst)
 
-
 (* Insertion of constants and parameters in environment. *)
 
 let infer_declaration env = function
   | DefinitionEntry c ->
-      let (j,cst) = infer env c.const_entry_body in
-      let j =
-        {uj_val = hcons_constr j.uj_val;
-         uj_type = hcons_constr j.uj_type} in
-      let (typ,cst) = constrain_type env j cst c.const_entry_type in
-      let def =
-	if c.const_entry_opaque
-	then OpaqueDef (Lazyconstr.opaque_from_val j.uj_val)
-	else Def (Lazyconstr.from_val j.uj_val)
-      in
-      def, typ, cst, c.const_entry_inline_code, c.const_entry_secctx
-  | ParameterEntry (ctx,t,nl) ->
-      let (j,cst) = infer env t in
-      let t = hcons_constr (Typeops.assumption_of_judgment env j) in
-      Undef nl, NonPolymorphicType t, cst, false, ctx
+    let env' = push_constraints_to_env c.const_entry_universes env in
+    let (j,cst) = infer env' c.const_entry_body in
+    let j =
+      {uj_val = hcons_constr j.uj_val;
+       uj_type = hcons_constr j.uj_type} in
+    let (typ,cst) = constrain_type env' j cst
+      c.const_entry_polymorphic c.const_entry_type in
+    let def =
+      if c.const_entry_opaque
+      then OpaqueDef (Lazyconstr.opaque_from_val j.uj_val)
+      else Def (Lazyconstr.from_val j.uj_val)
+    in
+    let univs = check_context_subset cst c.const_entry_universes in
+      def, typ, c.const_entry_polymorphic, univs,
+        c.const_entry_inline_code, c.const_entry_secctx
+  | ParameterEntry (ctx,(t,uctx),nl) ->
+    let env' = push_constraints_to_env uctx env in
+    let (j,cst) = infer env' t in
+    let t = hcons_constr (Typeops.assumption_of_judgment env j) in
+    (* let univs = check_context_subset cst uctx in *) (*FIXME*)
+    let univs = Univ.context_of_universe_context_set uctx in
+      Undef nl, t, false, univs, false, ctx
+      
+let global_vars_set_constant_type env = global_vars_set env
 
-let global_vars_set_constant_type env = function
-  | NonPolymorphicType t -> global_vars_set env t
-  | PolymorphicArity (ctx,_) ->
-      Sign.fold_rel_context
-        (fold_rel_declaration
-	  (fun t c -> Id.Set.union (global_vars_set env t) c))
-      ctx ~init:Id.Set.empty
-
-let build_constant_declaration env (def,typ,cst,inline_code,ctx) =
+let build_constant_declaration env kn (def,typ,poly,univs,inline_code,ctx) =
   let hyps = 
     let inferred =
       let ids_typ = global_vars_set_constant_type env typ in
@@ -105,17 +107,20 @@ let build_constant_declaration env (def,typ,cst,inline_code,ctx) =
     const_body = def;
     const_type = typ;
     const_body_code = tps;
-    const_constraints = cst;
+    const_polymorphic = poly;
+    const_universes = univs;
     const_native_name = ref NotLinked;
     const_inline_code = inline_code }
 
 (*s Global and local constant declaration. *)
 
-let translate_constant env ce =
-  build_constant_declaration env (infer_declaration env ce)
+let translate_constant env kn ce =
+  build_constant_declaration env kn (infer_declaration env ce)
 
-let translate_recipe env r =
-  build_constant_declaration env (Cooking.cook_constant env r)
+let translate_recipe env kn r =
+  build_constant_declaration env kn 
+    (let def,typ,poly,cst,inline,hyps = Cooking.cook_constant env r in
+     def,typ,poly,cst,inline,hyps)
 
 (* Insertion of inductive types. *)
 

@@ -98,8 +98,8 @@ let decomp =
   let constr_val_discr t =
   let c, l = decomp t in
     match kind_of_term c with
-    | Ind ind_sp -> Dn.Label(Term_dn.GRLabel (IndRef ind_sp),l)
-    | Construct cstr_sp -> Dn.Label(Term_dn.GRLabel (ConstructRef cstr_sp),l)
+    | Ind (ind_sp,_) -> Dn.Label(Term_dn.GRLabel (IndRef ind_sp),l)
+    | Construct (cstr_sp,_) -> Dn.Label(Term_dn.GRLabel (ConstructRef cstr_sp),l)
     | Var id -> Dn.Label(Term_dn.GRLabel (VarRef id),l)
     | Const _ -> Dn.Everything
     | _ -> Dn.Nothing

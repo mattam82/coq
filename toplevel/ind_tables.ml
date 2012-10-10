@@ -27,10 +27,12 @@ open Decl_kinds
 (**********************************************************************)
 (* Registering schemes in the environment *)
 
-type mutual_scheme_object_function = mutual_inductive -> constr array
-type individual_scheme_object_function = inductive -> constr
+type mutual_scheme_object_function = mutual_inductive -> constr array Evd.in_evar_universe_context
+type individual_scheme_object_function = inductive -> constr Evd.in_evar_universe_context
 
 type 'a scheme_kind = string
+
+let pr_scheme_kind = Pp.str
 
 let scheme_map = ref Indmap.empty
 
@@ -41,9 +43,9 @@ let cache_one_scheme kind (ind,const) =
 let cache_scheme (_,(kind,l)) =
   Array.iter (cache_one_scheme kind) l
 
-let subst_one_scheme subst ((mind,i),const) =
+let subst_one_scheme subst (ind,const) =
   (* Remark: const is a def: the result of substitution is a constant *)
-  ((subst_ind subst mind,i),fst (subst_con subst const))
+  (subst_ind subst ind,subst_constant subst const)
 
 let subst_scheme (subst,(kind,l)) =
   (kind,Array.map (subst_one_scheme subst) l)
@@ -80,8 +82,8 @@ type individual
 type mutual
 
 type scheme_object_function =
-  | MutualSchemeFunction of (mutual_inductive -> constr array)
-  | IndividualSchemeFunction of (inductive -> constr)
+  | MutualSchemeFunction of mutual_scheme_object_function
+  | IndividualSchemeFunction of individual_scheme_object_function
 
 let scheme_object_table =
   (Hashtbl.create 17 : (string, string * scheme_object_function) Hashtbl.t)
@@ -120,14 +122,18 @@ let compute_name internal id =
   | KernelSilent ->
       Namegen.next_ident_away_from (add_prefix "internal_" id) is_visible_name
 
-let define internal id c =
+let define internal id c p univs =
   let fd = declare_constant ~internal in
   let id = compute_name internal id in
+  let subst, ctx = Evd.normalize_evar_universe_context univs Univ.LMap.empty in
+  let c = subst_univs_constr subst c in
   let kn = fd id
     (DefinitionEntry
       { const_entry_body = c;
         const_entry_secctx = None;
         const_entry_type = None;
+	const_entry_polymorphic = p;
+	const_entry_universes = Evd.evar_context_universe_context ctx;
         const_entry_opaque = false;
 	const_entry_inline_code = false
       },
@@ -138,12 +144,12 @@ let define internal id c =
   kn
 
 let define_individual_scheme_base kind suff f internal idopt (mind,i as ind) =
-  let c = f ind in
+  let c, ctx = f ind in
   let mib = Global.lookup_mind mind in
   let id = match idopt with
     | Some id -> id
     | None -> add_suffix mib.mind_packets.(i).mind_typename suff in
-  let const = define internal id c in
+  let const = define internal id c mib.mind_polymorphic ctx in
   declare_scheme kind [|ind,const|];
   const
 
@@ -154,12 +160,13 @@ let define_individual_scheme kind internal names (mind,i as ind) =
       define_individual_scheme_base kind s f internal names ind
 
 let define_mutual_scheme_base kind suff f internal names mind =
-  let cl = f mind in
+  let cl, ctx = f mind in
   let mib = Global.lookup_mind mind in
   let ids = Array.init (Array.length mib.mind_packets) (fun i ->
       try List.assoc i names
       with Not_found -> add_suffix mib.mind_packets.(i).mind_typename suff) in
-  let consts = Array.map2 (define internal) ids cl in
+  let consts = Array.map2 (fun id cl -> 
+     define internal id cl mib.mind_polymorphic ctx) ids cl in
   declare_scheme kind (Array.mapi (fun i cst -> ((mind,i),cst)) consts);
   consts
 
@@ -181,4 +188,3 @@ let find_scheme kind (mind,i as ind) =
 let check_scheme kind ind =
   try let _ = String.Map.find kind (Indmap.find ind !scheme_map) in true
   with Not_found -> false
-

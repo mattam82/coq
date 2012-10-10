@@ -93,8 +93,9 @@ GEXTEND Gram
          "Resolve ->" and "Resolve <-" *)
       | IDENT "Hint"; IDENT "Resolve"; lc = LIST1 reference_or_constr; n = OPT natural;
 	  dbnames = opt_hintbases ->
-	  VernacHints (use_module_locality (),dbnames,
-	    HintsResolve (List.map (fun x -> (n, true, x)) lc))
+	  let poly = Flags.use_polymorphic_flag () in
+	    VernacHints (use_module_locality (),dbnames,
+			 HintsResolve (List.map (fun x -> (n, poly, true, x)) lc))
       ] ];
 
   obsolete_locality:
@@ -106,8 +107,11 @@ GEXTEND Gram
   ;
   hint:
     [ [ IDENT "Resolve"; lc = LIST1 reference_or_constr; n = OPT natural ->
-          HintsResolve (List.map (fun x -> (n, true, x)) lc)
-      | IDENT "Immediate"; lc = LIST1 reference_or_constr -> HintsImmediate lc
+	let poly = Flags.use_polymorphic_flag () in
+          HintsResolve (List.map (fun x -> (n, poly, true, x)) lc)
+      | IDENT "Immediate"; lc = LIST1 reference_or_constr -> 
+	let poly = Flags.use_polymorphic_flag () in
+	  HintsImmediate (List.map (fun c -> (poly, c)) lc)
       | IDENT "Transparent"; lc = LIST1 global -> HintsTransparency (lc, true)
       | IDENT "Opaque"; lc = LIST1 global -> HintsTransparency (lc, false)
       | IDENT "Unfold"; lqid = LIST1 global -> HintsUnfold lqid

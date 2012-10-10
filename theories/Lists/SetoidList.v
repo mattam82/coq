@@ -11,7 +11,7 @@ Require Export Sorted.
 Require Export Setoid Basics Morphisms.
 Set Implicit Arguments.
 Unset Strict Implicit.
-
+Set Universe Polymorphism.
 (** * Logical relations over lists with respect to a setoid equality
       or ordering. *)
 
@@ -34,7 +34,7 @@ Hint Constructors InA.
     of the previous one. Having [InA = Exists eqA] raises too
     many compatibility issues. For now, we only state the equivalence: *)
 
-Lemma InA_altdef : forall x l, InA x l <-> Exists (eqA x) l.
+Lemma InA_altdef : forall x l, InA x l <-> Exists (eqA x) l. 
 Proof. split; induction 1; auto. Qed.
 
 Lemma InA_cons : forall x y l, InA x (y::l) <-> eqA x y \/ InA x l.
@@ -151,7 +151,7 @@ Qed.
 
 Lemma InA_eqA : forall l x y, eqA x y -> InA x l -> InA y l.
 Proof.
- intros l x y H H'. rewrite <- H; auto.
+ intros l x y H H'. rewrite <- H. auto.
 Qed.
 Hint Immediate InA_eqA.
 

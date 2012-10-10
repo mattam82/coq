@@ -84,6 +84,18 @@ let auto_intros = ref true
 let make_auto_intros flag = auto_intros := flag
 let is_auto_intros () = version_strictly_greater V8_2 && !auto_intros
 
+let universe_polymorphism = ref false
+let make_universe_polymorphism b = universe_polymorphism := b
+let is_universe_polymorphism () = !universe_polymorphism
+
+let local_polymorphic_flag = ref None
+let use_polymorphic_flag () = 
+  match !local_polymorphic_flag with 
+  | Some p -> local_polymorphic_flag := None; p
+  | None -> is_universe_polymorphism ()
+let make_polymorphic_flag b =
+  local_polymorphic_flag := Some b
+
 (** [program_cmd] indicates that the current command is a Program one.
     [program_mode] tells that Program mode has been activated, either
     globally via [Set Program] or locally via the Program command prefix. *)

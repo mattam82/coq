@@ -43,12 +43,12 @@ type type_error =
   | NotAType of unsafe_judgment
   | BadAssumption of unsafe_judgment
   | ReferenceVariables of identifier * constr
-  | ElimArity of inductive * sorts_family list * constr * unsafe_judgment
+  | ElimArity of pinductive * sorts_family list * constr * unsafe_judgment
       * (sorts_family * sorts_family * arity_error) option
   | CaseNotInductive of unsafe_judgment
-  | WrongCaseInfo of inductive * case_info
+  | WrongCaseInfo of pinductive * case_info
   | NumberBranches of unsafe_judgment * int
-  | IllFormedBranch of constr * constructor * constr * constr
+  | IllFormedBranch of constr * pconstructor * constr * constr
   | Generalization of (Name.t * types) * unsafe_judgment
   | ActualType of unsafe_judgment * types
   | CantApplyBadType of
@@ -71,14 +71,14 @@ val error_assumption : env -> unsafe_judgment -> 'a
 val error_reference_variables : env -> identifier -> constr -> 'a
 
 val error_elim_arity :
-  env -> inductive -> sorts_family list -> constr -> unsafe_judgment ->
+  env -> pinductive -> sorts_family list -> constr -> unsafe_judgment ->
       (sorts_family * sorts_family * arity_error) option -> 'a
 
 val error_case_not_inductive : env -> unsafe_judgment -> 'a
 
 val error_number_branches : env -> unsafe_judgment -> int -> 'a
 
-val error_ill_formed_branch : env -> constr -> constructor -> constr -> constr -> 'a
+val error_ill_formed_branch : env -> constr -> pconstructor -> constr -> constr -> 'a
 
 val error_generalization : env -> Name.t * types -> unsafe_judgment -> 'a
 

@@ -155,11 +155,28 @@ let add_constraints cst senv =
     env = Environ.add_constraints cst senv.env;
     univ = Univ.union_constraints cst senv.univ }
 
-let constraints_of_sfb = function
-  | SFBconst cb -> cb.const_constraints
-  | SFBmind mib -> mib.mind_constraints
-  | SFBmodtype mtb -> mtb.typ_constraints
-  | SFBmodule mb -> mb.mod_constraints
+let globalize_constant_universes cb =
+  if cb.const_polymorphic then
+    (Univ.empty_constraint, cb)
+  else
+    let ctx, cstrs = cb.const_universes in
+      (cstrs, cb)
+      
+let globalize_mind_universes mb =
+  if mb.mind_polymorphic then
+    (Univ.empty_constraint, mb)
+  else
+    let ctx, cstrs = mb.mind_universes in
+      (cstrs, mb)
+
+let constraints_of_sfb sfb = 
+  match sfb with
+  | SFBconst cb -> let cstr, cb' = globalize_constant_universes cb in
+		     cstr, SFBconst cb'
+  | SFBmind mib -> let cstr, mib' = globalize_mind_universes mib in
+		     cstr, SFBmind mib'
+  | SFBmodtype mtb -> mtb.typ_constraints, sfb
+  | SFBmodule mb -> mb.mod_constraints, sfb
 
 (* A generic function for adding a new field in a same environment.
    It also performs the corresponding [add_constraints]. *)
@@ -170,7 +187,7 @@ type generic_name =
   | MT of module_path
   | M
 
-let add_field ((l,sfb) as field) gn senv =
+let add_field ((l,sfb) as _field) gn senv =
   let mlabs,olabs = match sfb with
     | SFBmind mib ->
       let l = labels_of_mib mib in
@@ -180,7 +197,8 @@ let add_field ((l,sfb) as field) gn senv =
     | SFBmodule _ | SFBmodtype _ ->
       check_modlabel l senv; (Label.Set.singleton l, Label.Set.empty)
   in
-  let senv = add_constraints (constraints_of_sfb sfb) senv in
+  let cst, sfb = constraints_of_sfb sfb in
+  let senv = add_constraints cst senv in
   let env' = match sfb, gn with
     | SFBconst cb, C con -> Environ.add_constant con cb senv.env
     | SFBmind mib, I mind -> Environ.add_mind mind mib senv.env
@@ -192,7 +210,7 @@ let add_field ((l,sfb) as field) gn senv =
     env = env';
     modlabels = Label.Set.union mlabs senv.modlabels;
     objlabels = Label.Set.union olabs senv.objlabels;
-    revstruct = field :: senv.revstruct }
+    revstruct = (l, sfb) :: senv.revstruct }
 
 (* Applying a certain function to the resolver of a safe environment *)
 
@@ -245,14 +263,17 @@ let safe_push_named (id,_,_ as d) env =
     with Not_found -> () in
   Environ.push_named d env
 
+(* FIXME: no polymorphism allowed here. Is that what we really want? *)
 let push_named_def (id,b,topt) senv =
   let (c,typ,cst) = Term_typing.translate_local_def senv.env (b,topt) in
+  let cst = constraints_of cst in
   let senv' = add_constraints cst senv in
   let env'' = safe_push_named (id,Some c,typ) senv'.env in
   (cst, {senv' with env=env''})
 
 let push_named_assum (id,t) senv =
   let (t,cst) = Term_typing.translate_local_assum senv.env t in
+  let cst = constraints_of cst in
   let senv' = add_constraints cst senv in
   let env'' = safe_push_named (id,None,t) senv'.env in
   (cst, {senv' with env=env''})
@@ -267,9 +288,9 @@ type global_declaration =
 let add_constant dir l decl senv =
   let kn = make_con senv.modinfo.modpath dir l in
   let cb = match decl with
-    | ConstantEntry ce -> Term_typing.translate_constant senv.env ce
+    | ConstantEntry ce -> Term_typing.translate_constant senv.env kn ce
     | GlobalRecipe r ->
-      let cb = Term_typing.translate_recipe senv.env r in
+      let cb = Term_typing.translate_recipe senv.env kn r in
       if DirPath.is_empty dir then Declareops.hcons_const_body cb else cb
   in
   let senv' = add_field (l,SFBconst cb) (C kn) senv in
@@ -610,6 +631,7 @@ let end_modtype l senv =
         senv.local_retroknowledge@oldsenv.local_retroknowledge}
 
 let current_modpath senv = senv.modinfo.modpath
+let current_dirpath senv = Names.ModPath.dp (current_modpath senv)
 let delta_of_senv senv = senv.modinfo.resolver,senv.modinfo.resolver_of_param
 
 (* Check that the engagement expected by a library matches the initial one *)
@@ -904,4 +926,4 @@ let j_type j = j.uj_type
 
 let safe_infer senv = infer (env_of_senv senv)
 
-let typing senv = Typeops.typing (env_of_senv senv)
+let typing senv t = fst (Typeops.typing (env_of_senv senv) t)

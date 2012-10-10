@@ -43,9 +43,7 @@ let subst_rel_context sub = List.smartmap (subst_rel_declaration sub)
 
 let subst_const_type sub arity =
   if is_empty_subst sub then arity
-  else match arity with
-    | NonPolymorphicType s -> NonPolymorphicType (subst_mps sub s)
-    | PolymorphicArity (ctx,s) -> PolymorphicArity (subst_rel_context sub ctx,s)
+  else subst_mps sub arity
 
 let subst_const_def sub = function
   | Undef inl -> Undef inl
@@ -57,7 +55,8 @@ let subst_const_body sub cb = {
   const_body = subst_const_def sub cb.const_body;
   const_type = subst_const_type sub cb.const_type;
   const_body_code = Cemitcodes.subst_to_patch_subst sub cb.const_body_code;
-  const_constraints = cb.const_constraints;
+  const_polymorphic = cb.const_polymorphic;
+  const_universes = cb.const_universes;
   const_native_name = ref NotLinked;
   const_inline_code = cb.const_inline_code }
 
@@ -71,16 +70,7 @@ let hcons_rel_decl ((n,oc,t) as d) =
 
 let hcons_rel_context l = List.smartmap hcons_rel_decl l
 
-let hcons_polyarity ar =
-  { poly_param_levels =
-      List.smartmap (Option.smartmap Univ.hcons_univ) ar.poly_param_levels;
-    poly_level = Univ.hcons_univ ar.poly_level }
-
-let hcons_const_type = function
-  | NonPolymorphicType t ->
-    NonPolymorphicType (Term.hcons_constr t)
-  | PolymorphicArity (ctx,s) ->
-    PolymorphicArity (hcons_rel_context ctx, hcons_polyarity s)
+let hcons_const_type t = Term.hcons_constr t
 
 let hcons_const_def = function
   | Undef inl -> Undef inl
@@ -97,7 +87,7 @@ let hcons_const_body cb =
   { cb with
     const_body = hcons_const_def cb.const_body;
     const_type = hcons_const_type cb.const_type;
-    const_constraints = Univ.hcons_constraints cb.const_constraints }
+    const_universes = Univ.hcons_universe_context cb.const_universes }
 
 (** Inductive types *)
 
@@ -109,9 +99,9 @@ let eq_recarg r1 r2 = match r1, r2 with
 
 let subst_recarg sub r = match r with
   | Norec -> r
-  | Mrec (kn,i) -> let kn' = subst_ind sub kn in
+  | Mrec (kn,i) -> let kn' = subst_mind sub kn in
       if kn==kn' then r else Mrec (kn',i)
-  | Imbr (kn,i) -> let kn' = subst_ind sub kn in
+  | Imbr (kn,i) -> let kn' = subst_mind sub kn in
       if kn==kn' then r else Imbr (kn',i)
 
 let mk_norec = Rtree.mk_node Norec [||]
@@ -140,13 +130,10 @@ let subst_wf_paths sub p = Rtree.smartmap (subst_recarg sub) p
 
 (** Substitution of inductive declarations *)
 
-let subst_indarity sub = function
-| Monomorphic s ->
-    Monomorphic {
-      mind_user_arity = subst_mps sub s.mind_user_arity;
-      mind_sort = s.mind_sort;
-    }
-| Polymorphic s as x -> x
+let subst_indarity sub s =
+  { mind_user_arity = subst_mps sub s.mind_user_arity;
+    mind_sort = s.mind_sort;
+  }
 
 let subst_mind_packet sub mbp =
   { mind_consnames = mbp.mind_consnames;
@@ -174,16 +161,15 @@ let subst_mind sub mib =
     mind_params_ctxt =
       Sign.map_rel_context (subst_mps sub) mib.mind_params_ctxt;
     mind_packets = Array.smartmap (subst_mind_packet sub) mib.mind_packets ;
-    mind_constraints = mib.mind_constraints;
+    mind_polymorphic = mib.mind_polymorphic;
+    mind_universes = mib.mind_universes;
     mind_native_name = ref NotLinked }
 
 (** Hash-consing of inductive declarations *)
 
-let hcons_indarity = function
-  | Monomorphic a ->
-    Monomorphic { mind_user_arity = Term.hcons_constr a.mind_user_arity;
-		  mind_sort = Term.hcons_sorts a.mind_sort }
-  | Polymorphic a -> Polymorphic (hcons_polyarity a)
+let hcons_indarity a =
+  { mind_user_arity = Term.hcons_constr a.mind_user_arity;
+    mind_sort = Term.hcons_sorts a.mind_sort }
 
 let hcons_mind_packet oib =
  { oib with
@@ -198,4 +184,4 @@ let hcons_mind mib =
   { mib with
     mind_packets = Array.smartmap hcons_mind_packet mib.mind_packets;
     mind_params_ctxt = hcons_rel_context mib.mind_params_ctxt;
-    mind_constraints = Univ.hcons_constraints mib.mind_constraints }
+    mind_universes = Univ.hcons_universe_context mib.mind_universes }

@@ -62,3 +62,5 @@ val iter_rel_context : (constr -> unit) -> rel_context -> unit
 
 (** {6 Map function of [named_context] } *)
 val iter_named_context : (constr -> unit) -> named_context -> unit
+
+val subst_univs_context : Univ.universe_subst -> rel_context -> rel_context

@@ -20,7 +20,7 @@ open Libobject
 (*i*)
 
 
-let add_instance_hint_ref = ref (fun id path local pri -> assert false)
+let add_instance_hint_ref = ref (fun id path local pri poly -> assert false)
 let register_add_instance_hint =
   (:=) add_instance_hint_ref
 let add_instance_hint id = !add_instance_hint_ref id
@@ -72,6 +72,7 @@ type instance = {
      -1 for discard, 0 for none, mutable to avoid redeclarations
      when multiple rebuild_object happen. *)
   is_global: int;
+  is_poly: bool;
   is_impl: global_reference;
 }
 
@@ -79,7 +80,7 @@ type instances = (instance Gmap.t) Gmap.t
 
 let instance_impl is = is.is_impl
 
-let new_instance cl pri glob impl =
+let new_instance cl pri glob poly impl =
   let global =
     if glob then Lib.sections_depth ()
     else -1
@@ -87,6 +88,7 @@ let new_instance cl pri glob impl =
     { is_class = cl.cl_impl;
       is_pri = pri ;
       is_global = global ;
+      is_poly = poly;
       is_impl = impl }
 
 (*
@@ -113,12 +115,32 @@ let _ =
       Summary.unfreeze_function = unfreeze;
       Summary.init_function = init }
 
+open Declarations
+
+let typeclass_univ_instance (cl,u') =
+  let subst = 
+    let u = 
+      match cl.cl_impl with
+      | ConstRef c -> 
+        let cb = Global.lookup_constant c in
+	  if cb.const_polymorphic then fst cb.const_universes else []
+      | IndRef c ->
+         let mib,oib = Global.lookup_inductive c in
+	  if mib.mind_polymorphic then fst mib.mind_universes else []
+      | _ -> []
+    in List.fold_left2 (fun subst u u' -> Univ.LMap.add u u' subst) Univ.LMap.empty u u'
+  in
+  let subst_ctx = Sign.map_rel_context (subst_univs_constr subst) in
+    { cl with cl_context = fst cl.cl_context, subst_ctx (snd cl.cl_context);
+      cl_props = subst_ctx cl.cl_props}, u'
+
 let class_info c =
   try Gmap.find c !classes
-  with _ -> not_a_class (Global.env()) (constr_of_global c)
+  with _ -> not_a_class (Global.env()) (printable_constr_of_global c)
 
 let global_class_of_constr env c =
-  try class_info (global_of_constr c)
+  try let gr, u = Universes.global_of_constr c in
+	class_info gr, u
   with Not_found -> not_a_class env c
 
 let dest_class_app env c =
@@ -154,7 +176,7 @@ let load_class (_, cl) =
 let cache_class = load_class
 
 let subst_class (subst,cl) =
-  let do_subst_con c = fst (Mod_subst.subst_con subst c)
+  let do_subst_con c = Mod_subst.subst_constant subst c
   and do_subst c = Mod_subst.subst_mps subst c
   and do_subst_gr gr = fst (subst_global subst gr) in
   let do_subst_ctx ctx = List.smartmap
@@ -163,7 +185,8 @@ let subst_class (subst,cl) =
   let do_subst_context (grs,ctx) =
     List.smartmap (Option.smartmap (fun (gr,b) -> do_subst_gr gr, b)) grs,
     do_subst_ctx ctx in
-  let do_subst_projs projs = List.smartmap (fun (x, y, z) -> (x, y, Option.smartmap do_subst_con z)) projs in
+  let do_subst_projs projs = List.smartmap (fun (x, y, z) -> 
+    (x, y, Option.smartmap do_subst_con z)) projs in
   { cl_impl = do_subst_gr cl.cl_impl;
     cl_context = do_subst_context cl.cl_context;
     cl_props = do_subst_ctx cl.cl_props;
@@ -195,7 +218,7 @@ let discharge_class (_,cl) =
       let newgrs = List.map (fun (_, _, t) -> 
 	match class_of_constr t with
 	| None -> None
-	| Some (_, (tc, _)) -> Some (tc.cl_impl, true))
+	| Some (_, ((tc,_), _)) -> Some (tc.cl_impl, true))
 	ctx' 
       in
 	List.smartmap (Option.smartmap (fun (gr, b) -> Lib.discharge_global gr, b)) grs
@@ -203,7 +226,7 @@ let discharge_class (_,cl) =
     in grs', discharge_rel_context subst 1 ctx @ ctx' in
   let cl_impl' = Lib.discharge_global cl.cl_impl in
   if cl_impl' == cl.cl_impl then cl else
-    let ctx = abs_context cl in
+    let ctx, uctx = abs_context cl in
     let ctx, subst = rel_of_variable_context ctx in
     let context = discharge_context ctx subst cl.cl_context in
     let props = discharge_rel_context subst (succ (List.length (fst cl.cl_context))) cl.cl_props in
@@ -252,7 +275,7 @@ let build_subclasses ~check env sigma glob pri =
     let ty = Evarutil.nf_evar sigma (Retyping.get_type_of env sigma c) in
       match class_of_constr ty with
       | None -> []
-      | Some (rels, (tc, args)) ->
+      | Some (rels, ((tc,u), args)) ->
 	let instapp = 
 	  Reductionops.whd_beta sigma (appvectc c (Termops.extended_rel_vect 0 rels)) 
 	in
@@ -264,7 +287,7 @@ let build_subclasses ~check env sigma glob pri =
 	   | Some (Backward, _) -> None
 	   | Some (Forward, pri') ->
 	     let proj = Option.get proj in
-	     let body = it_mkLambda_or_LetIn (mkApp (mkConst proj, projargs)) rels in
+	     let body = it_mkLambda_or_LetIn (mkApp (mkConstU (proj,u), projargs)) rels in
 	       if check && check_instance env sigma body then None
 	       else 
 		 let pri = 
@@ -280,7 +303,7 @@ let build_subclasses ~check env sigma glob pri =
 	  let rest = aux pri body path' in
 	    hints @ (path', pri, body) :: rest
 	in List.fold_left declare_proj [] projs 
-  in aux pri (constr_of_global glob) [glob]
+  in aux pri (Universes.constr_of_global glob) [glob]
 
 (*
  * instances persistent object
@@ -326,9 +349,11 @@ let discharge_instance (_, (action, inst)) =
 let is_local i = Int.equal i.is_global (-1)
 
 let add_instance check inst =
-  add_instance_hint (IsGlobal inst.is_impl) [inst.is_impl] (is_local inst) inst.is_pri;
+  let poly = Global.is_polymorphic inst.is_impl in
+  add_instance_hint (IsGlobal inst.is_impl) [inst.is_impl] (is_local inst) 
+    inst.is_pri poly;
   List.iter (fun (path, pri, c) -> add_instance_hint (IsConstr c) path
-    (is_local inst) pri) 
+    (is_local inst) pri poly)
     (build_subclasses ~check:(check && not (isVarRef inst.is_impl))
        (Global.env ()) Evd.empty inst.is_impl inst.is_pri)
 
@@ -363,11 +388,10 @@ let remove_instance i =
   remove_instance_hint i.is_impl
 
 let declare_instance pri local glob =
-  let c = constr_of_global glob in
-  let ty = Retyping.get_type_of (Global.env ()) Evd.empty c in
+  let ty = Global.type_of_global_unsafe (*FIXME*) glob in
     match class_of_constr ty with
-    | Some (rels, (tc, args) as _cl) ->
-      add_instance (new_instance tc pri (not local) glob)
+    | Some (rels, ((tc,_), args) as _cl) ->
+      add_instance (new_instance tc pri (not local) (Flags.use_polymorphic_flag ()) glob)
 (*       let path, hints = build_subclasses (not local) (Global.env ()) Evd.empty glob in *)
 (*       let entries = List.map (fun (path, pri, c) -> (pri, local, path, c)) hints in *)
 (* 	Auto.add_hints local [typeclasses_db] (Auto.HintsResolveEntry entries); *)
@@ -386,9 +410,9 @@ let add_class cl =
 
 
 open Declarations
-
+(* FIXME: deal with universe instances *)
 let add_constant_class cst =
-  let ty = Typeops.type_of_constant (Global.env ()) cst in
+  let ty = Typeops.type_of_constant_in (Global.env ()) (cst,[]) in
   let ctx, arity = decompose_prod_assum ty in
   let tc = 
     { cl_impl = ConstRef cst;
@@ -405,7 +429,7 @@ let add_inductive_class ind =
     let ctx = oneind.mind_arity_ctxt in
     let ty = Inductive.type_of_inductive_knowing_parameters
       (push_rel_context ctx (Global.env ()))
-	  oneind (Termops.extended_rel_vect 0 ctx)
+        ((mind,oneind),[]) (Termops.extended_rel_vect 0 ctx)
     in
       { cl_impl = IndRef ind;
 	cl_context = List.map (const None) ctx, ctx;
@@ -417,7 +441,7 @@ let add_inductive_class ind =
  * interface functions
  *)
 
-let instance_constructor cl args =
+let instance_constructor (cl,u) args =
   let filter (_, b, _) = match b with
   | None -> true
   | Some _ -> false
@@ -425,14 +449,17 @@ let instance_constructor cl args =
   let lenpars = List.length (List.filter filter (snd cl.cl_context)) in
   let pars = fst (List.chop lenpars args) in
     match cl.cl_impl with
-      | IndRef ind -> Some (applistc (mkConstruct (ind, 1)) args),
-	  applistc (mkInd ind) pars
+      | IndRef ind -> 
+        let ind = ind, u in
+          (Some (applistc (mkConstructUi (ind, 1)) args),
+	   applistc (mkIndU ind) pars)
       | ConstRef cst -> 
+        let cst = cst, u in
 	let term = match args with
-	| [] -> None
-	| _ -> Some (List.last args)
+	  | [] -> None
+	  | _ -> Some (List.last args)
 	in
-	  term, applistc (mkConst cst) pars
+	  (term, applistc (mkConstU cst) pars)
       | _ -> assert false
 
 let typeclasses () = Gmap.fold (fun _ l c -> l :: c) !classes []

@@ -25,7 +25,7 @@ module TypeDnet = Term_dnet.Make
      type t = Globnames.global_reference
      let compare = RefOrdered.compare
      let subst s gr = fst (Globnames.subst_global s gr)
-     let constr_of = Global.type_of_global
+     let constr_of = Global.type_of_global_unsafe
    end)
   (struct let reduce = reduce
 	  let direction = false
@@ -104,7 +104,7 @@ let add a b = Profile.profile1 add_key add a b
 let _ = Declare.add_cache_hook
   ( fun sp ->
       let gr = Nametab.global_of_path sp in
-      let ty = Global.type_of_global gr in
+      let ty = Global.type_of_global_unsafe gr in
       add ty gr )
 
 let _ = Declaremods.set_end_library_hook update

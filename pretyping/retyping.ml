@@ -41,10 +41,6 @@ let type_of_var env id =
   with Not_found ->
     anomaly ~label:"type_of" (str "variable " ++ Id.print id ++ str " unbound")
 
-let is_impredicative_set env = match Environ.engagement env with
-| Some ImpredicativeSet -> true
-| _ -> false
-
 let retype ?(polyprop=true) sigma =
   let rec type_of env cstr=
     match kind_of_term cstr with
@@ -55,7 +51,7 @@ let retype ?(polyprop=true) sigma =
         let (_,_,ty) = lookup_rel n env in
         lift n ty
     | Var id -> type_of_var env id
-    | Const cst -> Typeops.type_of_constant env cst
+    | Const cst -> Typeops.type_of_constant_in env cst
     | Evar ev -> Evd.existential_type sigma ev
     | Ind ind -> type_of_inductive env ind
     | Construct cstr -> type_of_constructor env cstr
@@ -92,15 +88,13 @@ let retype ?(polyprop=true) sigma =
 	  | _, (Prop Null as s) -> s
           | Prop _, (Prop Pos as s) -> s
           | Type _, (Prop Pos as s) when is_impredicative_set env -> s
-	  | (Type _, _) | (_, Type _) -> new_Type_sort ()
-(*
           | Type u1, Prop Pos -> Type (Univ.sup u1 Univ.type0_univ)
 	  | Prop Pos, (Type u2) -> Type (Univ.sup Univ.type0_univ u2)
 	  | Prop Null, (Type _ as s) -> s
-	  | Type u1, Type u2 -> Type (Univ.sup u1 u2)*))
-    | App(f,args) when isGlobalRef f ->
-	let t = type_of_global_reference_knowing_parameters env f args in
-        sort_of_atomic_type env sigma t args
+	  | Type u1, Type u2 -> Type (Univ.sup u1 u2))
+    (* | App(f,args) when isGlobalRef f -> *)
+    (* 	let t = type_of_global_reference_knowing_parameters env f args in *)
+    (*     sort_of_atomic_type env sigma t args *)
     | App(f,args) -> sort_of_atomic_type env sigma (type_of env f) args
     | Lambda _ | Fix _ | Construct _ ->
         anomaly ~label:"sort_of" (str "Not a type (1)")
@@ -128,12 +122,12 @@ let retype ?(polyprop=true) sigma =
     let argtyps = Array.map (fun c -> nf_evar sigma (type_of env c)) args in
     match kind_of_term c with
     | Ind ind ->
-      let (_,mip) = lookup_mind_specif env ind in
+      let mip = lookup_mind_specif env (fst ind) in
 	(try Inductive.type_of_inductive_knowing_parameters
-	       ~polyprop env mip argtyps
+	       ~polyprop env (mip,snd ind) argtyps
 	 with Reduction.NotArity -> anomaly ~label:"type_of" (str "Not an arity"))
     | Const cst ->
-      let t = constant_type env cst in
+      let t = constant_type_in env cst in
 	(try Typeops.type_of_constant_knowing_parameters env t argtyps
 	 with Reduction.NotArity -> anomaly ~label:"type_of" (str "Not an arity"))
     | Var id -> type_of_var env id
@@ -153,27 +147,23 @@ let type_of_global_reference_knowing_parameters env sigma c args =
 let type_of_global_reference_knowing_conclusion env sigma c conclty =
   let conclty = nf_evar sigma conclty in
   match kind_of_term c with
-    | Ind ind ->
-        let (_,mip) = Inductive.lookup_mind_specif env ind in
-        type_of_inductive_knowing_conclusion env mip conclty
+    | Ind (ind,u) ->
+        let spec = Inductive.lookup_mind_specif env ind in
+        type_of_inductive_knowing_conclusion env (spec,u) conclty
     | Const cst ->
-        let t = constant_type env cst in
+        let t = constant_type_in env cst in
         (* TODO *)
         Typeops.type_of_constant_knowing_parameters env t [||]
     | Var id -> type_of_var env id
     | Construct cstr -> type_of_constructor env cstr
     | _ -> assert false
 
-(* We are outside the kernel: we take fresh universes *)
-(* to avoid tactics and co to refresh universes themselves *)
-let get_type_of ?(polyprop=true) ?(refresh=true) env sigma c =
+let get_type_of ?(polyprop=true) env sigma c =
   let f,_,_,_ = retype ~polyprop sigma in
-  let t = f env c in
-    if refresh then refresh_universes t else t
+    f env c
 
 (* Makes an assumption from a constr *)
 let get_assumption_of env evc c = c
 
 (* Makes an unsafe judgment from a constr *)
 let get_judgment_of env evc c = { uj_val = c; uj_type = get_type_of env evc c }
-

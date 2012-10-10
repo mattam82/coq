@@ -62,6 +62,9 @@ let add_module id me inl =
     mp,resolve
     
 
+(** Build a fresh instance for a given context, its associated substitution and 
+    the instantiated constraints. *)
+
 let add_constraints c = global_env := add_constraints c !global_env
 
 let set_engagement c = global_env := set_engagement c !global_env
@@ -112,6 +115,7 @@ let pack_module () =
 let lookup_named id = lookup_named id (env())
 let lookup_constant kn = lookup_constant kn (env())
 let lookup_inductive ind = Inductive.lookup_mind_specif (env()) ind
+let lookup_pinductive (ind,_) = Inductive.lookup_mind_specif (env()) ind
 let lookup_mind kn = lookup_mind kn (env())
 
 let lookup_module mp = lookup_module mp (env())
@@ -153,19 +157,33 @@ let env_of_context hyps =
 
 open Globnames
 
-let type_of_reference env = function
+let type_of_global_unsafe r = 
+  let env = env() in
+  match r with
   | VarRef id -> Environ.named_type id env
-  | ConstRef c -> Typeops.type_of_constant env c
+  | ConstRef c -> 
+     let cb = Environ.lookup_constant c env in cb.Declarations.const_type
   | IndRef ind ->
-     let specif = Inductive.lookup_mind_specif env ind in
-      Inductive.type_of_inductive env specif
+     let (mib, oib) = Inductive.lookup_mind_specif env ind in
+       oib.Declarations.mind_arity.Declarations.mind_user_arity
   | ConstructRef cstr ->
-     let specif =
-      Inductive.lookup_mind_specif env (inductive_of_constructor cstr) in
-       Inductive.type_of_constructor cstr specif
+     let (mib,oib as specif) = Inductive.lookup_mind_specif env (inductive_of_constructor cstr) in
+     let inst = fst mib.Declarations.mind_universes in
+       Inductive.type_of_constructor (cstr,Univ.UList.of_llist inst) specif
 
-let type_of_global t = type_of_reference (env ()) t
 
+let is_polymorphic r = 
+  let env = env() in
+  match r with
+  | VarRef id -> false
+  | ConstRef c -> 
+     let cb = Environ.lookup_constant c env in cb.Declarations.const_polymorphic
+  | IndRef ind ->
+     let (mib, oib) = Inductive.lookup_mind_specif env ind in
+       mib.Declarations.mind_polymorphic
+  | ConstructRef cstr ->
+     let (mib,oib as specif) = Inductive.lookup_mind_specif env (inductive_of_constructor cstr) in
+       mib.Declarations.mind_polymorphic
 
 (* spiwack: register/unregister functions for retroknowledge *)
 let register field value by_clause =
@@ -173,4 +191,10 @@ let register field value by_clause =
   let senv = Safe_typing.register !global_env field entry by_clause in
   global_env := senv
 
+let current_dirpath () = 
+  current_dirpath (safe_env ())
+
+let with_global f = 
+  let (a, (ctx, cst)) = f (env ()) (current_dirpath ()) in
+    add_constraints cst; a
 

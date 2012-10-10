@@ -91,6 +91,7 @@ open Evarutil
 open Evarsolve
 open Tacred
 open Evd
+open Universes
 open Termops
 open Namegen
 open Indrec

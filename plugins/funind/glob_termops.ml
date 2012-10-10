@@ -10,7 +10,7 @@ open Misctypes
    Some basic functions to rebuild glob_constr
    In each of them the location is Loc.ghost
 *)
-let mkGRef ref = GRef(Loc.ghost,ref)
+let mkGRef ref = GRef(Loc.ghost,ref,None)
 let mkGVar id = GVar(Loc.ghost,id)
 let mkGApp(rt,rtl) = GApp(Loc.ghost,rt,rtl)
 let mkGLambda(n,t,b) = GLambda(Loc.ghost,n,Explicit,t,b)

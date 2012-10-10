@@ -135,6 +135,8 @@ let refine c =
 let thin l =
   Tacmach.thin_no_check l
 
+let eq_constr u v = eq_constr_nounivs u v
+
 let is_trivial_eq t =
   let res =   try
     begin
@@ -771,7 +773,7 @@ let build_proof
 			}
 		      in
 		      build_proof_args do_finalize new_infos  g
-		  | Const c when not (List.mem c fnames) ->
+		  | Const (c,_) when not (List.mem c fnames) ->
 		      let new_infos =
 			{ dyn_infos with
 			    info = (f,args)
@@ -945,7 +947,7 @@ let generate_equation_lemma fnames f fun_num nb_params nb_args rec_args_num =
 (*   observe (str "nb_args := " ++ str (string_of_int nb_args)); *)
 (*   observe (str "nb_params := " ++ str (string_of_int nb_params)); *)
 (*   observe (str "rec_args_num := " ++ str (string_of_int (rec_args_num + 1) )); *)
-  let f_def = Global.lookup_constant (destConst f) in
+  let f_def = Global.lookup_constant (fst (destConst f)) in
   let eq_lhs = mkApp(f,Array.init (nb_params + nb_args) (fun i -> mkRel(nb_params + nb_args - i))) in
   let f_body =
     Lazyconstr.force (Option.get (body_of_constant f_def))
@@ -964,10 +966,10 @@ let generate_equation_lemma fnames f fun_num nb_params nb_args rec_args_num =
   let eq_rhs = nf_betaiotazeta (mkApp(compose_lam params f_body_with_params_and_other_fun,Array.init (nb_params + nb_args) (fun i -> mkRel(nb_params + nb_args - i)))) in
 (*   observe (str "eq_rhs " ++  pr_lconstr eq_rhs); *)
   let type_ctxt,type_of_f = decompose_prod_n_assum (nb_params + nb_args)
-    (Typeops.type_of_constant_type (Global.env()) f_def.const_type) in
+    ((*FIXME*)f_def.const_type) in
   let eqn = mkApp(Lazy.force eq,[|type_of_f;eq_lhs;eq_rhs|]) in
   let lemma_type = it_mkProd_or_LetIn eqn type_ctxt in
-  let f_id = Label.to_id (con_label (destConst f)) in
+  let f_id = Label.to_id (con_label (fst (destConst f))) in
   let prove_replacement =
     tclTHENSEQ
       [
@@ -986,9 +988,9 @@ let generate_equation_lemma fnames f fun_num nb_params nb_args rec_args_num =
       Ensures by: obvious
       i*)
     (mk_equation_id f_id)
-    (Decl_kinds.Global,(Decl_kinds.Proof Decl_kinds.Theorem))
-    lemma_type
-    (fun _ _ -> ());
+    (Decl_kinds.Global, false, (Decl_kinds.Proof Decl_kinds.Theorem))
+    (lemma_type, (*FIXME*) Univ.empty_universe_context_set)
+    (fun _ _ _ -> ());
   Pfedit.by (prove_replacement);
   Lemmas.save_named false
 
@@ -998,10 +1000,10 @@ let generate_equation_lemma fnames f fun_num nb_params nb_args rec_args_num =
 let do_replace params rec_arg_num rev_args_id f fun_num all_funs g =
   let equation_lemma =
     try
-      let finfos = find_Function_infos (destConst f) in
+      let finfos = find_Function_infos (fst (destConst f)) (*FIXME*) in
       mkConst (Option.get finfos.equation_lemma)
     with (Not_found | Option.IsNone as e) ->
-      let f_id = Label.to_id (con_label (destConst f)) in
+      let f_id = Label.to_id (con_label (fst (destConst f))) in
       (*i The next call to mk_equation_id is valid since we will construct the lemma
 	Ensures by: obvious
 	i*)
@@ -1010,7 +1012,7 @@ let do_replace params rec_arg_num rev_args_id f fun_num all_funs g =
       let _ =
 	match e with
 	  | Option.IsNone ->
-	      let finfos = find_Function_infos (destConst f) in
+	      let finfos = find_Function_infos (fst (destConst f)) in
 	      update_Function
 		{finfos with
 		   equation_lemma = Some (match Nametab.locate (qualid_of_ident equation_lemma_id) with
@@ -1312,7 +1314,7 @@ let prove_princ_for_struct interactive_proof fun_num fnames all_funs _nparams : 
 		 in
 		 let fname = destConst (fst (decompose_app (List.hd (List.rev pte_args)))) in
 		 tclTHENSEQ
-		   [unfold_in_concl [(Locus.AllOccurrences, Names.EvalConstRef fname)];
+		   [unfold_in_concl [(Locus.AllOccurrences, Names.EvalConstRef (fst fname))];
 		    let do_prove =
 		      build_proof
 			interactive_proof

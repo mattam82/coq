@@ -165,7 +165,8 @@ sig
       there is none. *)
 
   val uniquize : 'a list -> 'a list
-  (** Return the list of elements without duplicates. *)
+  (** Return the list of elements without duplicates.
+      This is the list unchanged if there was none. *)
 
   val merge_uniq : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
   (** Merge two sorted lists and preserves the uniqueness property. *)

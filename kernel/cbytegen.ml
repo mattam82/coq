@@ -353,7 +353,7 @@ let rec str_const c =
   | App(f,args) ->
       begin
 	match kind_of_term f with
-	| Construct((kn,j),i) -> 
+	| Construct(((kn,j),i),u) -> 
             begin
 	    let oib = lookup_mind kn !global_env in
 	    let oip = oib.mind_packets.(j) in
@@ -422,8 +422,8 @@ let rec str_const c =
               end
 	| _ -> Bconstr c
       end
-  | Ind ind -> Bstrconst (Const_ind ind)
-  | Construct ((kn,j),i) ->  
+  | Ind (ind,u) -> Bstrconst (Const_ind ind)
+  | Construct (((kn,j),i),u) ->  
       begin
       (* spiwack: tries first to apply the run-time compilation
            behavior of the constructor, as in 2/ above *)
@@ -657,7 +657,7 @@ let rec compile_constr reloc c sz cont =
       in
       compile_constr reloc a sz
       (try
-	let entry = Term.Ind ind in
+	let entry = Term.Ind (ind,[]) in
 	Retroknowledge.get_vm_before_match_info (!global_env).retroknowledge
 	                                       entry code_sw
       with Not_found ->
@@ -689,13 +689,13 @@ and compile_const =
               falls back on its normal behavior *)
   try
     Retroknowledge.get_vm_compiling_info (!global_env).retroknowledge
-                  (kind_of_term (mkConst kn)) reloc args sz cont
+                  (kind_of_term (mkConstU kn)) reloc args sz cont
   with Not_found ->
     if Int.equal nargs 0 then
-      Kgetglobal (get_allias !global_env kn) :: cont
+      Kgetglobal (get_allias !global_env (Univ.out_punivs kn)) :: cont
     else
       comp_app (fun _ _ _ cont ->
-                   Kgetglobal (get_allias !global_env kn) :: cont)
+                   Kgetglobal (get_allias !global_env (Univ.out_punivs kn)) :: cont)
         compile_constr reloc () args sz cont
 
 let compile env c =
@@ -723,7 +723,7 @@ let compile_constant_body env = function
       match kind_of_term body with
 	| Const kn' ->
 	    (* we use the canonical name of the constant*)
-	    let con= constant_of_kn (canonical_con kn') in
+	    let con= constant_of_kn (canonical_con (Univ.out_punivs kn')) in
 	      BCallias (get_allias env con)
 	| _ ->
 	    let res = compile env body in
@@ -751,7 +751,7 @@ let compile_structured_int31 fc args =
   Const_b0
     (Array.fold_left
        (fun temp_i -> fun t -> match kind_of_term t with
-          | Construct (_,d) -> 2*temp_i+d-1
+          | Construct ((_,d),_) -> 2*temp_i+d-1
           | _ -> raise NotClosed)
        0 args
     )

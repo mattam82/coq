@@ -85,7 +85,7 @@ let transl_with_decl env = function
   | CWith_Module ((_,fqid),qid) ->
       With_Module (fqid,lookup_module qid)
   | CWith_Definition ((_,fqid),c) ->
-      With_Definition (fqid,interp_constr Evd.empty env c)
+      With_Definition (fqid, fst (interp_constr Evd.empty env c)) (*FIXME*)
 
 let loc_of_module = function
   | CMident (loc,_) | CMapply (loc,_,_) | CMwith (loc,_,_) -> loc

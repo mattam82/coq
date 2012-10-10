@@ -199,7 +199,7 @@ val contract_fix : ?env:Environ.env -> fixpoint ->
 val fix_recarg : fixpoint -> constr stack -> (int * constr) option
 
 (** {6 Querying the kernel conversion oracle: opaque/transparent constants } *)
-val is_transparent : 'a tableKey -> bool
+val is_transparent : constant tableKey -> bool
 
 (** {6 Conversion Functions (uses closures, lazy strategy) } *)
 
@@ -217,6 +217,9 @@ val is_fconv : conv_pb -> env ->  evar_map -> constr -> constr -> bool
 val is_trans_conv : transparent_state -> env -> evar_map -> constr -> constr -> bool
 val is_trans_conv_leq : transparent_state -> env ->  evar_map -> constr -> constr -> bool
 val is_trans_fconv : conv_pb -> transparent_state -> env ->  evar_map -> constr -> constr -> bool
+
+val trans_fconv : conv_pb -> transparent_state -> env ->  evar_map -> constr -> constr -> 
+  evar_map * bool
 
 (** {6 Special-Purpose Reduction Functions } *)
 

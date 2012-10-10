@@ -211,9 +211,9 @@ struct
       | Rel _          -> Term DRel
       | Sort _         -> Term DSort
       | Var i          -> Term (DRef (VarRef i))
-      | Const c        -> Term (DRef (ConstRef c))
-      | Ind i          -> Term (DRef (IndRef i))
-      | Construct c    -> Term (DRef (ConstructRef c))
+      | Const (c,u)    -> Term (DRef (ConstRef c))
+      | Ind (i,u)      -> Term (DRef (IndRef i))
+      | Construct (c,u)-> Term (DRef (ConstructRef c))
       | Term.Meta _    -> assert false
       | Evar (i,_)     -> Meta i
       | Case (ci,c1,c2,ca)     ->

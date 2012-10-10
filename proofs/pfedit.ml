@@ -148,7 +148,8 @@ open Decl_kinds
 let next = let n = ref 0 in fun () -> incr n; !n
 
 let build_constant_by_tactic id sign typ tac =
-  start_proof id (Global,Proof Theorem) sign typ (fun _ _ -> ());
+  start_proof id (Global,false(*FIXME*),Proof Theorem) sign 
+    typ (fun _ _ _ -> ());
   try
     by tac;
     let _,(const,_,_,_) = cook_proof (fun _ -> ()) in
@@ -178,6 +179,7 @@ let solve_by_implicit_tactic env sigma (evk,args) =
       when
 	Sign.named_context_equal (Environ.named_context_of_val evi.evar_hyps)
 	(Environ.named_context env) ->
-      (try build_by_tactic env evi.evar_concl (tclCOMPLETE tac)
+      (try build_by_tactic env (evi.evar_concl, Evd.get_universe_context_set sigma)
+	   (tclCOMPLETE tac)
        with e when Logic.catchable_exception e -> raise Exit)
   | _ -> raise Exit

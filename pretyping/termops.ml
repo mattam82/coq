@@ -20,7 +20,7 @@ open Locus
 let print_sort = function
   | Prop Pos -> (str "Set")
   | Prop Null -> (str "Prop")
-  | Type u -> (str "Type(" ++ Univ.pr_uni u ++ str ")")
+  | Type u -> (str "Type(" ++ Univ.Universe.pr u ++ str ")")
 
 let pr_sort_family = function
   | InSet -> (str "Set")
@@ -32,6 +32,10 @@ let pr_name = function
   | Anonymous -> str "_"
 
 let pr_con sp = str(string_of_con sp)
+
+let pr_puniverses p u = 
+  if u = [] then p 
+  else p ++ str"(*" ++ prlist_with_sep spc Univ.Universe.pr u ++ str"*)"
 
 let rec pr_constr c = match kind_of_term c with
   | Rel n -> str "#"++int n
@@ -60,10 +64,10 @@ let rec pr_constr c = match kind_of_term c with
   | Evar (e,l) -> hov 1
       (str"Evar#" ++ int e ++ str"{" ++
        prlist_with_sep spc pr_constr (Array.to_list l) ++str"}")
-  | Const c -> str"Cst(" ++ pr_con c ++ str")"
-  | Ind (sp,i) -> str"Ind(" ++ pr_mind sp ++ str"," ++ int i ++ str")"
-  | Construct ((sp,i),j) ->
-      str"Constr(" ++ pr_mind sp ++ str"," ++ int i ++ str"," ++ int j ++ str")"
+  | Const (c,u) -> str"Cst(" ++ pr_puniverses (pr_con c) u ++ str")"
+  | Ind ((sp,i),u) -> str"Ind(" ++ pr_puniverses (pr_mind sp ++ str"," ++ int i) u ++ str")"
+  | Construct (((sp,i),j),u) ->
+      str"Constr(" ++ pr_puniverses (pr_mind sp ++ str"," ++ int i ++ str"," ++ int j) u ++ str")"
   | Case (ci,p,c,bl) -> v 0
       (hv 0 (str"<"++pr_constr p++str">"++ cut() ++ str"Case " ++
              pr_constr c ++ str"of") ++ cut() ++
@@ -144,39 +148,6 @@ let print_env env =
 (*let current_module = ref DirPath.empty
 
 let set_module m = current_module := m*)
-
-let new_univ_level =
-  let univ_gen = ref 0 in
-  (fun sp ->
-    incr univ_gen;
-    Univ.UniverseLevel.make (Lib.library_dp()) !univ_gen)
-
-let new_univ () = Univ.Universe.make (new_univ_level ())
-let new_Type () = mkType (new_univ ())
-let new_Type_sort () = Type (new_univ ())
-
-(* This refreshes universes in types; works only for inferred types (i.e. for
-   types of the form (x1:A1)...(xn:An)B with B a sort or an atom in
-   head normal form) *)
-let refresh_universes_gen strict t =
-  let modified = ref false in
-  let rec refresh t = match kind_of_term t with
-    | Sort (Type u) when strict || not (Univ.is_type0m_univ u) ->
-	modified := true; new_Type ()
-    | Prod (na,u,v) -> mkProd (na,u,refresh v)
-    | _ -> t in
-  let t' = refresh t in
-  if !modified then t' else t
-
-let refresh_universes = refresh_universes_gen false
-let refresh_universes_strict = refresh_universes_gen true
-
-let new_sort_in_family = function
-  | InProp -> prop_sort
-  | InSet -> set_sort
-  | InType -> Type (new_univ ())
-
-
 
 (* [Rel (n+m);...;Rel(n+1)] *)
 let rel_vect n m = Array.init m (fun i -> mkRel(n+m-i))
@@ -514,6 +485,13 @@ let occur_meta_or_existential c =
     | _ -> iter_constr occrec c
   in try occrec c; false with Occur -> true
 
+let occur_const s c =
+  let rec occur_rec c = match kind_of_term c with
+    | Const (sp,_) when sp=s -> raise Occur
+    | _ -> iter_constr occur_rec c
+  in
+  try occur_rec c; false with Occur -> true
+
 let occur_evar n c =
   let rec occur_rec c = match kind_of_term c with
     | Evar (sp,_) when Int.equal sp n -> raise Occur
@@ -571,9 +549,10 @@ let collect_vars c =
 (* Tests whether [m] is a subterm of [t]:
    [m] is appropriately lifted through abstractions of [t] *)
 
-let dependent_main noevar m t =
+let dependent_main noevar univs m t =
+  let eqc x y = if univs then fst (eq_constr_universes x y) else eq_constr_nounivs x y in
   let rec deprec m t =
-    if eq_constr m t then
+    if eqc m t then
       raise Occur
     else
       match kind_of_term m, kind_of_term t with
@@ -588,8 +567,11 @@ let dependent_main noevar m t =
   in
   try deprec m t; false with Occur -> true
 
-let dependent = dependent_main false
-let dependent_no_evar = dependent_main true
+let dependent = dependent_main false false
+let dependent_no_evar = dependent_main true false
+
+let dependent_univs = dependent_main false true
+let dependent_univs_no_evar = dependent_main true true
 
 let count_occurrences m t =
   let n = ref 0 in
@@ -785,6 +767,14 @@ let make_eq_test c = {
   last_found = None
 } 
 
+let make_eq_univs_test c = {
+  match_fun = (fun c' -> let b, cst = eq_constr_universes c c' in 
+			   if b then cst else raise NotUnifiable);
+  merge_fun = Univ.UniverseConstraints.union;
+  testing_state = Univ.UniverseConstraints.empty;
+  last_found = None
+} 
+
 let subst_closed_term_occ_gen occs pos c t =
   subst_closed_term_occ_gen_modulo occs (make_eq_test c) None pos t
 
@@ -792,6 +782,13 @@ let subst_closed_term_occ occs c t =
   proceed_with_occurrences
     (fun occ -> subst_closed_term_occ_gen occs occ c)
     occs t
+
+let subst_closed_term_univs_occ occs c t =
+  let test = make_eq_univs_test c in
+  let t' = proceed_with_occurrences
+    (fun occ -> subst_closed_term_occ_gen_modulo occs test None occ)
+    occs t
+  in t', test.testing_state
 
 let subst_closed_term_occ_modulo occs test cl t =
   proceed_with_occurrences
@@ -877,10 +874,7 @@ let isGlobalRef c =
   | Const _ | Ind _ | Construct _ | Var _ -> true
   | _ -> false
 
-let has_polymorphic_type c =
-  match (Global.lookup_constant c).Declarations.const_type with
-  | Declarations.PolymorphicArity _ -> true
-  | _ -> false
+let has_polymorphic_type c = (Global.lookup_constant c).Declarations.const_polymorphic
 
 let base_sort_cmp pb s0 s1 =
   match (s0,s1) with

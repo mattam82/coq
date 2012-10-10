@@ -44,6 +44,7 @@ module CoeTypMap = Refmap_env
 type coe_info_typ = {
   coe_value : constr;
   coe_type : types;
+  coe_context : Univ.universe_context_set;
   coe_strength : locality;
   coe_is_identity : bool;
   coe_param : int }
@@ -156,16 +157,16 @@ let coercion_info coe = CoeTypMap.find coe !coercion_tab
 
 let coercion_exists coe = CoeTypMap.mem coe !coercion_tab
 
-(* find_class_type : evar_map -> constr -> cl_typ * constr list *)
+(* find_class_type : evar_map -> constr -> cl_typ * universe_list * constr list *)
 
 let find_class_type sigma t =
   let t', args = Reductionops.whd_betaiotazeta_stack sigma t in
   match kind_of_term t' with
-    | Var id -> CL_SECVAR id, args
-    | Const sp -> CL_CONST sp, args
-    | Ind ind_sp -> CL_IND ind_sp, args
-    | Prod (_,_,_) -> CL_FUN, []
-    | Sort _ -> CL_SORT, []
+    | Var id -> CL_SECVAR id, [], args
+    | Const (sp,u) -> CL_CONST sp, u, args
+    | Ind (ind_sp,u) -> CL_IND ind_sp, u, args
+    | Prod (_,_,_) -> CL_FUN, [], []
+    | Sort _ -> CL_SORT, [], []
     |  _ -> raise Not_found
 
 
@@ -173,38 +174,37 @@ let subst_cl_typ subst ct = match ct with
     CL_SORT
   | CL_FUN
   | CL_SECVAR _ -> ct
-  | CL_CONST kn ->
-      let kn',t = subst_con subst kn in
-	if kn' == kn then ct else
-         fst (find_class_type Evd.empty t)
-  | CL_IND (kn,i) ->
-      let kn' = subst_ind subst kn in
-	if kn' == kn then ct else
-	  CL_IND (kn',i)
+  | CL_CONST c ->
+      let c',t = subst_con_kn subst c in
+	if c' == c then ct else
+         pi1 (find_class_type Evd.empty t)
+  | CL_IND i ->
+      let i' = subst_ind subst i in
+	if i' == i then ct else CL_IND i'
 
 (*CSC: here we should change the datatype for coercions: it should be possible
        to declare any term as a coercion *)
-let subst_coe_typ subst t = fst (subst_global subst t)
+let subst_coe_typ subst t = subst_global_reference subst t
 
 (* class_of : Term.constr -> int *)
 
 let class_of env sigma t =
-  let (t, n1, i, args) =
+  let (t, n1, i, u, args) =
     try
-      let (cl,args) = find_class_type sigma t in
+      let (cl, u, args) = find_class_type sigma t in
       let (i, { cl_param = n1 } ) = class_info cl in
-      (t, n1, i, args)
+      (t, n1, i, u, args)
     with Not_found ->
       let t = Tacred.hnf_constr env sigma t in
-      let (cl, args) = find_class_type sigma t in
+      let (cl, u, args) = find_class_type sigma t in
       let (i, { cl_param = n1 } ) = class_info cl in
-      (t, n1, i, args)
+      (t, n1, i, u, args)
   in
   if Int.equal (List.length args) n1 then t, i else raise Not_found
 
 let inductive_class_of ind = fst (class_info (CL_IND ind))
 
-let class_args_of env sigma c = snd (find_class_type sigma c)
+let class_args_of env sigma c = pi3 (find_class_type sigma c)
 
 let string_of_class = function
   | CL_FUN -> "Funclass"
@@ -233,14 +233,14 @@ let lookup_path_to_sort_from_class s =
 
 let apply_on_class_of env sigma t cont =
   try
-    let (cl,args) = find_class_type sigma t in
+    let (cl,u,args) = find_class_type sigma t in
     let (i, { cl_param = n1 } ) = class_info cl in
     if not (Int.equal (List.length args) n1) then raise Not_found;
     t, cont i
   with Not_found ->
     (* Is it worth to be more incremental on the delta steps? *)
     let t = Tacred.hnf_constr env sigma t in
-    let (cl, args) = find_class_type sigma t in
+    let (cl, u, args) = find_class_type sigma t in
     let (i, { cl_param = n1 } ) = class_info cl in
     if not (Int.equal (List.length args) n1) then raise Not_found;
     t, cont i
@@ -263,7 +263,7 @@ let get_coercion_constructor coe =
     Reductionops.whd_betadeltaiota_stack (Global.env()) Evd.empty coe.coe_value
   in
   match kind_of_term c with
-  | Construct cstr ->
+  | Construct (cstr,u) ->
       (cstr, Inductiveops.constructor_nrealargs (Global.env()) cstr -1)
   | _ ->
       raise Not_found
@@ -275,8 +275,10 @@ let lookup_pattern_path_between (s,t) =
 
 (* coercion_value : coe_index -> unsafe_judgment * bool *)
 
-let coercion_value { coe_value = c; coe_type = t; coe_is_identity = b } =
-  (make_judge c t, b)
+let coercion_value { coe_value = c; coe_type = t; coe_context = ctx; coe_is_identity = b } =
+  let subst, ctx = Universes.fresh_universe_context_set_instance ctx in
+  let c' = subst_univs_level_constr subst c and t' = subst_univs_level_constr subst t in
+    (make_judge c' t', b), ctx
 
 (* pretty-print functions are now in Pretty *)
 (* rajouter une coercion dans le graphe *)
@@ -347,7 +349,7 @@ type coercion = coe_typ * locality * bool * cl_typ * cl_typ * int
 (* Calcul de l'arité d'une classe *)
 
 let reference_arity_length ref =
-  let t = Global.type_of_global ref in
+  let t,_ = Universes.type_of_global ref in
   List.length (fst (Reductionops.splay_arity (Global.env()) Evd.empty t))
 
 let class_params = function
@@ -378,9 +380,12 @@ let cache_coercion (_,(coe,stre,isid,cls,clt,ps)) =
   add_class clt;
   let is,_ = class_info cls in
   let it,_ = class_info clt in
+  let value, ctx = Universes.fresh_global_instance (Global.env()) coe in
+  let typ = Retyping.get_type_of (Global.env ()) Evd.empty value in
   let xf =
-    { coe_value = constr_of_global coe;
-      coe_type = Global.type_of_global coe;
+    { coe_value = value;
+      coe_type = typ;
+      coe_context = ctx;
       coe_strength = stre;
       coe_is_identity = isid;
       coe_param = ps } in
@@ -415,7 +420,7 @@ let discharge_coercion (_,(coe,stre,isid,cls,clt,ps)) =
   match stre with
   | Local -> None
   | Global ->
-    let n = try Array.length (Lib.section_instance coe) with Not_found -> 0 in
+    let n = try Array.length (snd (Lib.section_instance coe)) with Not_found -> 0 in
     Some (Lib.discharge_global coe,
           stre,
 	  isid,

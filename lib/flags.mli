@@ -60,6 +60,14 @@ val program_cmd : bool ref
 val program_mode : bool ref
 val is_program_mode : unit -> bool
 
+(** Global universe polymorphism flag. *)
+val make_universe_polymorphism : bool -> unit
+val is_universe_polymorphism : unit -> bool
+
+(** Local universe polymorphism flag. *)
+val make_polymorphic_flag : bool -> unit
+val use_polymorphic_flag : unit -> bool
+
 val make_warn : bool -> unit
 val if_warn : ('a -> unit) -> 'a -> unit
 

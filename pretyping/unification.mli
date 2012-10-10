@@ -77,3 +77,15 @@ val unify_0 :            Environ.env ->
            Evd.evar_map * Evd.metabinding list *
            (Environ.env * Term.types Term.pexistential * Term.constr) list
 
+val unify_0_with_initial_metas : 
+           Evd.evar_map * Evd.metabinding list *
+           (Environ.env * Term.types Term.pexistential * Term.constr) list ->
+           bool ->
+           Environ.env ->
+           Evd.conv_pb ->
+           unify_flags ->
+           Term.types ->
+           Term.types ->
+           Evd.evar_map * Evd.metabinding list *
+           (Environ.env * Term.types Term.pexistential * Term.constr) list
+

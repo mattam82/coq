@@ -142,7 +142,7 @@ let decideGralEquality g =
     let headtyp = hd_app (pf_compute g typ) in
     let rectype =
       match kind_of_term headtyp with
-        | Ind mi -> mi
+        | Ind (mi,_) -> mi
 	| _ -> error"This decision procedure only works for inductive objects."
     in
     (tclTHEN

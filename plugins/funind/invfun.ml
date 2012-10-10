@@ -108,7 +108,9 @@ let id_to_constr id =
 
 let generate_type g_to_f f graph i =
   (*i we deduce the number of arguments of the function and its returned type from the graph i*)
-  let graph_arity = Inductive.type_of_inductive (Global.env()) (Global.lookup_inductive (destInd graph))  in
+  let gr,u = destInd graph in
+  let graph_arity = Inductive.type_of_inductive (Global.env()) 
+    (Global.lookup_inductive gr, u) in
   let ctxt,_ = decompose_prod_assum graph_arity in
   let fun_ctxt,res_type =
     match ctxt with
@@ -162,7 +164,7 @@ let generate_type g_to_f f graph i =
    WARNING: while convertible, [type_of body] and [type] can be non equal
 *)
 let find_induction_principle f =
-  let f_as_constant =  match kind_of_term f with
+  let f_as_constant,u =  match kind_of_term f with
     | Const c' -> c'
     | _ -> error "Must be used with a function"
   in
@@ -233,7 +235,7 @@ let prove_fun_correct functional_induction funs_constr graphs_constr schemes lem
        \[fun (x_1:t_1)\ldots(x_n:t_n)=> fun  fv => fun res => res = fv \rightarrow graph\ x_1\ldots x_n\ res\]
     *)
     (* we the get the definition of the graphs block *)
-    let graph_ind = destInd graphs_constr.(i) in
+    let graph_ind,u = destInd graphs_constr.(i) in
     let kn = fst graph_ind in
     let mib,_ = Global.lookup_inductive graph_ind in
     (* and the principle to use in this lemma in $\zeta$ normal form *)
@@ -264,7 +266,7 @@ let prove_fun_correct functional_induction funs_constr graphs_constr schemes lem
     in
     (* before building the full intro pattern for the principle *)
     let eq_ind = Coqlib.build_coq_eq () in
-    let eq_construct = mkConstruct((destInd eq_ind),1) in
+    let eq_construct = mkConstructUi (destInd eq_ind, 1) in
     (* The next to referencies will be used to find out which constructor to apply in each branch *)
     let ind_number = ref 0
     and min_constr_number = ref 0 in
@@ -930,7 +932,7 @@ let prove_fun_complete funcs graphs schemes lemmas_types_infos i : tactic =
     *)
     let rewrite_tac j ids : tactic =
       let graph_def = graphs.(j) in
-      let infos =  try find_Function_infos (destConst funcs.(j)) with Not_found ->  error "No graph found" in
+      let infos =  try find_Function_infos (fst (destConst funcs.(j))) with Not_found ->  error "No graph found" in
       if infos.is_general ||  Rtree.is_infinite graph_def.mind_recargs
       then
 	let eq_lemma =
@@ -951,7 +953,7 @@ let prove_fun_complete funcs graphs schemes lemmas_types_infos i : tactic =
 	  h_generalize (List.map mkVar ids);
 	  thin ids
 	]
-      else unfold_in_concl [(Locus.AllOccurrences, Names.EvalConstRef (destConst f))]
+      else unfold_in_concl [(Locus.AllOccurrences, Names.EvalConstRef (fst (destConst f)))]
     in
     (* The proof of each branche itself *)
     let ind_number = ref 0 in
@@ -1016,7 +1018,7 @@ let derive_correctness make_scheme functional_induction (funs: constant list) (g
     let lemmas_types_infos =
       Util.Array.map2_i
 	(fun i f_constr graph ->
-	   let const_of_f = destConst f_constr in
+	   let const_of_f,u = destConst f_constr in
 	   let (type_of_lemma_ctxt,type_of_lemma_concl) as type_info =
 	     generate_type false const_of_f graph i
 	   in
@@ -1055,22 +1057,22 @@ let derive_correctness make_scheme functional_induction (funs: constant list) (g
 	 i*)
 	 let lem_id = mk_correct_id f_id in
 	 Lemmas.start_proof lem_id
-	   (Decl_kinds.Global,(Decl_kinds.Proof Decl_kinds.Theorem))
-	   (fst lemmas_types_infos.(i))
-	   (fun _ _ -> ());
+	   (Decl_kinds.Global, (*FIXME*)false, (Decl_kinds.Proof Decl_kinds.Theorem))
+	   (fst lemmas_types_infos.(i), (*FIXME*)Univ.empty_universe_context_set)
+	   (fun _ _ _ -> ());
 	 Pfedit.by
 	   (observe_tac ("prove correctness ("^(Id.to_string f_id)^")")
 	      (proving_tac i));
 	 do_save ();
 	 let finfo = find_Function_infos f_as_constant in
-	 let lem_cst = destConst (Constrintern.global_reference lem_id) in
+	 let lem_cst = fst (destConst (Constrintern.global_reference lem_id)) in
 	 update_Function {finfo with correctness_lemma = Some lem_cst}
       )
       funs;
     let lemmas_types_infos =
       Util.Array.map2_i
 	(fun i f_constr graph ->
-	   let const_of_f = destConst f_constr in
+	   let const_of_f = fst (destConst f_constr) in
 	   let (type_of_lemma_ctxt,type_of_lemma_concl) as type_info =
 	     generate_type true  const_of_f graph i
 	   in
@@ -1082,18 +1084,20 @@ let derive_correctness make_scheme functional_induction (funs: constant list) (g
 	funs_constr
 	graphs_constr
     in
-    let kn,_ as graph_ind  = destInd graphs_constr.(0) in
+    let kn,_ as graph_ind  = fst (destInd graphs_constr.(0)) in
     let  mib,mip = Global.lookup_inductive graph_ind in
-    let schemes =
-      Array.of_list
+    let sigma, scheme = 
 	(Indrec.build_mutual_induction_scheme (Global.env ()) Evd.empty
 	   (Array.to_list
 	      (Array.mapi
-		 (fun i _ -> (kn,i),true,InType)
+		 (fun i _ -> ((kn,i),[])(*FIXME*),true,InType)
 		 mib.Declarations.mind_packets
 	      )
 	   )
 	)
+    in
+    let schemes =
+      Array.of_list scheme
     in
     let proving_tac =
       prove_fun_complete funs_constr mib.Declarations.mind_packets schemes lemmas_types_infos
@@ -1106,15 +1110,15 @@ let derive_correctness make_scheme functional_induction (funs: constant list) (g
 	   i*)
 	 let lem_id = mk_complete_id f_id in
 	 Lemmas.start_proof lem_id
-	   (Decl_kinds.Global,(Decl_kinds.Proof Decl_kinds.Theorem))
-	   (fst lemmas_types_infos.(i))
-	   (fun _ _ -> ());
+	   (Decl_kinds.Global,(*FIXME*)false,(Decl_kinds.Proof Decl_kinds.Theorem))
+	   (fst lemmas_types_infos.(i), (*FIXME*)Univ.empty_universe_context_set)
+	   (fun _ _ _ -> ());
 	 Pfedit.by
 	   (observe_tac ("prove completeness ("^(Id.to_string f_id)^")")
 	      (proving_tac i));
 	 do_save ();
 	 let finfo = find_Function_infos f_as_constant in
-	 let lem_cst = destConst (Constrintern.global_reference lem_id) in
+	 let lem_cst,u = destConst (Constrintern.global_reference lem_id) in
 	 update_Function {finfo with completeness_lemma = Some lem_cst}
       )
       funs;
@@ -1140,7 +1144,7 @@ let revert_graph kn post_tac hid g =
     let typ = pf_type_of g (mkVar hid) in
     match kind_of_term typ with
       | App(i,args) when isInd i ->
-	  let ((kn',num) as ind') = destInd i in
+	  let ((kn',num) as ind'),u = destInd i in
 	  if kn = kn'
 	  then (* We have generated a graph hypothesis so that we must change it if we can *)
 	    let info =
@@ -1244,7 +1248,7 @@ let invfun qhyp f g =
 		     let f1,_ = decompose_app args.(1) in
 		     try
 		       if not (isConst f1) then failwith "";
-		       let finfos = find_Function_infos (destConst f1) in
+		       let finfos = find_Function_infos (fst (destConst f1)) in
 		       let f_correct = mkConst(Option.get finfos.correctness_lemma)
 		       and kn = fst finfos.graph_ind
 		       in
@@ -1253,7 +1257,7 @@ let invfun qhyp f g =
 		       try
 			 let f2,_ = decompose_app args.(2) in
 			 if not (isConst f2) then failwith "";
-			 let finfos = find_Function_infos (destConst f2) in
+			 let finfos = find_Function_infos (fst (destConst f2)) in
 			 let f_correct = mkConst(Option.get finfos.correctness_lemma)
 			 and kn = fst finfos.graph_ind
 			 in

@@ -21,19 +21,19 @@ Require Import Logic.
     Similarly [(sig2 A P Q)], or [{x:A | P x & Q x}], denotes the subset
     of elements of the type [A] which satisfy both [P] and [Q]. *)
 
-Inductive sig (A:Type) (P:A -> Prop) : Type :=
+Polymorphic Inductive sig (A:Type) (P:A -> Prop) : Type :=
     exist : forall x:A, P x -> sig P.
 
-Inductive sig2 (A:Type) (P Q:A -> Prop) : Type :=
+Polymorphic Inductive sig2 (A:Type) (P Q:A -> Prop) : Type :=
     exist2 : forall x:A, P x -> Q x -> sig2 P Q.
 
 (** [(sigT A P)], or more suggestively [{x:A & (P x)}] is a Sigma-type.
     Similarly for [(sigT2 A P Q)], also written [{x:A & (P x) & (Q x)}]. *)
 
-Inductive sigT (A:Type) (P:A -> Type) : Type :=
+Polymorphic Inductive sigT (A:Type) (P:A -> Type) : Type :=
     existT : forall x:A, P x -> sigT P.
 
-Inductive sigT2 (A:Type) (P Q:A -> Type) : Type :=
+Polymorphic Inductive sigT2 (A:Type) (P Q:A -> Type) : Type :=
     existT2 : forall x:A, P x -> Q x -> sigT2 P Q.
 
 (* Notations *)
@@ -71,11 +71,11 @@ Section Subset_projections.
   Variable A : Type.
   Variable P : A -> Prop.
 
-  Definition proj1_sig (e:sig P) := match e with
+  Polymorphic Definition proj1_sig (e:sig P) := match e with
                                     | exist _ a b => a
                                     end.
 
-  Definition proj2_sig (e:sig P) :=
+  Polymorphic Definition proj2_sig (e:sig P) :=
     match e return P (proj1_sig e) with
     | exist _ a b => b
     end.
@@ -90,15 +90,18 @@ End Subset_projections.
     [(projT1 x)] is the first projection and [(projT2 x)] is the
     second projection, the type of which depends on the [projT1]. *)
 
+
+
 Section Projections.
 
   Variable A : Type.
   Variable P : A -> Type.
 
-  Definition projT1 (x:sigT P) : A := match x with
+  Polymorphic Definition projT1 (x:sigT P) : A := match x with
                                       | existT _ a _ => a
                                       end.
-  Definition projT2 (x:sigT P) : P (projT1 x) :=
+
+  Polymorphic Definition projT2 (x:sigT P) : P (projT1 x) :=
     match x return P (projT1 x) with
     | existT _ _ h => h
     end.
@@ -187,10 +190,10 @@ Section Dependent_choice_lemmas.
     (forall x:X, {y | R x y}) ->
     forall x0, {f : nat -> X | f O = x0 /\ forall n, R (f n) (f (S n))}.
   Proof.
-    intros H x0.
+    intros H x0. 
     set (f:=fix f n := match n with O => x0 | S n' => proj1_sig (H (f n')) end).
     exists f.
-    split. reflexivity.
+    split. reflexivity. 
     induction n; simpl; apply proj2_sig.
   Defined.
 

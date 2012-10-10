@@ -68,8 +68,12 @@ let rec prolog l n gl =
   let prol = (prolog l (n-1)) in
   (tclFIRST (List.map (fun t -> (tclTHEN t prol)) (one_step l gl))) gl
 
+let out_term = function
+  | IsConstr (c, _) -> c
+  | IsGlobRef gr -> fst (Universes.fresh_global_instance (Global.env ()) gr)
+
 let prolog_tac l n gl =
-  let l = List.map (prepare_hint (pf_env gl)) l in
+  let l = List.map (fun x -> out_term (prepare_hint false (pf_env gl) x)) l in
   let n =
     match n with
       | ArgArg n -> n
@@ -92,11 +96,19 @@ open Unification
 
 let priority l = List.map snd (List.filter (fun (pr,_) -> Int.equal pr 0) l)
 
-let unify_e_resolve flags (c,clenv) gls =
-  let clenv' = connect_clenv gls clenv in
+let unify_e_resolve poly flags (c,clenv) gls =
+  let clenv', subst = if poly then Clenv.refresh_undefined_univs clenv 
+  else clenv, Univ.empty_level_subst in
+  let clenv' = connect_clenv gls clenv' in
   let _ = clenv_unique_resolver ~flags clenv' gls in
-  h_simplest_eapply c gls
+  h_simplest_eapply (subst_univs_level_constr subst c) gls
 
+let e_exact poly flags (c,clenv) =
+  let clenv', subst = 
+    if poly then Clenv.refresh_undefined_univs clenv 
+    else clenv, Univ.empty_level_subst
+  in e_give_exact ~flags (subst_univs_level_constr subst c)
+    
 let rec e_trivial_fail_db db_list local_db goal =
   let tacl =
     registered_e_assumption ::
@@ -123,15 +135,15 @@ and e_my_find_search db_list local_db hdc concl =
 	  List.map (fun x -> flags, x) (Hint_db.map_auto (hdc,concl) db)) (local_db::db_list)
   in
   let tac_of_hint =
-    fun (st, {pri=b; pat = p; code=t}) ->
+    fun (st, {pri = b; pat = p; code = t; poly = poly}) ->
       (b,
        let tac =
 	 match t with
-	   | Res_pf (term,cl) -> unify_resolve st (term,cl)
-	   | ERes_pf (term,cl) -> unify_e_resolve st (term,cl)
-	   | Give_exact (c) -> e_give_exact c
+	   | Res_pf (term,cl) -> unify_resolve poly st (term,cl)
+	   | ERes_pf (term,cl) -> unify_e_resolve poly st (term,cl)
+	   | Give_exact (c,cl) -> e_exact poly st (c,cl)
 	   | Res_pf_THEN_trivial_fail (term,cl) ->
-               tclTHEN (unify_e_resolve st (term,cl))
+               tclTHEN (unify_e_resolve poly st (term,cl))
 		 (e_trivial_fail_db db_list local_db)
 	   | Unfold_nth c -> h_reduce (Unfold [AllOccurrences,c]) onConcl
 	   | Extern tacast -> conclPattern concl p tacast
@@ -475,8 +487,8 @@ let unfold_head env (ids, csts) c =
 	(match Environ.named_body id env with
 	| Some b -> true, b
 	| None -> false, c)
-    | Const cst when Cset.mem cst csts ->
-	true, Environ.constant_value env cst
+    | Const (cst,u as c) when Cset.mem cst csts ->
+	true, Environ.constant_value_in env c
     | App (f, args) ->
 	(match aux f with
 	| true, f' -> true, Reductionops.whd_betaiota Evd.empty (mkApp (f', args))
@@ -538,7 +550,7 @@ TACTIC EXTEND autounfold_one
 TACTIC EXTEND autounfoldify
 | [ "autounfoldify" constr(x) ] -> [
     let db = match kind_of_term x with
-      | Const c -> Label.to_string (con_label c)
+      | Const (c,_) -> Label.to_string (con_label c)
       | _ -> assert false
     in autounfold ["core";db] onConcl ]
 END

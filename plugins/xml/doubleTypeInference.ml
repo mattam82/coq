@@ -101,7 +101,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
         Typeops.judge_of_variable env id
 
      | T.Const c ->
-        E.make_judge cstr (Typeops.type_of_constant env c)
+        E.make_judge cstr (fst (Typeops.type_of_constant env c))
 
      | T.Ind ind ->
         E.make_judge cstr (Inductiveops.type_of_inductive env ind)
@@ -143,10 +143,10 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
 (*CSC: again once Judicael will introduce his non-bugged algebraic       *)
 (*CSC: universes.                                                        *)
 (try
-        Typeops.judge_of_type u
+        fst (*FIXME*) (Typeops.judge_of_type u)
  with _ -> (* Successor of a non universe-variable universe anomaly *)
   Pp.msg_warning (Pp.str "Universe refresh performed!!!");
-  Typeops.judge_of_type (Termops.new_univ ())
+  fst (*FIXME*) (Typeops.judge_of_type (Universes.new_univ Names.empty_dirpath))
 )
 
      | T.App (f,args) ->

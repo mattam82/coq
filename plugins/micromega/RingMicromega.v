@@ -57,7 +57,7 @@ Variables ceqb cleb : C -> C -> bool.
 Variable phi : C -> R.
 
 (* Power coefficients *)
-Variable E : Set. (* the type of exponents *)
+Variable E : Type. (* the type of exponents *)
 Variable pow_phi : N -> E.
 Variable rpow : R -> E -> R.
 
@@ -414,7 +414,7 @@ Proof.
   simpl ; intros.
   destruct (nth_in_or_default n l (Pc cO, Equal)).
   (* index is in bounds *)
-  apply H ; congruence.
+  apply H. congruence.
   (* index is out-of-bounds *)
   inversion H0.
   rewrite e. simpl.

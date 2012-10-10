@@ -14,15 +14,6 @@ open Sign
 open Environ
 open Locus
 
-(** Universes *)
-val new_univ_level : unit -> Univ.universe_level
-val new_univ : unit -> Univ.universe
-val new_sort_in_family : sorts_family -> sorts
-val new_Type : unit -> types
-val new_Type_sort : unit -> sorts
-val refresh_universes : types -> types
-val refresh_universes_strict : types -> types
-
 (** printers *)
 val print_sort : sorts -> std_ppcmds
 val pr_sort_family : sorts_family -> std_ppcmds
@@ -111,6 +102,8 @@ val occur_var_in_decl :
 val free_rels : constr -> Int.Set.t
 val dependent : constr -> constr -> bool
 val dependent_no_evar : constr -> constr -> bool
+val dependent_univs : constr -> constr -> bool
+val dependent_univs_no_evar : constr -> constr -> bool
 val count_occurrences : constr -> constr -> int
 val collect_metas : constr -> int list
 val collect_vars : constr -> Id.Set.t (** for visible vars only *)
@@ -167,6 +160,8 @@ type 'a testing_function = {
 
 val make_eq_test : constr -> unit testing_function
 
+val make_eq_univs_test : constr -> Univ.UniverseConstraints.t testing_function
+
 exception NotUnifiable
 
 val subst_closed_term_occ_modulo :
@@ -176,6 +171,12 @@ val subst_closed_term_occ_modulo :
 (** [subst_closed_term_occ occl c d] replaces occurrences of closed [c] at
    positions [occl] by [Rel 1] in [d] (see also Note OCC) *)
 val subst_closed_term_occ : occurrences -> constr -> constr -> constr
+
+(** [subst_closed_term_occ occl c d] replaces occurrences of closed [c] at
+   positions [occl] by [Rel 1] in [d] (see also Note OCC), unifying universes
+   which results in a set of constraints. *)
+val subst_closed_term_univs_occ : occurrences -> constr -> constr -> 
+  constr Univ.universe_constrained
 
 (** [subst_closed_term_occ_decl occl c decl] replaces occurrences of closed [c]
    at positions [occl] by [Rel 1] in [decl] *)

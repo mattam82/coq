@@ -458,10 +458,10 @@ VERNAC COMMAND EXTEND MergeFunind
   [ "Mergeschemes" "(" ident(id1) ne_ident_list(cl1) ")"
       "with" "(" ident(id2) ne_ident_list(cl2)  ")" "using" ident(id) ] ->
      [
-       let f1 = Constrintern.interp_constr Evd.empty (Global.env())
-	 (CRef (Libnames.Ident (Loc.ghost,id1))) in
-       let f2 = Constrintern.interp_constr Evd.empty (Global.env())
-	 (CRef (Libnames.Ident (Loc.ghost,id2))) in
+       let f1,ctx = Constrintern.interp_constr Evd.empty (Global.env())
+	 (CRef (Libnames.Ident (Loc.ghost,id1),None)) in
+       let f2,ctx' = Constrintern.interp_constr Evd.empty (Global.env())
+	 (CRef (Libnames.Ident (Loc.ghost,id2),None)) in
        let f1type = Typing.type_of (Global.env()) Evd.empty f1 in
        let f2type = Typing.type_of (Global.env()) Evd.empty f2 in
        let ar1 = List.length (fst (decompose_prod f1type)) in

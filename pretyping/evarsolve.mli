@@ -34,6 +34,8 @@ type conv_fun_bool =
 val evar_define : conv_fun -> ?choose:bool -> env -> evar_map -> 
   existential -> constr -> evar_map
 
+val refresh_universes : bool -> evar_map -> types -> evar_map * types
+
 val solve_refl : ?can_drop:bool -> conv_fun_bool -> env ->  evar_map ->
   existential_key -> constr array -> constr array -> evar_map
 

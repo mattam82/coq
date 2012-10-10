@@ -71,7 +71,7 @@ and mk_clos_app_but f_map subs f args n =
       | None -> mk_clos_app_but f_map subs f args (n+1)
 
 let interp_map l t =
-  try Some(List.assoc_f eq_constr t l) with Not_found -> None
+  try Some(List.assoc_f eq_constr_nounivs t l) with Not_found -> None
 
 let protect_maps = ref String.Map.empty
 let add_map s m = protect_maps := String.Map.add s m !protect_maps
@@ -101,7 +101,7 @@ END;;
 (****************************************************************************)
 
 let closed_term t l =
-  let l = List.map constr_of_global l in
+  let l = List.map Universes.constr_of_global l in
   let cs = List.fold_right Quote.ConstrSet.add l Quote.ConstrSet.empty in
   if Quote.closed_under cs t then tclIDTAC else tclFAIL 0 (mt())
 ;;
@@ -140,6 +140,10 @@ let ic c =
   let env = Global.env() and sigma = Evd.empty in
   Constrintern.interp_constr sigma env c
 
+let ic_unsafe c = (*FIXME remove *)
+  let env = Global.env() and sigma = Evd.empty in
+    fst (Constrintern.interp_constr sigma env c)
+
 let ty c = Typing.type_of (Global.env()) Evd.empty c
 
 let decl_constant na c =
@@ -147,6 +151,8 @@ let decl_constant na c =
     { const_entry_body = c;
       const_entry_secctx = None;
       const_entry_type = None;
+      const_entry_polymorphic = false;
+      const_entry_universes = Univ.empty_universe_context;(*FIXME*)
       const_entry_opaque = true;
       const_entry_inline_code = false},
     IsProof Lemma))
@@ -457,7 +463,7 @@ let op_smorph r add mul req m1 m2 =
 (* let default_ring_equality (r,add,mul,opp,req) = *)
 (*   let is_setoid = function *)
 (*       {rel_refl=Some _; rel_sym=Some _;rel_trans=Some _;rel_aeq=rel} -> *)
-(*         eq_constr req rel (\* Qu: use conversion ? *\) *)
+(*         eq_constr_nounivs req rel (\* Qu: use conversion ? *\) *)
 (*     | _ -> false in *)
 (*   match default_relation_for_carrier ~filter:is_setoid r with *)
 (*       Leibniz _ -> *)
@@ -472,7 +478,7 @@ let op_smorph r add mul req m1 m2 =
 (*         let is_endomorphism = function *)
 (*             { args=args } -> List.for_all *)
 (*                 (function (var,Relation rel) -> *)
-(*                   var=None && eq_constr req rel *)
+(*                   var=None && eq_constr_nounivs req rel *)
 (*                   | _ -> false) args in *)
 (*         let add_m = *)
 (*           try default_morphism ~filter:is_endomorphism add *)
@@ -509,7 +515,7 @@ let op_smorph r add mul req m1 m2 =
 
 let ring_equality (r,add,mul,opp,req) =
   match kind_of_term req with
-    | App (f, [| _ |]) when eq_constr f (Lazy.force coq_eq) ->
+    | App (f, [| _ |]) when eq_constr_nounivs f (Lazy.force coq_eq) ->
 	let setoid = lapp coq_eq_setoid [|r|] in
 	let op_morph =
 	  match opp with
@@ -563,13 +569,13 @@ let dest_ring env sigma th_spec =
   let th_typ = Retyping.get_type_of env sigma th_spec in
   match kind_of_term th_typ with
       App(f,[|r;zero;one;add;mul;sub;opp;req|])
-        when eq_constr f (Lazy.force coq_almost_ring_theory) ->
+        when eq_constr_nounivs f (Lazy.force coq_almost_ring_theory) ->
           (None,r,zero,one,add,mul,Some sub,Some opp,req)
     | App(f,[|r;zero;one;add;mul;req|])
-        when eq_constr f (Lazy.force coq_semi_ring_theory) ->
+        when eq_constr_nounivs f (Lazy.force coq_semi_ring_theory) ->
         (Some true,r,zero,one,add,mul,None,None,req)
     | App(f,[|r;zero;one;add;mul;sub;opp;req|])
-        when eq_constr f (Lazy.force coq_ring_theory) ->
+        when eq_constr_nounivs f (Lazy.force coq_ring_theory) ->
         (Some false,r,zero,one,add,mul,Some sub,Some opp,req)
     | _ -> error "bad ring structure"
 
@@ -579,10 +585,10 @@ let dest_morph env sigma m_spec =
   match kind_of_term m_typ with
       App(f,[|r;zero;one;add;mul;sub;opp;req;
               c;czero;cone;cadd;cmul;csub;copp;ceqb;phi|])
-        when eq_constr f (Lazy.force coq_ring_morph) ->
+        when eq_constr_nounivs f (Lazy.force coq_ring_morph) ->
           (c,czero,cone,cadd,cmul,Some csub,Some copp,ceqb,phi)
     | App(f,[|r;zero;one;add;mul;req;c;czero;cone;cadd;cmul;ceqb;phi|])
-        when eq_constr f (Lazy.force coq_semi_morph) ->
+        when eq_constr_nounivs f (Lazy.force coq_semi_morph) ->
         (c,czero,cone,cadd,cmul,None,None,ceqb,phi)
     | _ -> error "bad morphism structure"
 
@@ -653,7 +659,7 @@ let interp_power env pow =
         | CstTac t -> Tacintern.glob_tactic t
         | Closed lc ->
             closed_term_ast (List.map Smartlocate.global_with_alias lc) in
-      let spec = make_hyp env (ic spec) in
+      let spec = make_hyp env (ic_unsafe spec) in
       (tac, lapp coq_Some [|carrier; spec|])
 
 let interp_sign env sign =
@@ -661,7 +667,7 @@ let interp_sign env sign =
   match sign with
   | None -> lapp coq_None [|carrier|]
   | Some spec ->
-      let spec = make_hyp env (ic spec) in
+      let spec = make_hyp env (ic_unsafe spec) in
       lapp coq_Some [|carrier;spec|]
        (* Same remark on ill-typed terms ... *)
 
@@ -670,7 +676,7 @@ let interp_div env div =
   match div with
   | None -> lapp coq_None [|carrier|]
   | Some spec ->
-      let spec = make_hyp env (ic spec) in
+      let spec = make_hyp env (ic_unsafe spec) in
       lapp coq_Some [|carrier;spec|]
        (* Same remark on ill-typed terms ... *)
 
@@ -732,9 +738,9 @@ type ring_mod =
 
 
 VERNAC ARGUMENT EXTEND ring_mod
-  | [ "decidable" constr(eq_test) ] -> [ Ring_kind(Computational (ic eq_test)) ]
+  | [ "decidable" constr(eq_test) ] -> [ Ring_kind(Computational (ic_unsafe eq_test)) ]
   | [ "abstract" ] -> [ Ring_kind Abstract ]
-  | [ "morphism" constr(morph) ] -> [ Ring_kind(Morphism (ic morph)) ]
+  | [ "morphism" constr(morph) ] -> [ Ring_kind(Morphism (ic_unsafe morph)) ]
   | [ "constants" "[" tactic(cst_tac) "]" ] -> [ Const_tac(CstTac cst_tac) ]
   | [ "closed" "[" ne_global_list(l) "]" ] -> [ Const_tac(Closed l) ]
   | [ "preprocess" "[" tactic(pre) "]" ] -> [ Pre_tac pre ]
@@ -765,7 +771,7 @@ let process_ring_mods l =
     | Const_tac t -> set_once "tactic recognizing constants" cst_tac t
     | Pre_tac t -> set_once "preprocess tactic" pre t
     | Post_tac t -> set_once "postprocess tactic" post t
-    | Setoid(sth,ext) -> set_once "setoid" set (ic sth,ic ext)
+    | Setoid(sth,ext) -> set_once "setoid" set (ic_unsafe sth,ic_unsafe ext)
     | Pow_spec(t,spec) -> set_once "power" power (t,spec)
     | Sign_spec t -> set_once "sign" sign t
     | Div_spec t -> set_once "div" div t) l;
@@ -775,7 +781,7 @@ let process_ring_mods l =
 VERNAC COMMAND EXTEND AddSetoidRing
   | [ "Add" "Ring" ident(id) ":" constr(t) ring_mods(l) ] ->
     [ let (k,set,cst,pre,post,power,sign, div) = process_ring_mods l in
-      add_theory id (ic t) set k cst (pre,post) power sign div]
+      add_theory id (ic_unsafe t) set k cst (pre,post) power sign div]
 END
 
 (*****************************************************************************)
@@ -880,18 +886,18 @@ let dest_field env sigma th_spec =
   let th_typ = Retyping.get_type_of env sigma th_spec in
   match kind_of_term th_typ with
     | App(f,[|r;zero;one;add;mul;sub;opp;div;inv;req|])
-        when eq_constr f (Lazy.force afield_theory) ->
+        when eq_constr_nounivs f (Lazy.force afield_theory) ->
         let rth = lapp af_ar
           [|r;zero;one;add;mul;sub;opp;div;inv;req;th_spec|] in
         (None,r,zero,one,add,mul,Some sub,Some opp,div,inv,req,rth)
     | App(f,[|r;zero;one;add;mul;sub;opp;div;inv;req|])
-        when eq_constr f (Lazy.force field_theory) ->
+        when eq_constr_nounivs f (Lazy.force field_theory) ->
         let rth =
           lapp f_r
             [|r;zero;one;add;mul;sub;opp;div;inv;req;th_spec|] in
         (Some false,r,zero,one,add,mul,Some sub,Some opp,div,inv,req,rth)
     | App(f,[|r;zero;one;add;mul;div;inv;req|])
-        when eq_constr f (Lazy.force sfield_theory) ->
+        when eq_constr_nounivs f (Lazy.force sfield_theory) ->
         let rth = lapp sf_sr
           [|r;zero;one;add;mul;div;inv;req;th_spec|] in
         (Some true,r,zero,one,add,mul,None,None,div,inv,req,rth)
@@ -1014,7 +1020,7 @@ let ftheory_to_obj : field_info -> obj =
 
 let field_equality r inv req =
   match kind_of_term req with
-    | App (f, [| _ |]) when eq_constr f (Lazy.force coq_eq) ->
+    | App (f, [| _ |]) when eq_constr_nounivs f (Lazy.force coq_eq) ->
         mkApp((Coqlib.build_coq_eq_data()).congr,[|r;r;inv|])
     | _ ->
 	let _setoid = setoid_of_relation (Global.env ()) r req in
@@ -1105,18 +1111,18 @@ let process_field_mods l =
         set_once "tactic recognizing constants" cst_tac t
     | Ring_mod(Pre_tac t) -> set_once "preprocess tactic" pre t
     | Ring_mod(Post_tac t) -> set_once "postprocess tactic" post t
-    | Ring_mod(Setoid(sth,ext)) -> set_once "setoid" set (ic sth,ic ext)
+    | Ring_mod(Setoid(sth,ext)) -> set_once "setoid" set (ic_unsafe sth,ic_unsafe ext)
     | Ring_mod(Pow_spec(t,spec)) -> set_once "power" power (t,spec)
     | Ring_mod(Sign_spec t) -> set_once "sign" sign t
     | Ring_mod(Div_spec t) -> set_once "div" div t
-    | Inject i -> set_once "infinite property" inj (ic i)) l;
+    | Inject i -> set_once "infinite property" inj (ic_unsafe i)) l;
   let k = match !kind with Some k -> k | None -> Abstract in
   (k, !set, !inj, !cst_tac, !pre, !post, !power, !sign, !div)
 
 VERNAC COMMAND EXTEND AddSetoidField
 | [ "Add" "Field" ident(id) ":" constr(t) field_mods(l) ] ->
   [ let (k,set,inj,cst_tac,pre,post,power,sign,div) = process_field_mods l in
-    add_field_theory id (ic t) set k cst_tac inj (pre,post) power sign div]
+    add_field_theory id (ic_unsafe t) set k cst_tac inj (pre,post) power sign div]
 END
 
 
