@@ -63,6 +63,10 @@ let _ =
 (* Extra info on proofs. *)
 type lemma_possible_guards = int list list
 
+type proof_decl_hook = 
+  (Universes.universe_opt_subst Univ.in_universe_context -> 
+   Decl_kinds.locality -> Globnames.global_reference -> unit) option
+
 type pstate = {
   pid : Id.t;
   endline_tactic : Tacexpr.raw_tactic_expr option;
@@ -70,7 +74,7 @@ type pstate = {
   proof : Proof.proof;
   strength : Decl_kinds.goal_kind;
   compute_guard : lemma_possible_guards;
-  hook : unit Tacexpr.declaration_hook;
+  hook : proof_decl_hook;
   mode : proof_mode option;
 }
 
@@ -267,15 +271,28 @@ type closed_proof =
 let close_proof ~now fpl =
   let { pid;section_vars;compute_guard;strength;hook;proof } = cur_pstate () in
   let initial_goals = Proof.initial_goals proof in
-  let entries = Future.map2 (fun p (c, t) -> { Entries.
+  let evdref = ref (Proof.return proof) in
+  let nf,subst = Evarutil.e_nf_evars_and_universes evdref in
+  let initial_goals = List.map (fun (c,t) -> (nf c, nf t)) initial_goals in
+  let ctx = Evd.universe_context !evdref in
+  let entries = Future.map2 (fun p (c, t) ->
+    let univs = 
+      Univ.LSet.union (Universes.universes_of_constr c)
+	(Universes.universes_of_constr t)
+    in 
+    let ctx = Universes.restrict_universe_context (Univ.ContextSet.of_context ctx) univs in
+    { Entries.
     const_entry_body = p;
     const_entry_secctx = section_vars;
     const_entry_type  = Some t;
     const_entry_inline_code = false;
-    const_entry_opaque = true }) fpl initial_goals in
+    const_entry_opaque = true;
+    const_entry_universes = Univ.ContextSet.to_context ctx;
+    const_entry_polymorphic = pi2 strength;
+    const_entry_proj = None}) fpl initial_goals in
   if now then
     List.iter (fun x -> ignore(Future.compute x.Entries.const_entry_body)) entries;
-  (pid, (entries, compute_guard, strength, hook))
+  (pid, (entries, compute_guard, strength, Option.map (fun f -> f (subst,ctx)) hook))
 
 let return_proof ~fix_exn =
   let { proof } = cur_pstate () in
@@ -299,6 +316,9 @@ let return_proof ~fix_exn =
 let close_future_proof proof = close_proof ~now:false proof
 let close_proof () =
   close_proof ~now:true (Future.from_here (return_proof ~fix_exn:(fun x -> x)))
+
+
+
 
 (**********************************************************)
 (*                                                        *)

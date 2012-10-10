@@ -111,6 +111,12 @@ END
 let db_strat db = StratUnary ("topdown", StratHints (false, db))
 let cl_rewrite_clause_db db = cl_rewrite_clause_strat (strategy_of_ast (db_strat db))
 
+let cl_rewrite_clause_db = 
+  if Flags.profile then
+    let key = Profile.declare_profile "cl_rewrite_clause_db" in
+      Profile.profile3 key cl_rewrite_clause_db
+  else cl_rewrite_clause_db
+
 TACTIC EXTEND rewrite_strat
 | [ "rewrite_strat" rewstrategy(s) "in" hyp(id) ] -> [ cl_rewrite_clause_strat s (Some id) ]
 | [ "rewrite_strat" rewstrategy(s) ] -> [ cl_rewrite_clause_strat s None ]
@@ -147,22 +153,22 @@ TACTIC EXTEND setoid_rewrite
       [ cl_rewrite_clause c o (occurrences_of occ) (Some id)]
 END
 
-let cl_rewrite_clause_newtac_tac c o occ cl gl =
-  cl_rewrite_clause_newtac' c o occ cl;
-  tclIDTAC gl
+(* let cl_rewrite_clause_newtac_tac c o occ cl gl = *)
+(*   cl_rewrite_clause_newtac' c o occ cl; *)
+(*   tclIDTAC gl *)
 
-TACTIC EXTEND GenRew
-| [ "rew" orient(o) glob_constr_with_bindings(c) "in" hyp(id) "at" occurrences(occ) ] ->
-    [ cl_rewrite_clause_newtac_tac c o (occurrences_of occ) (Some id) ]
-| [ "rew" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) "in" hyp(id) ] ->
-    [ cl_rewrite_clause_newtac_tac c o (occurrences_of occ) (Some id) ]
-| [ "rew" orient(o) glob_constr_with_bindings(c) "in" hyp(id) ] ->
-    [ cl_rewrite_clause_newtac_tac c o AllOccurrences (Some id) ]
-| [ "rew" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) ] ->
-    [ cl_rewrite_clause_newtac_tac c o (occurrences_of occ) None ]
-| [ "rew" orient(o) glob_constr_with_bindings(c) ] ->
-    [ cl_rewrite_clause_newtac_tac c o AllOccurrences None ]
-END
+(* TACTIC EXTEND GenRew *)
+(* | [ "rew" orient(o) glob_constr_with_bindings(c) "in" hyp(id) "at" occurrences(occ) ] -> *)
+(*     [ cl_rewrite_clause_newtac_tac c o (occurrences_of occ) (Some id) ] *)
+(* | [ "rew" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) "in" hyp(id) ] -> *)
+(*     [ cl_rewrite_clause_newtac_tac c o (occurrences_of occ) (Some id) ] *)
+(* | [ "rew" orient(o) glob_constr_with_bindings(c) "in" hyp(id) ] -> *)
+(*     [ cl_rewrite_clause_newtac_tac c o AllOccurrences (Some id) ] *)
+(* | [ "rew" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) ] -> *)
+(*     [ cl_rewrite_clause_newtac_tac c o (occurrences_of occ) None ] *)
+(* | [ "rew" orient(o) glob_constr_with_bindings(c) ] -> *)
+(*     [ cl_rewrite_clause_newtac_tac c o AllOccurrences None ] *)
+(* END *)
 
 VERNAC COMMAND EXTEND AddRelation CLASSIFIED AS SIDEFF
   | [ "Add" "Relation" constr(a) constr(aeq) "reflexivity" "proved" "by" constr(lemma1)

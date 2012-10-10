@@ -191,6 +191,12 @@ let rec compute_metamap env sigma c = match kind_of_term c with
 	  TH (c,[],[])
       end
 
+  | Proj (p,t) -> 
+     let t' = compute_metamap env sigma t in
+       (match t' with
+       | TH (_,_,[]) -> TH (c,[],[])
+       | TH (c1,mm1,sgp1) -> TH(mkProj(p,c1),mm1,sgp1))
+
   | Case (ci,p,cc,v) ->
       (* bof... *)
       let nbr = Array.length v in
@@ -272,6 +278,8 @@ let ensure_products n =
     (aux n)
     (* Now we know how many red are needed *)
     (fun gl -> tclDO !p red_in_concl gl)
+
+let refine = refine_no_check
 
 let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
   let c = substl subst c in
@@ -394,3 +402,6 @@ let refine (evd,c) gl =
      complicated to update meta types when passing through a binder *)
   let th = compute_metamap (pf_env gl) evd c in
   tclTHEN (Refiner.tclEVARS evd) (tcc_aux [] th) gl
+
+(* let refine_key = Profile.declare_profile "refine_tactic" *)
+(* let refine = Profile.profile2 refine_key refine *)

@@ -26,7 +26,6 @@ open Names
 open Term
 open Context
 open Vars
-open Univ
 open Declarations
 open Pre_env
 
@@ -44,6 +43,12 @@ let empty_named_context_val = empty_named_context_val
 let empty_env = empty_env
 
 let engagement env = env.env_stratification.env_engagement
+
+let is_impredicative_set env = 
+  match engagement env with
+  | Some ImpredicativeSet -> true
+  | _ -> false
+
 let universes env = env.env_stratification.env_universes
 let named_context env = env.env_named_context
 let named_context_val env = env.env_named_context,env.env_named_vals
@@ -151,6 +156,30 @@ let fold_named_context f env ~init =
 let fold_named_context_reverse f ~init env =
   Context.fold_named_context_reverse f ~init:init (named_context env)
 
+
+(* Universe constraints *)
+
+let add_constraints c env =
+  if Univ.Constraint.is_empty c then
+    env
+  else
+    let s = env.env_stratification in
+    { env with env_stratification =
+      { s with env_universes = Univ.merge_constraints c s.env_universes } }
+
+let check_constraints c env =
+  Univ.check_constraints c env.env_stratification.env_universes
+
+let set_engagement c env = (* Unsafe *)
+  { env with env_stratification =
+    { env.env_stratification with env_engagement = Some c } }
+
+let push_constraints_to_env (_,univs) env =
+  add_constraints univs env
+
+let push_context ctx env = add_constraints (Univ.UContext.constraints ctx) env
+let push_context_set ctx env = add_constraints (Univ.ContextSet.constraints ctx) env
+
 (* Global constants *)
 
 let lookup_constant = lookup_constant
@@ -163,30 +192,112 @@ let add_constant kn cs env =
 	env_constants = new_constants } in
   { env with env_globals = new_globals }
 
-(* constant_type gives the type of a constant *)
-let constant_type env kn =
-  let cb = lookup_constant kn env in
-    cb.const_type
+let universes_of cb = 
+  Future.force cb.const_universes
 
-type const_evaluation_result = NoBody | Opaque
+let universes_and_subst_of cb u =
+  let univs = universes_of cb in
+  let subst = Univ.make_universe_subst u univs in
+    subst, Univ.instantiate_univ_context subst univs
+
+(* constant_type gives the type of a constant *)
+let constant_type env (kn,u) =
+  let cb = lookup_constant kn env in
+    if cb.const_polymorphic then
+      let subst, csts = universes_and_subst_of cb u in
+	(subst_univs_constr subst cb.const_type, csts)
+    else cb.const_type, Univ.Constraint.empty
+
+let constant_type_in_ctx env kn =
+  let cb = lookup_constant kn env in
+    cb.const_type, Future.force cb.const_universes
+
+let constant_context env kn =
+  let cb = lookup_constant kn env in
+    if cb.const_polymorphic then Future.force cb.const_universes
+    else Univ.UContext.empty
+
+type const_evaluation_result = NoBody | Opaque | IsProj
 
 exception NotEvaluableConst of const_evaluation_result
 
-let constant_value env kn =
+let constant_value env (kn,u) =
   let cb = lookup_constant kn env in
-  match cb.const_body with
-    | Def l_body -> Lazyconstr.force l_body
-    | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
-    | Undef _ -> raise (NotEvaluableConst NoBody)
+    if cb.const_proj = None then
+      match cb.const_body with
+      | Def l_body -> 
+	if cb.const_polymorphic then
+	  let subst, csts = universes_and_subst_of cb u in
+	    (subst_univs_constr subst (Lazyconstr.force l_body), csts)
+	else Lazyconstr.force l_body, Univ.Constraint.empty
+      | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
+      | Undef _ -> raise (NotEvaluableConst NoBody)
+    else raise (NotEvaluableConst IsProj)
 
 let constant_opt_value env cst =
   try Some (constant_value env cst)
   with NotEvaluableConst _ -> None
 
+let constant_value_and_type env (kn, u) =
+  let cb = lookup_constant kn env in
+    if cb.const_polymorphic then
+      let subst, cst = universes_and_subst_of cb u in
+      let b' = match cb.const_body with
+	| Def l_body -> Some (subst_univs_constr subst (Lazyconstr.force l_body))
+	| OpaqueDef _ -> None
+	| Undef _ -> None
+      in b', subst_univs_constr subst cb.const_type, cst
+    else 
+      let b' = match cb.const_body with
+	| Def l_body -> Some (Lazyconstr.force l_body)
+	| OpaqueDef _ -> None
+	| Undef _ -> None
+      in b', cb.const_type, Univ.Constraint.empty
+
+(* These functions should be called under the invariant that [env] 
+   already contains the constraints corresponding to the constant 
+   application. *)
+
+(* constant_type gives the type of a constant *)
+let constant_type_in env (kn,u) =
+  let cb = lookup_constant kn env in
+    if cb.const_polymorphic then
+      let subst = Univ.make_universe_subst u (Future.force cb.const_universes) in
+	subst_univs_constr subst cb.const_type
+    else cb.const_type
+
+let constant_value_in env (kn,u) =
+  let cb = lookup_constant kn env in
+  match cb.const_body with
+    | Def l_body -> 
+      if cb.const_polymorphic then
+	let subst = Univ.make_universe_subst u (Future.force cb.const_universes) in
+	  subst_univs_constr subst (Lazyconstr.force l_body)
+      else Lazyconstr.force l_body
+    | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
+    | Undef _ -> raise (NotEvaluableConst NoBody)
+
+let constant_opt_value_in env cst =
+  try Some (constant_value_in env cst)
+  with NotEvaluableConst _ -> None
+
 (* A global const is evaluable if it is defined and not opaque *)
-let evaluable_constant cst env =
-  try let _  = constant_value env cst in true
-  with NotEvaluableConst _ -> false
+let evaluable_constant kn env =
+  let cb = lookup_constant kn env in
+    match cb.const_body with
+    | Def _ -> true
+    | OpaqueDef _ -> false
+    | Undef _ -> false
+
+let lookup_projection cst env =
+  match (lookup_constant cst env).const_proj with 
+  | Some pb -> pb
+  | None -> anomaly (Pp.str "lookup_projection: constant is not a projection")
+
+let is_projection cst env =
+  match (lookup_constant cst env).const_proj with 
+  | Some _ -> true
+  | None -> false
 
 (* Mutual Inductives *)
 let lookup_mind = lookup_mind
@@ -198,21 +309,10 @@ let add_mind kn mib env =
 	env_inductives = new_inds } in
   { env with env_globals = new_globals }
 
-(* Universe constraints *)
-
-let add_constraints c env =
-  if is_empty_constraint c then
-    env
-  else
-    let s = env.env_stratification in
-    { env with env_stratification =
-      { s with env_universes = merge_constraints c s.env_universes } }
-
-let set_engagement c env = (* Unsafe *)
-  { env with env_stratification =
-    { env.env_stratification with env_engagement = Some c } }
-
 (* Lookup of section variables *)
+
+let constant_body_hyps cb = cb.const_hyps
+
 let lookup_constant_variables c env =
   let cmap = lookup_constant c env in
   Context.vars_of_named_context cmap.const_hyps
@@ -229,9 +329,9 @@ let lookup_constructor_variables (ind,_) env =
 let vars_of_global env constr =
   match kind_of_term constr with
       Var id -> [id]
-    | Const kn -> lookup_constant_variables kn env
-    | Ind ind -> lookup_inductive_variables ind env
-    | Construct cstr -> lookup_constructor_variables cstr env
+    | Const (kn,_) -> lookup_constant_variables kn env
+    | Ind (ind,_) -> lookup_inductive_variables ind env
+    | Construct (cstr,_) -> lookup_constructor_variables cstr env
     | _ -> raise Not_found
 
 let global_vars_set env constr =
@@ -400,7 +500,7 @@ let unregister env field =
           is abstract, and that the only function which add elements to the
           retroknowledge is Environ.register which enforces this shape *)
 	(match retroknowledge find env field with
-	   | Ind i31t -> let i31c = Construct (i31t, 1) in
+	   | Ind (i31t,u) -> let i31c = Construct ((i31t, 1),u) in
 	     {env with retroknowledge =
 		 remove (retroknowledge clear_info env i31c) field}
 	   | _ -> assert false)
@@ -457,13 +557,13 @@ fun env field value ->
      operators to the reactive retroknowledge. *)
   let add_int31_binop_from_const op =
     match value with
-      | Const kn ->  retroknowledge add_int31_op env value 2
+      | Const (kn,_) ->  retroknowledge add_int31_op env value 2
 	                               op kn
       | _ -> anomaly ~label:"Environ.register" (Pp.str "should be a constant")
   in
   let add_int31_unop_from_const op =
     match value with
-      | Const kn ->  retroknowledge add_int31_op env value 1
+      | Const (kn,_) ->  retroknowledge add_int31_op env value 1
 	                               op kn
       | _ -> anomaly ~label:"Environ.register" (Pp.str "should be a constant")
   in
@@ -475,9 +575,9 @@ fun env field value ->
     match field with
       | KInt31 (grp, Int31Type) ->
 	  (match Retroknowledge.find rk (KInt31 (grp,Int31Bits)) with
-	    | Ind i31bit_type ->
+	    | Ind (i31bit_type,u) ->
 		(match value with
-		  | Ind i31t ->
+		  | Ind (i31t,u) ->
 		      Retroknowledge.add_vm_decompile_constant_info rk
 		               value (constr_of_int31 i31t i31bit_type)
 		  | _ -> anomaly ~label:"Environ.register" (Pp.str "should be an inductive type"))
@@ -489,7 +589,7 @@ fun env field value ->
   match field with
     | KInt31 (_, Int31Type) ->
         let i31c = match value with
-                     | Ind i31t -> (Construct (i31t, 1))
+                     | Ind (i31t,u) -> (Construct ((i31t, 1),u))
 		     | _ -> anomaly ~label:"Environ.register" (Pp.str "should be an inductive type")
 	in
 	add_int31_decompilation_from_type
@@ -507,14 +607,14 @@ fun env field value ->
     | KInt31 (_, Int31TimesC) -> add_int31_binop_from_const Cbytecodes.Kmulcint31
     | KInt31 (_, Int31Div21) -> (* this is a ternary operation *)
                                 (match value with
-				 | Const kn ->
+				 | Const (kn,u) ->
 				     retroknowledge add_int31_op env value 3
 	                               Cbytecodes.Kdiv21int31 kn
 				 | _ -> anomaly ~label:"Environ.register" (Pp.str "should be a constant"))
     | KInt31 (_, Int31Div) -> add_int31_binop_from_const Cbytecodes.Kdivint31
     | KInt31 (_, Int31AddMulDiv) -> (* this is a ternary operation *)
                                 (match value with
-				 | Const kn ->
+				 | Const (kn,u) ->
 				     retroknowledge add_int31_op env value 3
 	                               Cbytecodes.Kaddmuldivint31 kn
 				 | _ -> anomaly ~label:"Environ.register" (Pp.str "should be a constant"))

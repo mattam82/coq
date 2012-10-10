@@ -47,6 +47,7 @@ type gname =
   | Gind of string * inductive (* prefix, inductive name *)
   | Gconstruct of string * constructor (* prefix, constructor name *)
   | Gconstant of string * constant (* prefix, constant name *)
+  | Gproj of string * constant (* prefix, constant name *)
   | Gcase of label option * int
   | Gpred of label option * int
   | Gfixtype of label option * int
@@ -220,6 +221,7 @@ type primitive =
   | Mk_cofix of int
   | Mk_rel of int
   | Mk_var of identifier
+  | Mk_proj
   | Is_accu
   | Cast_accu
   | Upd_cofix
@@ -242,6 +244,13 @@ let eq_primitive p1 p2 =
   | Force_cofix, Force_cofix -> true
   | _ -> false
 
+type match_annot = {
+  ma_ind : inductive;
+  ma_prefix : string
+  }
+
+let match_annot_of_annot_sw asw = { ma_ind = asw.asw_ind; ma_prefix = asw.asw_prefix}
+let eq_match_annot m m' = eq_ind m.ma_ind m'.ma_ind && m.ma_prefix = m'.ma_prefix
 type mllambda =
   | MLlocal        of lname 
   | MLglobal       of gname 
@@ -251,7 +260,7 @@ type mllambda =
   | MLlet          of lname * mllambda * mllambda
   | MLapp          of mllambda * mllambda array
   | MLif           of mllambda * mllambda * mllambda
-  | MLmatch        of annot_sw * mllambda * mllambda * mllam_branches
+  | MLmatch        of match_annot * mllambda * mllambda * mllam_branches
                               (* argument, prefix, accu branch, branches *)
   | MLconstruct    of string * constructor * mllambda array
                    (* prefix, constructor name, arguments *)
@@ -304,7 +313,7 @@ let rec eq_mllambda gn1 gn2 n env1 env2 t1 t2 =
       eq_mllambda gn1 gn2 n env1 env2 br1 br2 &&
       eq_mllambda gn1 gn2 n env1 env2 br'1 br'2
   | MLmatch (annot1, c1, accu1, br1), MLmatch (annot2, c2, accu2, br2) ->
-      eq_annot_sw annot1 annot2 &&
+      eq_match_annot annot1 annot2 &&
       eq_mllambda gn1 gn2 n env1 env2 c1 c2 &&
       eq_mllambda gn1 gn2 n env1 env2 accu1 accu2 &&
       eq_mllam_branches gn1 gn2 n env1 env2 br1 br2
@@ -487,7 +496,7 @@ type global =
   | Gtblfixtype of gname * lname array * mllambda array
   | Glet of gname * mllambda
   | Gletcase of 
-      gname * lname array * annot_sw * mllambda * mllambda * mllam_branches
+      gname * lname array * match_annot * mllambda * mllambda * mllam_branches
   | Gopen of string
   | Gtype of inductive * int array
     (* ind name, arities of constructors *)
@@ -762,6 +771,7 @@ let merge_branches t =
   | Lapp(f,args) ->
       MLapp(ml_of_lam env l f, Array.map (ml_of_lam env l) args)
   | Lconst (prefix,c) -> MLglobal(Gconstant (prefix,c))
+  | Lproj (prefix,c) -> MLglobal(Gproj (prefix,c))
   | Lcase (annot,p,a,bs) ->
       (* let predicate_uid fv_pred = compilation of p 
          let rec case_uid fv a_uid = 
@@ -802,8 +812,9 @@ let merge_branches t =
 		 cn_fv |]) in
 (*      let body = MLlam([|a_uid|], MLmatch(annot, la_uid, accu, bs)) in
       let case = generalize_fv env_c body in *)
+      let ma = match_annot_of_annot_sw annot in
       let cn = push_global_case cn (Array.append (fv_params env_c) [|a_uid|])
-        annot la_uid accu (merge_branches bs)
+        ma la_uid accu (merge_branches bs)
       in
       (* Final result *)
       let arg = ml_of_lam env l a in
@@ -1205,6 +1216,8 @@ let string_of_gname g =
       Format.sprintf "%sconstruct_%s_%i_%i" prefix (string_of_mind mind) i (j-1)
   | Gconstant (prefix, c) ->
       Format.sprintf "%sconst_%s" prefix (string_of_con c)
+  | Gproj (prefix, c) ->
+      Format.sprintf "%sproj_%s" prefix (string_of_con c)
   | Gcase (l,i) ->
       Format.sprintf "case_%s_%i" (string_of_label_def l) i
   | Gpred (l,i) ->
@@ -1262,12 +1275,12 @@ let pp_mllam fmt l =
     | MLif(t,l1,l2) ->
 	Format.fprintf fmt "@[(if %a then@\n  %a@\nelse@\n  %a)@]"
 	  pp_mllam t pp_mllam l1 pp_mllam l2 
-    | MLmatch (asw, c, accu_br, br) ->
-	let mind,i = asw.asw_ind in
-    let prefix = asw.asw_prefix in
-	let accu = Format.sprintf "%sAccu_%s_%i" prefix (string_of_mind mind) i in
-	Format.fprintf fmt 
-	  "@[begin match Obj.magic (%a) with@\n| %s _ ->@\n  %a@\n%aend@]"
+    | MLmatch (annot, c, accu_br, br) ->
+	  let mind,i = annot.ma_ind in
+      let prefix = annot.ma_prefix in
+	  let accu = Format.sprintf "%sAccu_%s_%i" prefix (string_of_mind mind) i in
+	  Format.fprintf fmt 
+	    "@[begin match Obj.magic (%a) with@\n| %s _ ->@\n  %a@\n%aend@]"
 	  pp_mllam c accu pp_mllam accu_br (pp_branches prefix) br
 	  
     | MLconstruct(prefix,c,args) ->
@@ -1371,6 +1384,7 @@ let pp_mllam fmt l =
     | Mk_rel i -> Format.fprintf fmt "mk_rel_accu %i" i
     | Mk_var id ->
         Format.fprintf fmt "mk_var_accu (Names.id_of_string \"%s\")" (string_of_id id)
+    | Mk_proj -> Format.fprintf fmt "mk_proj_accu"
     | Is_accu -> Format.fprintf fmt "is_accu"
     | Cast_accu -> Format.fprintf fmt "cast_accu"
     | Upd_cofix -> Format.fprintf fmt "upd_cofix"
@@ -1476,9 +1490,11 @@ and compile_named env auxdefs id =
   | None -> 
       Glet(Gnamed id, MLprimitive (Mk_var id))::auxdefs
 
-let compile_constant env prefix ~interactive con body =
-  match body with
-  | Def t ->
+let compile_constant env prefix ~interactive con cb =
+  match cb.const_proj with
+  | None ->
+    begin match cb.const_body with
+    | Def t ->
       let t = Lazyconstr.force t in
       let code = lambda_of_constr env t in
       let is_lazy = is_lazy t in
@@ -1493,11 +1509,37 @@ let compile_constant env prefix ~interactive con body =
         optimize_stk (Glet(Gconstant ("",con),code)::auxdefs)
       in
       code, name
-  | _ -> 
+    | _ -> 
+        let i = push_symbol (SymbConst con) in
+        [Glet(Gconstant ("",con), MLapp (MLprimitive Mk_const, [|get_const_code i|]))],
+	  if interactive then LinkedInteractive (prefix, false)
+	  else Linked (prefix, false)
+    end
+  | Some pb ->
+      let mind = pb.proj_ind in
+      let ind = (mind,0) in
+      let mib = lookup_mind mind env in
+      let oib = mib.mind_packets.(0) in
+      let tbl = oib.mind_reloc_tbl in 
+      (* Building info *)
+      let prefix = get_mind_prefix env mind in
+      let ma = { ma_ind = ind; ma_prefix = prefix } in
+      let c_uid = fresh_lname Anonymous in
+      let _, arity = tbl.(0) in
+      let ci_uid = fresh_lname Anonymous in
+      let cargs = Array.init arity
+        (fun i -> if Int.equal i pb.proj_arg then Some ci_uid else None)
+      in
       let i = push_symbol (SymbConst con) in
-      [Glet(Gconstant ("",con), MLapp (MLprimitive Mk_const, [|get_const_code i|]))],
-      if interactive then LinkedInteractive (prefix, false)
-      else Linked (prefix, false)
+      let accu = MLapp (MLprimitive Cast_accu, [|MLlocal c_uid|]) in
+      let accu_br = MLapp (MLprimitive Mk_proj, [|get_const_code i;accu|]) in
+      let code = MLmatch(ma,MLlocal c_uid,accu_br,[|[((ind,1),cargs)],MLlocal ci_uid|]) in
+      let gn = Gproj ("",con) in
+      let fargs = Array.init (pb.proj_npars + 1) (fun _ -> fresh_lname Anonymous) in
+      let arg = fargs.(pb.proj_npars) in
+        Glet(Gconstant ("",con), mkMLlam fargs (MLapp (MLglobal gn, [|MLlocal
+          arg|])))::
+            [Glet(gn, mkMLlam [|c_uid|] code)], Linked (prefix, false)
 
 let loaded_native_files = ref ([] : string list)
 
@@ -1571,8 +1613,8 @@ let rec compile_deps env prefix ~interactive init t =
   match kind_of_term t with
   | Meta _ -> invalid_arg "Nativecode.compile_deps: Meta"
   | Evar _ -> invalid_arg "Nativecode.compile_deps: Evar"
-  | Ind (mind,_) -> compile_mind_deps env prefix ~interactive init mind
-  | Const c ->
+  | Ind ((mind,_),u) -> compile_mind_deps env prefix ~interactive init mind
+  | Const (c,u) ->
       let c = get_allias env c in
       let cb = lookup_constant c env in
       let (_, (_, const_updates)) = init in
@@ -1584,11 +1626,13 @@ let rec compile_deps env prefix ~interactive init t =
         | Def t -> compile_deps env prefix ~interactive init (Lazyconstr.force t)
         | _ -> init
       in
-      let code, name = compile_constant env prefix ~interactive c cb.const_body in
+      let code, name = compile_constant env prefix ~interactive c cb in
       let comp_stack = code@comp_stack in
       let const_updates = Cmap_env.add c (cb.const_native_name, name) const_updates in
       comp_stack, (mind_updates, const_updates)
-  | Construct ((mind,_),_) -> compile_mind_deps env prefix ~interactive init mind
+  | Construct (((mind,_),_),u) -> compile_mind_deps env prefix ~interactive init mind
+  | Proj (p,c) ->
+      compile_deps env prefix ~interactive init (mkApp (mkConst p, [|c|]))
   | Case (ci, p, c, ac) ->
       let mind = fst ci.ci_ind in
       let init = compile_mind_deps env prefix ~interactive init mind in
@@ -1604,13 +1648,13 @@ let compile_constant_field env prefix con (code, (mupds, cupds)) cb =
       compile_deps env prefix ~interactive:false acc t
     in
     let (gl, name) =
-      compile_constant ~interactive:false env prefix con cb.const_body
+      compile_constant ~interactive:false env prefix con cb
     in
     let cupds = Cmap_env.add con (cb.const_native_name, name) cupds in
     gl@code, (mupds, cupds)
   | _ ->
     let (gl, name) =
-      compile_constant env prefix ~interactive:false con cb.const_body
+      compile_constant env prefix ~interactive:false con cb
     in
     let cupds = Cmap_env.add con (cb.const_native_name, name) cupds in
     gl@code, (mupds, cupds)

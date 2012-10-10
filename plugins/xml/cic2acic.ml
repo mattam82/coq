@@ -194,6 +194,7 @@ module CPropRetyping =
 let typeur sigma metamap =
   let rec type_of env cstr=
     match Term.kind_of_term cstr with
+    | T.Proj _ -> assert false
     | T.Meta n ->
           (try T.strip_outer_cast (List.assoc n metamap)
            with Not_found -> Errors.anomaly ~label:"type_of" (Pp.str "this is not a well-typed term"))
@@ -206,9 +207,7 @@ let typeur sigma metamap =
           ty
         with Not_found ->
           Errors.anomaly ~label:"type_of" (str "variable " ++ Names.Id.print id ++ str " unbound"))
-    | T.Const c ->
-        let cb = Environ.lookup_constant c env in
-        Typeops.type_of_constant_type env (cb.Declarations.const_type)
+    | T.Const c -> Typeops.type_of_constant_in env c
     | T.Evar ev -> Evd.existential_type sigma ev
     | T.Ind ind -> Inductiveops.type_of_inductive env ind
     | T.Construct cstr -> Inductiveops.type_of_constructor env cstr
@@ -364,7 +363,7 @@ Pp.msg_debug (Pp.(++) (Pp.str "BUG: this subterm was not visited during the doub
           {D.synthesized =
             Reductionops.nf_beta evar_map
              (CPropRetyping.get_type_of env evar_map
-              (Termops.refresh_universes tt)) ;
+              ((* Termops.refresh_universes *) tt)) ;
            D.expected = None}
         in
          let innersort =
@@ -493,7 +492,8 @@ print_endline "PASSATO" ; flush stdout ;
           (* Now that we have all the auxiliary functions we  *)
           (* can finally proceed with the main case analysis. *)
           match T.kind_of_term tt with
-             T.Rel n ->
+	  | T.Proj _ -> assert false
+          | T.Rel n ->
               let id =
                match List.nth (E.rel_context env) (n - 1) with
                   (N.Name id,_,_)   -> id
@@ -679,7 +679,7 @@ print_endline "PASSATO" ; flush stdout ;
                 explicit_substitute_and_eta_expand_if_required h
                  (Array.to_list t) t'
                  compute_result_if_eta_expansion_not_required
-           | T.Const kn ->
+           | T.Const (kn,u) ->
               Hashtbl.add ids_to_inner_sorts fresh_id'' innersort ;
               if is_a_Prop innersort  && expected_available then
                add_inner_type fresh_id'' ;
@@ -690,7 +690,7 @@ print_endline "PASSATO" ; flush stdout ;
                 explicit_substitute_and_eta_expand_if_required tt []
                  (List.map snd subst')
                  compute_result_if_eta_expansion_not_required
-           | T.Ind (kn,i) ->
+           | T.Ind ((kn,i),u) ->
               let compute_result_if_eta_expansion_not_required _ _ =
                A.AInd (fresh_id'', subst, (uri_of_kernel_name (Inductive kn)), i)
               in
@@ -698,7 +698,7 @@ print_endline "PASSATO" ; flush stdout ;
                 explicit_substitute_and_eta_expand_if_required tt []
                  (List.map snd subst')
                  compute_result_if_eta_expansion_not_required
-           | T.Construct ((kn,i),j) ->
+           | T.Construct (((kn,i),j),u) ->
               Hashtbl.add ids_to_inner_sorts fresh_id'' innersort ;
               if is_a_Prop innersort  && expected_available then
                add_inner_type fresh_id'' ;

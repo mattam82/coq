@@ -36,7 +36,7 @@ val proofview : proofview -> Goal.goal list * Evd.evar_map
 
 (* Initialises a proofview, the argument is a list of environement, 
    conclusion types, creating that many initial goals. *)
-val init : (Environ.env * Term.types) list -> proofview
+val init : (Environ.env * Term.types Univ.in_universe_context_set) list -> proofview
 
 (* Returns whether this proofview is finished or not.That is,
    if it has empty subgoals in the comb. There could still be unsolved
@@ -45,6 +45,8 @@ val finished : proofview -> bool
 
 (* Returns the current value of the proofview partial proofs. *)
 val return : proofview -> Evd.evar_map
+
+(* val return : proofview -> ((constr*types) list * Universes.universe_opt_subst) Univ.in_universe_context *)
 
 val partial_proof : proofview -> constr list
 val initial_goals : proofview -> (constr * types) list

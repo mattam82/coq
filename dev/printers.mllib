@@ -73,6 +73,7 @@ Type_errors
 Modops
 Inductive
 Typeops
+Fast_typeops
 Indtypes
 Cooking
 Term_typing
@@ -80,6 +81,7 @@ Subtyping
 Mod_typing
 Nativelibrary
 Safe_typing
+Unionfind
 
 Summary
 Nameops
@@ -98,6 +100,7 @@ Locusops
 Miscops
 Termops
 Namegen
+Universes
 Evd
 Glob_ops
 Redops
@@ -174,4 +177,9 @@ Himsg
 Cerrors
 Locality
 Vernacinterp
+Dischargedhypsmap
+Discharge
+Declare
+Ind_tables
 Top_printers
+

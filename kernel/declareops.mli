@@ -56,7 +56,7 @@ val recarg_length : wf_paths -> int -> int
 
 val subst_wf_paths : substitution -> wf_paths -> wf_paths
 
-val subst_mind : substitution -> mutual_inductive_body -> mutual_inductive_body
+val subst_mind_body : substitution -> mutual_inductive_body -> mutual_inductive_body
 
 val join_constant_body : constant_body -> unit
 val prune_constant_body : constant_body -> constant_body

@@ -26,7 +26,7 @@ type unification_error =
   | ConversionFailed of env * constr * constr
   | MetaOccurInBody of existential_key
   | InstanceNotSameType of existential_key * env * types * types
-  | UnifUnivInconsistency
+  | UnifUnivInconsistency of Univ.univ_inconsistency
 
 type pretype_error =
   (** Old Case *)
@@ -74,7 +74,7 @@ val error_case_not_inductive_loc :
 
 val error_ill_formed_branch_loc :
   Loc.t -> env -> Evd.evar_map ->
-      constr -> constructor -> constr -> constr -> 'b
+      constr -> pconstructor -> constr -> constr -> 'b
 
 val error_number_branches_loc :
   Loc.t -> env -> Evd.evar_map ->

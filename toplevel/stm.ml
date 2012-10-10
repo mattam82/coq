@@ -737,7 +737,7 @@ end = struct (* {{{ *)
           List.iter (fun (_,se) -> Declareops.iter_side_effects (function
             | Declarations.SEsubproof(_,
                { Declarations.const_body = Declarations.OpaqueDef f;
-                 const_constraints = cst} ) -> 
+                 const_universes = cst} ) -> 
                   ignore(Future.force f); ignore(Future.force cst)
             | _ -> ())
           se) l;
@@ -819,13 +819,13 @@ end = struct (* {{{ *)
                 let e = Stateid.add ~valid (RemoteException e) err_id in
                 assign (`Exn e);
                 Pp.feedback (Interface.InProgress ~-1)
-            | _, RespGetCounterFreshLocalUniv ->
-                marshal_more_data oc (MoreDataLocalUniv
-                  (CList.init 10 (fun _ -> Univ.fresh_local_univ ())));
-                loop ()
+            | _, RespGetCounterFreshLocalUniv -> assert false (* Deprecated function *)
+                (* marshal_more_data oc (MoreDataLocalUniv *)
+                (*   (CList.init 10 (fun _ -> Universes.fresh_local_univ ()))); *)
+                (* loop () *)
             | _, RespGetCounterNewUnivLevel ->
                 marshal_more_data oc (MoreDataUnivLevel
-                  (CList.init 10 (fun _ -> Termops.new_univ_level ())));
+                  (CList.init 10 (fun _ -> Universes.new_univ_level (Global.current_dirpath ()))));
                 loop ()
             | _, RespFeedback {id = State state_id; content = msg} ->
                 Pp.feedback ~state_id msg;
@@ -902,14 +902,14 @@ end = struct (* {{{ *)
       Marshal.to_channel oc (RespFeedback fb) [];
       flush oc in
     Pp.set_feeder (slave_feeder !slave_oc);
-    Termops.set_remote_new_univ_level (bufferize (fun () ->
+    Universes.set_remote_new_univ_level (bufferize (fun () ->
       marshal_response !slave_oc RespGetCounterNewUnivLevel;
       match unmarshal_more_data !slave_ic with
       | MoreDataUnivLevel l -> l | _ -> assert false));
-    Univ.set_remote_fresh_local_univ (bufferize (fun () ->
-      marshal_response !slave_oc RespGetCounterFreshLocalUniv;
-      match unmarshal_more_data !slave_ic with
-      | MoreDataLocalUniv l -> l | _ -> assert false));
+    (* Univ.set_remote_fresh_local_univ (bufferize (fun () -> *)
+    (*   marshal_response !slave_oc RespGetCounterFreshLocalUniv; *)
+    (*   match unmarshal_more_data !slave_ic with *)
+    (*   | MoreDataLocalUniv l -> l | _ -> assert false)); *)
     while true do
       try
         let request = unmarshal_request !slave_ic in

@@ -24,6 +24,7 @@ open Locus
 type rew_rule = { rew_lemma: constr;
 		  rew_type: types;
 		  rew_pat: constr;
+		  rew_ctx: Univ.universe_context_set;
 		  rew_l2r: bool;
 		  rew_tac: glob_tactic_expr option }
 
@@ -86,18 +87,23 @@ let print_rewrite_hintdb bas =
 	       Pptactic.pr_glob_tactic (Global.env()) tac) (mt ()) h.rew_tac)
 	   (find_rewrites bas))
 
-type raw_rew_rule = Loc.t * constr * bool * raw_tactic_expr option
+type raw_rew_rule = Loc.t * constr Univ.in_universe_context_set * bool * raw_tactic_expr option
 
 (* Applies all the rules of one base *)
 let one_base general_rewrite_maybe_in tac_main bas =
   let lrul = find_rewrites bas in
+  let try_rewrite dir ctx c tc gl = 
+    let subst, ctx' = Universes.fresh_universe_context_set_instance ctx in
+    let c' = Vars.subst_univs_level_constr subst c in
+      Refiner.tclPUSHCONTEXT Evd.univ_flexible ctx' (general_rewrite_maybe_in dir c' tc) gl
+  in
   let lrul = List.map (fun h -> 
   let tac = match h.rew_tac with None -> tclIDTAC | Some t -> Tacinterp.eval_tactic t in
-    (h.rew_lemma,h.rew_l2r,tac)) lrul in
-    tclREPEAT_MAIN (tclPROGRESS (List.fold_left (fun tac (csr,dir,tc) ->
+    (h.rew_ctx,h.rew_lemma,h.rew_l2r,tac)) lrul in
+    tclREPEAT_MAIN (tclPROGRESS (List.fold_left (fun tac (ctx,csr,dir,tc) ->
       tclTHEN tac
         (tclREPEAT_MAIN
-	    (tclTHENFIRST (general_rewrite_maybe_in dir csr tc) tac_main)))
+	    (tclTHENFIRST (try_rewrite dir ctx csr tc) tac_main)))
       tclIDTAC lrul))
 
 (* The AutoRewrite tactic *)
@@ -181,6 +187,9 @@ let gen_auto_multi_rewrite conds tac_main lbas cl =
 		    (except maybe the rewritten one) *)
 		 let ids =  Tacmach.pf_ids_of_hyps gl
 		 in try_do_hyps (fun id -> id)  ids gl)
+
+(* let gen_auto_multi_rewrite_key = Profile.declare_profile "gen_auto_multi_rewrite" *)
+(* let gen_auto_multi_rewrite = Profile.profile5 gen_auto_multi_rewrite_key gen_auto_multi_rewrite *)
 
 let auto_multi_rewrite ?(conds=Naive) = gen_auto_multi_rewrite conds Refiner.tclIDTAC
 
@@ -283,11 +292,11 @@ let add_rew_rules base lrul =
   let counter = ref 0 in
   let lrul =
     List.fold_left
-      (fun dn (loc,c,b,t) ->
+      (fun dn (loc,(c,ctx),b,t) ->
 	let info = find_applied_relation false loc (Global.env ()) Evd.empty c b in
 	let pat = if b then info.hyp_left else info.hyp_right in
 	let rul = { rew_lemma = c; rew_type = info.hyp_ty;
-		    rew_pat = pat; rew_l2r = b;
+		    rew_pat = pat; rew_ctx = ctx; rew_l2r = b;
 		    rew_tac = Option.map Tacintern.glob_tactic t}
 	in incr counter;
 	  HintDN.add pat (!counter, rul) dn) HintDN.empty lrul

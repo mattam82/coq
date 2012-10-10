@@ -54,6 +54,7 @@ struct
   let decomp = 
     let rec decrec acc c = match kind_of_term c with
       | App (f,l) -> decrec (Array.fold_right (fun a l -> a::l) l acc) f
+      | Proj (p,c) -> decrec (c :: acc) (mkConst p)
       | Cast (c1,_,_) -> decrec acc c1
       | _ -> (c,acc)
     in 
@@ -62,18 +63,21 @@ struct
   let constr_val_discr t =
     let c, l = decomp t in
       match kind_of_term c with
-      | Ind ind_sp -> Dn.Label(Term_dn.GRLabel (IndRef ind_sp),l)
-      | Construct cstr_sp -> Dn.Label(Term_dn.GRLabel (ConstructRef cstr_sp),l)
+      | Ind (ind_sp,_) -> Dn.Label(Term_dn.GRLabel (IndRef ind_sp),l)
+      | Construct (cstr_sp,_) -> Dn.Label(Term_dn.GRLabel (ConstructRef cstr_sp),l)
       | Var id -> Dn.Label(Term_dn.GRLabel (VarRef id),l)
       | Const _ -> Dn.Everything
+      | Proj (p, c) -> Dn.Everything
       | _ -> Dn.Nothing
 	
   let constr_val_discr_st (idpred,cpred) t =
     let c, l = decomp t in
       match kind_of_term c with
-      | Const c -> if Cpred.mem c cpred then Dn.Everything else Dn.Label(Term_dn.GRLabel (ConstRef c),l)
-      | Ind ind_sp -> Dn.Label(Term_dn.GRLabel (IndRef ind_sp),l)
-      | Construct cstr_sp -> Dn.Label(Term_dn.GRLabel (ConstructRef cstr_sp),l)
+      | Const (c,_) -> if Cpred.mem c cpred then Dn.Everything else Dn.Label(Term_dn.GRLabel (ConstRef c),l)
+      | Ind (ind_sp,_) -> Dn.Label(Term_dn.GRLabel (IndRef ind_sp),l)
+      | Construct (cstr_sp,_) -> Dn.Label(Term_dn.GRLabel (ConstructRef cstr_sp),l)
+      | Proj (p,c) ->
+        if Cpred.mem p cpred then Dn.Everything else Dn.Label(Term_dn.GRLabel (ConstRef p), c::l)
       | Var id when not (Id.Pred.mem id idpred) -> Dn.Label(Term_dn.GRLabel (VarRef id),l)
       | Prod (n, d, c) -> Dn.Label(Term_dn.ProdLabel, [d; c])
       | Lambda (n, d, c) -> Dn.Label(Term_dn.LambdaLabel, [d; c] @ l)

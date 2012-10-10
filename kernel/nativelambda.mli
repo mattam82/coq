@@ -23,6 +23,7 @@ type lambda =
   | Llet          of name * lambda * lambda
   | Lapp          of lambda * lambda array
   | Lconst        of string * constant (* prefix, constant name *)
+  | Lproj         of string * constant (* prefix, projection name *)
   | Lcase         of annot_sw * lambda * lambda * lam_branches 
                   (* annotations, term being matched, accu, branches *)
   | Lif           of lambda * lambda * lambda
@@ -48,6 +49,8 @@ val decompose_Llam_Llet : lambda -> (Names.name * lambda option) array * lambda
 
 val is_lazy : constr -> bool
 val mk_lazy : lambda -> lambda
+
+val get_mind_prefix : env -> mutual_inductive -> string
 
 val get_allias : env -> constant -> constant
 

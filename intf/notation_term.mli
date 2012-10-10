@@ -24,6 +24,7 @@ type notation_constr =
   | NRef of global_reference
   | NVar of Id.t
   | NApp of notation_constr * notation_constr list
+  | NProj of projection * notation_constr
   | NHole of Evar_kinds.t
   | NList of Id.t * Id.t * notation_constr * notation_constr * bool
   (** Part only in [glob_constr] *)

@@ -18,14 +18,7 @@ type engagement = ImpredicativeSet
 
 (** {6 Representation of constants (Definition/Axiom) } *)
 
-type polymorphic_arity = {
-  poly_param_levels : Univ.universe option list;
-  poly_level : Univ.universe;
-}
-
-type constant_type =
-  | NonPolymorphicType of types
-  | PolymorphicArity of rel_context * polymorphic_arity
+type constant_type = types
 
 (** Inlining level of parameters at functor applications.
     None means no inlining *)
@@ -34,6 +27,17 @@ type inline = int option
 
 (** A constant can have no body (axiom/parameter), or a
     transparent body, or an opaque one *)
+
+(** Projections are a particular kind of constant: 
+    always transparent. *)
+
+type projection_body = {
+  proj_ind : mutual_inductive;
+  proj_npars : int;
+  proj_arg : int;
+  proj_type : types; (* Type under params *)
+  proj_body : constr; (* For compatibility, the match version *)
+}
 
 type constant_def =
   | Undef of inline
@@ -48,14 +52,16 @@ type native_name =
   | LinkedInteractive of string * bool
   | NotLinked
 
-type constant_constraints = Univ.constraints Future.computation
+type constant_universes = Univ.universe_context Future.computation
 
 type constant_body = {
     const_hyps : Context.section_context; (** New: younger hyp at top *)
     const_body : constant_def;
     const_type : constant_type;
     const_body_code : Cemitcodes.to_patch_substituted;
-    const_constraints : constant_constraints;
+    const_polymorphic : bool; (** Is it polymorphic or not *)
+    const_universes : constant_universes;
+    const_proj : projection_body option;
     const_native_name : native_name ref;
     const_inline_code : bool }
 
@@ -80,14 +86,10 @@ type wf_paths = recarg Rtree.t
 v}
 *)
 
-type monomorphic_inductive_arity = {
-  mind_user_arity : constr;
+type inductive_arity = {
+  mind_user_arity : types;
   mind_sort : sorts;
 }
-
-type inductive_arity =
-| Monomorphic of monomorphic_inductive_arity
-| Polymorphic of polymorphic_arity
 
 type one_inductive_body = {
 (** {8 Primitive datas } *)
@@ -96,7 +98,7 @@ type one_inductive_body = {
 
     mind_arity_ctxt : rel_context; (** Arity context of [Ii] with parameters: [forall params, Ui] *)
 
-    mind_arity : inductive_arity; (** Arity sort and original user arity if monomorphic *)
+    mind_arity : inductive_arity; (** Arity sort and original user arity *)
 
     mind_consnames : Id.t array; (** Names of the constructors: [cij] *)
 
@@ -134,7 +136,9 @@ type mutual_inductive_body = {
 
     mind_packets : one_inductive_body array;  (** The component of the mutual inductive block *)
 
-    mind_record : bool;  (** Whether the inductive type has been declared as a record *)
+    mind_record : (constr * constant array) option;  
+    (** Whether the inductive type has been declared as a record, 
+	In that case we get its canonical eta-expansion and list of projections. *)
 
     mind_finite : bool;  (** Whether the type is inductive or coinductive *)
 
@@ -148,12 +152,13 @@ type mutual_inductive_body = {
 
     mind_params_ctxt : rel_context;  (** The context of parameters (includes let-in declaration) *)
 
-    mind_constraints : Univ.constraints;  (** Universes constraints enforced by the inductive declaration *)
+    mind_polymorphic : bool; (** Is it polymorphic or not *)
+
+    mind_universes : Univ.universe_context; (** Local universe variables and constraints *)
 
 (** {8 Data for native compilation } *)
 
     mind_native_name : native_name ref; (** status of the code (linked or not, and where) *)
-
 
   }
 

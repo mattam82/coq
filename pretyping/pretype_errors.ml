@@ -24,7 +24,7 @@ type unification_error =
   | ConversionFailed of env * constr * constr
   | MetaOccurInBody of existential_key
   | InstanceNotSameType of existential_key * env * types * types
-  | UnifUnivInconsistency
+  | UnifUnivInconsistency of Univ.univ_inconsistency
 
 type pretype_error =
   (* Old Case *)
@@ -98,7 +98,7 @@ let contract3' env a b c = function
       contract3 env a b c, ConversionFailed (env',t1,t2)
   | NotSameArgSize | NotSameHead | NoCanonicalStructure
   | MetaOccurInBody _ | InstanceNotSameType _ 
-  | UnifUnivInconsistency as x -> contract3 env a b c, x
+  | UnifUnivInconsistency _ as x -> contract3 env a b c, x
 
 let raise_pretype_error (loc,env,sigma,te) =
   Loc.raise loc (PretypeError(env,sigma,te))

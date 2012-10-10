@@ -10,7 +10,7 @@ Require Import Le Gt Minus Bool.
 Require Setoid.
 
 Set Implicit Arguments.
-
+Set Universe Polymorphism.
 
 (******************************************************************)
 (** * Basics: definition of polymorphic lists and some operations *)
@@ -64,8 +64,6 @@ Notation " [ x ; .. ; y ] " := (cons x .. (cons y nil) ..) : list_scope.
 End ListNotations.
 
 Import ListNotations.
-
-(** ** Facts about lists *)
 
 Section Facts.
 
@@ -131,7 +129,7 @@ Section Facts.
   subst a; auto.
   exists [], l; auto.
   destruct (IHl H) as (l1,(l2,H0)).
-  exists (a::l1), l2; simpl; f_equal; auto.
+  exists (a::l1), l2; simpl. apply f_equal. auto.
   Qed.
 
   (** Inversion *)
@@ -174,7 +172,7 @@ Section Facts.
   Qed.
 
   Theorem app_nil_r : forall l:list A, l ++ [] = l.
-  Proof.
+  Proof. 
     induction l; simpl; f_equal; auto.
   Qed.
 
@@ -655,8 +653,6 @@ Section Elts.
 
 End Elts.
 
-
-
 (*******************************)
 (** * Manipulating whole lists *)
 (*******************************)
@@ -859,7 +855,7 @@ End ListOps.
 (************)
 
 Section Map.
-  Variables A B : Type.
+  Variables (A : Type) (B : Type).
   Variable f : A -> B.
 
   Fixpoint map (l:list A) : list B :=
@@ -984,7 +980,7 @@ Qed.
 (************************************)
 
 Section Fold_Left_Recursor.
-  Variables A B : Type.
+  Variables (A : Type) (B : Type).
   Variable f : A -> B -> A.
 
   Fixpoint fold_left (l:list B) (a0:A) : A :=
@@ -1022,7 +1018,7 @@ Qed.
 (************************************)
 
 Section Fold_Right_Recursor.
-  Variables A B : Type.
+  Variables (A : Type) (B : Type).
   Variable f : B -> A -> A.
   Variable a0 : A.
 
@@ -1209,7 +1205,7 @@ End Fold_Right_Recursor.
   (******************************************************)
 
   Section ListPairs.
-    Variables A B : Type.
+    Variables (A : Type) (B : Type).
 
   (** [split] derives two lists from a list of pairs *)
 
@@ -1940,3 +1936,5 @@ Notation AllS := Forall (only parsing). (* was formerly in TheoryList *)
 
 Hint Resolve app_nil_end : datatypes v62.
 (* end hide *)
+
+Unset Universe Polymorphism.

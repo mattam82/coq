@@ -82,9 +82,9 @@ let rec safe_define evm ev c =
 let add_gen_ctx (cl,gen,evm) ctx : signature * constr list =
   let env = Environ.empty_named_context_val in
   let fold_new_evar evm _ = Evarutil.new_pure_evar evm env mkProp in
-  let rec mksubst b = function
+  let rec _mksubst b = function
     | [] -> []
-    | a::tl -> b::(mksubst (a::b) tl) in
+    | a::tl -> b::(_mksubst (a::b) tl) in
   let (evm, evl) = List.fold_map fold_new_evar evm ctx in
   let evcl = List.map (fun i -> mkEvar (i,[||])) evl in
 (*   let substl = List.rev (mksubst [] (evcl)) in *)
@@ -114,7 +114,7 @@ let complete_evar (cl,gen,evm:signature) (ev,evi) (k:signature -> unit) =
 	let (_,genl,_) = Termops.decompose_prod_letin pat in
 	let genl = List.map (fun (_,_,t) -> t) genl in
 	let ((cl,gen,evm),argl) = add_gen_ctx (cl,gen,evm) genl in
-	let def = applistc (Globnames.constr_of_global gr) argl in
+	let def = applistc (Universes.constr_of_global gr) argl in (*FIXME*)
 (*	msgnl(str"essayons  ?"++Pp.int ev++spc()++str":="++spc()
 	      ++pr_constr def++spc()++str":"++spc()++pr_constr (Global.type_of_global gr)*)
 	(*++spc()++str"dans"++spc()++pr_evar_map evm++spc());*)
@@ -178,41 +178,31 @@ let new_instance_message ident typ def =
 
 open Entries
 
-let rec deep_refresh_universes c =
-  match kind_of_term c with
-    | Sort (Type _) -> Termops.new_Type()
-    | _ -> map_constr deep_refresh_universes c
-
 let declare_record_instance gr ctx params =
   let ident = make_instance_ident gr in
-  let def = it_mkLambda_or_LetIn (applistc (constr_of_global gr) params) ctx in
-  let def = deep_refresh_universes def in
-  let ce = { const_entry_body= Future.from_val (def,Declareops.no_seff);
-             const_entry_secctx = None;
-	     const_entry_type=None;
-         const_entry_opaque=false;
-         const_entry_inline_code = false } in
+  let def = it_mkLambda_or_LetIn (applistc (Universes.constr_of_global (*FIXME*) gr) params) ctx in
+  (* let def = deep_refresh_universes def in *)
+  let ce = Declare.definition_entry ~poly:true def (*FIXME*) in
   let decl = (DefinitionEntry ce,Decl_kinds.IsDefinition Decl_kinds.StructureComponent) in
   let cst = Declare.declare_constant ident decl in
-  new_instance_message ident (Typeops.type_of_constant (Global.env()) cst) def
+  new_instance_message ident (Typeops.type_of_constant_in (Global.env())(*FIXME*) (cst,Univ.Instance.empty)) def
 
 let declare_class_instance gr ctx params =
   let ident = make_instance_ident gr in
   let cl = Typeclasses.class_info gr in
-  let (def,typ) = Typeclasses.instance_constructor cl params in
+  let c, uctx = Universes.fresh_global_instance (Global.env ()) gr in
+  let _, u = Universes.global_of_constr c in
+  let (def,typ) = Typeclasses.instance_constructor (cl,u) params in
   let (def,typ) = it_mkLambda_or_LetIn (Option.get def) ctx, it_mkProd_or_LetIn typ ctx in
-  let def = deep_refresh_universes def in
-  let typ = deep_refresh_universes typ in
+  let univs = Univ.ContextSet.to_context uctx in
   let ce = Entries.DefinitionEntry
-    {  const_entry_type= Some typ;
-       const_entry_body= Future.from_val (def,Declareops.no_seff);
-       const_entry_secctx = None;
-       const_entry_opaque = false;
-       const_entry_inline_code = false } in
+    (Declare.definition_entry ~types:typ ~poly:false (*FIXME*) ~univs def)
+  in
   try
   let cst = Declare.declare_constant ident
     (ce,Decl_kinds.IsDefinition Decl_kinds.Instance) in
-  Typeclasses.add_instance (Typeclasses.new_instance cl (Some 100) true (ConstRef cst));
+  Typeclasses.add_instance (Typeclasses.new_instance cl (Some 100) true
+			    (*FIXNE*)true (ConstRef cst));
   new_instance_message ident typ def
   with e when Errors.noncritical e ->
     msg_info (str"Error defining instance := "++pr_constr def++
@@ -247,7 +237,6 @@ let grem_add key data map =
 (* main search function: search for total instances containing gr, and
    apply k to each of them *)
 let complete_signature_with_def gr deftyp (k:instance_decl_function -> signature -> unit) : unit =
-  let gr_c = Globnames.constr_of_global gr in
   let smap = ref GREM.empty in
   iter_under_prod
     ( fun ctx typ ->
@@ -261,7 +250,7 @@ let complete_signature_with_def gr deftyp (k:instance_decl_function -> signature
     ( fun (cl,evm) evl ->
 	let f = if Typeclasses.is_class cl then
 	  declare_class_instance else declare_record_instance in
-	complete_with_evars_permut (cl,[],evm) evl gr_c
+	complete_with_evars_permut (cl,[],evm) evl (Universes.constr_of_global gr)
 	  (fun sign -> complete_signature (k f) sign)
     ) !smap
 
@@ -312,7 +301,7 @@ let autoinstance_opt = ref false
 let search_declaration gr =
   if !autoinstance_opt &&
     not (Lib.is_modtype()) then
-    let deftyp = Global.type_of_global gr in
+    let deftyp = Global.type_of_global_unsafe gr in
     complete_signature_with_def gr deftyp declare_instance
 
 let search_record k cons sign =

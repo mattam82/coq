@@ -300,6 +300,7 @@ let parse_args arglist =
     |"-h"|"-H"|"-?"|"-help"|"--help" -> usage ()
     |"-ideslave" -> Flags.ide_slave := true
     |"-impredicative-set" -> set_engagement Declarations.ImpredicativeSet
+    |"-indices-matter" -> Indtypes.enforce_indices_matter ()
     |"-just-parsing" -> Vernac.just_parsing := true
     |"-lazy-load-proofs" -> Flags.load_proofs := Flags.Lazy
     |"-m"|"--memory" -> memory_stat := true

@@ -1,4 +1,4 @@
-(************************************************************************)
+1(************************************************************************)
 (*  v      *   The Coq Proof Assistant  /  The Coq Development Team     *)
 (* <O___,, *   INRIA - CNRS - LIX - LRI - PPS - Copyright 1999-2012     *)
 (*   \VV/  **************************************************************)
@@ -261,33 +261,32 @@ let jmeq_same_dom gl = function
 
 let find_elim hdcncl lft2rgt dep cls ot gl =
   let inccl = Option.is_empty cls in
-  let hdcncl_is u = eq_constr hdcncl (constr_of_reference u) in
-  if (hdcncl_is (Coqlib.glob_eq) ||
-      hdcncl_is (Coqlib.glob_jmeq) && jmeq_same_dom gl ot)
-     && not dep
-     || Flags.version_less_or_equal Flags.V8_2
+  if (is_global Coqlib.glob_eq hdcncl ||
+      (is_global Coqlib.glob_jmeq hdcncl &&
+	 jmeq_same_dom gl ot)) && not dep
+    || Flags.version_less_or_equal Flags.V8_2
   then
     match kind_of_term hdcncl with 
-      | Ind ind_sp -> 
+      | Ind (ind_sp,u) -> 
 	let pr1 = 
 	  lookup_eliminator ind_sp (elimination_sort_of_clause cls gl) 
 	in
         begin match lft2rgt, cls with
         | Some true, None
         | Some false, Some _ ->
-	  let c1 = destConst pr1 in 
+	  let c1 = destConstRef pr1 in 
 	  let mp,dp,l = repr_con (constant_of_kn (canonical_con c1)) in 
 	  let l' = Label.of_id (add_suffix (Label.to_id l) "_r")  in 
 	  let c1' = Global.constant_of_delta_kn (make_kn mp dp l') in
 	  begin 
 	    try 
 	      let _ = Global.lookup_constant c1' in
-              mkConst c1', gl
+		c1', gl
 	    with Not_found -> 
 	      let rwr_thm = Label.to_string l' in 
 	      error ("Cannot find rewrite principle "^rwr_thm^".")
 	  end
-	| _ -> pr1, gl
+	| _ -> destConstRef pr1, gl
         end
       | _ -> 
 	  (* cannot occur since we checked that we are in presence of 
@@ -307,10 +306,10 @@ let find_elim hdcncl lft2rgt dep cls ot gl =
     | true, _, false -> rew_r2l_forward_dep_scheme_kind
   in
   match kind_of_term hdcncl with
-  | Ind ind -> 
+  | Ind (ind,u) -> 
       let c, eff = find_scheme scheme_name ind in 
       let gl = {gl with sigma = Evd.emit_side_effects eff gl.sigma } in
-      mkConst c, gl
+      c, gl
   | _ -> assert false
 
 let type_of_clause gl = function
@@ -322,9 +321,11 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac c t l with_evars frzevars d
   let dep_fun = if isatomic then dependent else dependent_no_evar in
   let dep = dep_proof_ok && dep_fun c (type_of_clause gl cls) in
   let elim, gl = find_elim hdcncl lft2rgt dep cls (Some t) gl in
-  general_elim_clause with_evars frzevars tac cls c t l
-    (match lft2rgt with None -> false | Some b -> b)
-    {elimindex = None; elimbody = (elim,NoBindings)} gl
+  let tac elim gl = 
+    general_elim_clause with_evars frzevars tac cls c t l
+      (match lft2rgt with None -> false | Some b -> b)
+      {elimindex = None; elimbody = (elim,NoBindings)} gl
+  in pf_constr_of_global (ConstRef elim) tac gl
 
 let adjust_rewriting_direction args lft2rgt =
   match args with
@@ -479,23 +480,29 @@ let multi_replace clause c2 c1 unsafe try_prove_eq_opt gl =
   in
   let t1 = pf_apply get_type_of gl c1
   and t2 = pf_apply get_type_of gl c2 in
-  if unsafe || (pf_conv_x gl t1 t2) then
-    let e = build_coq_eq () in
-    let sym = build_coq_eq_sym () in
-    let eq = applist (e, [t1;c1;c2]) in
-    tclTHENS (assert_as false None eq)
-      [onLastHypId (fun id ->
-	tclTHEN
-	  (tclTRY (general_multi_rewrite false false (mkVar id,NoBindings) clause))
-	  (clear [id]));
-       tclFIRST
-	 [assumption;
-	  tclTHEN (apply sym) assumption;
-	  try_prove_eq
-	 ]
-      ] gl
-  else
-    error "Terms do not have convertible types."
+  let evd = 
+    if unsafe then project gl
+    else
+      try Evarconv.the_conv_x (pf_env gl) t1 t2 (project gl)
+      with Evarconv.UnableToUnify _ -> 
+	error "Terms do not have convertible types."
+  in
+  let eqdata = build_coq_eq_data () in
+    tclTHEN (Refiner.tclEVARS evd)
+      (pf_constr_of_global eqdata.eq (fun e ->
+      (pf_constr_of_global eqdata.sym (fun sym ->
+	let eq = applist (e, [t1;c1;c2]) in
+      	  (tclTHENS (assert_as false None eq)
+	     [onLastHypId (fun id ->
+	       tclTHEN
+		 (tclTRY (general_multi_rewrite false false (mkVar id,NoBindings) clause))
+		 (clear [id]));
+	      tclFIRST
+		[assumption;
+		 tclTHEN (apply sym) assumption;
+		 try_prove_eq
+		]
+	     ]))))) gl
 
 
 let replace c2 c1 gl = multi_replace onConcl c2 c1 false None gl
@@ -561,14 +568,13 @@ let find_positions env sigma t1 t2 =
     let hd1,args1 = whd_betadeltaiota_stack env sigma t1 in
     let hd2,args2 = whd_betadeltaiota_stack env sigma t2 in
     match (kind_of_term hd1, kind_of_term hd2) with
-
-      | Construct sp1, Construct sp2
+      | Construct (sp1,_), Construct (sp2,_)
           when Int.equal (List.length args1) (mis_constructor_nargs_env env sp1)
             ->
 	  let sorts = List.intersect sorts (allowed_sorts env (fst sp1)) in
           (* both sides are fully applied constructors, so either we descend,
              or we can discriminate here. *)
-	  if is_conv env sigma hd1 hd2 then
+	  if eq_constructor sp1 sp2 then
 	    let nrealargs = constructor_nrealargs env sp1 in
 	    let rargs1 = List.lastn nrealargs args1 in
 	    let rargs2 = List.lastn nrealargs args2 in
@@ -673,7 +679,7 @@ let descend_then sigma env head dirn =
     try find_rectype env sigma (get_type_of env sigma head)
     with Not_found ->
       error "Cannot project on an inductive type derived from a dependency." in
-   let ind,_ = dest_ind_family indf in
+  let (ind,_),_ = dest_ind_family indf in
   let (mib,mip) = lookup_mind_specif env ind in
   let cstr = get_constructors env indf in
   let dirn_nlams = cstr.(dirn-1).cs_nargs in
@@ -722,7 +728,7 @@ let construct_discriminator sigma env dirn c sort =
       errorlabstrm "Equality.construct_discriminator"
 	(str "Cannot discriminate on inductive constructors with \
 		 dependent types.") in
-  let (ind,_) = dest_ind_family indf in
+  let ((ind,_),_) = dest_ind_family indf in
   let (mib,mip) = lookup_mind_specif env ind in
   let (true_0,false_0,sort_0) = build_coq_True(),build_coq_False(),Prop Null in
   let deparsign = make_arity_signature env true indf in
@@ -771,22 +777,23 @@ let gen_absurdity id gl =
 *)
 
 let ind_scheme_of_eq lbeq =
-  let (mib,mip) = Global.lookup_inductive (destInd lbeq.eq) in
+  let (mib,mip) = Global.lookup_inductive (destIndRef lbeq.eq) in
   let kind = inductive_sort_family mip in
   (* use ind rather than case by compatibility *)
   let kind =
     if kind == InProp then Elimschemes.ind_scheme_kind_from_prop
     else Elimschemes.ind_scheme_kind_from_type in
-  let c, eff = find_scheme kind (destInd lbeq.eq) in
-  mkConst c, eff
+  let c, eff = find_scheme kind (destIndRef lbeq.eq) in
+    ConstRef c, eff
 
 
-let discrimination_pf e (t,t1,t2) discriminator lbeq =
+let discrimination_pf env sigma e (t,t1,t2) discriminator lbeq =
   let i            = build_coq_I () in
   let absurd_term  = build_coq_False () in
   let eq_elim, eff = ind_scheme_of_eq lbeq in
-  (applist (eq_elim, [t;t1;mkNamedLambda e t discriminator;i;t2]), absurd_term),
-  eff
+  let sigma, eq_elim = Evd.fresh_global env sigma eq_elim in
+    sigma, (applist (eq_elim, [t;t1;mkNamedLambda e t discriminator;i;t2]), absurd_term),
+    eff
 
 let eq_baseid = Id.of_string "e"
 
@@ -804,12 +811,12 @@ let discr_positions env sigma (lbeq,eqn,(t,t1,t2)) eq_clause cpath dirn sort gl=
   let e_env = push_named (e,None,t) env in
   let discriminator =
     build_discriminator sigma e_env dirn (mkVar e) sort cpath in
-  let (pf, absurd_term), eff =
-    discrimination_pf e (t,t1,t2) discriminator lbeq in
+  let sigma,(pf, absurd_term), eff = 
+    discrimination_pf env sigma e (t,t1,t2) discriminator lbeq in
   let pf_ty = mkArrow eqn absurd_term in
   let absurd_clause = apply_on_clause (pf,pf_ty) eq_clause in
   let pf = clenv_value_cast_meta absurd_clause in
-  let gl = {gl with sigma = Evd.emit_side_effects eff gl.sigma } in
+  let gl = {gl with sigma = Evd.emit_side_effects eff sigma } in
   tclTHENS (cut_intro absurd_term)
     [onLastHypId gen_absurdity; refine pf] gl
 
@@ -829,9 +836,7 @@ let onEquality with_evars tac (c,lbindc) gls =
   let eq_clause = make_clenv_binding gls (c,t') lbindc in
   let eq_clause' = clenv_pose_dependent_evars with_evars eq_clause in
   let eqn = clenv_type eq_clause' in
-  let eq,eq_args = find_this_eq_data_decompose gls eqn in
-  tclTHEN
-    (Refiner.tclEVARS eq_clause'.evd)
+  let eq,u,eq_args = find_this_eq_data_decompose gls eqn in
     (tac (eq,eqn,eq_args) eq_clause') gls
 
 let onNegatedEquality with_evars tac gls =
@@ -877,7 +882,7 @@ let discrHyp id gls = discrClause false (onHyp id) gls
     constructor depending on the sort *)
 (* J.F.: correction du bug #1167 en accord avec Hugo. *)
 
-let find_sigma_data s = build_sigma_type ()
+let find_sigma_data env s = build_sigma_type ()
 
 (* [make_tuple env sigma (rterm,rty) lind] assumes [lind] is the lesser
    index bound in [rty]
@@ -891,16 +896,18 @@ let find_sigma_data s = build_sigma_type ()
 
 let make_tuple env sigma (rterm,rty) lind =
   assert (dependent (mkRel lind) rty);
-  let {intro = exist_term; typ = sig_term} =
-    find_sigma_data (get_sort_of env sigma rty) in
+  let sigdata = find_sigma_data env (get_sort_of env sigma rty) in
   let a = type_of env sigma (mkRel lind) in
   let (na,_,_) = lookup_rel lind env in
   (* We move [lind] to [1] and lift other rels > [lind] by 1 *)
   let rty = lift (1-lind) (liftn lind (lind+1) rty) in
   (* Now [lind] is [mkRel 1] and we abstract on (na:a) *)
   let p = mkLambda (na, a, rty) in
-  (applist(exist_term,[a;p;(mkRel lind);rterm]),
-   applist(sig_term,[a;p]))
+  let sigma, exist_term = Evd.fresh_global env sigma sigdata.intro in
+  let sigma, sig_term = Evd.fresh_global env sigma sigdata.typ in
+    sigma,
+    (applist(exist_term,[a;p;(mkRel lind);rterm]),
+     applist(sig_term,[a;p]))
 
 (* check that the free-references of the type of [c] are contained in
    the free-references of the normal-form of that type. Strictly
@@ -965,7 +972,7 @@ let minimal_free_rels_rec env sigma =
  *)
 
 let sig_clausal_form env sigma sort_of_ty siglen ty dflt =
-  let { intro = exist_term } = find_sigma_data sort_of_ty in
+  let sigdata = find_sigma_data env sort_of_ty in
   let evdref = ref (Evd.create_goal_evar_defs sigma) in
   let rec sigrec_clausal_form siglen p_i =
     if Int.equal siglen 0 then
@@ -990,13 +997,14 @@ let sig_clausal_form env sigma sort_of_ty siglen ty dflt =
 	| Some w ->
             let w_type = type_of env sigma w in
             if Evarconv.e_cumul env evdref w_type a then
+	      let exist_term = Evarutil.evd_comb1 (Evd.fresh_global env) evdref sigdata.intro in
               applist(exist_term,[w_type;p_i_minus_1;w;tuple_tail])
             else
               error "Cannot solve a unification problem."
 	| None -> anomaly (Pp.str "Not enough components to build the dependent tuple")
   in
   let scf = sigrec_clausal_form siglen ty in
-  Evarutil.nf_evar !evdref scf
+    !evdref, Evarutil.nf_evar !evdref scf
 
 (* The problem is to build a destructor (a generalization of the
    predecessor) which, when applied to a term made of constructors
@@ -1060,13 +1068,13 @@ let make_iterated_tuple env sigma dflt (z,zty) =
   let (zty,rels) = minimal_free_rels_rec env sigma (z,zty) in
   let sort_of_zty = get_sort_of env sigma zty in
   let sorted_rels = List.sort Pervasives.compare (Int.Set.elements rels) in
-  let (tuple,tuplety) =
-    List.fold_left (make_tuple env sigma) (z,zty) sorted_rels
+  let sigma, (tuple,tuplety) =
+    List.fold_left (fun (sigma, t) -> make_tuple env sigma t) (sigma, (z,zty)) sorted_rels
   in
   assert (closed0 tuplety);
   let n = List.length sorted_rels in
-  let dfltval = sig_clausal_form env sigma sort_of_zty n tuplety dflt in
-  (tuple,tuplety,dfltval)
+  let sigma, dfltval = sig_clausal_form env sigma sort_of_zty n tuplety dflt in
+    sigma, (tuple,tuplety,dfltval)
 
 let rec build_injrec sigma env dflt c = function
   | [] -> make_iterated_tuple env sigma dflt (c,type_of env sigma c)
@@ -1074,15 +1082,14 @@ let rec build_injrec sigma env dflt c = function
     try
       let (cnum_nlams,cnum_env,kont) = descend_then sigma env c cnum in
       let newc = mkRel(cnum_nlams-argnum) in
-      let (subval,tuplety,dfltval) = build_injrec sigma cnum_env dflt newc l in
-      (kont subval (dfltval,tuplety),
-      tuplety,dfltval)
+      let sigma, (subval,tuplety,dfltval) = build_injrec sigma cnum_env dflt newc l in
+	sigma, (kont subval (dfltval,tuplety), tuplety,dfltval)
     with
 	UserError _ -> failwith "caught"
 
 let build_injector sigma env dflt c cpath =
-  let (injcode,resty,_) = build_injrec sigma env dflt c cpath in
-  (injcode,resty)
+  let sigma, (injcode,resty,_) = build_injrec sigma env dflt c cpath in
+    sigma, (injcode,resty)
 
 (*
 let try_delta_expand env sigma t =
@@ -1111,27 +1118,31 @@ let simplify_args env sigma t =
 let inject_at_positions env sigma l2r (eq,_,(t,t1,t2)) eq_clause posns tac =
   let e = next_ident_away eq_baseid (ids_of_context env) in
   let e_env = push_named (e, None,t) env in
+  let evdref = ref sigma in
   let filter (cpath, t1', t2') =
     try
       (* arbitrarily take t1' as the injector default value *)
-      let (injbody,resty) = build_injector sigma e_env t1' (mkVar e) cpath in
+      let sigma, (injbody,resty) = build_injector !evdref e_env t1' (mkVar e) cpath in
       let injfun = mkNamedLambda e t injbody in
-      let pf = applist(eq.congr,[t;resty;injfun;t1;t2]) in
-      let pf_typ = get_type_of env sigma pf in
+      let congr = Evarutil.evd_comb1 (Evd.fresh_global env) evdref eq.congr in
+      let pf = applist(congr,[t;resty;injfun;t1;t2]) in
+      let sigma, pf_typ = Typing.e_type_of env sigma pf in
       let inj_clause = apply_on_clause (pf,pf_typ) eq_clause in
       let pf = clenv_value_cast_meta inj_clause in
       let ty = simplify_args env sigma (clenv_type inj_clause) in
-      Some (pf, ty)
+	evdref := sigma;
+	Some (pf, ty)
     with Failure _ -> None
   in
   let injectors = List.map_filter filter posns in
   if List.is_empty injectors then
     errorlabstrm "Equality.inj" (str "Failed to decompose the equality.");
-  tclTHEN
-    (tclMAP
-      (fun (pf,ty) -> tclTHENS (cut ty) [tclIDTAC; refine pf])
-      (if l2r then List.rev injectors else injectors))
-    (tac (List.length injectors))
+  tclTHEN (Refiner.tclEVARS !evdref) 
+    (tclTHEN
+       (tclMAP
+	  (fun (pf,ty) -> tclTHENS (cut ty) [tclIDTAC; refine pf])
+	  (if l2r then List.rev injectors else injectors))
+       (tac (List.length injectors)))
 
 exception Not_dep_pair
 
@@ -1142,34 +1153,38 @@ let eqdep_dec = qualid_of_string "Coq.Logic.Eqdep_dec"
 
 let inject_if_homogenous_dependent_pair env sigma (eq,_,(t,t1,t2)) gl =
   (* fetch the informations of the  pair *)
-  let ceq = constr_of_global Coqlib.glob_eq in
+  let ceq = Universes.constr_of_global Coqlib.glob_eq in
   let sigTconstr () = (Coqlib.build_sigma_type()).Coqlib.typ in
   let eqTypeDest = fst (destApp t) in
   let _,ar1 = destApp t1 and
       _,ar2 = destApp t2 in
   let ind = destInd ar1.(0) in
-  (* check whether the equality deals with dep pairs or not *)
-  (* if yes, check if the user has declared the dec principle *)
-  (* and compare the fst arguments of the dep pair *)
+	(* check whether the equality deals with dep pairs or not *)
+	(* if yes, check if the user has declared the dec principle *)
+	(* and compare the fst arguments of the dep pair *)
   let new_eq_args = [|type_of env sigma ar1.(3);ar1.(3);ar2.(3)|] in
-  if (eq_constr eqTypeDest (sigTconstr())) &&
-    (Ind_tables.check_scheme (!eq_dec_scheme_kind_name()) ind) &&
-    (is_conv env sigma ar1.(2) ar2.(2))
-  then begin
-    Library.require_library [Loc.ghost,eqdep_dec] (Some false);
-    let inj2 = Coqlib.coq_constant "inj_pair2_eq_dec is missing"
-      ["Logic";"Eqdep_dec"] "inj_pair2_eq_dec" in
-    let c, eff = find_scheme (!eq_dec_scheme_kind_name()) ind in
-    let gl = { gl with sigma = Evd.emit_side_effects eff gl.sigma } in
-      (* cut with the good equality and prove the requested goal *)
-    tclTHENS (cut (mkApp (ceq,new_eq_args)))
-      [tclIDTAC; tclTHEN (apply (
-        mkApp(inj2,[|ar1.(0);mkConst c;ar1.(1);ar1.(2);ar1.(3);ar2.(3)|])
-       )) (Auto.trivial [] [])
-      ] gl
-  (* not a dep eq or no decidable type found *)
-  end
-  else raise Not_dep_pair
+    if (Globnames.is_global (sigTconstr()) eqTypeDest) &&
+      (Ind_tables.check_scheme (!eq_dec_scheme_kind_name()) (fst ind)) &&
+      (is_conv env sigma ar1.(2) ar2.(2))
+    then begin
+      Library.require_library [Loc.ghost,eqdep_dec] (Some false);
+      let inj2 = Coqlib.coq_constant "inj_pair2_eq_dec is missing"
+        ["Logic";"Eqdep_dec"] "inj_pair2_eq_dec" in
+      let scheme, eff = find_scheme (!eq_dec_scheme_kind_name()) (fst ind) in
+      let gl = { gl with sigma = Evd.emit_side_effects eff gl.sigma } in
+        (* cut with the good equality and prove the requested goal *)
+        tclTHENS (cut (mkApp (ceq,new_eq_args)))
+          [tclIDTAC; 
+	   pf_constr_of_global (ConstRef scheme) (fun c ->
+	     tclTHEN (apply (
+               mkApp(inj2,
+                     [|ar1.(0);c;
+                       ar1.(1);ar1.(2);ar1.(3);ar2.(3)|])
+             )) (Auto.trivial [] []))
+          ] gl
+    (* not a dep eq or no decidable type found *)
+    end
+    else raise Not_dep_pair
 
 let injEqThen tac l2r (eq,_,(t,t1,t2) as u) eq_clause gl =
   let sigma = eq_clause.evd in
@@ -1247,26 +1262,29 @@ let swap_equality_args = function
   | HeterogenousEq (t1,e1,t2,e2) -> [t2;e2;t1;e1]
 
 let swap_equands gls eqn =
-  let (lbeq,eq_args) = find_eq_data eqn in
-  applist(lbeq.eq,swap_equality_args eq_args)
+  let (lbeq,u,eq_args) = find_eq_data (pf_env gls) eqn in
+  let eq = Universes.constr_of_global_univ (lbeq.eq,u) in
+    applist(eq,swap_equality_args eq_args)
 
 let swapEquandsInConcl gls =
-  let (lbeq,eq_args) = find_eq_data (pf_concl gls) in
-  let sym_equal = lbeq.sym in
-  refine
-    (applist(sym_equal,(swap_equality_args eq_args@[Evarutil.mk_new_meta()])))
+  let (lbeq,u,eq_args) = find_eq_data (pf_env gls) (pf_concl gls) in
+    pf_constr_of_global lbeq.sym (fun sym_equal ->
+      refine
+	(applist(sym_equal,(swap_equality_args eq_args@[Evarutil.mk_new_meta()]))))
     gls
 
 (* Refine from [|- P e2] to [|- P e1] and [|- e1=e2:>t] (body is P (Rel 1)) *)
 
-let bareRevSubstInConcl lbeq body (t,e1,e2) gls =
+let bareRevSubstInConcl (lbeq,u) body (t,e1,e2) gls =
   (* find substitution scheme *)
-  let eq_elim, gls = find_elim lbeq.eq (Some false) false None None gls in
+  let eq_elim, gls = find_elim (Universes.constr_of_global_univ (lbeq.eq,u))
+    (Some false) false None None gls in
   (* build substitution predicate *)
   let p = lambda_create (pf_env gls) (t,body) in
   (* apply substitution scheme *)
-  refine (applist(eq_elim,[t;e1;p;Evarutil.mk_new_meta();
-                           e2;Evarutil.mk_new_meta()])) gls
+  pf_constr_of_global (ConstRef eq_elim) (fun c ->
+    refine (applist(c,[t;e1;p;Evarutil.mk_new_meta();
+                       e2;Evarutil.mk_new_meta()]))) gls
 
 (* [subst_tuple_term dep_pair B]
 
@@ -1304,19 +1322,18 @@ let decomp_tuple_term env c t =
   let rec decomprec inner_code ex exty =
     let iterated_decomp =
     try
-      let {proj1=p1; proj2=p2},(a,p,car,cdr) = find_sigma_data_decompose ex in
-      let car_code = applist (p1,[a;p;inner_code])
-      and cdr_code = applist (p2,[a;p;inner_code]) in
+      let ({proj1=p1; proj2=p2}),(i,a,p,car,cdr) = find_sigma_data_decompose ex in
+      let car_code = applist (mkConstU (destConstRef p1,i),[a;p;inner_code])
+      and cdr_code = applist (mkConstU (destConstRef p2,i),[a;p;inner_code]) in
       let cdrtyp = beta_applist (p,[car]) in
-      List.map (fun l -> ((car,a),car_code)::l) (decomprec cdr_code cdr cdrtyp)
+	List.map (fun l -> ((car,a),car_code)::l)
+	  (decomprec cdr_code cdr cdrtyp)
     with PatternMatchingFailure ->
       []
-    in
-    [((ex,exty),inner_code)]::iterated_decomp
-  in
-  decomprec (mkRel 1) c t
+    in [((ex,exty),inner_code)]::iterated_decomp
+  in decomprec (mkRel 1) c t
 
-let subst_tuple_term env sigma dep_pair1 dep_pair2 b =
+let subst_tuple_term env sigma t dep_pair1 dep_pair2 b =
   let typ = get_type_of env sigma dep_pair1 in
   (* We find all possible decompositions *)
   let decomps1 = decomp_tuple_term env dep_pair1 typ in
@@ -1337,19 +1354,19 @@ let subst_tuple_term env sigma dep_pair1 dep_pair2 b =
   let expected_goal = beta_applist (abst_B,List.map fst e2_list) in
   (* Simulate now the normalisation treatment made by Logic.mk_refgoals *)
   let expected_goal = nf_betaiota sigma expected_goal in
-  pred_body,expected_goal
+    pred_body,expected_goal
 
 (* Like "replace" but decompose dependent equalities *)
 
 exception NothingToRewrite
 
 let cutSubstInConcl_RL eqn gls =
-  let (lbeq,(t,e1,e2 as eq)) = find_eq_data_decompose gls eqn in
-  let body,expected_goal = pf_apply subst_tuple_term gls e2 e1 (pf_concl gls) in
+  let (lbeq,u,(t,e1,e2 as eq)) = find_eq_data_decompose gls eqn in
+  let body,expected_goal = pf_apply subst_tuple_term gls t e2 e1 (pf_concl gls) in
   if not (dependent (mkRel 1) body) then raise NothingToRewrite;
-  tclTHENFIRST
-    (bareRevSubstInConcl lbeq body eq)
-    (convert_concl expected_goal DEFAULTcast) gls
+    (tclTHENFIRST
+       (bareRevSubstInConcl (lbeq,u) body eq)
+       (convert_concl expected_goal DEFAULTcast)) gls
 
 (* |- (P e1)
      BY CutSubstInConcl_LR (eq T e1 e2)
@@ -1364,14 +1381,14 @@ let cutSubstInConcl_LR eqn gls =
 let cutSubstInConcl l2r =if l2r then cutSubstInConcl_LR else cutSubstInConcl_RL
 
 let cutSubstInHyp_LR eqn id gls =
-  let (lbeq,(t,e1,e2 as eq)) = find_eq_data_decompose gls eqn in
+  let (lbeq,u,(t,e1,e2 as eq)) = find_eq_data_decompose gls eqn in
   let idtyp = pf_get_hyp_typ gls id in
-  let body,expected_goal = pf_apply subst_tuple_term gls e1 e2 idtyp in
+  let body,expected_goal = pf_apply subst_tuple_term gls t e1 e2 idtyp in
   if not (dependent (mkRel 1) body) then raise NothingToRewrite;
-  cut_replacing id expected_goal
-    (tclTHENFIRST
-      (bareRevSubstInConcl lbeq body eq)
-      (refine_no_check (mkVar id))) gls
+    (cut_replacing id expected_goal
+       (tclTHENFIRST
+	  (bareRevSubstInConcl (lbeq,u) body eq)
+	  (refine_no_check (mkVar id)))) gls
 
 let cutSubstInHyp_RL eqn id gls =
   (tclTHENS (cutSubstInHyp_LR (swap_equands gls eqn) id)
@@ -1448,8 +1465,8 @@ let unfold_body x gl =
 
 
 let restrict_to_eq_and_identity eq = (* compatibility *)
-  if not (eq_constr eq (constr_of_global glob_eq)) &&
-    not (eq_constr eq (constr_of_global glob_identity)) then
+  if not (is_global glob_eq eq) &&
+    not (is_global glob_identity eq) then
     raise PatternMatchingFailure
 
 exception FoundHyp of (Id.t * constr * bool)
@@ -1457,7 +1474,7 @@ exception FoundHyp of (Id.t * constr * bool)
 (* tests whether hyp [c] is [x = t] or [t = x], [x] not occuring in [t] *)
 let is_eq_x gl x (id,_,c) =
   try
-    let (_,lhs,rhs) = snd (find_eq_data_decompose gl c) in
+    let (_,lhs,rhs) = pi3 (find_eq_data_decompose gl c) in
     if (eq_constr x lhs) && not (occur_term x rhs) then raise (FoundHyp (id,rhs,true));
     if (eq_constr x rhs) && not (occur_term x lhs) then raise (FoundHyp (id,lhs,false))
   with PatternMatchingFailure ->
@@ -1545,8 +1562,9 @@ let default_subst_tactic_flags () =
 let subst_all ?(flags=default_subst_tactic_flags ()) gl =
   let test (_,c) =
     try
-      let lbeq,(_,x,y) = find_eq_data_decompose gl c in
-      if flags.only_leibniz then restrict_to_eq_and_identity lbeq.eq;
+      let lbeq,u,(_,x,y) = find_eq_data_decompose gl c in
+      let eq = Universes.constr_of_global_univ (lbeq.eq,u) in
+      if flags.only_leibniz then restrict_to_eq_and_identity eq;
       (* J.F.: added to prevent failure on goal containing x=x as an hyp *)
       if eq_constr x y then failwith "caught";
       match kind_of_term x with Var x -> x | _ ->
@@ -1563,19 +1581,19 @@ let subst_all ?(flags=default_subst_tactic_flags ()) gl =
 
 let cond_eq_term_left c t gl =
   try
-    let (_,x,_) = snd (find_eq_data_decompose gl t) in
+    let (_,x,_) = pi3 (find_eq_data_decompose gl t) in
     if pf_conv_x gl c x then true else failwith "not convertible"
   with PatternMatchingFailure -> failwith "not an equality"
 
 let cond_eq_term_right c t gl =
   try
-    let (_,_,x) = snd (find_eq_data_decompose gl t) in
+    let (_,_,x) = pi3 (find_eq_data_decompose gl t) in
     if pf_conv_x gl c x then false else failwith "not convertible"
   with PatternMatchingFailure -> failwith "not an equality"
 
 let cond_eq_term c t gl =
   try
-    let (_,x,y) = snd (find_eq_data_decompose gl t) in
+    let (_,x,y) = pi3 (find_eq_data_decompose gl t) in
     if pf_conv_x gl c x then true
     else if pf_conv_x gl c y then false
     else failwith "not convertible"

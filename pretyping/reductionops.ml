@@ -33,6 +33,7 @@ exception Elimconst
 type 'a stack_member =
   | Zapp of 'a list
   | Zcase of case_info * 'a * 'a array * ('a * 'a list) option
+  | Zproj of int * int * projection
   | Zfix of fixpoint * 'a stack * ('a * 'a list) option
   | Zshift of int
   | Zupdate of 'a
@@ -47,7 +48,9 @@ let compare_stack_shape stk1 stk2 =
     | (Zapp l1::s1, _) -> compare_rec (bal+List.length l1) s1 stk2
     | (_, Zapp l2::s2) -> compare_rec (bal-List.length l2) stk1 s2
     | (Zcase(c1,_,_,_)::s1, Zcase(c2,_,_,_)::s2) ->
-        Int.equal bal 0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
+       Int.equal bal 0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
+    | (Zproj (n1,m1,p)::s1, Zproj(n2,m2,p2)::s2) ->
+       Int.equal bal 0 && compare_rec 0 s1 s2
     | (Zfix(_,a1,_)::s1, Zfix(_,a2,_)::s2) ->
         Int.equal bal 0 && compare_rec 0 a1 a2 && compare_rec 0 s1 s2
     | (_,_) -> false in
@@ -157,6 +160,7 @@ let rec zip ?(refold=false) = function
   | f, (Zfix (fix,st,_)::s) -> zip ~refold
     (mkFix fix, st @ (append_stack_app_list [f] s))
   | f, (Zshift n::s) -> zip ~refold (lift n f, s)
+  | f, (Zproj (n,m,p)::s) -> zip ~refold (mkProj (p,f),s)
   | _ -> assert false
 
 (** The type of (machine) states (= lambda-bar-calculus' cuts) *)
@@ -165,6 +169,7 @@ type state = constr * constr stack
 type  contextual_reduction_function = env ->  evar_map -> constr -> constr
 type  reduction_function =  contextual_reduction_function
 type local_reduction_function = evar_map -> constr -> constr
+type e_reduction_function = env -> evar_map -> constr -> evar_map * constr
 
 type  contextual_stack_reduction_function =
     env ->  evar_map -> constr -> constr * constr list
@@ -302,9 +307,17 @@ let magicaly_constant_of_fixbody env bd = function
     try
       let cst = Nametab.locate_constant
 	(Libnames.make_qualid DirPath.empty id) in
-      match constant_opt_value env cst with
+      let (cst, u), ctx = Universes.fresh_constant_instance env cst in
+      match constant_opt_value env (cst,u) with
       | None -> bd
-      | Some t -> if eq_constr t bd then mkConst cst else bd
+      | Some (t,cstrs) -> 
+        let b, csts = eq_constr_universes t bd in
+	let subst = UniverseConstraints.fold (fun (l,d,r) acc -> 
+	  Univ.LMap.add (Option.get (Universe.level l)) (Option.get (Universe.level r)) acc)
+	  csts Univ.LMap.empty
+	in
+	let inst = Instance.subst_fn (fun u -> Univ.LMap.find u subst) u in
+          if b then mkConstU (cst,inst) else bd
     with
     | Not_found -> bd
 
@@ -325,7 +338,7 @@ let contract_cofix ?env (bodynum,(names,types,bodies as typedbodies)) cst =
 
 let reduce_mind_case mia =
   match kind_of_term mia.mconstr with
-    | Construct (ind_sp,i) ->
+    | Construct ((ind_sp,i),u) ->
 (*	let ncargs = (fst mia.mci).(i-1) in*)
 	let real_cargs = List.skipn mia.mci.ci_npar mia.mcargs in
         applist (mia.mlf.(i-1),real_cargs)
@@ -359,6 +372,10 @@ let fix_recarg ((recindices,bodynum),_) stack =
     Some (recargnum, stack_nth stack recargnum)
   with Not_found ->
     None
+
+type 'a reduced_state = 
+  | NotReducible
+  | Reduced of constr
 
 (** Generic reduction function with environment
 
@@ -398,10 +415,15 @@ let rec whd_state_gen ?csts refold flags env sigma =
       (match safe_meta_value sigma ev with
       | Some body -> whrec cst_l (body, stack)
       | None -> fold ())
-    | Const const when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST const) ->
-      (match constant_opt_value env const with
-      | Some  body -> whrec (Cst_stack.add_cst (mkConst const) cst_l) (body, stack)
+    | Const (const,u as cu) when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST const) ->
+      (match constant_opt_value_in env cu with
+      | Some  body -> whrec (Cst_stack.add_cst (mkConstU cu) cst_l) (body, stack)
       | None -> fold ())
+    | Proj (p, c) when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) ->
+      (match (lookup_constant p env).Declarations.const_proj with
+      | None -> assert false
+      | Some pb -> whrec cst_l (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+        :: stack))
     | LetIn (_,b,_,c) when Closure.RedFlags.red_set flags Closure.RedFlags.fZETA ->
       apply_subst whrec [b] cst_l c stack
     | Cast (c,_,_) -> whrec cst_l (c, stack)
@@ -439,11 +461,13 @@ let rec whd_state_gen ?csts refold flags env sigma =
       |None -> fold ()
       |Some (bef,arg,s') -> whrec noth (arg, Zfix(f,[Zapp bef],Cst_stack.best_cst cst_l)::s'))
 
-    | Construct (ind,c) ->
+    | Construct ((ind,c),u) ->
       if Closure.RedFlags.red_set flags Closure.RedFlags.fIOTA then
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec noth (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	|args, (Zproj (n,m,p)::s') ->
+	  whrec noth (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
 	  whrec noth ((if refold then contract_fix ~env f else contract_fix f) cst,
@@ -461,7 +485,7 @@ let rec whd_state_gen ?csts refold flags env sigma =
 	|_ -> fold ()
       else fold ()
 
-    | Rel _ | Var _ | Const _ | LetIn _ -> fold ()
+    | Rel _ | Var _ | Const _ | LetIn _ | Proj _ -> fold ()
     | Sort _ | Ind _ | Prod _ -> fold ()
   in
   whrec (Option.default noth csts)
@@ -493,6 +517,12 @@ let local_whd_state_gen flags sigma =
 	  else s
 	| _ -> s)
       | _ -> s)
+      
+    | Proj (p,c) when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) -> 
+      (match (lookup_constant p (Global.env ())).Declarations.const_proj with
+      | None -> assert false
+      | Some pb -> whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+        :: stack))
 
     | Case (ci,p,d,lf) ->
       whrec (d, Zcase (ci,p,lf,None) :: stack)
@@ -512,11 +542,13 @@ let local_whd_state_gen flags sigma =
         Some c -> whrec (c,stack)
       | None -> s)
 
-    | Construct (ind,c) ->
+    | Construct ((ind,c),u) ->
       if Closure.RedFlags.red_set flags Closure.RedFlags.fIOTA then
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	|args, (Zproj (n,m,p) :: s') ->
+	  whrec (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
 	  whrec (contract_fix f cst, s' @ (append_stack_app_list [x'] s''))
@@ -636,7 +668,18 @@ let rec whd_evar sigma c =
         (match safe_evar_value sigma ev with
             Some c -> whd_evar sigma c
           | None -> c)
-    | Sort s -> whd_sort_variable sigma c
+    | Sort (Type u) -> 
+      let u' = Evd.normalize_universe sigma u in
+	if u' == u then c else mkSort (Type u')
+    | Const (c', u) when not (Univ.Instance.is_empty u) -> 
+      let u' = Evd.normalize_universe_instance sigma u in
+	if u' == u then c else mkConstU (c', u')
+    | Ind (i, u) when not (Univ.Instance.is_empty u) -> 
+      let u' = Evd.normalize_universe_instance sigma u in
+	if u' == u then c else mkIndU (i, u')
+    | Construct (co, u) when not (Univ.Instance.is_empty u) ->
+      let u' = Evd.normalize_universe_instance sigma u in
+	if u' == u then c else mkConstructU (co, u')
     | _ -> c
 
 let nf_evar =
@@ -652,9 +695,9 @@ let clos_norm_flags flgs env sigma t =
       (inject t)
   with e when is_anomaly e -> error "Tried to normalize ill-typed term"
 
-let nf_beta = clos_norm_flags Closure.beta empty_env
-let nf_betaiota = clos_norm_flags Closure.betaiota empty_env
-let nf_betaiotazeta = clos_norm_flags Closure.betaiotazeta empty_env
+let nf_beta = clos_norm_flags Closure.beta (Global.env ())
+let nf_betaiota = clos_norm_flags Closure.betaiota (Global.env ())
+let nf_betaiotazeta = clos_norm_flags Closure.betaiotazeta (Global.env ())
 let nf_betadeltaiota env sigma =
   clos_norm_flags Closure.betadeltaiota env sigma
 
@@ -700,10 +743,19 @@ let whd_betaiota_preserving_vm_cast env sigma t =
        | Case (ci,p,d,lf) ->
 	 whrec (d, Zcase (ci,p,lf,None) :: stack)
 
-       | Construct (ind,c) -> begin
+       | Proj (p,c) -> 
+          (match (lookup_constant p env).Declarations.const_proj with
+	  | None -> assert false
+	  | Some pb -> 
+	    whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) :: stack))
+	 
+       | Construct ((ind,c),u) -> begin
 	 match strip_app stack with
 	   |args, (Zcase(ci, _, lf,_)::s') ->
 	     whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	   |args, (Zproj (n,m,p) :: s') ->
+	     (* no delta *) s
+	     (* whrec (List.nth args (n+m), s') *)
 	   |args, (Zfix (f,s',cst)::s'') ->
 	     let x' = applist(x,args) in
 	     whrec (contract_fix f cst,s' @ (append_stack_app_list [x'] s''))
@@ -749,27 +801,40 @@ let pb_equal = function
   | CUMUL -> CONV
   | CONV -> CONV
 
-let sort_cmp = sort_cmp
-
-let test_conversion (f: ?l2r:bool-> ?evars:'a->'b) env sigma x y =
-  try let _ =
-    f ~evars:(safe_evar_value sigma) env x y in true
-  with NotConvertible -> false
-    | e when is_anomaly e -> error "Conversion test raised an anomaly"
-
-let is_conv env sigma = test_conversion Reduction.conv env sigma
-let is_conv_leq env sigma = test_conversion Reduction.conv_leq env sigma
-let is_fconv = function | CONV -> is_conv | CUMUL -> is_conv_leq
+let sort_cmp cv_pb s1 s2 u = 
+  ignore(sort_cmp_universes cv_pb s1 s2 (u, None))
 
 let test_trans_conversion (f: ?l2r:bool-> ?evars:'a->'b) reds env sigma x y =
-  try let _ = f ~evars:(safe_evar_value sigma) reds env x y in true
+  try let _ = f ~evars:(safe_evar_value sigma) reds env (Evd.universes sigma) x y in true
   with NotConvertible -> false
     | e when is_anomaly e -> error "Conversion test raised an anomaly"
 
-let is_trans_conv reds env sigma = test_trans_conversion Reduction.trans_conv reds env sigma
-let is_trans_conv_leq reds env sigma = test_trans_conversion Reduction.trans_conv_leq reds env sigma
+let is_trans_conv reds env sigma = test_trans_conversion Reduction.trans_conv_universes reds env sigma
+let is_trans_conv_leq reds env sigma = test_trans_conversion Reduction.trans_conv_leq_universes reds env sigma
 let is_trans_fconv = function | CONV -> is_trans_conv | CUMUL -> is_trans_conv_leq
 
+let is_conv = is_trans_conv full_transparent_state
+let is_conv_leq = is_trans_conv_leq full_transparent_state
+let is_fconv = function | CONV -> is_conv | CUMUL -> is_conv_leq
+
+let check_conv ?(pb=CUMUL) ?(ts=full_transparent_state) env sigma x y = 
+  let f = match pb with
+    | CONV -> Reduction.trans_conv_universes
+    | CUMUL -> Reduction.trans_conv_leq_universes in
+    try f ~evars:(safe_evar_value sigma) ts env (Evd.universes sigma) x y; true
+    with NotConvertible -> false
+    | e when is_anomaly e -> error "Conversion test raised an anomaly"
+
+let infer_conv ?(pb=CUMUL) ?(ts=full_transparent_state) env sigma x y = 
+  let f = match pb with
+    | CONV -> Reduction.infer_conv
+    | CUMUL -> Reduction.infer_conv_leq in
+    try 
+      let cstrs = f ~evars:(safe_evar_value sigma) ~ts env (Evd.universes sigma) x y in
+	Evd.add_constraints sigma cstrs, true
+    with NotConvertible -> sigma, false
+    | e when is_anomaly e -> error "Conversion test raised an anomaly"
+    
 (********************************************************************)
 (*             Special-Purpose Reduction                            *)
 (********************************************************************)
@@ -960,6 +1025,15 @@ let whd_betaiota_deltazeta_for_iota_state ts env sigma csts s =
 	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
 	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
 	if isConstruct t_o then whrec csts_o (t_o, stack_o@stack') else s,csts'
+      |args, (Zproj (n,m,p) :: stack'' as stack') ->
+	let seq = (t,append_stack_app_list args empty_stack) in
+	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
+	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
+	if isConstruct t_o then
+	  if is_transparent_constant ts p then
+	    whrec csts_o (stack_nth stack_o (n+m), stack'')
+	  else (* Won't unfold *) (whd_betaiota_state sigma (t_o, stack_o@stack'),csts')
+	else s,csts'
       |_ -> s,csts'
   in whrec csts s
 
@@ -987,6 +1061,13 @@ let whd_programs_stack env sigma =
           (match decomp_stack stack with
              | None -> s
              | Some (a,m) -> stacklam whrec [a] c m)
+      | Proj (p,c) ->
+          if occur_existential c then s
+	  else
+	    (match (lookup_constant p env).Declarations.const_proj with
+	    | None -> assert false
+	    | Some pb -> whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) :: stack))
+
       | Case (ci,p,d,lf) ->
 	  if occur_existential d then
 	    s
@@ -996,10 +1077,12 @@ let whd_programs_stack env sigma =
 	(match strip_n_app ri.(n) stack with
 	  |None -> s
 	  |Some (bef,arg,s') -> whrec (arg, Zfix(f,[Zapp bef],None)::s'))
-      | Construct (ind,c) -> begin
+      | Construct ((ind,c),u) -> begin
 	match strip_app stack with
 	  |args, (Zcase(ci, _, lf,_)::s') ->
 	    whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	  |args, (Zproj (n,m,p)::s') ->
+	    whrec (List.nth args (n+m),s')
 	  |args, (Zfix (f,s',cst)::s'') ->
 	    let x' = applist(x,args) in
 	    whrec (contract_fix f cst,s' @ (append_stack_app_list [x'] s''))
@@ -1096,6 +1179,17 @@ let meta_reducible_instance evd b =
           let is_coerce = match s with CoerceToType -> true | _ -> false in
           if not is_coerce then irec g else u
 	 with Not_found -> u)
+    | Proj (p,c) when isMeta c or isCast c & isMeta (pi1 (destCast c)) ->
+	let m = try destMeta c with _ -> destMeta (pi1 (destCast c)) in
+	  (match
+	  try
+	    let g, s = Metamap.find m metas in
+            let is_coerce = match s with CoerceToType -> true | _ -> false in
+	    if isConstruct g || not is_coerce then Some g else None
+	  with Not_found -> None
+	  with
+	    | Some g -> irec (mkProj (p,g))
+	    | None -> mkProj (p,c))
     | _ -> map_constr irec u
   in
   if Metaset.is_empty fm then (* nf_betaiota? *) b.rebus
@@ -1103,12 +1197,12 @@ let meta_reducible_instance evd b =
 
 
 let head_unfold_under_prod ts env _ c =
-  let unfold cst =
+  let unfold (cst,u as cstu) =
     if Cpred.mem cst (snd ts) then
-      match constant_opt_value env cst with
+      match constant_opt_value_in env cstu with
 	| Some c -> c
-	| None -> mkConst cst
-    else mkConst cst in
+	| None -> mkConstU cstu
+    else mkConstU cstu in
   let rec aux c =
     match kind_of_term c with
       | Prod (n,t,c) -> mkProd (n,aux t, aux c)

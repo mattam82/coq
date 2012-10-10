@@ -525,8 +525,11 @@ Definition pow_N_gen (R:Type)(x1:R)(m:R->R->R)(x:R) (p:N) :=
   Proof.
    intros.
    induction pe.
+<<<<<<< .merge_file_yzQ8iK
    - now simpl; rewrite <- ring_morphism0.
    - now simpl; rewrite <- ring_morphism1.
+=======
+>>>>>>> .merge_file_g5TGm0
    - Esimpl3. 
    - Esimpl3. 
    - simpl.
@@ -541,7 +544,11 @@ Definition pow_N_gen (R:Type)(x1:R)(m:R->R->R)(x:R) (p:N) :=
    - now simpl; rewrite IHpe; Esimpl3. 
    - simpl.
      rewrite Ppow_N_ok; (intros;try reflexivity). 
+<<<<<<< .merge_file_yzQ8iK
      rewrite rpow_pow_N; [| now apply pow_th]. 
+=======
+     rewrite @rpow_pow_N; [| now apply pow_th]. 
+>>>>>>> .merge_file_g5TGm0
      induction n;simpl; [now Esimpl3|]. 
      induction p; simpl; trivial.
      + try rewrite IHp;try rewrite IHpe;

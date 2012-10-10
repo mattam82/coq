@@ -46,6 +46,10 @@ exception NoCurrentProof
 val give_me_the_proof : unit -> Proof.proof
 (** @raise NoCurrentProof when outside proof mode. *)
 
+type proof_decl_hook = 
+  (Universes.universe_opt_subst Univ.in_universe_context -> 
+   Decl_kinds.locality -> Globnames.global_reference -> unit) option
+
 (** [start_proof s str goals ~init_tac ~compute_guard hook] starts 
     a proof of name [s] and
     conclusion [t]; [hook] is optionally a function to be applied at
@@ -54,10 +58,9 @@ val give_me_the_proof : unit -> Proof.proof
 type lemma_possible_guards = int list list
 val start_proof : Names.Id.t -> 
                           Decl_kinds.goal_kind ->
-                          (Environ.env * Term.types) list  ->
+                          (Environ.env * Term.types Univ.in_universe_context_set) list  ->
                           ?compute_guard:lemma_possible_guards -> 
-                          unit Tacexpr.declaration_hook -> 
-                          unit
+  proof_decl_hook -> unit
 
 type closed_proof =
   Names.Id.t *
@@ -140,8 +143,9 @@ module Bullet : sig
 end
 
 module V82 : sig
-  val get_current_initial_conclusions : unit -> Names.Id.t *(Term.types list *
-  Decl_kinds.goal_kind * unit Tacexpr.declaration_hook)
+  val get_current_initial_conclusions : unit -> Names.Id.t *
+    (Term.types list * Decl_kinds.goal_kind *
+     (proof_decl_hook))
 end
 
 type state

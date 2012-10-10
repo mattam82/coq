@@ -29,6 +29,7 @@ Type_errors
 Modops
 Inductive
 Typeops
+Fast_typeops
 Indtypes
 Cooking
 Term_typing
@@ -36,7 +37,6 @@ Subtyping
 Mod_typing
 Nativelibrary
 Safe_typing
-
 Vm
 Csymtable
 Vconv

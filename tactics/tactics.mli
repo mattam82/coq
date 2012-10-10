@@ -36,8 +36,8 @@ open Locus
 (** {6 General functions. } *)
 
 val string_of_inductive : constr -> string
-val head_constr       : constr -> constr * constr list
-val head_constr_bound : constr -> constr * constr list
+val head_constr       : constr -> constr
+val head_constr_bound : constr -> constr
 val is_quantified_hypothesis : Id.t -> goal sigma -> bool
 
 exception Bound
@@ -54,6 +54,9 @@ val mutual_fix      :
 val fix             : Id.t option -> int -> tactic
 val mutual_cofix    : Id.t -> (Id.t * constr) list -> int -> tactic
 val cofix           : Id.t option -> tactic
+
+val convert         : constr -> constr -> tactic
+val convert_leq     : constr -> constr -> tactic
 
 (** {6 Introduction tactics. } *)
 

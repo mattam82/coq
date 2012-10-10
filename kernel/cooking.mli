@@ -14,17 +14,19 @@ open Univ
 
 (** {6 Cooking the constants. } *)
 
-type work_list = Id.t array Cmap.t * Id.t array Mindmap.t
+type work_list = (Instance.t * Id.t array) Cmap.t * 
+  (Instance.t * Id.t array) Mindmap.t
 
 type recipe = {
   d_from : constant_body;
-  d_abstract : Context.named_context;
+  d_abstract : Context.named_context in_universe_context;
   d_modlist : work_list }
 
 type inline = bool
 
 type result =
-  constant_def * constant_type * constant_constraints * inline
+  constant_def * constant_type * projection_body option * 
+    bool * constant_universes * inline
     * Context.section_context option
 
 val cook_constant : env -> recipe -> result

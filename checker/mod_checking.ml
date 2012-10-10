@@ -15,31 +15,30 @@ open Environ
 
 (** {6 Checking constants } *)
 
-let refresh_arity ar =
-  let ctxt, hd = decompose_prod_assum ar in
-  match hd with
-      Sort (Type u) when not (Univ.is_univ_variable u) ->
-        let u' = Univ.fresh_local_univ() in
-        mkArity (ctxt,Type u'),
-        Univ.enforce_leq u u' Univ.empty_constraint
-    | _ -> ar, Univ.empty_constraint
+(* let refresh_arity ar = *)
+(*   let ctxt, hd = decompose_prod_assum ar in *)
+(*   match hd with *)
+(*       Sort (Type u) when not (Univ.is_univ_variable u) -> *)
+(*         let u' = Univ.fresh_local_univ() in *)
+(*         mkArity (ctxt,Type u'), *)
+(*         Univ.enforce_leq u u' Univ.empty_constraint *)
+(*     | _ -> ar, Univ.empty_constraint *)
 
 let check_constant_declaration env kn cb =
   Flags.if_verbose ppnl (str "  checking cst: " ++ prcon kn);
 (*  let env = add_constraints cb.const_constraints env in*)
   (match cb.const_type with
-      NonPolymorphicType ty ->
-        let ty, cu = refresh_arity ty in
-        let envty = add_constraints cu env in
-        let _ = infer_type envty ty in
-        (match body_of_constant cb with
+      ty ->
+        let env' = add_constraints cb.const_constraints env in
+	let _ = infer_type env' ty in
+          (match body_of_constant cb with
           | Some bd ->
-              let j = infer env bd in
-              conv_leq envty j ty
+              let j = infer env' bd in
+              conv_leq env' j ty
           | None -> ())
-    | PolymorphicArity(ctxt,par) ->
-        let _ = check_ctxt env ctxt in
-        check_polymorphic_arity env ctxt par);
+    (* | PolymorphicArity(ctxt,par) -> *)
+    (*     let _ = check_ctxt env ctxt in *)
+    (*     check_polymorphic_arity env ctxt par *));
   add_constant kn cb env
 
 
@@ -88,6 +87,38 @@ and check_module_type env mty =
     check_signature env mty.typ_expr mty.typ_mp mty.typ_delta in
   ()
 
+<<<<<<< .merge_file_hiXZ5p
+=======
+							 
+and check_module env mp mb =
+  match mb.mod_expr, mb.mod_type with
+    | None,mtb -> 
+	let (_:struct_expr_body) =
+	  check_modtype env mtb mb.mod_mp mb.mod_delta in ()
+    | Some mexpr, mtb when mtb==mexpr ->
+	let (_:struct_expr_body) =
+	  check_modtype env mtb mb.mod_mp mb.mod_delta in ()
+    | Some mexpr, _ ->
+	let sign = check_modexpr env mexpr mb.mod_mp mb.mod_delta in
+	let (_:struct_expr_body) =
+	  check_modtype env mb.mod_type mb.mod_mp mb.mod_delta in
+	let mtb1 =
+	  {typ_mp=mp;
+	   typ_expr=sign;
+	   typ_expr_alg=None;
+	   typ_constraints=Univ.Constraint.empty;
+	   typ_delta = mb.mod_delta;}
+	and mtb2 =
+	  {typ_mp=mp;
+	   typ_expr=mb.mod_type;
+	   typ_expr_alg=None;
+	   typ_constraints=Univ.Constraint.empty;
+	   typ_delta = mb.mod_delta;}
+	in
+	let env = add_module (module_body_of_type mp mtb1) env in
+	check_subtypes env mtb1 mtb2
+
+>>>>>>> .merge_file_M3S73l
 and check_structure_field env mp lab res = function
   | SFBconst cb ->
       let c = Constant.make2 mp lab in

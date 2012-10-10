@@ -133,7 +133,7 @@ let parse_args () =
       |"-q"|"-full"|"-profile"|"-just-parsing"|"-echo" |"-unsafe"|"-quiet"
       |"-silent"|"-m"|"-xml"|"-v7"|"-v8"|"-beautify"|"-strict-implicit"
       |"-dont-load-proofs"|"-load-proofs"|"-force-load-proofs"
-      |"-impredicative-set"|"-vm"|"-no-native-compiler"
+      |"-indices-matter"|"-impredicative-set"|"-vm"|"-no-native-compiler"
       |"-verbose-compat-notations"|"-no-compat-notations" as o) :: rem ->
 	parse (cfiles,o::args) rem
 
@@ -162,8 +162,6 @@ let parse_args () =
     | "-R" :: s :: "-as" :: t :: rem ->	parse (cfiles,t::"-as"::s::"-R"::args) rem
     | "-R" :: s :: "-as" :: [] -> usage ()
     | "-R" :: s :: t :: rem -> parse (cfiles,t::s::"-R"::args) rem
-
-(* Anything else is interpreted as a file *)
 
     | f :: rem ->
 	if Sys.file_exists f then

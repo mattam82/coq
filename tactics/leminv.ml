@@ -195,7 +195,7 @@ let inversion_scheme env sigma t sort dep_option inv_op =
     errorlabstrm "lemma_inversion"
     (str"Computed inversion goal was not closed in initial signature.");
   *)
-  let pf = Proof.start [invEnv,invGoal] in
+  let pf = Proof.start [invEnv,(invGoal,Evd.get_universe_context_set sigma)] in
   let pf = Proof.run_tactic env 
     (Proofview.V82.tactic (tclTHEN intro (onLastHypId inv_op))) pf in
   let pfterm = List.hd (Proof.partial_proof pf) in
@@ -231,9 +231,13 @@ let add_inversion_lemma name env sigma t sort dep inv_op =
     const_entry_body = Future.from_val (invProof,Declareops.no_seff);
     const_entry_secctx = None;
     const_entry_type = None;
+    const_entry_proj = None;
+    const_entry_polymorphic = true;
+    const_entry_universes = Univ.UContext.empty (*FIXME *);
     const_entry_opaque = false;
-    const_entry_inline_code = false;
-  } in
+    const_entry_inline_code = false	   
+  }
+  in
   let _ = declare_constant name (DefinitionEntry entry, IsProof Lemma) in
   ()
 
@@ -252,8 +256,9 @@ let inversion_lemma_from_goal n na (loc,id) sort dep_option inv_op =
 
 let add_inversion_lemma_exn na com comsort bool tac =
   let env = Global.env () and sigma = Evd.empty in
-  let c = Constrintern.interp_type sigma env com in
-  let sort = Pretyping.interp_sort comsort in
+  let c,ctx = Constrintern.interp_type sigma env com in
+  let sigma = Evd.merge_context_set Evd.univ_rigid sigma ctx in
+  let sigma, sort = Pretyping.interp_sort sigma comsort in
   try
     add_inversion_lemma na env sigma c sort bool tac
   with
@@ -268,7 +273,7 @@ let lemInv id c gls =
   try
     let clause = mk_clenv_type_of gls c in
     let clause = clenv_constrain_last_binding (mkVar id) clause in
-    Clenvtac.res_pf clause ~flags:Unification.elim_flags gls
+    Clenvtac.res_pf clause ~flags:(Unification.elim_flags ()) gls
   with
     | NoSuchBinding ->
 	errorlabstrm ""

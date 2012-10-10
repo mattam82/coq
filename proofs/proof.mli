@@ -46,7 +46,7 @@ val proof : proof -> Goal.goal list * (Goal.goal list * Goal.goal list) list * E
 
 (*** General proof functions ***)
 
-val start : (Environ.env * Term.types) list -> proof
+val start : (Environ.env * Term.types Univ.in_universe_context_set) list -> proof
 val initial_goals : proof -> (Term.constr * Term.types) list
 
 (* Returns [true] if the considered proof is completed, that is if no goal remain
