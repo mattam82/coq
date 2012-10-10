@@ -70,13 +70,13 @@ val pf_hnf_constr              : goal sigma -> constr -> constr
 val pf_red_product             : goal sigma -> constr -> constr
 val pf_nf                      : goal sigma -> constr -> constr
 val pf_nf_betaiota             : goal sigma -> constr -> constr
-val pf_reduce_to_quantified_ind : goal sigma -> types -> inductive * types
-val pf_reduce_to_atomic_ind     : goal sigma -> types -> inductive * types
+val pf_reduce_to_quantified_ind : goal sigma -> types -> pinductive * types
+val pf_reduce_to_atomic_ind     : goal sigma -> types -> pinductive * types
 val pf_compute                 : goal sigma -> constr -> constr
 val pf_unfoldn    : (occurrences * evaluable_global_reference) list
         -> goal sigma -> constr -> constr
 
-val pf_const_value : goal sigma -> constant -> constr
+val pf_const_value : goal sigma -> pconstant -> constr
 val pf_conv_x      : goal sigma -> constr -> constr -> bool
 val pf_conv_x_leq  : goal sigma -> constr -> constr -> bool
 

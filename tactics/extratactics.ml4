@@ -252,7 +252,14 @@ TACTIC EXTEND rewrite_star
 
 let add_rewrite_hint bases ort t lcsr =
   let env = Global.env() and sigma = Evd.empty in
-  let f c = Constrexpr_ops.constr_loc c, Constrintern.interp_constr sigma env c, ort, t in
+  let poly = Flags.is_universe_polymorphism () in 
+  let f ce = 
+    let c, ctx = Constrintern.interp_constr sigma env ce in
+    let ctx =
+      if poly then ctx
+      else (Global.add_constraints (snd ctx); Univ.ContextSet.empty)
+    in
+      Constrexpr_ops.constr_loc ce, (c, ctx), ort, t in
   let eqs = List.map f lcsr in
   let add_hints base = add_rew_rules base eqs in
   List.iter add_hints bases
@@ -279,8 +286,8 @@ open Coqlib
 let project_hint pri l2r r =
   let gr = Smartlocate.global_with_alias r in
   let env = Global.env() in
-  let c = Globnames.constr_of_global gr in
-  let t = Retyping.get_type_of env Evd.empty c in
+  let c,ctx = Universes.fresh_global_instance env gr in
+  let t = Retyping.get_type_of env (Evd.from_env ~ctx env) c in
   let t =
     Tacred.reduce_to_quantified_ref env Evd.empty (Lazy.force coq_iff_ref) t in
   let sign,ccl = decompose_prod_assum t in
@@ -292,7 +299,11 @@ let project_hint pri l2r r =
   let c = Reductionops.whd_beta Evd.empty (mkApp (c,Termops.extended_rel_vect 0 sign)) in
   let c = it_mkLambda_or_LetIn
     (mkApp (p,[|mkArrow a (lift 1 b);mkArrow b (lift 1 a);c|])) sign in
-    (pri,true,Auto.PathAny, Globnames.IsConstr c)
+  let id =
+    Nameops.add_suffix (Nametab.basename_of_global gr) ("_proj_" ^ (if l2r then "l2r" else "r2l"))
+  in
+  let c = Declare.declare_definition ~internal:Declare.KernelSilent id (c,ctx) in
+    (pri,false,true,Auto.PathAny, Auto.IsGlobRef (Globnames.ConstRef c))
 
 let add_hints_iff l2r lc n bl =
   Auto.add_hints true bl
@@ -453,7 +464,7 @@ let inTransitivity : bool * constr -> obj =
 (* Main entry points *)
 
 let add_transitivity_lemma left lem =
- let lem' = Constrintern.interp_constr Evd.empty (Global.env ()) lem in
+ let lem',ctx (*FIXME*) = Constrintern.interp_constr Evd.empty (Global.env ()) lem in
   add_anonymous_leaf (inTransitivity (left,lem'))
 
 (* Vernacular syntax *)
@@ -491,8 +502,8 @@ END
 
 VERNAC COMMAND EXTEND RetroknowledgeRegister
  | [ "Register" constr(c) "as" retroknowledge_field(f) "by" constr(b)] ->
-           [ let tc = Constrintern.interp_constr Evd.empty (Global.env ()) c in
-             let tb = Constrintern.interp_constr Evd.empty (Global.env ()) b in
+           [ let tc,ctx = Constrintern.interp_constr Evd.empty (Global.env ()) c in
+             let tb,ctx(*FIXME*) = Constrintern.interp_constr Evd.empty (Global.env ()) b in
              Global.register f tc tb ]
 END
 
@@ -585,9 +596,11 @@ let hResolve id c occ t gl =
           let loc = match Loc.get_loc e with None -> Loc.ghost | Some loc -> loc in
           resolve_hole (subst_hole_with_term (fst (Loc.unloc loc)) c_raw t_hole)
   in
-  let t_constr = resolve_hole (subst_var_with_hole occ id t_raw) in
+  let t_constr,ctx = resolve_hole (subst_var_with_hole occ id t_raw) in
+  let sigma = Evd.merge_context_set Evd.univ_rigid sigma ctx in
   let t_constr_type = Retyping.get_type_of env sigma t_constr in
-  change_in_concl None (mkLetIn (Anonymous,t_constr,t_constr_type,pf_concl gl)) gl
+    tclTHEN (Refiner.tclEVARS sigma)
+     (change_in_concl None (mkLetIn (Anonymous,t_constr,t_constr_type,pf_concl gl))) gl
 
 let hResolve_auto id c t gl =
   let rec resolve_auto n = 

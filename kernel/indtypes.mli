@@ -36,5 +36,9 @@ exception InductiveError of inductive_error
 
 (** The following function does checks on inductive declarations. *)
 
-val check_inductive :
-  env -> mutual_inductive -> mutual_inductive_entry -> mutual_inductive_body
+val check_inductive : env -> mutual_inductive -> mutual_inductive_entry -> mutual_inductive_body
+
+(** The following enforces a system compatible with the univalent model *)
+
+val enforce_indices_matter : unit -> unit
+val is_indices_matter : unit -> bool

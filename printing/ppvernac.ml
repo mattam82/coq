@@ -187,7 +187,8 @@ let pr_hints db h pr_c pr_pat =
 	    match pri with Some x -> spc () ++ str"(" ++ int x ++ str")" | None -> mt ())
 	  l
     | HintsImmediate l ->
-        str"Immediate" ++ spc() ++ prlist_with_sep sep (pr_reference_or_constr pr_c) l
+        str"Immediate" ++ spc() ++ 
+	  prlist_with_sep sep (fun c -> pr_reference_or_constr pr_c c) l
     | HintsUnfold l ->
         str "Unfold " ++ prlist_with_sep sep pr_reference l
     | HintsTransparency (l, b) ->
@@ -389,6 +390,11 @@ let pr_statement head (id,(bl,c,guard)) =
     pr_opt (pr_guard_annot pr_lconstr_expr bl) guard ++
     str":" ++ pr_spc_lconstr c)
 
+let pr_poly p = 
+  if Flags.is_universe_polymorphism () then
+    if not p then str"Monomorphic " else mt ()
+  else if p then str"Polymorphic " else mt ()
+
 (**************************************)
 (* Pretty printer for vernac commands *)
 (**************************************)
@@ -477,6 +483,9 @@ let pr_printable = function
 in
 
 let rec pr_vernac = function
+  | VernacPolymorphic (poly, v) -> 
+    let s = if poly then str"Polymorphic" else str"Monomorphic" in
+      s ++ pr_vernac v
   | VernacProgram v -> str"Program" ++ spc() ++ pr_vernac v
   | VernacLocal (local, v) -> pr_locality local ++ spc() ++ pr_vernac v
 
@@ -579,7 +588,7 @@ let rec pr_vernac = function
   | VernacDefinition (d,id,b) -> (* A verifier... *)
       let pr_def_token (l,dk) =
         let l = match l with Some x -> x | None -> Decl_kinds.Global in
-        str (Kindops.string_of_definition_kind (l,dk)) in
+          str (Kindops.string_of_definition_kind (l,false,dk)) in
       let pr_reduce = function
         | None -> mt()
         | Some r ->
@@ -619,7 +628,6 @@ let rec pr_vernac = function
         (pr_assumption_token (n > 1) stre ++ spc() ++
 	 pr_ne_params_list pr_lconstr_expr l)
   | VernacInductive (f,i,l) ->
-
       let pr_constructor (coe,(id,c)) =
         hov 2 (pr_lident id ++ str" " ++
                (if coe then str":>" else str":") ++

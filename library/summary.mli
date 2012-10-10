@@ -27,7 +27,7 @@ type 'a summary_declaration = {
     the responsability of plugins to initialize themselves properly.
 *)
 
-val declare_summary : string -> 'a summary_declaration -> unit
+val declare_summary : string -> ?survive_section:bool -> 'a summary_declaration -> unit
 
 (** All-in-one reference declaration + summary registration.
     It behaves just as OCaml's standard [ref] function, except
@@ -48,7 +48,7 @@ val nop : unit -> unit
 type frozen
 
 val freeze_summaries : marshallable:bool -> frozen
-val unfreeze_summaries : frozen -> unit
+val unfreeze_summaries : ?discharge:bool -> frozen -> unit
 val init_summaries : unit -> unit
 
 (** The type [frozen_bits] is a snapshot of some of the registered tables *)

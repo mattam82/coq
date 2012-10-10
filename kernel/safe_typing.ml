@@ -99,6 +99,7 @@ type safe_environment =
       objlabels : Label.Set.t;
       revstruct : structure_body;
       univ : Univ.constraints;
+      max_univ : int;
       engagement : engagement option;
       imports : library_info list;
       loads : (module_path * module_body) list;
@@ -141,7 +142,8 @@ let rec empty_environment =
     modlabels = Label.Set.empty;
     objlabels = Label.Set.empty;
     revstruct = [];
-    univ = Univ.empty_constraint;
+    univ = Univ.Constraint.empty;
+    max_univ = 0;
     engagement = None;
     imports = [];
     loads = [];
@@ -153,13 +155,37 @@ let env_of_senv = env_of_safe_env
 let add_constraints cst senv =
   { senv with
     env = Environ.add_constraints cst senv.env;
-    univ = Univ.union_constraints cst senv.univ }
+    univ = Univ.Constraint.union cst senv.univ }
 
-let constraints_of_sfb = function
-  | SFBconst cb -> cb.const_constraints
-  | SFBmind mib -> mib.mind_constraints
-  | SFBmodtype mtb -> mtb.typ_constraints
-  | SFBmodule mb -> mb.mod_constraints
+let next_universe senv = 
+  let univ = senv.max_univ in
+    univ + 1, { senv with max_univ = univ + 1 }
+
+let push_context_set ctx = add_constraints (ContextSet.constraints ctx)
+let push_context ctx = add_constraints (UContext.constraints ctx)
+
+let globalize_constant_universes cb =
+  if cb.const_polymorphic then
+    (Univ.Constraint.empty, 0, cb)
+  else
+    (UContext.constraints cb.const_universes, 
+     Univ.Instance.max_level (UContext.instance cb.const_universes), cb)
+      
+let globalize_mind_universes mb =
+  if mb.mind_polymorphic then
+    (Univ.Constraint.empty, 0, mb)
+  else
+    (UContext.constraints mb.mind_universes, 
+     Univ.Instance.max_level (UContext.instance mb.mind_universes), mb)
+
+let constraints_of_sfb sfb = 
+  match sfb with
+  | SFBconst cb -> let cstr, lev, cb' = globalize_constant_universes cb in
+		     cstr, lev, SFBconst cb'
+  | SFBmind mib -> let cstr, lev, mib' = globalize_mind_universes mib in
+		     cstr, lev, SFBmind mib'
+  | SFBmodtype mtb -> mtb.typ_constraints, 0, sfb
+  | SFBmodule mb -> mb.mod_constraints, 0, sfb
 
 (* A generic function for adding a new field in a same environment.
    It also performs the corresponding [add_constraints]. *)
@@ -170,7 +196,7 @@ type generic_name =
   | MT of module_path
   | M
 
-let add_field ((l,sfb) as field) gn senv =
+let add_field ((l,sfb) as _field) gn senv =
   let mlabs,olabs = match sfb with
     | SFBmind mib ->
       let l = labels_of_mib mib in
@@ -180,7 +206,8 @@ let add_field ((l,sfb) as field) gn senv =
     | SFBmodule _ | SFBmodtype _ ->
       check_modlabel l senv; (Label.Set.singleton l, Label.Set.empty)
   in
-  let senv = add_constraints (constraints_of_sfb sfb) senv in
+  let cst, lev, sfb = constraints_of_sfb sfb in
+  let senv = add_constraints cst senv in
   let env' = match sfb, gn with
     | SFBconst cb, C con -> Environ.add_constant con cb senv.env
     | SFBmind mib, I mind -> Environ.add_mind mind mib senv.env
@@ -190,9 +217,10 @@ let add_field ((l,sfb) as field) gn senv =
   in
   { senv with
     env = env';
+    max_univ = max senv.max_univ lev;
     modlabels = Label.Set.union mlabs senv.modlabels;
     objlabels = Label.Set.union olabs senv.objlabels;
-    revstruct = field :: senv.revstruct }
+    revstruct = (l, sfb) :: senv.revstruct }
 
 (* Applying a certain function to the resolver of a safe environment *)
 
@@ -246,16 +274,16 @@ let safe_push_named (id,_,_ as d) env =
   Environ.push_named d env
 
 let push_named_def (id,de) senv =
-  let (c,typ,cst) = Term_typing.translate_local_def senv.env de in
-  let senv' = add_constraints cst senv in
+  let senv' = push_context de.const_entry_universes senv in
+  let c,typ = Term_typing.translate_local_def senv'.env de in
   let env'' = safe_push_named (id,Some c,typ) senv'.env in
-  (cst, {senv' with env=env''})
+  {senv' with env=env''}
 
-let push_named_assum (id,t) senv =
-  let (t,cst) = Term_typing.translate_local_assum senv.env t in
-  let senv' = add_constraints cst senv in
+let push_named_assum ((id,t),ctx) senv =
+  let senv' = push_context_set ctx senv in
+  let t = Term_typing.translate_local_assum senv'.env t in
   let env'' = safe_push_named (id,None,t) senv'.env in
-  (cst, {senv' with env=env''})
+  {senv' with env=env''}
 
 
 (* Insertion of constants and parameters in environment. *)
@@ -267,9 +295,9 @@ type global_declaration =
 let add_constant dir l decl senv =
   let kn = make_con senv.modinfo.modpath dir l in
   let cb = match decl with
-    | ConstantEntry ce -> Term_typing.translate_constant senv.env ce
+    | ConstantEntry ce -> Term_typing.translate_constant senv.env kn ce
     | GlobalRecipe r ->
-      let cb = Term_typing.translate_recipe senv.env r in
+      let cb = Term_typing.translate_recipe senv.env kn r in
       if DirPath.is_empty dir then Declareops.hcons_const_body cb else cb
   in
   let cb = match cb.const_body with
@@ -349,7 +377,8 @@ let start_module l senv =
 	 modlabels = Label.Set.empty;
 	 objlabels = Label.Set.empty;
 	 revstruct = [];
-         univ = Univ.empty_constraint;
+         univ = Univ.Constraint.empty;
+	 max_univ = senv.max_univ;
          engagement = None;
 	 imports = senv.imports;
 	 loads = [];
@@ -383,13 +412,13 @@ let end_module l restype senv =
    let mexpr,mod_typ,mod_typ_alg,resolver,cst = 
     match restype with
       | None ->  let mexpr = functorize_struct auto_tb in
-	 mexpr,mexpr,None,modinfo.resolver,empty_constraint
+	 mexpr,mexpr,None,modinfo.resolver,Constraint.empty
       | Some mtb ->
 	  let auto_mtb = {
 	    typ_mp = senv.modinfo.modpath;
 	    typ_expr = auto_tb;
 	    typ_expr_alg = None;
-	    typ_constraints = empty_constraint;
+	    typ_constraints = Constraint.empty;
 	    typ_delta = empty_delta_resolver} in
 	  let cst = check_subtypes senv.env auto_mtb
 	    mtb in
@@ -399,7 +428,7 @@ let end_module l restype senv =
 	    Option.map functorize_struct mtb.typ_expr_alg in
 	    mexpr,mod_typ,typ_alg,mtb.typ_delta,cst
   in
-  let cst = union_constraints cst senv.univ in
+  let cst = Constraint.union cst senv.univ in
   let mb =
     { mod_mp = mp;
       mod_expr = Some mexpr;
@@ -434,7 +463,8 @@ let end_module l restype senv =
 		  modlabels = Label.Set.add l oldsenv.modlabels;
 		  objlabels = oldsenv.objlabels;
 		  revstruct = (l,SFBmodule mb)::oldsenv.revstruct;
-		  univ = Univ.union_constraints senv'.univ oldsenv.univ;
+		  univ = Univ.Constraint.union senv'.univ oldsenv.univ;
+		  max_univ = senv'.max_univ;
 		  (* engagement is propagated to the upper level *)
 		  engagement = senv'.engagement;
 		  imports = senv'.imports;
@@ -477,7 +507,7 @@ let end_module l restype senv =
    let resolver,sign,senv = compute_sign sign {typ_mp = mp_sup;
 				      typ_expr = SEBstruct (List.rev senv.revstruct);
 				      typ_expr_alg = None;
-				      typ_constraints = empty_constraint;
+				      typ_constraints = Constraint.empty;
 				      typ_delta = senv.modinfo.resolver} resolver senv
    in
    let str = match sign with
@@ -532,6 +562,7 @@ let add_module_parameter mbid mte inl senv =
 		     objlabels = senv.objlabels;
 		     revstruct = [];
 		     univ = senv.univ;
+		     max_univ = senv.max_univ;
 		     engagement = senv.engagement;
 		     imports = senv.imports;
 		     loads = [];
@@ -555,7 +586,8 @@ let start_modtype l senv =
 	modlabels = Label.Set.empty;
 	objlabels = Label.Set.empty;
 	revstruct = [];
-        univ = Univ.empty_constraint;
+        univ = Univ.Constraint.empty;
+	max_univ = senv.max_univ;
         engagement = None;
 	imports = senv.imports;
 	loads = [] ;
@@ -607,7 +639,8 @@ let end_modtype l senv =
 	  modlabels = Label.Set.add l oldsenv.modlabels;
 	  objlabels = oldsenv.objlabels;
 	  revstruct = (l,SFBmodtype mtb)::oldsenv.revstruct;
-          univ = Univ.union_constraints senv.univ oldsenv.univ;
+          univ = Univ.Constraint.union senv.univ oldsenv.univ;
+	  max_univ = senv.max_univ;
           engagement = senv.engagement;
 	  imports = senv.imports;
 	  loads = senv.loads@oldsenv.loads;
@@ -615,6 +648,9 @@ let end_modtype l senv =
              it's likely to come from here *)
           local_retroknowledge = 
         senv.local_retroknowledge@oldsenv.local_retroknowledge}
+
+let current_modpath senv = senv.modinfo.modpath
+let current_dirpath senv = Names.ModPath.dp (current_modpath senv)
 
 let delta_of_senv senv = senv.modinfo.resolver,senv.modinfo.resolver_of_param
 
@@ -672,7 +708,8 @@ let start_library dir senv =
 	modlabels = Label.Set.empty;
 	objlabels = Label.Set.empty;
 	revstruct = [];
-        univ = Univ.empty_constraint;
+        univ = Univ.Constraint.empty;
+	max_univ = senv.max_univ;
         engagement = None;
 	imports = senv.imports;
 	loads = [];
@@ -770,4 +807,4 @@ let j_type j = j.uj_type
 
 let safe_infer senv = infer (env_of_senv senv)
 
-let typing senv = Typeops.typing (env_of_senv senv)
+let typing senv t = Typeops.typing (env_of_senv senv) t

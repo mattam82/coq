@@ -36,11 +36,14 @@ let set_typeclass_transparency c local b =
     
 let _ =
   Hook.set Typeclasses.add_instance_hint_hook
-    (fun inst path local pri ->
+    (fun inst path local pri poly ->
+     let inst' = match inst with IsConstr c -> Auto.IsConstr (c, Univ.ContextSet.empty)
+       | IsGlobal gr -> Auto.IsGlobRef gr
+     in
       Flags.silently (fun () ->
 	Auto.add_hints local [typeclasses_db]
 	  (Auto.HintsResolveEntry
-	     [pri, false, Auto.PathHints path, inst])) ());
+	     [pri, poly, false, Auto.PathHints path, inst'])) ());
   Hook.set Typeclasses.set_typeclass_transparency_hook set_typeclass_transparency;
   Hook.set Typeclasses.classes_transparent_state_hook
     (fun () -> Auto.Hint_db.transparent_state (Auto.searchtable_map typeclasses_db))
@@ -55,10 +58,11 @@ let declare_class g =
 (** TODO: add subinstances *)
 let existing_instance glob g =
   let c = global g in
-  let instance = Typing.type_of (Global.env ()) Evd.empty (constr_of_global c) in
+  let instance = Typing.type_of (Global.env ()) Evd.empty (Universes.constr_of_global c) in
   let _, r = decompose_prod_assum instance in
     match class_of_constr r with
-      | Some (_, (tc, _)) -> add_instance (new_instance tc None glob c)
+      | Some (_, ((tc,u), _)) -> add_instance (new_instance tc None glob 
+  (*FIXME*) (Flags.use_polymorphic_flag ()) c)
       | None -> user_err_loc (loc_of_reference g, "declare_instance",
 			     Pp.str "Constant does not build instances of a declared type class.")
 
@@ -100,14 +104,16 @@ let instance_hook k pri global imps ?hook cst =
   Typeclasses.declare_instance pri (not global) cst;
   (match hook with Some h -> h cst | None -> ())
 
-let declare_instance_constant k pri global imps ?hook id term termtype =
+let declare_instance_constant k pri global imps ?hook id poly uctx term termtype =
   let kind = IsDefinition Instance in
-  let entry = {
-    const_entry_body   = term;
-    const_entry_secctx = None;
-    const_entry_type   = Some termtype;
-    const_entry_opaque = false;
-    const_entry_inline_code = false }
+  let entry =
+    { const_entry_body   = term;
+      const_entry_secctx = None;
+      const_entry_type   = Some termtype;
+      const_entry_polymorphic = poly;
+      const_entry_universes = uctx;
+      const_entry_opaque = false;
+      const_entry_inline_code = false }
   in
   let cdecl = (DefinitionEntry entry, kind) in
   let kn = Declare.declare_constant id cdecl in
@@ -115,11 +121,11 @@ let declare_instance_constant k pri global imps ?hook id term termtype =
     instance_hook k pri global imps ?hook (ConstRef kn);
     id
 
-let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
+let new_instance ?(abstract=false) ?(global=false) poly ctx (instid, bk, cl) props
     ?(generalize=true)
     ?(tac:Proof_type.tactic option) ?(hook:(global_reference -> unit) option) pri =
   let env = Global.env() in
-  let evars = ref Evd.empty in
+  let evars = ref (Evd.from_env env) in
   let tclass, ids =
     match bk with
     | Implicit ->
@@ -133,15 +139,19 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
 	  cl
     | Explicit -> cl, Id.Set.empty
   in
-  let tclass = if generalize then CGeneralization (Loc.ghost, Implicit, Some AbsPi, tclass) else tclass in
-  let k, cty, ctx', ctx, len, imps, subst =
+  let tclass = 
+    if generalize then CGeneralization (Loc.ghost, Implicit, Some AbsPi, tclass) 
+    else tclass 
+  in
+  let k, u, cty, ctx', ctx, len, imps, subst =
     let impls, ((env', ctx), imps) = interp_context_evars evars env ctx in
     let c', imps' = interp_type_evars_impls ~impls evars env' tclass in
     let len = List.length ctx in
     let imps = imps @ Impargs.lift_implicits len imps' in
     let ctx', c = decompose_prod_assum c' in
     let ctx'' = ctx' @ ctx in
-    let cl, args = Typeclasses.dest_class_app (push_rel_context ctx'' env) c in
+    let k, args = Typeclasses.dest_class_app (push_rel_context ctx'' env) c in
+    let cl, u = Typeclasses.typeclass_univ_instance k in
     let _, args = 
       List.fold_right (fun (na, b, t) (args, args') ->
 	match b with
@@ -149,7 +159,7 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
 	| Some b -> (args, substl args' b :: args'))
 	(snd cl.cl_context) (args, [])
     in
-      cl, c', ctx', ctx, len, imps, args
+      cl, u, c', ctx', ctx, len, imps, args
   in
   let id =
     match snd instid with
@@ -165,21 +175,25 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
   let env' = push_rel_context ctx env in
   evars := Evarutil.nf_evar_map !evars;
   evars := resolve_typeclasses ~filter:Typeclasses.no_goals ~fail:true env !evars;
-  let sigma =  !evars in
-  let subst = List.map (Evarutil.nf_evar sigma) subst in
+  let subst = List.map (Evarutil.nf_evar !evars) subst in
     if abstract then
       begin
 	if not (Lib.is_modtype ()) then
 	  error "Declare Instance while not in Module Type.";
-	let _, ty_constr = instance_constructor k (List.rev subst) in
+	let subst = List.fold_left2
+	  (fun subst' s (_, b, _) -> if Option.is_empty b then s :: subst' else subst')
+	  [] subst (snd k.cl_context)
+	in
+	let (_, ty_constr) = instance_constructor (k,u) subst in
 	let termtype =
 	  let t = it_mkProd_or_LetIn ty_constr (ctx' @ ctx) in
-	    Evarutil.nf_evar !evars t
+	    fst (Evarutil.e_nf_evars_and_universes evars) t
 	in
 	Evarutil.check_evars env Evd.empty !evars termtype;
+	let ctx = Evd.universe_context !evars in
 	let cst = Declare.declare_constant ~internal:Declare.KernelSilent id
 	  (Entries.ParameterEntry 
-            (None,termtype,None), Decl_kinds.IsAssumption Decl_kinds.Logical)
+            (None,poly,(termtype,ctx),None), Decl_kinds.IsAssumption Decl_kinds.Logical)
 	in instance_hook k None global imps ?hook (ConstRef cst); id
       end
     else (
@@ -209,28 +223,28 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
 	    let props, rest =
 	      List.fold_left
 		(fun (props, rest) (id,b,_) ->
-		   if Option.is_empty b then
-		     try
-                      let is_id (id', _) = match id, get_id id' with
-                      | Name id, (_, id') -> Id.equal id id'
-                      | Anonymous, _ -> false
+		  if Option.is_empty b then 
+		    try
+		      let is_id (id', _) = match id, get_id id' with
+			| Name id, (_, id') -> Id.equal id id'
+			| Anonymous, _ -> false
                       in
-		       let (loc_mid, c) =
-			 List.find is_id rest 
-		       in
-		       let rest' = 
-			 List.filter (fun v -> not (is_id v)) rest 
-		       in
-		       let (loc, mid) = get_id loc_mid in
-			 List.iter (fun (n, _, x) -> 
-				      if Name.equal n (Name mid) then
-					Option.iter (fun x -> Dumpglob.add_glob loc (ConstRef x)) x)
-			   k.cl_projs;
-			 c :: props, rest'
-		     with Not_found ->
-		       (CHole (Loc.ghost, Some Evar_kinds.GoalEvar) :: props), rest
-		   else props, rest)
-		([], props) k.cl_props
+		      let (loc_mid, c) =
+			List.find is_id rest 
+		      in
+		      let rest' = 
+			List.filter (fun v -> not (is_id v)) rest 
+		      in
+		      let (loc, mid) = get_id loc_mid in
+			List.iter (fun (n, _, x) -> 
+			  if Name.equal n (Name mid) then
+			    Option.iter (fun x -> Dumpglob.add_glob loc (ConstRef x)) x)
+			k.cl_projs;
+			c :: props, rest'
+		    with Not_found ->
+		      (CHole (Loc.ghost, Some Evar_kinds.GoalEvar) :: props), rest
+		  else props, rest)
+	      ([], props) k.cl_props
 	    in
               match rest with
               | (n, _) :: _ ->
@@ -248,7 +262,7 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
 	    (fun subst' s (_, b, _) -> if Option.is_empty b then s :: subst' else subst')
 	    [] subst (k.cl_props @ snd k.cl_context)
 	  in
-	  let app, ty_constr = instance_constructor k subst in
+	  let (app, ty_constr) = instance_constructor (k,u) subst in
 	  let termtype = it_mkProd_or_LetIn ty_constr (ctx' @ ctx) in
 	  let term = Termops.it_mkLambda_or_LetIn (Option.get app) (ctx' @ ctx) in
 	    Some term, termtype
@@ -265,17 +279,20 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
 	evars := Typeclasses.resolve_typeclasses ~filter:Typeclasses.all_evars ~fail:false
 	  env !evars
       in
-      let termtype = Evarutil.nf_evar !evars termtype in
+      let _ = evars := Evarutil.nf_evar_map_undefined !evars in
+      let evm, nf = Evarutil.nf_evar_map_universes !evars in
+      let termtype = nf termtype in
       let _ = (* Check that the type is free of evars now. *)
-	Evarutil.check_evars env Evd.empty !evars termtype
+	Evarutil.check_evars env Evd.empty evm termtype
       in
-      let term = Option.map (Evarutil.nf_evar !evars) term in
-      let evm = Evarutil.nf_evar_map_undefined !evars in
+      let term = Option.map nf term in
       let evm = undefined_evars evm in
 	if Evd.is_empty evm && not (Option.is_empty term) then
-	  declare_instance_constant k pri global imps ?hook id (Option.get term) termtype
+	  let ctx = Evd.universe_context evm in
+	    declare_instance_constant k pri global imps ?hook
+	      id poly ctx (Option.get term) termtype
 	else begin
-	  let kind = Decl_kinds.Global, Decl_kinds.DefinitionBody Decl_kinds.Instance in
+	  let kind = Decl_kinds.Global, poly, Decl_kinds.DefinitionBody Decl_kinds.Instance in
 	    if Flags.is_program_mode () then
 	      let hook vis gr =
 		let cst = match gr with ConstRef kn -> kn | _ -> assert false in
@@ -286,18 +303,19 @@ let new_instance ?(abstract=false) ?(global=false) ctx (instid, bk, cl) props
 		match term with 
 		| Some t -> 
 		  let obls, _, constr, typ = 
-		    Obligations.eterm_obligations env id !evars 0 t termtype
+		    Obligations.eterm_obligations env id evm 0 t termtype
 		  in obls, Some constr, typ
 		| None -> [||], None, termtype
 	      in
+	      let ctx = Evd.get_universe_context_set evm in
 		ignore (Obligations.add_definition id ?term:constr
-			typ ~kind:(Global,Instance) ~hook obls);
+			typ ctx ~kind:(Global,poly,Instance) ~hook obls);
 		id
 	    else
 	      (Flags.silently 
 	       (fun () ->
-		Lemmas.start_proof id kind termtype
-		(fun _ -> instance_hook k pri global imps ?hook);
+		Lemmas.start_proof id kind (termtype, Evd.get_universe_context_set evm)
+		(fun _ _ -> instance_hook k pri global imps ?hook);
 		if not (Option.is_empty term) then 
 		  Pfedit.by (!refine_ref (evm, Option.get term))
 		else if Flags.is_auto_intros () then
@@ -320,7 +338,8 @@ let context l =
   let env = Global.env() in
   let evars = ref Evd.empty in
   let _, ((env', fullctx), impls) = interp_context_evars evars env l in
-  let fullctx = Evarutil.nf_rel_context_evar !evars fullctx in
+  let subst = Evarutil.evd_comb0 Evarutil.nf_evars_and_universes evars in
+  let fullctx = map_rel_context subst fullctx in
   let ce t = Evarutil.check_evars env Evd.empty !evars t in
   let () = List.iter (fun (n, b, t) -> Option.iter ce b; ce t) fullctx in
   let ctx =
@@ -328,13 +347,17 @@ let context l =
     with e when Errors.noncritical e ->
       error "Anonymous variables not allowed in contexts."
   in
+  let uctx = Evd.get_universe_context_set !evars in
   let fn status (id, _, t) =
+    let uctx = Universes.shrink_universe_context uctx (Universes.universes_of_constr t) in
     if Lib.is_modtype () && not (Lib.sections_are_opened ()) then
-      let decl = (ParameterEntry (None,t,None), IsAssumption Logical) in
+      let uctx = Univ.ContextSet.to_context uctx in	
+      let decl = (ParameterEntry (None,false,(t,uctx),None), IsAssumption Logical) in
       let cst = Declare.declare_constant ~internal:Declare.KernelSilent id decl in
 	match class_of_constr t with
-	| Some (rels, (tc, args) as _cl) ->
-	    add_instance (Typeclasses.new_instance tc None false (ConstRef cst));
+	| Some (rels, ((tc,_), args) as _cl) ->
+	    add_instance (Typeclasses.new_instance tc None false (*FIXME*)
+			  (Flags.use_polymorphic_flag ()) (ConstRef cst));
             status
 	    (* declare_subclasses (ConstRef cst) cl *)
 	| None -> status
@@ -344,9 +367,9 @@ let context l =
       | _ -> false
       in
       let impl = List.exists test impls in
-      let decl = (Discharge, Definitional) in
+      let decl = (Discharge, (Flags.use_polymorphic_flag ()), Definitional) in
       let nstatus =
-        snd (Command.declare_assumption false decl t [] impl
+        snd (Command.declare_assumption false decl (t, uctx) [] impl
           Vernacexpr.NoInline (Loc.ghost, id))
       in
       status && nstatus

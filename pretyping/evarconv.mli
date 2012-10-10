@@ -40,12 +40,12 @@ val consider_remaining_unif_problems : ?ts:transparent_state -> env -> evar_map 
 (** Check all pending unification problems are solved and raise an
     error otherwise *)
 
-val check_problems_are_solved : evar_map -> unit
+val check_problems_are_solved : env -> evar_map -> unit
 
 (** Check if a canonical structure is applicable *)
 
 val check_conv_record : constr * types stack -> constr * types stack ->
-  constr * constr list * (constr list * constr list) *
+  Univ.universe_context_set * constr * constr list * (constr list * constr list) *
     (constr list * types list) *
     (constr stack * types stack) * constr *
     (int * constr)

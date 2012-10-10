@@ -14,19 +14,22 @@ open Declarations
 open Entries
 
 val translate_local_def : env -> definition_entry ->
-  constr * types * constraints
+  constr * types
 
-val translate_local_assum : env -> types -> types * constraints
+val translate_local_assum : env -> types -> types
 
-val translate_constant : env -> constant_entry -> constant_body
+val infer_declaration : env -> constant_entry ->
+  constant_def * constant_type * bool * universe_context * bool * Context.section_context option
+
+val translate_constant : env -> constant -> constant_entry -> constant_body
 
 val translate_mind :
   env -> mutual_inductive -> mutual_inductive_entry -> mutual_inductive_body
 
-val translate_recipe : env -> Cooking.recipe -> constant_body
+val translate_recipe : env -> constant -> Cooking.recipe -> constant_body
 
 
 (** Internal functions, mentioned here for debug purpose only *)
 
 val infer_declaration : env -> constant_entry -> Cooking.result
-val build_constant_declaration : env -> Cooking.result -> constant_body
+val build_constant_declaration : env -> constant -> Cooking.result -> constant_body

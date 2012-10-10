@@ -95,21 +95,21 @@ and check_with_def env sign (idl,c) mp equiv =
 	      (* In the spirit of subtyping.check_constant, we accept
                  any implementations of parameters and opaques terms,
 	         as long as they have the right type *)
+	      (* FIXME: unsure how to deal with constraints here *)
 	      let def,cst = match cb.const_body with
 		| Undef _ | OpaqueDef _ ->
-		    let (j,cst1) = Typeops.infer env' c in
-		    let typ = Typeops.type_of_constant_type env' cb.const_type in
-		    let cst2 = Reduction.conv_leq env' j.uj_type typ in
-		    let cst =
-		      union_constraints
-			(union_constraints cb.const_constraints cst1)
-			cst2
-		    in
+		    let j = Typeops.infer env' c in
+		    let typ = cb.const_type (* FIXME *) in
+		    let cst = Reduction.infer_conv_leq env' (Environ.universes env') 
+		      j.uj_type typ in
 		    let def = Def (Lazyconstr.from_val j.uj_val) in
 		    def,cst
 		| Def cs ->
-		    let cst1 = Reduction.conv env' c (Lazyconstr.force cs) in
-		    let cst = union_constraints cb.const_constraints cst1 in
+		    let cst = Reduction.infer_conv env' (Environ.universes env') c
+		      (Lazyconstr.force cs) in
+		    let cst = 
+		      if cb.const_polymorphic then cst
+		      else Constraint.union (UContext.constraints cb.const_universes) cst in
 		    let def = Def (Lazyconstr.from_val c) in
 		    def,cst
 	      in
@@ -117,8 +117,7 @@ and check_with_def env sign (idl,c) mp equiv =
 		{ cb with
 		  const_body = def;
 		  const_body_code =
-		    Cemitcodes.from_val (compile_constant_body env' def);
-		  const_constraints = cst }
+		    Cemitcodes.from_val (compile_constant_body env' def) }
 	      in
 	      SEBstruct(before@(l,SFBconst(cb'))::after),cb',cst
       | _ ->
@@ -171,7 +170,7 @@ and check_with_mod env sign (idl,mp1) mp equiv =
 		match old.mod_expr with
 		    None ->
 		      begin
-			try union_constraints
+			try Constraint.union
 			  (check_subtypes env' mtb_mp1 
 			     (module_type_of_module None old))
 			  old.mod_constraints
@@ -218,7 +217,7 @@ and check_with_mod env sign (idl,mp1) mp equiv =
 		      let mpnew = rebuild_mp mp' (List.map Label.of_id idl) in
 			check_modpath_equiv env' mpnew mp;
 			  SEBstruct(before@(l,spec)::after)
-			    ,equiv,empty_constraint
+			    ,equiv,Constraint.empty
 		  | _ ->
 		      error_generative_module_expected l
               end
@@ -245,14 +244,14 @@ and translate_module env mp inl me =
 	let sign,alg1,resolver,cst2 =
 	  match me.mod_entry_type with
 	    | None ->
-		sign,None,resolver,empty_constraint
+		sign,None,resolver,Constraint.empty
 	    | Some mte ->
 		let mtb = translate_module_type env mp inl mte in
                 let cst = check_subtypes env
 		  {typ_mp = mp;
 		   typ_expr = sign;
 		   typ_expr_alg = None;
-		   typ_constraints = empty_constraint;
+		   typ_constraints = Constraint.empty;
 		   typ_delta = resolver;}
 		  mtb
 		in
@@ -262,7 +261,7 @@ and translate_module env mp inl me =
 	    mod_type = sign;
 	    mod_expr = alg_implem;
 	    mod_type_alg = alg1;
-	    mod_constraints = Univ.union_constraints cst1 cst2;
+	    mod_constraints = Univ.Constraint.union cst1 cst2;
 	    mod_delta = resolver;
 	    mod_retroknowledge = []} 
 	    (* spiwack: not so sure about that. It may
@@ -286,7 +285,7 @@ and translate_apply env inl ftrans mexpr mkalg =
   subst_struct_expr subst fbody_b,
   mkalg alg mp1 cst2,
   subst_codom_delta_resolver subst resolver,
-  Univ.union_constraints cst1 cst2
+  Univ.Constraint.union cst1 cst2
 
 and translate_functor env inl arg_id arg_e trans mkalg =
   let mtb = translate_module_type env (MPbound arg_id) inl arg_e in
@@ -296,13 +295,13 @@ and translate_functor env inl arg_id arg_e trans mkalg =
   SEBfunctor (arg_id, mtb, sign),
   mkalg alg arg_id mtb,
   resolver,
-  Univ.union_constraints cst mtb.typ_constraints
+  Univ.Constraint.union cst mtb.typ_constraints
 
 and translate_struct_module_entry env mp inl = function
   | MSEident mp1 ->
       let mb = lookup_module mp1 env in
       let mb' = strengthen_and_subst_mb mb mp false in
-      mb'.mod_type, Some (SEBident mp1), mb'.mod_delta,Univ.empty_constraint
+      mb'.mod_type, Some (SEBident mp1), mb'.mod_delta,Univ.Constraint.empty
   | MSEfunctor (arg_id, arg_e, body_expr) ->
       let trans env' = translate_struct_module_entry env' mp inl body_expr in
       let mkalg a id m = Option.map (fun a -> SEBfunctor (id,m,a)) a in
@@ -316,12 +315,12 @@ and translate_struct_module_entry env mp inl = function
 	translate_struct_module_entry env mp inl mte in
       let sign,alg,resolve,cst2 =
 	check_with env sign with_decl alg mp resolve in
-      sign,alg,resolve,Univ.union_constraints cst1 cst2
+      sign,alg,resolve,Univ.Constraint.union cst1 cst2
 
 and translate_struct_type_entry env inl = function
   | MSEident mp1 ->
       let mtb = lookup_modtype mp1 env in
-      mtb.typ_expr,Some (SEBident mp1),mtb.typ_delta,Univ.empty_constraint
+      mtb.typ_expr,Some (SEBident mp1),mtb.typ_delta,Univ.Constraint.empty
   | MSEfunctor (arg_id, arg_e, body_expr) ->
       let trans env' = translate_struct_type_entry env' inl body_expr in
       translate_functor env inl arg_id arg_e trans (fun _ _ _ -> None)
@@ -333,7 +332,7 @@ and translate_struct_type_entry env inl = function
       let sign,alg,resolve,cst2 =
 	check_with env sign with_decl alg (mp_from_mexpr mte) resolve
       in
-      sign,alg,resolve,Univ.union_constraints cst1 cst2
+      sign,alg,resolve,Univ.Constraint.union cst1 cst2
 
 and translate_module_type env mp inl mte =
   let mp_from = mp_from_mexpr mte in
@@ -351,7 +350,7 @@ let rec translate_struct_include_module_entry env mp inl = function
       let mb = lookup_module mp1 env in
       let mb' = strengthen_and_subst_mb mb mp true in
       let mb_typ = clean_bounded_mod_expr mb'.mod_type in
-      mb_typ,None,mb'.mod_delta,Univ.empty_constraint
+      mb_typ,None,mb'.mod_delta,Univ.Constraint.empty
   | MSEapply (fexpr,mexpr) ->
       let ftrans = translate_struct_include_module_entry env mp inl fexpr in
       translate_apply env inl ftrans mexpr (fun _ _ _ -> None)
@@ -376,14 +375,16 @@ let rec add_struct_expr_constraints env = function
 	  (add_struct_expr_constraints env meb1)
 	  meb2)
   | SEBwith(meb,With_definition_body(_,cb))->
-      Environ.add_constraints cb.const_constraints
+  (* FIXME probably wrong *)
+      Environ.push_context cb.const_universes
 	(add_struct_expr_constraints env meb)
   | SEBwith(meb,With_module_body(_,_))->
       add_struct_expr_constraints env meb
 		
 and add_struct_elem_constraints env = function 
-  | SFBconst cb -> Environ.add_constraints cb.const_constraints env
-  | SFBmind mib -> Environ.add_constraints mib.mind_constraints env
+(* FIXME *)
+  | SFBconst cb -> Environ.push_context cb.const_universes env
+  | SFBmind mib -> Environ.push_context mib.mind_universes env
   | SFBmodule mb -> add_module_constraints env mb
   | SFBmodtype mtb -> add_modtype_constraints env mtb
 
@@ -417,11 +418,12 @@ let rec struct_expr_constraints cst = function
 
   | SEBapply (meb1,meb2,cst1) ->
       struct_expr_constraints
-	(struct_expr_constraints (Univ.union_constraints cst1 cst) meb1)
+	(struct_expr_constraints (Univ.Constraint.union cst1 cst) meb1)
 	meb2
   | SEBwith(meb,With_definition_body(_,cb))->
       struct_expr_constraints
-        (Univ.union_constraints cb.const_constraints cst) meb
+      (* FIXME *)
+        (Univ.Constraint.union (UContext.constraints cb.const_universes) cst) meb
   | SEBwith(meb,With_module_body(_,_))->
       struct_expr_constraints  cst meb	
 		
@@ -437,11 +439,11 @@ and module_constraints cst mb =
     | Some meb -> struct_expr_constraints cst meb in
   let cst = 
       struct_expr_constraints cst mb.mod_type in
-  Univ.union_constraints mb.mod_constraints cst
+  Univ.Constraint.union mb.mod_constraints cst
 
 and modtype_constraints cst mtb =
-  struct_expr_constraints  (Univ.union_constraints mtb.typ_constraints cst) mtb.typ_expr
+  struct_expr_constraints  (Univ.Constraint.union mtb.typ_constraints cst) mtb.typ_expr
 
 
-let struct_expr_constraints = struct_expr_constraints Univ.empty_constraint
-let module_constraints = module_constraints Univ.empty_constraint
+let struct_expr_constraints = struct_expr_constraints Univ.Constraint.empty
+let module_constraints = module_constraints Univ.Constraint.empty

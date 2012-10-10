@@ -55,6 +55,9 @@ val fix             : Id.t option -> int -> tactic
 val mutual_cofix    : Id.t -> (Id.t * constr) list -> int -> tactic
 val cofix           : Id.t option -> tactic
 
+val convert         : constr -> constr -> tactic
+val convert_leq     : constr -> constr -> tactic
+
 (** {6 Introduction tactics. } *)
 
 val fresh_id_in_env : Id.t list -> Id.t -> env -> Id.t

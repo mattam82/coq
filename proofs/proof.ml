@@ -178,7 +178,7 @@ let has_unresolved_evar p =
 
 (* Returns the list of partial proofs to initial goals *)
 let partial_proof p =
-  List.map fst (Proofview.return p.state.proofview)
+  List.map fst (fst (fst (Proofview.return p.state.proofview))) (*FIXME: unsafe?*)
 
 
 
@@ -385,7 +385,7 @@ let start goals =
       undo_stack = [] ;
       transactions = [] ;
       info = { endline_tactic = Proofview.tclUNIT ();
-               initial_conclusions = List.map snd goals;
+               initial_conclusions = List.map (fun x -> fst (snd x)) goals;
                section_vars = None }
     }
   in

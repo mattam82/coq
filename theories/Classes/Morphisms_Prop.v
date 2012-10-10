@@ -72,8 +72,8 @@ Program Instance ex_impl_morphism {A : Type} :
     exists H0. apply H. assumption.
   Qed.
 
-Program Instance ex_inverse_impl_morphism {A : Type} :
-  Proper (pointwise_relation A (inverse impl) ==> inverse impl) (@ex A) | 1.
+Program Instance ex_flip_impl_morphism {A : Type} :
+  Proper (pointwise_relation A (flip impl) ==> flip impl) (@ex A) | 1.
 
   Next Obligation.
   Proof.
@@ -93,8 +93,8 @@ Program Instance all_iff_morphism {A : Type} :
 Program Instance all_impl_morphism {A : Type} :
   Proper (pointwise_relation A impl ==> impl) (@all A) | 1.
 
-Program Instance all_inverse_impl_morphism {A : Type} :
-  Proper (pointwise_relation A (inverse impl) ==> inverse impl) (@all A) | 1.
+Program Instance all_flip_impl_morphism {A : Type} :
+  Proper (pointwise_relation A (flip impl) ==> flip impl) (@all A) | 1.
 
 (** Equivalent points are simultaneously accessible or not *)
 

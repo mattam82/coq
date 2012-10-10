@@ -532,10 +532,10 @@ struct
 
   let get_left_construct term =
    match Term.kind_of_term term with
-    | Term.Construct(_,i) -> (i,[| |])
+    | Term.Construct((_,i),_) -> (i,[| |])
     | Term.App(l,rst) ->
        (match Term.kind_of_term l with
-        | Term.Construct(_,i) -> (i,rst)
+        | Term.Construct((_,i),_) -> (i,rst)
         |   _     -> raise ParseError
        )
     | _ ->   raise ParseError
@@ -829,8 +829,8 @@ struct
 
   let parse_zop (op,args) =
    match kind_of_term op with
-    | Const x -> (assoc_const op zop_table, args.(0) , args.(1))
-    |  Ind(n,0) ->
+    | Const (x,_) -> (assoc_const op zop_table, args.(0) , args.(1))
+    | Ind((n,0),_) ->
         if op = Lazy.force coq_Eq &&   args.(0) = Lazy.force coq_Z
         then (Mc.OpEq, args.(1), args.(2))
         else raise ParseError
@@ -838,8 +838,8 @@ struct
 
   let parse_rop (op,args) =
     match kind_of_term op with
-     | Const x -> (assoc_const op rop_table, args.(0) , args.(1))
-     |  Ind(n,0) ->
+     | Const (x,_) -> (assoc_const op rop_table, args.(0) , args.(1))
+     | Ind((n,0),_) ->
         if op = Lazy.force coq_Eq &&   args.(0) = Lazy.force coq_R
         then (Mc.OpEq, args.(1), args.(2))
         else raise ParseError

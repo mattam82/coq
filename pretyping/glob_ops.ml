@@ -232,7 +232,7 @@ let free_glob_vars  =
 
 
 let loc_of_glob_constr = function
-  | GRef (loc,_) -> loc
+  | GRef (loc,_,_) -> loc
   | GVar (loc,_) -> loc
   | GEvar (loc,_,_) -> loc
   | GPatVar (loc,_) -> loc
@@ -260,18 +260,18 @@ let rec cases_pattern_of_glob_constr na = function
     | Anonymous -> PatVar (loc,Name id)
     end
   | GHole (loc,_) -> PatVar (loc,na)
-  | GRef (loc,ConstructRef cstr) ->
+  | GRef (loc,ConstructRef cstr,_) ->
       PatCstr (loc,cstr,[],na)
-  | GApp (loc,GRef (_,ConstructRef cstr),l) ->
+  | GApp (loc,GRef (_,ConstructRef cstr,_),l) ->
       PatCstr (loc,cstr,List.map (cases_pattern_of_glob_constr Anonymous) l,na)
   | _ -> raise Not_found
 
 (* Turn a closed cases pattern into a glob_constr *)
 let rec glob_constr_of_closed_cases_pattern_aux = function
   | PatCstr (loc,cstr,[],Anonymous) ->
-      GRef (loc,ConstructRef cstr)
+      GRef (loc,ConstructRef cstr,None)
   | PatCstr (loc,cstr,l,Anonymous) ->
-      let ref = GRef (loc,ConstructRef cstr) in
+      let ref = GRef (loc,ConstructRef cstr,None) in
       GApp (loc,ref, List.map glob_constr_of_closed_cases_pattern_aux l)
   | _ -> raise Not_found
 

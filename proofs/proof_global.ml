@@ -67,7 +67,7 @@ type lemma_possible_guards = int list list
 type proof_info = {
   strength : Decl_kinds.goal_kind ;
   compute_guard :  lemma_possible_guards;
-  hook : unit Tacexpr.declaration_hook ;
+  hook : Universes.universe_opt_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook ;
   mode : proof_mode
 }
 
@@ -264,20 +264,28 @@ let close_proof () =
   try
     let id = get_current_proof_name () in
     let p = give_me_the_proof () in
-    let proofs_and_types = Proof.return p in
+    let (proofs_and_types, subst), ctx = Proof.return p in
     let section_vars = Proof.get_used_variables p in
-    let entries = List.map
-      (fun (c,t) -> { Entries.const_entry_body = c;
-                      const_entry_secctx = section_vars;
-                      const_entry_type = Some t;
-              const_entry_opaque = true;
-              const_entry_inline_code = false })
-      proofs_and_types
-    in
     let { compute_guard=cg ; strength=str ; hook=hook } =
       Id.Map.find id !proof_info
     in
-    (id, (entries,cg,str,hook))
+    let entries = List.map
+      (fun (c,t) ->
+	let univs = 
+	  Univ.LSet.union (Universes.universes_of_constr c)
+	    (Universes.universes_of_constr t)
+	in 
+	let ctx = Universes.restrict_universe_context (Univ.ContextSet.of_context ctx) univs in
+	  { Entries.const_entry_body = c;
+            const_entry_secctx = section_vars;
+            const_entry_type = Some t;
+	    const_entry_polymorphic = Util.pi2 str;
+	    const_entry_universes = Univ.ContextSet.to_context ctx;
+	    const_entry_opaque = true;
+	    const_entry_inline_code = false })
+      proofs_and_types
+    in
+    (id, (entries,cg,str,hook (subst, ctx)))
   with
     |  Proof.UnfinishedProof ->
 	 Errors.error "Attempt to save an incomplete proof"

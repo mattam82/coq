@@ -46,7 +46,7 @@ val proof : proof -> Goal.goal list * (Goal.goal list * Goal.goal list) list * E
 
 (*** General proof functions ***)
 
-val start : (Environ.env * Term.types) list -> proof
+val start : (Environ.env * Term.types Univ.in_universe_context_set) list -> proof
 
 (* Returns [true] if the considered proof is completed, that is if no goal remain
     to be considered (this does not require that all evars have been solved). *)
@@ -60,7 +60,7 @@ val partial_proof : proof -> Term.constr list
     Raises [HasUnresolvedEvar] if some evars have been left undefined. *)
 exception UnfinishedProof
 exception HasUnresolvedEvar
-val return : proof -> (Term.constr * Term.types) list
+val return : proof -> ((Term.constr * Term.types) list * Universes.universe_opt_subst) Univ.in_universe_context
 
 (* Interpretes the Undo command. Raises [EmptyUndoStack] if 
     the undo stack is empty. *)

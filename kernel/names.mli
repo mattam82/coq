@@ -195,6 +195,8 @@ sig
   val initial : t
   (** Name of the toplevel structure ([= MPfile initial_dir]) *)
 
+  val dp : t -> DirPath.t
+
 end
 
 module MPset : Set.S with type elt = ModPath.t
@@ -403,10 +405,11 @@ val hcons_construct : constructor -> constructor
 (******)
 
 type 'a tableKey =
-  | ConstKey of Constant.t
+  | ConstKey of 'a
   | VarKey of Id.t
-  | RelKey of 'a
+  | RelKey of Int.t
 
+(** Sets of names *)
 type transparent_state = Id.Pred.t * Cpred.t
 
 val empty_transparent_state : transparent_state
@@ -418,8 +421,10 @@ type inv_rel_key = int (** index in the [rel_context] part of environment
 			  starting by the end, {e inverse}
 			  of de Bruijn indice *)
 
-type id_key = inv_rel_key tableKey
+type id_key = Constant.t tableKey
 
+val eq_table_key : ('a -> 'a -> bool) -> 'a tableKey -> 'a tableKey -> bool
+val eq_constant_key : Constant.t -> Constant.t -> bool
 val eq_id_key : id_key -> id_key -> bool
 
 (** equalities on constant and inductive names (for the checker) *)

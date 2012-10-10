@@ -55,6 +55,8 @@ exception NonSingletonProp of inductive
 
 let dl = Loc.ghost
 
+let constr_of_global g = lazy (Universes.constr_of_global g)
+
 (* Some pre declaration of constant we are going to use *)
 let bb = constr_of_global Coqlib.glob_bool
 
@@ -106,7 +108,7 @@ let mkFullInd ind n =
     else mkInd ind
 
 let check_bool_is_defined () =
-  try let _ = Global.type_of_global Coqlib.glob_bool in ()
+  try let _ = Global.type_of_global_unsafe Coqlib.glob_bool in ()
   with e when Errors.noncritical e -> raise (UndefinedCst "bool")
 
 let beq_scheme_kind_aux = ref (fun _ -> failwith "Undefined")
@@ -142,7 +144,7 @@ let build_beq_scheme kn =
       let eqs_typ = List.map (fun aa ->
                                 let a = lift !lift_cnt aa in
                                   incr lift_cnt;
-                                  myArrow a (myArrow a bb)
+                                  myArrow a (myArrow a (Lazy.force bb))
                              ) ext_rel_list in
 
         let eq_input = List.fold_left2
@@ -159,11 +161,12 @@ let build_beq_scheme kn =
                 t  a) eq_input lnamesparrec
  in
  let make_one_eq cur =
-  let ind = kn,cur in
+  let u = Univ.Instance.empty in
+  let ind = (kn,cur),u (* FIXME *) in
   (* current inductive we are working on *)
-  let cur_packet = mib.mind_packets.(snd ind) in
+  let cur_packet = mib.mind_packets.(snd (fst ind)) in
   (* Inductive toto : [rettyp] := *)
-  let rettyp = Inductive.type_of_inductive env (mib,cur_packet) in
+  let rettyp = Inductive.type_of_inductive env ((mib,cur_packet),u) in
   (* split rettyp in a list without the non rec params and the last ->
   e.g. Inductive vec (A:Set) : nat -> Set := ... will do [nat] *)
   let rettyp_l = quick_chop nparrec (deconstruct_type rettyp) in
@@ -182,7 +185,7 @@ let build_beq_scheme kn =
         | Var x -> mkVar (Id.of_string ("eq_"^(Id.to_string x)))
         | Cast (x,_,_) -> aux (applist (x,a))
         | App _ -> assert false
-        | Ind (kn',i as ind') -> if eq_mind kn kn' then mkRel(eqA-nlist-i+nb_ind-1)
+        | Ind ((kn',i as ind'),u) -> if eq_mind kn kn' then mkRel(eqA-nlist-i+nb_ind-1)
                         else ( try
 			  let a = Array.of_list a in
                           let eq = mkConst (find_scheme (!beq_scheme_kind_aux()) (kn',i))
@@ -193,15 +196,15 @@ let build_beq_scheme kn =
                             in if Array.equal eq_constr args [||] then eq
                                else mkApp (eq,Array.append
                                       (Array.map (fun x->lift lifti x) a) eqa)
-                         with Not_found -> raise(EqNotFound (ind',ind))
+                         with Not_found -> raise(EqNotFound (ind',fst ind))
                         )
         | Sort _  -> raise InductiveWithSort
         | Prod _ -> raise InductiveWithProduct
         | Lambda _-> raise (EqUnknown "Lambda")
         | LetIn _ -> raise (EqUnknown "LetIn")
         | Const kn ->
-	    (match Environ.constant_opt_value env kn with
-	      | None -> raise (ParameterWithoutEquality kn)
+	    (match Environ.constant_opt_value_in env kn with
+	      | None -> raise (ParameterWithoutEquality (fst kn))
 	      | Some c -> aux (applist (c,a)))
         | Construct _ -> raise (EqUnknown "Construct")
         | Case _ -> raise (EqUnknown "Case")
@@ -216,28 +219,28 @@ let build_beq_scheme kn =
   let do_predicate rel_list n =
      List.fold_left (fun a b -> mkLambda(Anonymous,b,a))
       (mkLambda (Anonymous,
-                 mkFullInd ind (n+3+(List.length rettyp_l)+nb_ind-1),
-                 bb))
+                 mkFullInd (fst ind) (*FIXME*) (n+3+(List.length rettyp_l)+nb_ind-1),
+                 (Lazy.force bb)))
       (List.rev rettyp_l) in
   (* make_one_eq *)
   (* do the [| C1 ... =>  match Y with ... end
                ...
                Cn => match Y with ... end |]  part *)
-    let ci = make_case_info env ind MatchStyle in
+    let ci = make_case_info env (fst ind) MatchStyle in
     let constrs n = get_constructors env (make_ind_family (ind,
       extended_rel_list (n+nb_ind-1) mib.mind_params_ctxt)) in
     let constrsi = constrs (3+nparrec) in
     let n = Array.length constrsi in
-    let ar = Array.make n ff in
+    let ar = Array.make n (Lazy.force ff) in
 	for i=0 to n-1 do
 	  let nb_cstr_args = List.length constrsi.(i).cs_args in
-	  let ar2 = Array.make n ff in
+	  let ar2 = Array.make n (Lazy.force ff) in
           let constrsj = constrs (3+nparrec+nb_cstr_args) in
 	    for j=0 to n-1 do
 	      if Int.equal i j then
 		ar2.(j) <- let cc = (match nb_cstr_args with
-                    | 0 -> tt
-                    | _ -> let eqs = Array.make nb_cstr_args tt in
+                    | 0 -> Lazy.force tt
+                    | _ -> let eqs = Array.make nb_cstr_args (Lazy.force tt) in
                       for ndx = 0 to nb_cstr_args-1 do
                         let _,_,cc = List.nth constrsi.(i).cs_args ndx in
                           let eqA = compute_A_equality rel_list
@@ -261,7 +264,7 @@ let build_beq_scheme kn =
                     (constrsj.(j).cs_args)
 		)
 	      else ar2.(j) <- (List.fold_left (fun a (p,q,r) ->
-			mkLambda (p,r,a)) ff (constrsj.(j).cs_args) )
+			mkLambda (p,r,a)) (Lazy.force ff) (constrsj.(j).cs_args) )
 	    done;
 
 	  ar.(i) <- (List.fold_left (fun a (p,q,r) -> mkLambda (p,r,a))
@@ -269,8 +272,8 @@ let build_beq_scheme kn =
 				  mkVar (Id.of_string "Y") ,ar2))
 			 (constrsi.(i).cs_args))
 	done;
-        mkNamedLambda (Id.of_string "X") (mkFullInd ind (nb_ind-1+1))  (
-          mkNamedLambda (Id.of_string "Y") (mkFullInd ind (nb_ind-1+2))  (
+        mkNamedLambda (Id.of_string "X") (mkFullInd (fst ind) (*FIXME*) (nb_ind-1+1))  (
+          mkNamedLambda (Id.of_string "Y") (mkFullInd (fst ind) (nb_ind-1+2))  (
  	    mkCase (ci, do_predicate rel_list 0,mkVar (Id.of_string "X"),ar)))
     in (* build_beq_scheme *)
     let names = Array.make nb_ind Anonymous and
@@ -279,7 +282,7 @@ let build_beq_scheme kn =
     for i=0 to (nb_ind-1) do
         names.(i) <- Name (Id.of_string (rec_name i));
 	types.(i) <- mkArrow (mkFullInd (kn,i) 0)
-                     (mkArrow (mkFullInd (kn,i) 1) bb);
+                     (mkArrow (mkFullInd (kn,i) 1) (Lazy.force bb));
         cores.(i) <- make_one_eq i
     done;
     Array.init nb_ind (fun i ->
@@ -287,7 +290,7 @@ let build_beq_scheme kn =
 	if not (List.mem InSet kelim) then
 	  raise (NonSingletonProp (kn,i));
         let fix = mkFix (((Array.make nb_ind 0),i),(names,types,cores)) in
-        create_input fix)
+        create_input fix), Evd.empty_evar_universe_context (* FIXME *)
 
 let beq_scheme_kind = declare_mutual_scheme_object "_beq" build_beq_scheme
 
@@ -329,8 +332,8 @@ let do_replace_lb lb_scheme_key aavoid narg gls p q =
       (* if this happen then the args have to be already declared as a
               Parameter*)
       (
-        let mp,dir,lbl = repr_con (destConst v) in
-          mkConst (make_con mp dir (Label.make (
+        let mp,dir,lbl = repr_con (fst (destConst v)) in
+          mkConst (make_con mp dir (mk_label (
           if Int.equal offset 1 then ("eq_"^(Label.to_string lbl))
                        else ((Label.to_string lbl)^"_lb")
         )))
@@ -339,7 +342,7 @@ let do_replace_lb lb_scheme_key aavoid narg gls p q =
   let type_of_pq = pf_type_of gls p in
     let u,v = destruct_ind type_of_pq
     in let lb_type_of_p =
-        try mkConst (find_scheme lb_scheme_key u)
+        try mkConst (find_scheme lb_scheme_key (fst u))
         with Not_found ->
           (* spiwack: the format of this error message should probably
 	              be improved. *)
@@ -360,7 +363,7 @@ let do_replace_lb lb_scheme_key aavoid narg gls p q =
             in [Equality.replace p q ; apply app ; Auto.default_auto]
 
 (* used in the bool -> leib side *)
-let do_replace_bl bl_scheme_key ind gls aavoid narg lft rgt =
+let do_replace_bl bl_scheme_key (ind,u as indu) gls aavoid narg lft rgt =
   let avoid = Array.of_list aavoid in
   let do_arg v offset =
   try
@@ -377,8 +380,8 @@ let do_replace_bl bl_scheme_key ind gls aavoid narg lft rgt =
       (* if this happen then the args have to be already declared as a
          Parameter*)
       (
-        let mp,dir,lbl = repr_con (destConst v) in
-          mkConst (make_con mp dir (Label.make (
+        let mp,dir,lbl = repr_con (fst (destConst v)) in
+          mkConst (make_con mp dir (mk_label (
           if Int.equal offset 1 then ("eq_"^(Label.to_string lbl))
                        else ((Label.to_string lbl)^"_bl")
         )))
@@ -392,12 +395,12 @@ let do_replace_bl bl_scheme_key ind gls aavoid narg lft rgt =
         else (
           let u,v = try  destruct_ind tt1
           (* trick so that the good sequence is returned*)
-                with e when Errors.noncritical e -> ind,[||]
-          in if eq_ind u ind
+                with e when Errors.noncritical e -> indu,[||]
+          in if eq_ind (fst u) ind
              then (Equality.replace t1 t2)::(Auto.default_auto)::(aux q1 q2)
              else (
                let bl_t1 =
-               try mkConst (find_scheme bl_scheme_key u)
+               try mkConst (find_scheme bl_scheme_key (fst u))
                with Not_found ->
 		 (* spiwack: the format of this error message should probably
 	                     be improved. *)
@@ -431,12 +434,12 @@ let do_replace_bl bl_scheme_key ind gls aavoid narg lft rgt =
     try destApp rgt with DestKO -> error "replace failed."
   in
   let (sp1,i1) =
-    try destInd ind1 with DestKO ->
-      try fst (destConstruct ind1) with DestKO ->
+    try fst (destInd ind1) with DestKO ->
+      try fst (fst (destConstruct ind1)) with DestKO ->
         error "The expected type is an inductive one."
   and (sp2,i2) =
-    try destInd ind2 with DestKO ->
-      try fst (destConstruct ind2)  with DestKO ->
+    try fst (destInd ind2) with DestKO ->
+      try fst (fst (destConstruct ind2))  with DestKO ->
         error "The expected type is an inductive one."
   in
   if not (eq_mind sp1 sp2) || not (Int.equal i1 i2)
@@ -481,15 +484,15 @@ let compute_bl_goal ind lnamesparrec nparrec =
         mkNamedProd x (mkVar s) (
             mkNamedProd y (mkVar s) (
               mkArrow
-               ( mkApp(eq,[|bb;mkApp(mkVar seq,[|mkVar x;mkVar y|]);tt|]))
-               ( mkApp(eq,[|mkVar s;mkVar x;mkVar y|]))
+               ( mkApp(Lazy.force eq,[|(Lazy.force bb);mkApp(mkVar seq,[|mkVar x;mkVar y|]);(Lazy.force tt)|]))
+               ( mkApp(Lazy.force eq,[|mkVar s;mkVar x;mkVar y|]))
           ))
         ) list_id in
       let bl_input = List.fold_left2 ( fun a (s,_,sbl,_) b ->
         mkNamedProd sbl b a
       ) c (List.rev list_id) (List.rev bl_typ) in
       let eqs_typ = List.map (fun (s,_,_,_) ->
-          mkProd(Anonymous,mkVar s,mkProd(Anonymous,mkVar s,bb))
+          mkProd(Anonymous,mkVar s,mkProd(Anonymous,mkVar s,(Lazy.force bb)))
           ) list_id in
       let eq_input = List.fold_left2 ( fun a (s,seq,_,_) b ->
         mkNamedProd seq b a
@@ -504,8 +507,8 @@ let compute_bl_goal ind lnamesparrec nparrec =
         mkNamedProd n (mkFullInd ind nparrec) (
           mkNamedProd m (mkFullInd ind (nparrec+1)) (
             mkArrow
-              (mkApp(eq,[|bb;mkApp(eqI,[|mkVar n;mkVar m|]);tt|]))
-              (mkApp(eq,[|mkFullInd ind (nparrec+3);mkVar n;mkVar m|]))
+              (mkApp(Lazy.force eq,[|(Lazy.force bb);mkApp(eqI,[|mkVar n;mkVar m|]);(Lazy.force tt)|]))
+              (mkApp(Lazy.force eq,[|mkFullInd ind (nparrec+3);mkVar n;mkVar m|]))
         )))
 
 let compute_bl_tact bl_scheme_key ind lnamesparrec nparrec gsig =
@@ -562,7 +565,7 @@ repeat ( apply andb_prop in z;let z1:= fresh "Z" in destruct z as [z1 z]).
                       match (kind_of_term gl) with
                       | App (c,ca) -> (
                         match (kind_of_term c) with
-                        | Ind indeq ->
+                        | Ind (indeq,u) ->
                             if eq_gr (IndRef indeq) Coqlib.glob_eq
                             then (
                               tclTHENSEQ ((do_replace_bl bl_scheme_key ind gls
@@ -588,11 +591,12 @@ let make_bl_scheme mind =
   let ind = (mind,0) in
   let nparams = mib.mind_nparams in
   let nparrec = mib.mind_nparams_rec in
-  let lnonparrec,lnamesparrec =
+  let lnonparrec,lnamesparrec = (* TODO subst *)
     context_chop (nparams-nparrec) mib.mind_params_ctxt in
   [|Pfedit.build_by_tactic (Global.env())
-    (compute_bl_goal ind lnamesparrec nparrec)
-    (compute_bl_tact (!bl_scheme_kind_aux()) ind lnamesparrec nparrec)|]
+    (compute_bl_goal ind lnamesparrec nparrec, Univ.ContextSet.empty)
+    (compute_bl_tact (!bl_scheme_kind_aux()) (ind,Univ.Instance.empty)(*FIXME*) lnamesparrec nparrec)|],
+    Evd.empty_evar_universe_context
 
 let bl_scheme_kind = declare_mutual_scheme_object "_dec_bl" make_bl_scheme
 
@@ -603,6 +607,7 @@ let _ = bl_scheme_kind_aux := fun () -> bl_scheme_kind
 
 let compute_lb_goal ind lnamesparrec nparrec =
   let list_id = list_id lnamesparrec in
+  let eq = Lazy.force eq and tt = Lazy.force tt and bb = Lazy.force bb in
   let eqI = eqI ind lnamesparrec in
     let create_input c =
       let x = Id.of_string "x" and
@@ -703,8 +708,9 @@ let make_lb_scheme mind =
   let lnonparrec,lnamesparrec =
     context_chop (nparams-nparrec) mib.mind_params_ctxt in
   [|Pfedit.build_by_tactic (Global.env())
-    (compute_lb_goal ind lnamesparrec nparrec)
-    (compute_lb_tact (!lb_scheme_kind_aux()) ind lnamesparrec nparrec)|]
+    (compute_lb_goal ind lnamesparrec nparrec, Univ.ContextSet.empty)
+    (compute_lb_tact (!lb_scheme_kind_aux()) ind lnamesparrec nparrec)|],
+    Evd.empty_evar_universe_context (* FIXME *)
 
 let lb_scheme_kind = declare_mutual_scheme_object "_dec_lb" make_lb_scheme
 
@@ -720,6 +726,7 @@ let check_not_is_defined () =
 (* {n=m}+{n<>m}  part  *)
 let compute_dec_goal ind lnamesparrec nparrec =
   check_not_is_defined ();
+  let eq = Lazy.force eq and tt = Lazy.force tt and bb = Lazy.force bb in
   let list_id = list_id lnamesparrec in
     let create_input c =
       let x = Id.of_string "x" and
@@ -770,6 +777,8 @@ let compute_dec_goal ind lnamesparrec nparrec =
       )
 
 let compute_dec_tact ind lnamesparrec nparrec gsig =
+  let eq = Lazy.force eq and tt = Lazy.force tt 
+  and ff = Lazy.force ff and bb = Lazy.force bb in
   let list_id = list_id lnamesparrec in
   let eqI = eqI ind lnamesparrec in
   let avoid = ref [] in
@@ -858,8 +867,9 @@ let make_eq_decidability mind =
   let lnonparrec,lnamesparrec =
     context_chop (nparams-nparrec) mib.mind_params_ctxt in
   [|Pfedit.build_by_tactic (Global.env())
-    (compute_dec_goal ind lnamesparrec nparrec)
-    (compute_dec_tact ind lnamesparrec nparrec)|]
+    (compute_dec_goal ind lnamesparrec nparrec, Univ.ContextSet.empty)
+    (compute_dec_tact ind lnamesparrec nparrec)|],
+    Evd.empty_evar_universe_context (* FIXME *)
 
 let eq_dec_scheme_kind =
   declare_mutual_scheme_object "_eq_dec" make_eq_decidability

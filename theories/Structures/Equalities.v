@@ -133,7 +133,7 @@ End BackportEq.
 
 Module UpdateEq (E:Eq)(F:IsEqOrig E) <: IsEq E.
  Instance eq_equiv : Equivalence E.eq.
- Proof. exact (Build_Equivalence _ _ F.eq_refl F.eq_sym F.eq_trans). Qed.
+ Proof. exact (Build_Equivalence _ F.eq_refl F.eq_sym F.eq_trans). Qed.
 End UpdateEq.
 
 Module Backport_ET (E:EqualityType) <: EqualityTypeBoth

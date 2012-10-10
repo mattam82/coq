@@ -162,7 +162,7 @@ let is_flexible_reference env bound depth f =
     | Rel n when n >= bound+depth -> (* inductive type *) false
     | Rel n when n >= depth -> (* previous argument *) true
     | Rel n -> (* since local definitions have been expanded *) false
-    | Const kn ->
+    | Const (kn,_) ->
         let cb = Environ.lookup_constant kn env in
 	(match cb.const_body with Def _ -> true | _ -> false)
     | Var id ->
@@ -392,7 +392,8 @@ let compute_semi_auto_implicits env f manual t =
 
 let compute_constant_implicits flags manual cst =
   let env = Global.env () in
-  compute_semi_auto_implicits env flags manual (Typeops.type_of_constant env cst)
+  let ty = (Environ.lookup_constant cst env).const_type in
+  compute_semi_auto_implicits env flags manual ty
 
 (*s Inductives and constructors. Their implicit arguments are stored
    in an array, indexed by the inductive number, of pairs $(i,v)$ where
@@ -404,14 +405,15 @@ let compute_mib_implicits flags manual kn =
   let mib = lookup_mind kn env in
   let ar =
     Array.to_list
-      (Array.map  (* No need to lift, arities contain no de Bruijn *)
-        (fun mip ->
-	  (Name mip.mind_typename, None, type_of_inductive env (mib,mip)))
+      (Array.mapi  (* No need to lift, arities contain no de Bruijn *)
+        (fun i mip ->
+	  (** No need to care about constraints here *)
+	  (Name mip.mind_typename, None, Global.type_of_global_unsafe (IndRef (kn,i))))
         mib.mind_packets) in
   let env_ar = push_rel_context ar env in
   let imps_one_inductive i mip =
     let ind = (kn,i) in
-    let ar = type_of_inductive env (mib,mip) in
+    let ar = Global.type_of_global_unsafe (IndRef ind) in
     ((IndRef ind,compute_semi_auto_implicits env flags manual ar),
      Array.mapi (fun j c ->
        (ConstructRef (ind,j+1),compute_semi_auto_implicits env_ar flags manual c))
@@ -508,7 +510,7 @@ let section_segment_of_reference = function
   | ConstRef con -> section_segment_of_constant con
   | IndRef (kn,_) | ConstructRef ((kn,_),_) ->
       section_segment_of_mutual_inductive kn
-  | _ -> []
+  | _ -> [], Univ.UContext.empty
 
 let adjust_side_condition p = function
   | LessArgsThan n -> LessArgsThan (n+p)
@@ -523,7 +525,7 @@ let discharge_implicits (_,(req,l)) =
   | ImplLocal -> None
   | ImplInteractive (ref,flags,exp) ->
     (try
-      let vars = section_segment_of_reference ref in
+      let vars,_ = section_segment_of_reference ref in
       let ref' = if isVarRef ref then ref else pop_global_reference ref in
       let extra_impls = impls_of_context vars in
       let l' = [ref', List.map (add_section_impls vars extra_impls) (snd (List.hd l))] in
@@ -532,7 +534,7 @@ let discharge_implicits (_,(req,l)) =
   | ImplConstant (con,flags) ->
     (try
       let con' = pop_con con in
-      let vars = section_segment_of_constant con in
+      let vars,_ = section_segment_of_constant con in
       let extra_impls = impls_of_context vars in
       let l' = [ConstRef con',List.map (add_section_impls vars extra_impls) (snd (List.hd l))] in
 	Some (ImplConstant (con',flags),l')
@@ -540,7 +542,7 @@ let discharge_implicits (_,(req,l)) =
   | ImplMutualInductive (kn,flags) ->
     (try
       let l' = List.map (fun (gr, l) ->
-	let vars = section_segment_of_reference gr in
+	let vars,_ = section_segment_of_reference gr in
 	let extra_impls = impls_of_context vars in
 	((if isVarRef gr then gr else pop_global_reference gr),
 	 List.map (add_section_impls vars extra_impls) l)) l
@@ -653,7 +655,7 @@ let check_rigidity isrigid =
 let declare_manual_implicits local ref ?enriching l =
   let flags = !implicit_args in
   let env = Global.env () in
-  let t = Global.type_of_global ref in
+  let t = Global.type_of_global_unsafe ref in
   let enriching = Option.default flags.auto enriching in
   let isrigid,autoimpls = compute_auto_implicits env flags enriching t in
   let l' = match l with

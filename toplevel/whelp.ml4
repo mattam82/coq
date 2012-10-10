@@ -126,9 +126,9 @@ let uri_params f = function
 let get_discharged_hyp_names sp = List.map basename (get_discharged_hyps sp)
 
 let section_parameters = function
-  | GRef (_,(ConstructRef ((induri,_),_) | IndRef (induri,_))) ->
+  | GRef (_,(ConstructRef ((induri,_),_) | IndRef (induri,_)),_) ->
       get_discharged_hyp_names (path_of_global (IndRef(induri,0)))
-  | GRef (_,(ConstRef cst as ref)) ->
+  | GRef (_,(ConstRef cst as ref),_) ->
       get_discharged_hyp_names (path_of_global ref)
   | _ -> []
 
@@ -141,7 +141,7 @@ let merge vl al =
 let rec uri_of_constr c =
   match c with
   | GVar (_,id) -> url_id id
-  | GRef (_,ref) ->  uri_of_global ref
+  | GRef (_,ref,_) ->  uri_of_global ref
   | GHole _ | GEvar _ -> url_string "?"
   | GSort (_,s) -> url_string (whelp_of_glob_sort s)
   | _ -> url_paren (fun () -> match c with

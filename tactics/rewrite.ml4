@@ -76,7 +76,7 @@ let try_find_global_reference dir s =
     Nametab.global_of_path sp
 
 let try_find_reference dir s =
-  constr_of_global (try_find_global_reference dir s)
+  Universes.constr_of_global (try_find_global_reference dir s)
 
 let gen_constant dir s = Coqlib.gen_constant "rewrite" dir s
 let coq_eq = lazy(gen_constant ["Init"; "Logic"] "eq")
@@ -110,11 +110,10 @@ let coq_relation = lazy (gen_constant ["Relations";"Relation_Definitions"] "rela
 let mk_relation a = mkApp (Lazy.force coq_relation, [| a |])
 let rewrite_relation_class = lazy (gen_constant ["Classes"; "RelationClasses"] "RewriteRelation")
 
-let proper_type = lazy (constr_of_global (Lazy.force proper_class).cl_impl)
-let proper_proxy_type = lazy (constr_of_global (Lazy.force proper_proxy_class).cl_impl)
-
+let proper_type = lazy (Universes.constr_of_global (Lazy.force proper_class).cl_impl)
+let proper_proxy_type = lazy (Universes.constr_of_global (Lazy.force proper_proxy_class).cl_impl)
+ 
 (** Utility functions *)
-
 let split_head = function
     hd :: tl -> hd, tl
   | [] -> assert(false)
@@ -155,7 +154,7 @@ let find_class_proof proof_type proof_method env evars carrier relation =
     let goal = mkApp (Lazy.force proof_type, [| carrier ; relation |]) in
     let evars', c = Typeclasses.resolve_one_typeclass env evars goal in
       if extends_undefined evars evars' then raise Not_found
-      else mkApp (Lazy.force proof_method, [| carrier; relation; c |])
+      else evars', mkApp (Lazy.force proof_method, [| carrier; relation; c |])
   with e when Logic.catchable_exception e -> raise Not_found
 
 let get_reflexive_proof env = find_class_proof reflexive_type reflexive_proof env
@@ -229,7 +228,7 @@ let is_applied_rewrite_relation env sigma rels t =
 	  (try
 	      let params, args = Array.chop (Array.length args - 2) args in
 	      let env' = Environ.push_rel_context rels env in
-	      let evd, evar = Evarutil.new_evar sigma env' (new_Type ()) in
+	      let evd, (evar, _) = Evarutil.new_type_evar Evd.univ_flexible sigma env' in
 	      let inst = mkApp (Lazy.force rewrite_relation_class, [| evar; mkApp (c, params) |]) in
 	      let _ = Typeclasses.resolve_one_typeclass env' evd inst in
 		Some (it_mkProd_or_LetIn t rels)
@@ -276,8 +275,8 @@ let decompose_applied_relation env sigma flags orig (c,l) left2right =
     match find_rel ctype with
     | Some c -> c
     | None ->
-	let ctx,t' = Reductionops.splay_prod_assum env sigma ctype in (* Search for underlying eq *)
-	match find_rel (it_mkProd_or_LetIn t' ctx) with
+	let ctx,t' = Reductionops.splay_prod env sigma ctype in (* Search for underlying eq *)
+	match find_rel (it_mkProd_or_LetIn t' (List.map (fun (n,t) -> n, None, t) ctx)) with
 	| Some c -> c
 	| None -> error "The term does not end with an applied homogeneous relation."
 
@@ -368,7 +367,7 @@ let solve_remaining_by by env prf =
     let evd' = 
       List.fold_right (fun mv evd ->
         let ty = Clenv.clenv_nf_meta env (meta_type evd mv) in
-	let c = Pfedit.build_by_tactic env.env ty (tclCOMPLETE tac) in
+	let c = Pfedit.build_by_tactic env.env (ty,Univ.ContextSet.empty) (tclCOMPLETE tac) in
 	  meta_assign mv (c, (Conv,TypeNotProcessed)) evd)
       indep env.evd
     in { env with evd = evd' }, prf
@@ -422,15 +421,16 @@ let unify_eqn env (sigma, cstrs) hypinfo by t =
 		  evd', prf, c1, c2, car, rel)
 	    else raise Reduction.NotConvertible
     in
-    let res =
-      if l2r then (prf, (car, rel, c1, c2))
+    let evd, res =
+      if l2r then evd', (prf, (car, rel, c1, c2))
       else
-	try (mkApp (get_symmetric_proof env evd' car rel,
-		   [| c1 ; c2 ; prf |]),
-	    (car, rel, c2, c1))
+	try
+	  let evd', symprf = get_symmetric_proof env evd' car rel in
+	    evd', (mkApp (symprf, [| c1 ; c2 ; prf |]),
+		   (car, rel, c2, c1))
 	with Not_found ->
-	  (prf, (car, inverse car rel, c2, c1))
-    in Some (evd', res)
+	  evd', (prf, (car, inverse car rel, c2, c1))
+    in Some (evd, res)
   with e when Class_tactics.catchable e -> None
 
 let unfold_impl t =
@@ -552,15 +552,20 @@ type rewrite_result = rewrite_result_info option
 type strategy = Environ.env -> Id.t list -> constr -> types ->
   constr option -> evars -> rewrite_result option
 
+let make_eq () =
+(*FIXME*) Universes.constr_of_global (Coqlib.build_coq_eq ())
+let make_eq_refl () =
+(*FIXME*) Universes.constr_of_global (Coqlib.build_coq_eq_refl ())
+
 let get_rew_rel r = match r.rew_prf with
   | RewPrf (rel, prf) -> rel
-  | RewCast c -> mkApp (Coqlib.build_coq_eq (), [| r.rew_car; r.rew_from; r.rew_to |])
+  | RewCast c -> mkApp (make_eq (),[| r.rew_car; r.rew_from; r.rew_to |])
 
 let get_rew_prf r = match r.rew_prf with
   | RewPrf (rel, prf) -> rel, prf 
   | RewCast c ->
-    let rel = mkApp (Coqlib.build_coq_eq (), [| r.rew_car |]) in
-      rel, mkCast (mkApp (Coqlib.build_coq_eq_refl (), [| r.rew_car; r.rew_from |]),
+    let rel = mkApp (make_eq (), [| r.rew_car |]) in
+      rel, mkCast (mkApp (make_eq_refl (), [| r.rew_car; r.rew_from |]),
 		   c, mkApp (rel, [| r.rew_from; r.rew_to |]))
 
 let resolve_subrelation env avoid car rel prf rel' res =
@@ -661,7 +666,7 @@ let apply_rule hypinfo by loccs : strategy =
 let apply_lemma flags (evm,c) left2right by loccs : strategy =
   fun env avoid t ty cstr evars ->
     let hypinfo = 
-      ref (decompose_applied_relation env (goalevars evars) flags None c left2right)
+      ref (decompose_applied_relation env (Evd.merge (goalevars evars) evm) flags None c left2right)
     in
       apply_rule hypinfo by loccs env avoid t ty cstr evars
 
@@ -729,8 +734,8 @@ let fold_match ?(force=false) env sigma c =
       
 let unfold_match env sigma sk app =
   match kind_of_term app with
-  | App (f', args) when eq_constr f' (mkConst sk) ->
-      let v = Environ.constant_value (Global.env ()) sk in
+  | App (f', args) when eq_constant (fst (destConst f')) sk ->
+      let v = Environ.constant_value_in (Global.env ()) (sk,Univ.Instance.empty)(*FIXME*) in
 	Reductionops.whd_beta sigma (mkApp (v, args))
   | _ -> app
 
@@ -852,6 +857,34 @@ let subterm all flags (s : strategy) : strategy =
 	    (match res with
 	     | Some (Some r) -> Some (Some { r with rew_to = unfold r.rew_to })
 	     | _ -> res)
+
+(* TODO: real rewriting under binders: introduce x x' (H : R x x') and rewrite with 
+   H at any occurrence of x. Ask for (R ==> R') for the lambda. Formalize this.
+   B. Barras' idea is to have a context of relations, of length 1, with Σ for gluing
+   dependent relations and using projections to get them out.
+ *)
+      (* | Lambda (n, t, b) when flags.under_lambdas -> *)
+      (* 	  let n' = name_app (fun id -> Tactics.fresh_id_in_env avoid id env) n in *)
+      (* 	  let n'' = name_app (fun id -> Tactics.fresh_id_in_env avoid id env) n' in *)
+      (* 	  let n''' = name_app (fun id -> Tactics.fresh_id_in_env avoid id env) n'' in *)
+      (* 	  let rel = new_cstr_evar cstr env (mkApp (Lazy.force coq_relation, [|t|])) in *)
+      (* 	  let env' = Environ.push_rel_context [(n'',None,lift 2 rel);(n'',None,lift 1 t);(n', None, t)] env in *)
+      (* 	  let b' = s env' avoid b (Typing.type_of env' (goalevars evars) (lift 2 b)) (unlift_cstr env (goalevars evars) cstr) evars in *)
+      (* 	    (match b' with *)
+      (* 	    | Some (Some r) -> *)
+      (* 		let prf = match r.rew_prf with *)
+      (* 		  | RewPrf (rel, prf) -> *)
+      (* 		      let rel = pointwise_or_dep_relation n' t r.rew_car rel in *)
+      (* 		      let prf = mkLambda (n', t, prf) in *)
+      (* 			RewPrf (rel, prf) *)
+      (* 		  | x -> x *)
+      (* 		in *)
+      (* 		  Some (Some { r with *)
+      (* 		    rew_prf = prf; *)
+      (* 		    rew_car = mkProd (n, t, r.rew_car); *)
+      (* 		    rew_from = mkLambda(n, t, r.rew_from); *)
+      (* 		    rew_to = mkLambda (n, t, r.rew_to) }) *)
+      (* 	    | _ -> b') *)
 
       | Lambda (n, t, b) when flags.under_lambdas ->
 	  let n' = name_app (fun id -> Tactics.fresh_id_in_env avoid id env) n in
@@ -1017,17 +1050,20 @@ module Strategies =
 	choice tac (apply_lemma flags l l2r by AllOccurrences))
 	fail cs
 
-    let inj_open c = (Evd.empty,c)
+    let inj_open hint =
+      (Evd.from_env ~ctx:hint.Autorewrite.rew_ctx (Global.env()),
+       (hint.Autorewrite.rew_lemma, NoBindings))
 
     let old_hints (db : string) : strategy =
       let rules = Autorewrite.find_rewrites db in
 	lemmas rewrite_unif_flags
-	  (List.map (fun hint -> (inj_open (hint.Autorewrite.rew_lemma, NoBindings), hint.Autorewrite.rew_l2r, hint.Autorewrite.rew_tac)) rules)
+	  (List.map (fun hint -> (inj_open hint, hint.Autorewrite.rew_l2r,
+				  hint.Autorewrite.rew_tac)) rules)
 
     let hints (db : string) : strategy =
       fun env avoid t ty cstr evars ->
       let rules = Autorewrite.find_matches db t in
-      let lemma hint = (inj_open (hint.Autorewrite.rew_lemma, NoBindings), hint.Autorewrite.rew_l2r,
+      let lemma hint = (inj_open hint, hint.Autorewrite.rew_l2r,
 			hint.Autorewrite.rew_tac) in
       let lems = List.map lemma rules in
 	lemmas rewrite_unif_flags lems env avoid t ty cstr evars
@@ -1185,8 +1221,7 @@ let cl_rewrite_clause_tac ?abs strat meta clause gl =
   let treat res =
     match res with
     | None -> tclFAIL 0 (str "Nothing to rewrite")
-    | Some None ->
-	tclFAIL 0 (str"No progress made")
+    | Some None -> tclIDTAC
     | Some (Some (undef, p, newt)) ->
 	let tac = 
 	  match clause, p with
@@ -1268,8 +1303,7 @@ let cl_rewrite_clause_newtac ?abs strat clause =
   let treat (res, is_hyp) = 
     match res with
     | None -> newfail 0 (str "Nothing to rewrite")
-    | Some None ->
-	newfail 0 (str"No progress made")
+    | Some None -> Proofview.tclUNIT ()
     | Some (Some res) ->
 	match is_hyp, res with
 	| Some id, (undef, Some p, newt) ->
@@ -1569,17 +1603,18 @@ TACTIC EXTEND GenRew
     [ cl_rewrite_clause_newtac_tac c o AllOccurrences None ]
 END
 
-let mkappc s l = CAppExpl (Loc.ghost,(None,(Libnames.Ident (Loc.ghost,Id.of_string s))),l)
+let mkappc s l = CAppExpl (Loc.ghost,(None,(Libnames.Ident (Loc.ghost,Id.of_string s)),None),l)
 
 let declare_an_instance n s args =
   ((Loc.ghost,Name n), Explicit,
-  CAppExpl (Loc.ghost, (None, Qualid (Loc.ghost, qualid_of_string s)),
+  CAppExpl (Loc.ghost, (None, Qualid (Loc.ghost, qualid_of_string s),None),
 	   args))
 
 let declare_instance a aeq n s = declare_an_instance n s [a;aeq]
 
 let anew_instance global binders instance fields =
-  new_instance binders instance (Some (CRecord (Loc.ghost,None,fields)))
+  new_instance (Flags.is_universe_polymorphism ()) 
+    binders instance (Some (CRecord (Loc.ghost,None,fields)))
     ~global ~generalize:false None
 
 let declare_instance_refl global binders a aeq n lemma =
@@ -1724,8 +1759,9 @@ let proper_projection r ty =
     it_mkLambda_or_LetIn app ctx
 
 let declare_projection n instance_id r =
-  let ty = Global.type_of_global r in
-  let c = constr_of_global r in
+  let c,uctx = Universes.fresh_global_instance (Global.env()) r in
+  let poly = Global.is_polymorphic r in
+  let ty = Retyping.get_type_of (Global.env ()) Evd.empty c in
   let term = proper_projection c ty in
   let typ = Typing.type_of (Global.env ()) Evd.empty term in
   let ctx, typ = decompose_prod_assum typ in
@@ -1752,16 +1788,20 @@ let declare_projection n instance_id r =
     { const_entry_body = term;
       const_entry_secctx = None;
       const_entry_type = Some typ;
+      const_entry_polymorphic = poly;
+      const_entry_universes = Univ.ContextSet.to_context uctx;
       const_entry_opaque = false;
       const_entry_inline_code = false }
   in
-    ignore(Declare.declare_constant n (Entries.DefinitionEntry cst, Decl_kinds.IsDefinition Decl_kinds.Definition))
+    ignore(Declare.declare_constant n 
+	   (Entries.DefinitionEntry cst, Decl_kinds.IsDefinition Decl_kinds.Definition))
 
 let build_morphism_signature m =
   let env = Global.env () in
-  let m = Constrintern.interp_constr Evd.empty env m in
-  let t = Typing.type_of env Evd.empty m in
-  let evdref = ref (Evd.empty, Int.Set.empty) in
+  let m,ctx = Constrintern.interp_constr Evd.empty env m in
+  let sigma = Evd.from_env ~ctx env in
+  let t = Typing.type_of env sigma m in
+  let isevars = ref (Evd.empty, Int.Set.empty) in
   let cstrs =
     let rec aux t =
       match kind_of_term t with
@@ -1770,21 +1810,21 @@ let build_morphism_signature m =
 	| _ -> []
     in aux t
   in
-  let evars, t', sig_, cstrs = build_signature !evdref env t cstrs None in
-  let _ = evdref := evars in
+  let evars, t', sig_, cstrs = build_signature !isevars env t cstrs None in
+  let _ = isevars := evars in
   let _ = List.iter
     (fun (ty, rel) ->
       Option.iter (fun rel ->
 	let default = mkApp (Lazy.force default_relation, [| ty; rel |]) in
-	let evars,c = new_cstr_evar !evdref env default in
-	  evdref := evars)
+	let evars,c = new_cstr_evar !isevars env default in
+	  isevars := evars)
 	rel)
     cstrs
   in
   let morph =
     mkApp (Lazy.force proper_type, [| t; sig_; m |])
   in
-  let evd = solve_constraints env !evdref in
+  let evd = solve_constraints env !isevars in
   let m = Evarutil.nf_evar evd morph in
     Evarutil.check_evars env Evd.empty evd m; m
 
@@ -1814,38 +1854,44 @@ let add_setoid global binders a aeq t n =
 
 let add_morphism_infer glob m n =
   init_setoid ();
+  let poly = Flags.is_universe_polymorphism () in
   let instance_id = add_suffix n "_Proper" in
   let instance = build_morphism_signature m in
+  let ctx = Univ.ContextSet.empty (*FIXME *) in
     if Lib.is_modtype () then
       let cst = Declare.declare_constant ~internal:Declare.KernelSilent instance_id
-				(Entries.ParameterEntry (None,instance,None), Decl_kinds.IsAssumption Decl_kinds.Logical)
+				(Entries.ParameterEntry 
+				 (None,poly,(instance,Univ.UContext.empty),None), 
+				 Decl_kinds.IsAssumption Decl_kinds.Logical)
       in
-	add_instance (Typeclasses.new_instance (Lazy.force proper_class) None glob (ConstRef cst));
+	add_instance (Typeclasses.new_instance (Lazy.force proper_class) None glob 
+			poly (ConstRef cst));
 	declare_projection n instance_id (ConstRef cst)
     else
-      let kind = Decl_kinds.Global, Decl_kinds.DefinitionBody Decl_kinds.Instance in
+      let kind = Decl_kinds.Global, poly, Decl_kinds.DefinitionBody Decl_kinds.Instance in
 	Flags.silently
 	  (fun () ->
-	    Lemmas.start_proof instance_id kind instance
-	      (fun _ -> function
-		Globnames.ConstRef cst ->
+	    Lemmas.start_proof instance_id kind (instance, ctx)
+	      (fun _ _ -> function
+		 | Globnames.ConstRef cst ->
 		  add_instance (Typeclasses.new_instance (Lazy.force proper_class) None
-				   glob (ConstRef cst));
+				glob poly (ConstRef cst));
 		  declare_projection n instance_id (ConstRef cst)
 		| _ -> assert false);
 	    Pfedit.by (Tacinterp.interp <:tactic< Coq.Classes.SetoidTactics.add_morphism_tactic>>)) ()
 
 let add_morphism glob binders m s n =
   init_setoid ();
+  let poly = Flags.is_universe_polymorphism () in
   let instance_id = add_suffix n "_Proper" in
   let instance =
     ((Loc.ghost,Name instance_id), Explicit,
     CAppExpl (Loc.ghost,
-	     (None, Qualid (Loc.ghost, Libnames.qualid_of_string "Coq.Classes.Morphisms.Proper")),
+	     (None, Qualid (Loc.ghost, Libnames.qualid_of_string "Coq.Classes.Morphisms.Proper"),None),
 	     [cHole; s; m]))
   in
   let tac = Tacinterp.interp <:tactic<add_morphism_tactic>> in
-    ignore(new_instance ~global:glob binders instance (Some (CRecord (Loc.ghost,None,[])))
+    ignore(new_instance ~global:glob poly binders instance (Some (CRecord (Loc.ghost,None,[])))
 	      ~generalize:false ~tac ~hook:(declare_projection n instance_id) None)
 
 VERNAC COMMAND EXTEND AddSetoid1
@@ -1982,14 +2028,19 @@ let setoid_proof gl ty fn fallback =
 		not_declared env ty rel gl
 	  | _ -> raise e
 
+let tac_open (evm, c) tac = 
+  tclTHEN (Refiner.tclEVARS evm) (tac c)
+
 let setoid_reflexivity gl =
   setoid_proof gl "reflexive"
-    (fun env evm car rel -> apply (get_reflexive_proof env evm car rel))
+    (fun env evm car rel -> 
+      tac_open (get_reflexive_proof env evm car rel) apply)
     (reflexivity_red true)
 
 let setoid_symmetry gl =
   setoid_proof gl "symmetric"
-    (fun env evm car rel -> apply (get_symmetric_proof env evm car rel))
+    (fun env evm car rel -> 
+      tac_open (get_symmetric_proof env evm car rel) apply)
     (symmetry_red true)
 
 let setoid_transitivity c gl =
@@ -1997,8 +2048,8 @@ let setoid_transitivity c gl =
     (fun env evm car rel ->
       let proof = get_transitive_proof env evm car rel in
       match c with
-      | None -> eapply proof
-      | Some c -> apply_with_bindings (proof,ImplicitBindings [ c ]))
+      | None -> tac_open proof eapply
+      | Some c -> tac_open proof (fun t -> apply_with_bindings (t,ImplicitBindings [ c ])))
     (transitivity_red true c)
 
 let setoid_symmetry_in id gl =
@@ -2084,9 +2135,10 @@ TACTIC EXTEND myapply
     fun gl -> 
       let gr = id in
       let _, impls = List.hd (Impargs.implicits_of_global gr) in
-      let ty = Global.type_of_global gr in
       let env = pf_env gl in
       let evars = ref (project gl) in
+      let evd, ty = fresh_global env !evars gr in
+      let _ = evars := evd in
       let app =
 	let rec aux ty impls args args' =
 	  match impls, kind_of_term ty with
@@ -2105,7 +2157,7 @@ TACTIC EXTEND myapply
 		       aux (subst1 arg t') impls args (arg :: args')
 	       | arg :: args -> 
 		   aux (subst1 arg t') impls args (arg :: args'))
-	  | _, _ -> mkApp (constr_of_global gr, Array.of_list (List.rev args'))
+	  | _, _ -> mkApp (Universes.constr_of_global gr, Array.of_list (List.rev args'))
 	in aux ty impls l []
       in
 	tclTHEN (Refiner.tclEVARS !evars) (apply app) gl ]

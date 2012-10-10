@@ -74,9 +74,15 @@ GEXTEND Gram
     [ [ IDENT "Time"; v = vernac -> VernacTime v
       | IDENT "Timeout"; n = natural; v = vernac -> VernacTimeout(n,v)
       | IDENT "Fail"; v = vernac -> VernacFail v
-      | IDENT "Local"; v = vernac_aux -> VernacLocal (true, v)
-      | IDENT "Global"; v = vernac_aux -> VernacLocal (false, v)
-      | v = vernac_aux -> v ] 
+      | IDENT "Local"; v = vernac_poly -> VernacLocal (true, v)
+      | IDENT "Global"; v = vernac_poly -> VernacLocal (false, v)
+      | v = vernac_poly -> v ] 
+    ]
+  ;
+  vernac_poly: 
+    [ [ IDENT "Polymorphic"; v = vernac_aux -> VernacPolymorphic (true, v)
+      | IDENT "Monomorphic"; v = vernac_aux -> VernacPolymorphic (false, v) 
+      | v = vernac_aux -> v ]
     ]
   ;
   vernac_aux:
@@ -150,8 +156,8 @@ GEXTEND Gram
     [ [ thm = thm_token; id = identref; bl = binders; ":"; c = lconstr;
         l = LIST0
           [ "with"; id = identref; bl = binders; ":"; c = lconstr ->
-            (Some id,(bl,c,None)) ] ->
-          VernacStartTheoremProof (thm,(Some id,(bl,c,None))::l, false)
+          (Some id,(bl,c,None)) ] ->
+          VernacStartTheoremProof (thm, (Some id,(bl,c,None))::l, false)
       | stre = assumption_token; nl = inline; bl = assum_list ->
 	  VernacAssumption (stre, nl, bl)
       | stre = assumptions_token; nl = inline; bl = assum_list ->
@@ -179,6 +185,7 @@ GEXTEND Gram
       | IDENT "Combined"; IDENT "Scheme"; id = identref; IDENT "from";
 	l = LIST1 identref SEP "," -> VernacCombinedScheme (id, l) ] ]
   ;
+
   gallina_ext:
     [ [ b = record_token; infer = infer_token; oc = opt_coercion; name = identref;
         ps = binders;

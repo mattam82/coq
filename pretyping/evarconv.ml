@@ -44,9 +44,9 @@ let not_purely_applicative_stack args =
 
 let eval_flexible_term ts env c =
   match kind_of_term c with
-  | Const c ->
+  | Const (c,u as cu) ->
       if is_transparent_constant ts c
-      then constant_opt_value env c
+      then constant_opt_value_in env cu
       else None
   | Rel n ->
       (try let (_,v,_) = lookup_rel n env in Option.map (lift n) v
@@ -94,7 +94,7 @@ let position_problem l2r = function
 
 let check_conv_record (t1,sk1) (t2,sk2) =
   try
-    let proji = global_of_constr t1 in
+    let proji, u = Universes.global_of_constr t1 in
     let canon_s,sk2_effective =
       try
 	match kind_of_term t2 with
@@ -110,7 +110,7 @@ let check_conv_record (t1,sk1) (t2,sk2) =
       with Not_found ->
 	lookup_canonical_conversion (proji,Default_cs),[]
     in
-    let { o_DEF = c; o_INJ=n; o_TABS = bs;
+    let { o_DEF = c; o_CTX = ctx; o_INJ=n; o_TABS = bs;
           o_TPARAMS = params; o_NPARAMS = nparams; o_TCOMPS = us } = canon_s in
     let params1, c1, extra_args1 =
       match strip_n_app nparams sk1 with
@@ -120,7 +120,10 @@ let check_conv_record (t1,sk1) (t2,sk2) =
       let l',s' = strip_app sk2_effective in
       let bef,aft = List.chop (List.length us) l' in
       (bef, append_stack_app_list aft s') in
-    c,bs,(params,params1),(us,us2),(extra_args1,extra_args2),c1,
+    let subst, ctx' = Universes.fresh_universe_context_set_instance ctx in
+    let c' = subst_univs_level_constr subst c in
+    let bs' = List.map (subst_univs_level_constr subst) bs in
+      ctx',c',bs',(params,params1),(us,us2),(extra_args1,extra_args2),c1,
     (n,zip(t2,sk2))
   with Failure _ | Not_found ->
     raise Not_found
@@ -236,6 +239,13 @@ let exact_ise_stack2 env evd f sk1 sk2 =
     ise_exact (ise_stack2 false env evd f) sk1 sk2
   else UnifFailure (evd, (* Dummy *) NotSameHead)
 
+let eq_puniverses evd pbty f (x,u) (y,v) =
+  if f x y then 
+    try 
+      Success (Evd.set_eq_instances evd u v)
+    with _ -> UnifFailure (evd, UnifUnivInconsistency)
+  else UnifFailure (evd, NotSameHead)
+    
 let rec evar_conv_x ts env evd pbty term1 term2 =
   let term1 = whd_head_evar evd term1 in
   let term2 = whd_head_evar evd term2 in
@@ -243,15 +253,19 @@ let rec evar_conv_x ts env evd pbty term1 term2 =
      could have found, we do it only if the terms are free of evar.
      Note: incomplete heuristic... *)
   let ground_test =
-    if is_ground_term evd term1 && is_ground_term evd term2 then
-      if is_trans_fconv pbty ts env evd term1 term2 then
-        Some true
-      else if is_ground_env evd env then Some false
-      else None
-    else None in
+    if is_ground_term evd term1 && is_ground_term evd term2 then (
+      let evd, b = 
+	try infer_conv ~pb:pbty ~ts env evd term1 term2 
+	with Univ.UniverseInconsistency _ -> evd, false
+      in
+	if b then Some (evd, true)
+	else if is_ground_env evd env then Some (evd, false)
+	else None)
+    else None
+  in
   match ground_test with
-    | Some true -> Success evd
-    | Some false -> UnifFailure (evd,ConversionFailed (env,term1,term2))
+    | Some (evd, true) -> Success evd
+    | Some (evd, false) -> UnifFailure (evd,ConversionFailed (env,term1,term2))
     | None ->
 	(* Until pattern-unification is used consistently, use nohdbeta to not
 	   destroy beta-redexes that can be used for 1st-order unification *)
@@ -373,11 +387,20 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	ise_try evd [f1; f2]
 
 	| _, _ ->
-	let f1 i =
-	  if eq_constr term1 term2 then
-	    exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2
-	  else
-	     UnifFailure (i,NotSameHead)
+	let f1 i = 
+	  (* Gather the universe constraints that would make term1 and term2 equal.
+	     If these only involve unifications of flexible universes to other universes,
+	     allow this identification (first-order unification of universes). Otherwise
+	     fallback to unfolding.
+	  *)
+	  let b,univs = eq_constr_universes term1 term2 in
+	    if b then
+	      ise_and i [(fun i -> 
+		try Success (Evd.add_universe_constraints i univs)
+		with UniversesDiffer -> UnifFailure (i,NotSameHead)
+		| Univ.UniverseInconsistency _ -> UnifFailure (i, UnifUnivInconsistency));
+			 (fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2)]
+	    else UnifFailure (i,NotSameHead)
 	and f2 i =
 	  (try conv_record ts env i
              (try check_conv_record appr1 appr2
@@ -396,9 +419,10 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	    (* false (* immediate solution without Canon Struct *)*)
             | Lambda _ -> assert (match args with [] -> true | _ -> false); true
             | LetIn (_,b,_,c) -> is_unnamed
-	      (fst (whd_betaiota_deltazeta_for_iota_state
+	     (fst (whd_betaiota_deltazeta_for_iota_state
 		      ts env i Cst_stack.empty (subst1 b c, args)))
-            | Case _| Fix _| App _| Cast _ -> assert false in
+	    | Fix _ -> true (* Partially applied fix can be the result of a whd call *)
+            | Case _ | App _| Cast _ -> assert false in
           let rhs_is_stuck_and_unnamed () =
             match eval_flexible_term ts env term2 with
             | None -> false
@@ -538,14 +562,14 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	         evar_conv_x ts (push_rel (n,None,c) env) i pbty c'1 c'2)]
 
 	| Ind sp1, Ind sp2 ->
-	    if eq_ind sp1 sp2 then
-              exact_ise_stack2 env evd (evar_conv_x ts) sk1 sk2
-            else UnifFailure (evd,NotSameHead)
+	     ise_and evd
+	       [(fun i -> eq_puniverses i pbty eq_ind sp1 sp2);
+		(fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2)]
 
 	| Construct sp1, Construct sp2 ->
-	    if eq_constructor sp1 sp2 then
-              exact_ise_stack2 env evd (evar_conv_x ts) sk1 sk2
-            else UnifFailure (evd,NotSameHead)
+	     ise_and evd
+	       [(fun i -> eq_puniverses i pbty eq_constructor sp1 sp2);
+		(fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2)]
 
 	| Fix ((li1, i1),(_,tys1,bds1 as recdef1)), Fix ((li2, i2),(_,tys2,bds2)) -> (* Partially applied fixs *)
 	  if Int.equal i1 i2 && Array.equal Int.equal li1 li2 then
@@ -583,7 +607,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 
       end
 
-and conv_record trs env evd (c,bs,(params,params1),(us,us2),(ts,ts1),c1,(n,t2)) =
+and conv_record trs env evd (ctx,c,bs,(params,params1),(us,us2),(ts,ts1),c1,(n,t2)) =
+  let evd = Evd.merge_context_set Evd.univ_flexible evd ctx in
   if Reductionops.compare_stack_shape ts ts1 then
     let (evd',ks,_) =
       List.fold_left
@@ -835,7 +860,7 @@ let apply_conversion_problem_heuristic ts env evd pbty t1 t2 =
       (* Some head evar have been instantiated, or unknown kind of problem *)
       evar_conv_x ts env evd pbty t1 t2
 
-let check_problems_are_solved evd =
+let check_problems_are_solved env evd =
   match snd (extract_all_conv_pbs evd) with
   | (pbty,env,t1,t2)::_ -> Pretype_errors.error_cannot_unify env evd (t1, t2)
   | _ -> ()
@@ -879,10 +904,16 @@ let rec solve_unconstrained_evars_with_canditates evd =
       let evd = aux (List.rev l) in
       solve_unconstrained_evars_with_canditates evd
 
-let solve_unconstrained_impossible_cases evd =
+let solve_unconstrained_impossible_cases env evd =
   Evd.fold_undefined (fun evk ev_info evd' ->
     match ev_info.evar_source with
-    | _,Evar_kinds.ImpossibleCase -> Evd.define evk (j_type (coq_unit_judge ())) evd'
+    | _,Evar_kinds.ImpossibleCase -> 
+      let j, ctx = coq_unit_judge () in
+      let evd' = Evd.merge_context_set Evd.univ_flexible_alg evd' ctx in
+      let ty = j_type j in
+      let conv_algo = evar_conv_x full_transparent_state in
+      let evd' = check_evar_instance evd' evk ty conv_algo in
+	Evd.define evk ty evd' 
     | _ -> evd') evd evd
 
 let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
@@ -913,8 +944,8 @@ let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
   in
   let (evd,pbs) = extract_all_conv_pbs evd in
   let heuristic_solved_evd = aux evd pbs false [] in
-  check_problems_are_solved heuristic_solved_evd;
-  solve_unconstrained_impossible_cases heuristic_solved_evd
+  check_problems_are_solved env heuristic_solved_evd;
+  solve_unconstrained_impossible_cases env heuristic_solved_evd
 
 (* Main entry points *)
 

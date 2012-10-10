@@ -1048,7 +1048,7 @@ Qed.
 
 (** ** Filter *)
 
-Lemma filter_app A f (l l':list A) :
+Polymorphic Lemma filter_app A f (l l':list A) :
  List.filter f (l ++ l') = List.filter f l ++ List.filter f l'.
 Proof.
  induction l as [|x l IH]; simpl; trivial.

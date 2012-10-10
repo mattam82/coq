@@ -1247,11 +1247,11 @@ Proof.
  intros m1 m2; functional induction (concat m1 m2); intros; auto;
  try factornode _x _x0 _x1 _x2 _x3 as m1.
  apply join_bst; auto.
- change (bst (m2',xd)#1); rewrite <-e1; eauto.
+ change (bst (m2',xd)#1). rewrite <-e1; eauto.
  intros y Hy.
  apply H1; auto.
  rewrite remove_min_in, e1; simpl; auto.
- change (gt_tree (m2',xd)#2#1 (m2',xd)#1); rewrite <-e1; eauto.
+ change (gt_tree (m2',xd)#2#1 (m2',xd)#1). rewrite <-e1; eauto.
 Qed.
 Hint Resolve concat_bst.
 

@@ -11,6 +11,7 @@ Import Ring_polynom Ring_tac Ring_theory InitialRing Setoid List Morphisms.
 Require Import ZArith_base.
 (*Require Import Omega.*)
 Set Implicit Arguments.
+(* Set Universe Polymorphism. *)
 
 Section MakeFieldPol.
 
@@ -292,7 +293,7 @@ intros r1 r2 H H0.
 assert (~ r1 / r2 == 0) as Hk.
  intros H1; case H.
    transitivity (r2 * (r1 / r2)); auto.
-   rewrite H1;  ring.
+   rewrite H1; ring.
  apply rmul_reg_l with (r1 / r2); auto.
    transitivity (/ (r1 / r2) * (r1 / r2)); auto.
    transitivity 1; auto.
@@ -573,13 +574,14 @@ Fixpoint PExpr_simp (e : PExpr C) : PExpr C :=
 
 Theorem PExpr_simp_correct:
  forall l e,  NPEeval l (PExpr_simp e) == NPEeval l e.
+clear eq_sym.
 intros l e; elim e; simpl; auto.
 intros e1 He1 e2 He2.
 transitivity (NPEeval l (PEadd (PExpr_simp e1) (PExpr_simp e2))); auto.
 apply NPEadd_correct.
 simpl; auto.
 intros e1 He1 e2 He2.
-transitivity (NPEeval l (PEsub (PExpr_simp e1) (PExpr_simp e2))); auto.
+transitivity (NPEeval l (PEsub (PExpr_simp e1) (PExpr_simp e2))). auto.
 apply NPEsub_correct.
 simpl; auto.
 intros e1 He1 e2 He2.

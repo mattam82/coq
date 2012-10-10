@@ -23,12 +23,13 @@ open Libobject
 open Misctypes
 
 (* call by value normalisation function using the virtual machine *)
-let cbv_vm env _ c =
-  let ctyp = (fst (Typeops.infer env c)).Environ.uj_type in
+let cbv_vm env evd c =
+  let ctyp = (Retyping.get_type_of env evd c) in
   Vnorm.cbv_vm env c ctyp
 
-let cbv_native env _ c =
-  let ctyp = (fst (Typeops.infer env c)).Environ.uj_type in
+let cbv_native env evd c =
+  let ctyp = (Retyping.get_type_of env evd c) in
+  (* let ctyp = (Typeops.infer env c).Environ.uj_type in *)
   Nativenorm.native_norm env c ctyp
 
 let set_strategy_one ref l  =

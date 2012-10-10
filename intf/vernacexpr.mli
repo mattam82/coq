@@ -267,7 +267,7 @@ type vernac_expr =
   (* Gallina *)
   | VernacDefinition of
       (locality option * definition_object_kind) * lident * definition_expr
-  | VernacStartTheoremProof of theorem_kind *
+  | VernacStartTheoremProof of theorem_kind * 
       (lident option * (local_binder list * constr_expr * (lident option * recursion_order_expr) option)) list *
         bool
   | VernacEndProof of proof_end
@@ -402,6 +402,7 @@ type vernac_expr =
 
   (* Flags *)
   | VernacProgram of vernac_expr
+  | VernacPolymorphic of bool * vernac_expr
   | VernacLocal of bool * vernac_expr
 
 and located_vernac_expr = Loc.t * vernac_expr

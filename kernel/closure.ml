@@ -207,18 +207,21 @@ let unfold_red kn =
  * instantiations (cbv or lazy) are.
  *)
 
-type table_key = id_key
+type table_key = constant puniverses tableKey
 
+let eq_pconstant_key (c,u) (c',u') =
+  eq_constant_key c c' && Univ.Instance.eq u u'
+  
 module IdKeyHash =
 struct
-  type t = id_key
-  let equal = Names.eq_id_key
+  type t = table_key
+  let equal = Names.eq_table_key eq_pconstant_key
   let hash = Hashtbl.hash
 end
 
 module KeyTable = Hashtbl.Make(IdKeyHash)
 
-let eq_table_key = Names.eq_id_key
+let eq_table_key = IdKeyHash.equal
 
 type 'a infos = {
   i_flags : reds;
@@ -247,7 +250,7 @@ let ref_value_cache info ref =
             | Some t -> lift n t
             end
 	| VarKey id -> List.assoc id info.i_vars
-	| ConstKey cst -> constant_value info.i_env cst
+	| ConstKey cst -> constant_value_in info.i_env cst
     in
     let v = info.i_repr info body in
     KeyTable.add info.i_tab ref v;
@@ -330,8 +333,8 @@ and fterm =
   | FAtom of constr (* Metas and Sorts *)
   | FCast of fconstr * cast_kind * fconstr
   | FFlex of table_key
-  | FInd of inductive
-  | FConstruct of constructor
+  | FInd of pinductive
+  | FConstruct of pconstructor
   | FApp of fconstr * fconstr array
   | FFix of fixpoint * fconstr subs
   | FCoFix of cofixpoint * fconstr subs
@@ -617,9 +620,9 @@ let rec to_constr constr_fun lfts v =
     | FAtom c -> exliftn lfts c
     | FCast (a,k,b) ->
         mkCast (constr_fun lfts a, k, constr_fun lfts b)
-    | FFlex (ConstKey op) -> mkConst op
-    | FInd op -> mkInd op
-    | FConstruct op -> mkConstruct op
+    | FFlex (ConstKey op) -> mkConstU op
+    | FInd op -> mkIndU op
+    | FConstruct op -> mkConstructU op
     | FCases (ci,p,c,ve) ->
 	mkCase (ci, constr_fun lfts p,
                 constr_fun lfts c,
@@ -873,8 +876,8 @@ let rec knr info m stk =
       (match get_args n tys f e stk with
           Inl e', s -> knit info e' f s
         | Inr lam, s -> (lam,s))
-  | FFlex(ConstKey kn) when red_set info.i_flags (fCONST kn) ->
-      (match ref_value_cache info (ConstKey kn) with
+  | FFlex(ConstKey (kn,_ as c)) when red_set info.i_flags (fCONST kn) ->
+      (match ref_value_cache info (ConstKey c) with
           Some v -> kni info v stk
         | None -> (set_norm m; (m,stk)))
   | FFlex(VarKey id) when red_set info.i_flags (fVAR id) ->
@@ -885,7 +888,7 @@ let rec knr info m stk =
       (match ref_value_cache info (RelKey k) with
           Some v -> kni info v stk
         | None -> (set_norm m; (m,stk)))
-  | FConstruct(ind,c) when red_set info.i_flags fIOTA ->
+  | FConstruct((ind,c),u) when red_set info.i_flags fIOTA ->
       (match strip_update_shift_app m stk with
           (depth, args, Zcase(ci,_,br)::s) ->
             assert (ci.ci_npar>=0);

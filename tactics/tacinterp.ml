@@ -302,6 +302,9 @@ let interp_fresh_ident = interp_ident_gen true
 let pf_interp_ident id gl = interp_ident_gen false id (pf_env gl)
 let pf_interp_fresh_ident id gl = interp_ident_gen true id (pf_env gl)
 
+let interp_global ist gl gr = 
+  Evd.fresh_global (pf_env gl) (project gl) gr
+
 (* Interprets an optional identifier which must be fresh *)
 let interp_fresh_name ist env = function
   | Anonymous -> Anonymous
@@ -624,7 +627,9 @@ let interp_may_eval f ist gl = function
   | ConstrEval (r,c) ->
       let (sigma,redexp) = pf_interp_red_expr ist gl r in
       let (sigma,c_interp) = f ist { gl with sigma=sigma } c in
-      sigma , pf_reduction_of_red_expr gl redexp c_interp
+      (* let sigma, subst = Evd.nf_univ_variables sigma in *)
+      sigma , pf_reduction_of_red_expr {gl with sigma=sigma} redexp c_interp
+	(* (subst_univs_constr subst c_interp) *)
   | ConstrContext ((loc,s),c) ->
       (try
 	let (sigma,ic) = f ist gl c
@@ -820,7 +825,7 @@ let interp_induction_arg ist gl arg =
 	if Tactics.is_quantified_hypothesis id gl then
           ElimOnIdent (loc,id)
 	else
-          let c = (GVar (loc,id),Some (CRef (Ident (loc,id)))) in
+          let c = (GVar (loc,id),Some (CRef (Ident (loc,id),None))) in
           let (sigma,c) = interp_constr ist env sigma c in
           ElimOnConstr (sigma,(c,NoBindings))
 
@@ -926,7 +931,7 @@ let push_id_couple id name env = match name with
 
 let match_pat refresh lmatch hyp gl = function
 | Term t ->
-  let hyp = if refresh then refresh_universes_strict hyp else hyp in
+  let hyp = if refresh then (* refresh_universes_strict *) hyp else hyp in
   begin
     try
       let lmeta = extended_matches t hyp in
@@ -936,7 +941,7 @@ let match_pat refresh lmatch hyp gl = function
     with PatternMatchingFailure | Not_coherent_metas -> IStream.empty
   end
 | Subterm (b,ic,t) ->
-  let hyp = if refresh then refresh_universes_strict hyp else hyp in
+  let hyp = if refresh then (* refresh_universes_strict *) hyp else hyp in
   let matches = match_subterm_gen b t hyp in
   let filter s =
     try
@@ -1114,7 +1119,7 @@ and interp_tacarg ist gl arg =
         let (sigma,fv) = interp_ltac_reference loc true ist gl f in
 	let (sigma,largs) =
 	  List.fold_right begin fun a (sigma',acc) ->
-	    let (sigma', a_interp) = interp_tacarg ist gl a in
+	    let (sigma', a_interp) = interp_tacarg ist { gl with sigma=sigma'} a in
 	    sigma' , a_interp::acc
 	  end l (sigma,[])
 	in
@@ -1806,8 +1811,8 @@ and interp_atomic ist gl tac =
 	 extend_gl_hyps) is incorrect.  This means that evar
 	 instantiated by pf_interp_constr may be lost, there. *)
       let to_catch = function Not_found -> true | e -> Errors.is_anomaly e in
-      let (_,c_interp) =
-	try pf_interp_constr ist (extend_gl_hyps gl sign) c
+      let (sigma,c_interp) =
+	try pf_interp_constr ist (* (extend_gl_hyps gl sign) *) gl c
 	with e when to_catch e (* Hack *) ->
 	   errorlabstrm "" (strbrk "Failed to get enough information from the left-hand side to type the right-hand side.")
       in
@@ -1867,10 +1872,12 @@ and interp_atomic ist gl tac =
 	  sigma , a_interp::acc
 	end l (project gl,[])
       in
-      tac args ist
+      tclTHEN
+       (tclEVARS sigma)
+	(tac args ist)
   | TacAlias (loc,s,l,(_,body)) -> fun gl ->
     let evdref = ref gl.sigma in
-    let rec f x = match genarg_tag x with
+    let rec f gl x = match genarg_tag x with
     | IntOrVarArgType ->
         mk_int_or_var_value ist (out_gen (glbwit wit_int_or_var) x)
     | IntroPatternArgType ->
@@ -1882,11 +1889,17 @@ and interp_atomic ist gl tac =
     | VarArgType ->
         mk_hyp_value ist gl (out_gen (glbwit wit_var) x)
     | RefArgType ->
-        Value.of_constr (constr_of_global
-          (pf_interp_reference ist gl (out_gen (glbwit wit_ref) x)))
-    | GenArgType -> f (out_gen (glbwit wit_genarg) x)
+        let (sigma,c) =
+          interp_global ist gl
+            (pf_interp_reference ist gl (out_gen (glbwit wit_ref) x))
+	in
+	  evdref := sigma;
+          Value.of_constr c
+    | GenArgType -> f gl (out_gen (glbwit wit_genarg) x)
     | SortArgType ->
-        Value.of_constr (mkSort (interp_sort (out_gen (glbwit wit_sort) x)))
+        let (sigma,s) = interp_sort !evdref (out_gen (glbwit wit_sort) x) in
+	  evdref := sigma;
+	  Value.of_constr (mkSort s)
     | ConstrArgType ->
         let (sigma,v) = mk_constr_value ist gl (out_gen (glbwit wit_constr) x) in
 	evdref := sigma;
@@ -1962,8 +1975,8 @@ and interp_atomic ist gl tac =
 	let mk_ipat x = interp_intro_pattern ist gl x in
 	let ans = List.map mk_ipat (out_gen wit x) in
         in_gen (topwit (wit_list1 wit_intro_pattern)) ans
-    | List0ArgType _ -> app_list0 f x
-    | List1ArgType _ -> app_list1 f x
+    | List0ArgType _ -> app_list0 (f gl) x
+    | List1ArgType _ -> app_list1 (f gl) x
     | ExtraArgType _ ->
       let (sigma, v) = Genarg.interpret ist { gl with sigma = !evdref } x in
       evdref := sigma;
@@ -1975,9 +1988,14 @@ and interp_atomic ist gl tac =
 	-> error "This argument type is not supported in tactic notations."
 
     in
-    let lfun = (List.map (fun (x,c) -> (x,f c)) l)@ist.lfun in
+    let gl, lfun = List.fold_left (fun (gl,args) (x,c) -> 
+      let res = f gl c in
+      let gl = { gl with sigma = !evdref } in
+	(gl, (x,res) :: args)) 
+      (gl, []) l 
+    in
+    let lfun = lfun@ist.lfun in
     let trace = push_trace (loc,LtacNotationCall s) ist in
-    let gl = { gl with sigma = !evdref } in
     let ist = {
       lfun = lfun;
       extra = TacStore.set ist.extra f_trace trace; } in
@@ -2019,7 +2037,6 @@ let hide_interp t ot gl =
   match ot with
   | None -> t gl
   | Some t' -> (tclTHEN t t') gl
-
 
 (***************************************************************************)
 (* Other entry points *)

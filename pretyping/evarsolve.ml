@@ -418,8 +418,8 @@ let make_projectable_subst aliases sigma evi args =
               let a',args = decompose_app_vect a in
               match kind_of_term a' with
               | Construct cstr ->
-                  let l = try Constrmap.find cstr cstrs with Not_found -> [] in
-                  Constrmap.add cstr ((args,id)::l) cstrs
+                  let l = try Constrmap.find (fst cstr) cstrs with Not_found -> [] in
+                  Constrmap.add (fst cstr) ((args,id)::l) cstrs
               | _ -> cstrs in
             (rest,Id.Map.add id [a,normalize_alias_opt aliases a,id] all,cstrs)
         | Some c, a::rest ->
@@ -948,7 +948,7 @@ exception CannotProject of bool list option
 let rec is_constrainable_in k (ev,(fv_rels,fv_ids) as g) t =
   let f,args = decompose_app_vect t in
   match kind_of_term f with
-  | Construct (ind,_) ->
+  | Construct ((ind,_),u) ->
     let n = Inductiveops.inductive_nparams ind in
     if n > Array.length args then true (* We don't try to be more clever *)
     else
@@ -1007,10 +1007,27 @@ let project_evar_on_evar g env evd aliases k2 (evk1,argsv1 as ev1) (evk2,argsv2 
   else
     raise (CannotProject filter1)
 
+
+exception IllTypedInstance of env * types * types
+
+let check_evar_instance evd evk1 body conv_algo =
+  let evi = Evd.find evd evk1 in
+  let evenv = evar_env evi in
+  (* FIXME: The body might be ill-typed when this is called from w_merge *)
+  (* This happens in practice, cf MathClasses build failure on 2013-3-15 *)
+  let ty =
+    try Retyping.get_type_of ~lax:true evenv evd body
+    with Retyping.RetypeError _ -> error "Ill-typed evar instance"
+  in
+  match conv_algo evenv evd Reduction.CUMUL ty evi.evar_concl with
+  | Success evd -> evd
+  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
+
 let solve_evar_evar_l2r f g env evd aliases ev1 (evk2,_ as ev2) =
   try
     let evd,body = project_evar_on_evar g env evd aliases 0 ev1 ev2 in
-    Evd.define evk2 body evd
+    let evd' = Evd.define evk2 body evd in
+      check_evar_instance evd' evk2 body g
   with EvarSolvedOnTheFly (evd,c) ->
     f env evd ev2 c
 
@@ -1038,20 +1055,23 @@ type conv_fun =
 type conv_fun_bool =
   env ->  evar_map -> conv_pb -> constr -> constr -> bool
 
-exception IllTypedInstance of env * types * types
-
-let check_evar_instance evd evk1 body conv_algo =
-  let evi = Evd.find evd evk1 in
-  let evenv = evar_env evi in
-  (* FIXME: The body might be ill-typed when this is called from w_merge *)
-  (* This happens in practice, cf MathClasses build failure on 2013-3-15 *)
-  let ty =
-    try Retyping.get_type_of ~lax:true evenv evd body
-    with Retyping.RetypeError _ -> error "Ill-typed evar instance"
-  in
-  match conv_algo evenv evd Reduction.CUMUL ty evi.evar_concl with
-  | Success evd -> evd
-  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
+let refresh_universes dir evd t =
+  let evdref = ref evd in
+  let modified = ref false in
+  let rec refresh t = match kind_of_term t with
+    | Sort (Type u as s) when Univ.universe_level u = None ||
+			   Evd.is_sort_variable evd s = None ->
+      (modified := true;
+       (* s' will appear in the term, it can't be algebraic *)
+       let s' = evd_comb0 (new_sort_variable Evd.univ_flexible) evdref in
+	 evdref :=
+	   (if dir then set_leq_sort !evdref s' s else
+	     set_leq_sort !evdref s s');
+         mkSort s')
+    | Prod (na,u,v) -> mkProd (na,u,refresh v)
+    | _ -> t in
+  let t' = refresh t in
+  if !modified then !evdref, t' else evd, t
 
 (* Solve pbs ?e[t1..tn] = ?e[u1..un] which arise often in fixpoint
  * definitions. We try to unify the ti with the ui pairwise. The pairs
@@ -1220,7 +1240,8 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
              (* Try to project (a restriction of) the left evar ... *)
             try
               let evd,body = project_evar_on_evar conv_algo env' evd aliases 0 ev'' ev' in
-              Evd.define evk' body evd
+              let evd = Evd.define evk' body evd in
+		check_evar_instance evd evk' body conv_algo
             with
             | EvarSolvedOnTheFly _ -> assert false (* ev has no candidates *)
             | CannotProject filter'' ->
@@ -1233,7 +1254,7 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
         match
           let c,args = decompose_app_vect t in
           match kind_of_term c with
-          | Construct cstr when noccur_between 1 k t ->
+          | Construct (cstr,u) when noccur_between 1 k t ->
             (* This is common case when inferring the return clause of match *)
             (* (currently rudimentary: we do not treat the case of multiple *)
             (*  possible inversions; we do not treat overlap with a possible *)
@@ -1275,7 +1296,7 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
  * context "hyps" and not referring to itself.
  *)
 
-and evar_define conv_algo ?(choose=false) env evd (evk,argsv as ev) rhs =
+and evar_define conv_algo ?(choose=false) ?(dir=false) env evd (evk,argsv as ev) rhs =
   match kind_of_term rhs with
   | Evar (evk2,argsv2 as ev2) ->
       if Int.equal evk evk2 then
@@ -1294,7 +1315,7 @@ and evar_define conv_algo ?(choose=false) env evd (evk,argsv as ev) rhs =
     (* so we recheck acyclicity *)
     if occur_evar evk body then raise (OccurCheckIn (evd',body));
     (* needed only if an inferred type *)
-    let body = refresh_universes body in
+    let evd', body = refresh_universes dir evd' body in
 (* Cannot strictly type instantiations since the unification algorithm
  * does not unify applications from left to right.
  * e.g problem f x == g y yields x==y and f==g (in that order)
@@ -1383,7 +1404,10 @@ let solve_simple_eqn conv_algo ?(choose=false) env evd (pbty,(evk1,args1 as ev1)
       | Some false when isEvar t2 ->
           add_conv_pb (Reduction.CUMUL,env,t2,mkEvar ev1) evd
       | _ ->
-          evar_define conv_algo ~choose env evd ev1 t2 in
+	let direction = 
+	  match pbty with Some d -> d | None -> false
+	in
+          evar_define conv_algo ~choose ~dir:direction env evd ev1 t2 in
     reconsider_conv_pbs conv_algo evd
   with
     | NotInvertibleUsingOurAlgorithm t ->

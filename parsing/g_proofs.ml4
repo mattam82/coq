@@ -107,7 +107,8 @@ GEXTEND Gram
   hint:
     [ [ IDENT "Resolve"; lc = LIST1 reference_or_constr; n = OPT natural ->
           HintsResolve (List.map (fun x -> (n, true, x)) lc)
-      | IDENT "Immediate"; lc = LIST1 reference_or_constr -> HintsImmediate lc
+      | IDENT "Immediate"; lc = LIST1 reference_or_constr -> 
+	  HintsImmediate lc
       | IDENT "Transparent"; lc = LIST1 global -> HintsTransparency (lc, true)
       | IDENT "Opaque"; lc = LIST1 global -> HintsTransparency (lc, false)
       | IDENT "Unfold"; lqid = LIST1 global -> HintsUnfold lqid

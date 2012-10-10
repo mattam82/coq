@@ -161,7 +161,7 @@ Module PositiveSet <: S with Module E:=PositiveOrderedTypeBits.
 
   Section Fold.
 
-    Variables B : Type.
+    Variable B : Type.
     Variable f : positive -> B -> B.
 
     (** the additional argument, [i], records the current path, in
@@ -759,7 +759,7 @@ Module PositiveSet <: S with Module E:=PositiveOrderedTypeBits.
   Proof. intros. rewrite diff_spec. split; assumption. Qed.
 
   (** Specification of [fold] *)
-
+  
   Lemma fold_1: forall s (A : Type) (i : A) (f : elt -> A -> A),
       fold f s i = fold_left (fun a e => f e a) (elements s) i.
   Proof.
@@ -1000,7 +1000,7 @@ Module PositiveSet <: S with Module E:=PositiveOrderedTypeBits.
       constructor.
        intros x H. apply E.lt_not_eq in H. apply H. reflexivity.
        intro. apply E.lt_trans.
-      intros ? ? <- ? ? <-. reflexivity.
+     solve_proper.
       apply elements_3.
   Qed.
 

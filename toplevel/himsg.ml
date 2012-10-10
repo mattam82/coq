@@ -75,9 +75,15 @@ let rec pr_disjunction pr = function
   | a::l -> pr a ++ str "," ++ spc () ++ pr_disjunction pr l
   | [] -> assert false
 
+let pr_puniverses f env (c,u) = 
+  f env c ++ 
+  (if Flags.is_universe_polymorphism () && not (Univ.Instance.is_empty u) then
+    str"(*" ++ Univ.Instance.pr u ++ str"*)"
+  else mt())
+
 let explain_elim_arity env ind sorts c pj okinds =
   let env = make_all_name_different env in
-  let pi = pr_inductive env ind in
+  let pi = pr_inductive env (fst ind) in
   let pc = pr_lconstr_env env c in
   let msg = match okinds with
   | Some(kp,ki,explanation) ->
@@ -140,7 +146,7 @@ let explain_ill_formed_branch env sigma c ci actty expty =
   let pe = pr_lconstr_env env (simp expty) in
   strbrk "In pattern-matching on term" ++ brk(1,1) ++ pc ++
   spc () ++ strbrk "the branch for constructor" ++ spc () ++
-  quote (pr_constructor env ci) ++
+  quote (pr_puniverses pr_constructor env ci) ++
   spc () ++ str "has type" ++ brk(1,1) ++ pa ++ spc () ++
   str "which should be" ++ brk(1,1) ++ pe ++ str "."
 
@@ -452,7 +458,7 @@ let explain_var_not_found env id =
   spc () ++ str "was not found" ++
   spc () ++ str "in the current" ++ spc () ++ str "environment" ++ str "."
 
-let explain_wrong_case_info env ind ci =
+let explain_wrong_case_info env (ind,u) ci =
   let pi = pr_inductive (Global.env()) ind in
   if eq_ind ci.ci_ind ind then
     str "Pattern-matching expression on an object of inductive type" ++
@@ -923,7 +929,7 @@ let error_not_allowed_case_analysis isrec kind i =
   str (if isrec then "Induction" else "Case analysis") ++
   strbrk " on sort " ++ pr_sort kind ++
   strbrk " is not allowed for inductive definition " ++
-  pr_inductive (Global.env()) i ++ str "."
+  pr_inductive (Global.env()) (fst i) ++ str "."
 
 let error_not_mutual_in_scheme ind ind' =
   if eq_ind ind ind' then

@@ -35,24 +35,25 @@ let proofview p =
 (* Initialises a proofview, the argument is a list of environement, 
    conclusion types, and optional names, creating that many initial goals. *)
 let init = 
-  let rec aux = function
+  let rec aux env = function
   | [] ->  { initial = [] ; 
-	     solution = Evd.empty ;
+	     solution = Evd.from_env env ;
 	     comb = []
 	   }
-  | (env,typ)::l -> let { initial = ret ; solution = sol ; comb = comb } =
-                           aux l
+  | (env,(typ,ctx))::l -> let { initial = ret ; solution = sol ; comb = comb } =
+                           aux env l
                          in
                          let ( new_defs , econstr ) = 
 			   Evarutil.new_evar sol env typ
 			 in
 			 let (e,_) = Term.destEvar econstr in
+			 let new_defs = Evd.merge_context_set Evd.univ_rigid new_defs ctx in
 			 let gl = Goal.build e in
 			 { initial = (econstr,typ)::ret;
 			   solution = new_defs ;
 			   comb = gl::comb }
   in
-  fun l -> let v = aux l in
+  fun l -> let v = aux (Global.env()) l in
     (* Marks all the goal unresolvable for typeclasses. *)
     { v with solution = Typeclasses.mark_unresolvables v.solution }
 
@@ -65,7 +66,10 @@ let finished = function
 
 (* Returns the current value of the proofview partial proofs. *)
 let return { initial=init; solution=defs }  =
-  List.map (fun (c,t) -> (Evarutil.nf_evar defs c , t)) init
+  let evdref = ref defs in
+  let nf,subst = Evarutil.e_nf_evars_and_universes evdref in
+  ((List.map (fun (c,t) -> (nf c, nf t)) init, subst),
+   Evd.universe_context !evdref)
 
 (* spiwack: this function should probably go in the Util section,
     but I'd rather have Util (or a separate module for lists)

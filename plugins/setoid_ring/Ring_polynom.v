@@ -6,13 +6,14 @@
 (*         *       GNU Lesser General Public License Version 2.1        *)
 (************************************************************************)
 
-Set Implicit Arguments.
-Require Import Setoid Morphisms BinList BinPos BinNat BinInt.
-Require Export Ring_theory.
 
+Set Implicit Arguments.
+Require Import Setoid Morphisms. 
+Require Import BinList BinPos BinNat BinInt.
+Require Export Ring_theory.
 Local Open Scope positive_scope.
 Import RingSyntax.
-
+(* Set Universe Polymorphism. *)
 Section MakeRingPol.
 
  (* Ring elements *)
@@ -656,7 +657,7 @@ Section MakeRingPol.
   - add_permut.
   - destruct p; simpl;
     rewrite ?jump_pred_double; add_permut.
-  - destr_pos_sub; intros ->;Esimpl.
+  - destr_pos_sub; intros ->; Esimpl.
     + rewrite IHP';rsimpl. add_permut.
     + rewrite IHP', pow_pos_add;simpl;Esimpl. add_permut.
     + rewrite IHP1, pow_pos_add;rsimpl. add_permut.
@@ -807,9 +808,9 @@ Section MakeRingPol.
      P@l == Q@l + [c] * R@l.
  Proof.
  revert l.
- induction P as [c0 | j P IH | P1 IH1 i P2 IH2]; intros l; Esimpl.
- - assert (H := div_th.(div_eucl_th) c0 c).
-   destruct cdiv as (q,r). rewrite H; Esimpl. add_permut.
+ induction P as [c0 | j P IH | P1 IH1 i P2 IH2]; intros l; Esimpl. 
+ - assert (H := div_th.(div_eucl_th) c0 c). 
+   destruct cdiv as (q,r). rewrite H; Esimpl. add_permut. 
  - destr_factor. Esimpl.
  - destr_factor. Esimpl. add_permut.
  Qed.
@@ -818,11 +819,12 @@ Section MakeRingPol.
    let (c,M) := cM in
    let (Q,R) := MFactor P c M in
      P@l == Q@l + [c] * M@@l * R@l.
- Proof.
+ Proof. 
  destruct cM as (c,M). revert M l.
- induction P; destruct M; intros l; simpl; auto;
+ induction P; destruct M; intros l; simpl; auto; 
  try (case ceqb_spec; intro He);
-  try (case Pos.compare_spec; intros He); rewrite ?He;
+  try (case Pos.compare_spec; intros He);
+  rewrite ?He;
    destr_factor; simpl; Esimpl.
  - assert (H := div_th.(div_eucl_th) c0 c).
    destruct cdiv as (q,r). rewrite H; Esimpl. add_permut.
@@ -880,9 +882,9 @@ Section MakeRingPol.
  Lemma PSubstL1_ok n LM1 P1 l :
    MPcond LM1 l -> P1@l == (PSubstL1 P1 LM1 n)@l.
  Proof.
- revert P1; induction LM1 as [|(M2,P2) LM2 IH]; simpl; intros.
- - reflexivity.
- - rewrite <- IH by intuition. now apply PNSubst1_ok.
+ revert P1; induction LM1 as [|(M2,P2) LM2 IH]; simpl; intros. 
+ - reflexivity. 
+ - rewrite <- IH by intuition; now apply PNSubst1_ok.
  Qed.
 
  Lemma PSubstL_ok n LM1 P1 P2 l :
@@ -1109,7 +1111,7 @@ Section POWER.
     destruct (c ?=! cO).
     discriminate.
     inversion H;trivial;Esimpl.
-    generalize H;clear H;case_eq (mon_of_pol P).
+    generalize H;clear H; case_eq (mon_of_pol P).
     intros (c1,P2) H0 H1; inversion H1; Esimpl.
       generalize (IHP (c1, P2) H0 (jump p l)).
       rewrite mkZmon_ok;simpl;auto.

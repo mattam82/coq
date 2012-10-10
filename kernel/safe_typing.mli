@@ -31,11 +31,11 @@ val is_empty : safe_environment -> bool
 
 (** Adding and removing local declarations (Local or Variables) *)
 val push_named_assum :
-  Id.t * types -> safe_environment ->
-    Univ.constraints * safe_environment
+  (Id.t * types) Univ.in_universe_context_set -> safe_environment ->
+  safe_environment
 val push_named_def :
-  Id.t * definition_entry -> safe_environment ->
-    Univ.constraints * safe_environment
+  (Id.t * definition_entry) -> safe_environment ->
+  safe_environment
 
 (** Adding global axioms or definitions *)
 type global_declaration =
@@ -65,6 +65,16 @@ val add_modtype :
 val add_constraints :
   Univ.constraints -> safe_environment -> safe_environment
 
+(** Adding universe constraints *)
+val push_context_set :
+  Univ.universe_context_set -> safe_environment -> safe_environment
+
+val push_context :
+  Univ.universe_context -> safe_environment -> safe_environment
+
+(** Generator of universes *)
+val next_universe : safe_environment -> int * safe_environment
+
 (** Settin the strongly constructive or classical logical engagement *)
 val set_engagement : engagement -> safe_environment -> safe_environment
 
@@ -91,6 +101,9 @@ val add_include :
   module_struct_entry -> bool -> inline -> safe_environment ->
    delta_resolver * safe_environment
 
+val current_modpath : safe_environment -> module_path
+val current_dirpath : safe_environment -> dir_path
+
 val delta_of_senv : safe_environment -> delta_resolver*delta_resolver
 
 (** Loading and saving compilation units *)
@@ -116,11 +129,7 @@ type judgment
 val j_val : judgment -> constr
 val j_type : judgment -> constr
 
-(** Safe typing of a term returning a typing judgment and universe
-   constraints to be added to the environment for the judgment to
-   hold. It is guaranteed that the constraints are satisfiable
- *)
-val safe_infer : safe_environment -> constr -> judgment * Univ.constraints
+(** Safe typing of a term returning a typing judgment. *)
 
 val typing : safe_environment -> constr -> judgment
 

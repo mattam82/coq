@@ -20,6 +20,16 @@ let prop = Prop Null
 let set = Prop Pos
 let type1 = Type type1_univ
 
+let univ_of_sort = function
+  | Type u -> u
+  | Prop Pos -> Universe.type0
+  | Prop Null -> Universe.type0m
+
+let sort_of_univ u =
+  if is_type0m_univ u then Prop Null
+  else if is_type0_univ u then Prop Pos
+  else Type u
+
 let compare s1 s2 =
   if s1 == s2 then 0 else
   match s1, s2 with
@@ -36,8 +46,16 @@ let compare s1 s2 =
 let equal s1 s2 = Int.equal (compare s1 s2) 0
 
 let is_prop = function
-| Prop Null -> true
-| _ -> false
+  | Prop Null -> true
+  | _ -> false
+
+let is_set = function
+  | Prop Pos -> true
+  | _ -> false
+
+let is_small = function
+  | Prop _ -> true
+  | Type u -> is_small_univ u
 
 let family = function
   | Prop Null -> InProp

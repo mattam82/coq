@@ -527,7 +527,7 @@ let rec lambda_of_constr env c =
   | Var id -> Lvar id
 
   | Sort s -> Lsort s
-  | Ind ind ->
+  | Ind (ind,u) ->
       let prefix = get_mind_prefix !global_env (fst ind) in
       Lind (prefix, ind)
 	
@@ -610,7 +610,7 @@ let rec lambda_of_constr env c =
 
 and lambda_of_app env f args =
   match kind_of_term f with
-  | Const kn ->
+  | Const (kn,u) ->
       let kn = get_allias !global_env kn in
       let cb = lookup_constant kn !global_env in
       begin match cb.const_body with
@@ -629,7 +629,7 @@ and lambda_of_app env f args =
           let prefix = get_const_prefix !global_env kn in
           mkLapp (Lconst (prefix, kn)) (lambda_of_args env 0 args)
       end
-  | Construct c ->
+  | Construct (c,u) ->
       let tag, nparams, arity = Renv.get_construct_info env c in
       let expected = nparams + arity in
       let nargs = Array.length args in

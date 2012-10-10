@@ -1560,8 +1560,8 @@ let rec compile_deps env prefix ~interactive init t =
   match kind_of_term t with
   | Meta _ -> invalid_arg "Nativecode.get_deps: Meta"
   | Evar _ -> invalid_arg "Nativecode.get_deps: Evar"
-  | Ind (mind,_) -> compile_mind_deps env prefix ~interactive init mind
-  | Const c ->
+  | Ind ((mind,_),u) -> compile_mind_deps env prefix ~interactive init mind
+  | Const (c,u) ->
       let c = get_allias env c in
       let cb = lookup_constant c env in
       let (_, (_, const_updates)) = init in
@@ -1577,7 +1577,7 @@ let rec compile_deps env prefix ~interactive init t =
       let comp_stack = code@comp_stack in
       let const_updates = Cmap_env.add c (cb.const_native_name, name) const_updates in
       comp_stack, (mind_updates, const_updates)
-  | Construct ((mind,_),_) -> compile_mind_deps env prefix ~interactive init mind
+  | Construct (((mind,_),_),u) -> compile_mind_deps env prefix ~interactive init mind
   | Case (ci, p, c, ac) ->
       let mind = fst ci.ci_ind in
       let init = compile_mind_deps env prefix ~interactive init mind in

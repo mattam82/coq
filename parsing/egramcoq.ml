@@ -48,7 +48,7 @@ open Egramml
 
 let constr_expr_of_name (loc,na) = match na with
   | Anonymous -> CHole (loc,None)
-  | Name id -> CRef (Ident (loc,id))
+  | Name id -> CRef (Ident (loc,id),None)
 
 let cases_pattern_expr_of_name (loc,na) = match na with
   | Anonymous -> CPatAtom (loc,None)
@@ -77,7 +77,7 @@ let make_constr_action
 	  make (v :: constrs, constrlists, binders) tl)
     | ETReference ->
         Gram.action (fun (v:reference) ->
-	  make (CRef v :: constrs, constrlists, binders) tl)
+	  make (CRef (v,None) :: constrs, constrlists, binders) tl)
     | ETName ->
         Gram.action (fun (na:Loc.t * Name.t) ->
 	  make (constr_expr_of_name na :: constrs, constrlists, binders) tl)

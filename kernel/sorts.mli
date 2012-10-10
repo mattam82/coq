@@ -23,7 +23,12 @@ val type1  : t
 val equal : t -> t -> bool
 val compare : t -> t -> int
 
+val is_set : t -> bool
 val is_prop : t -> bool
+val is_small : t -> bool
 val family : t -> family
 
 val hcons : t -> t
+
+val univ_of_sort : t -> Univ.universe
+val sort_of_univ : Univ.universe -> t

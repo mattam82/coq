@@ -113,13 +113,15 @@ let _ =
 
 (* Util *)
 
-let define id internal c t =
+let define id internal ctx c t =
   let f = declare_constant ~internal in
   let kn = f id
     (DefinitionEntry
       { const_entry_body = c;
         const_entry_secctx = None;
         const_entry_type = t;
+	const_entry_polymorphic = true;
+	const_entry_universes = Evd.universe_context ctx; (* FIXME *)
         const_entry_opaque = false;
 	const_entry_inline_code = false
       },
@@ -291,6 +293,7 @@ let declare_sym_scheme ind =
 
 (* Scheme command *)
 
+let smart_global_inductive y = smart_global_inductive y
 let rec split_scheme l =
  let env = Global.env() in
  match l with
@@ -310,7 +313,7 @@ requested
       let names inds recs isdep y z =
         let ind = smart_global_inductive y in
         let sort_of_ind = inductive_sort_family (snd (lookup_mind_specif env ind)) in
-        let z' = family_of_sort (interp_sort z) in
+        let z' = interp_elimination_sort z in
         let suffix = (
           match sort_of_ind with
           | InProp ->
@@ -344,18 +347,19 @@ requested
 
 let do_mutual_induction_scheme lnamedepindsort =
   let lrecnames = List.map (fun ((_,f),_,_,_) -> f) lnamedepindsort
-  and sigma = Evd.empty
   and env0 = Global.env() in
-  let lrecspec =
-    List.map
-      (fun (_,dep,ind,sort) -> (ind,dep,interp_elimination_sort sort))
-      lnamedepindsort
+  let sigma, lrecspec =
+    List.fold_left
+      (fun (evd, l) (_,dep,ind,sort) -> 
+        let evd, indu = Evd.fresh_inductive_instance env0 evd ind in
+          (evd, (indu,dep,interp_elimination_sort sort) :: l))
+    (Evd.from_env env0,[]) lnamedepindsort
   in
-  let listdecl = Indrec.build_mutual_induction_scheme env0 sigma lrecspec in
+  let sigma, listdecl = Indrec.build_mutual_induction_scheme env0 sigma lrecspec in
   let declare decl fi lrecref =
-    let decltype = Retyping.get_type_of env0 Evd.empty decl in
-    let decltype = refresh_universes decltype in
-    let cst = define fi UserVerbose decl (Some decltype) in
+    let decltype = Retyping.get_type_of env0 sigma decl in
+    (* let decltype = refresh_universes decltype in *)
+    let cst = define fi UserVerbose sigma decl (Some decltype) in
     ConstRef cst :: lrecref
   in
   let _ = List.fold_right2 declare listdecl lrecnames [] in
@@ -405,7 +409,9 @@ let fold_left' f = function
   | hd :: tl -> List.fold_left f hd tl
 
 let build_combined_scheme env schemes =
-  let defs = List.map (fun cst -> (cst, Typeops.type_of_constant env cst)) schemes in
+  let defs = List.map (fun cst -> (* FIXME *)
+    let evd, c = Evd.fresh_constant_instance env Evd.empty cst in
+      (c, Typeops.type_of_constant_in env c)) schemes in
 (*   let nschemes = List.length schemes in *)
   let find_inductive ty =
     let (ctx, arity) = decompose_prod ty in
@@ -413,7 +419,7 @@ let build_combined_scheme env schemes =
       match kind_of_term last with
 	| App (ind, args) ->
 	    let ind = destInd ind in
-	    let (_,spec) = Inductive.lookup_mind_specif env ind in
+	    let (_,spec) = Inductive.lookup_mind_specif env (fst ind) in
 	      ctx, ind, spec.mind_nrealargs
 	| _ -> ctx, destInd last, 0
   in
@@ -424,8 +430,8 @@ let build_combined_scheme env schemes =
   let coqand = Coqlib.build_coq_and () and coqconj = Coqlib.build_coq_conj () in
   let relargs = rel_vect 0 prods in
   let concls = List.rev_map
-    (fun (cst, t) ->
-      mkApp(mkConst cst, relargs),
+    (fun (cst, t) -> (* FIXME *)
+      mkApp(mkConstU cst, relargs),
       snd (decompose_prod_n prods t)) defs in
   let concl_bod, concl_typ =
     fold_left'
@@ -450,7 +456,7 @@ let do_combined_scheme name schemes =
       schemes
   in
   let body,typ = build_combined_scheme (Global.env ()) csts in
-  ignore (define (snd name) UserVerbose body (Some typ));
+  ignore (define (snd name) UserVerbose Evd.empty body (Some typ));
   fixpoint_message None [snd name]
 
 (**********************************************************************)

@@ -65,7 +65,7 @@ val get_proof_clean : bool ->
 
 
 
-(* [with_full_print f a] applies [f] to [a] in full printing environment
+(* [with_full_print f a] applies [f] to [a] in full printing environment.
 
    This function preserves the print settings
 *)
