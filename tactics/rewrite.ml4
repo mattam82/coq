@@ -1761,6 +1761,7 @@ let declare_projection n instance_id r =
     { const_entry_body = term;
       const_entry_secctx = None;
       const_entry_type = Some typ;
+      const_entry_proj = None;
       const_entry_opaque = false;
       const_entry_inline_code = false }
   in

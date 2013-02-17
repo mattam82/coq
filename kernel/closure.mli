@@ -89,6 +89,7 @@ val info_flags: 'a infos -> reds
 val create: ('a infos -> constr -> 'a) -> reds -> env ->
   (existential -> constr option) -> 'a infos
 val evar_value : 'a infos -> existential -> constr option
+val info_env : 'a infos -> env
 
 (***********************************************************************
   s Lazy reduction. *)
@@ -108,6 +109,7 @@ type fterm =
   | FInd of inductive
   | FConstruct of constructor
   | FApp of fconstr * fconstr array
+  | FProj of constant * fconstr
   | FFix of fixpoint * fconstr subs
   | FCoFix of cofixpoint * fconstr subs
   | FCases of case_info * fconstr * fconstr * fconstr array
@@ -127,6 +129,7 @@ type fterm =
 type stack_member =
   | Zapp of fconstr array
   | Zcase of case_info * fconstr * fconstr array
+  | Zproj of int * int * constant
   | Zfix of fconstr * stack
   | Zshift of int
   | Zupdate of fconstr

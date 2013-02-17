@@ -65,9 +65,9 @@ Section Retracts.
 
 Variables A B : Prop.
 
+Set Printing All.
 Record retract : Prop :=
   {i : A -> B; j : B -> A; inv : forall a:A, j (i a) = a}.
-
 Record retract_cond : Prop :=
   {i2 : A -> B; j2 : B -> A; inv2 : retract -> forall a:A, j2 (i2 a) = a}.
 

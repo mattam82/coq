@@ -300,7 +300,7 @@ let elimination_then_using tac predicate bindings c gl =
   let (ind,t) = pf_reduce_to_quantified_ind gl (pf_type_of gl c) in
   let indclause  = mk_clenv_from gl (c,t) in
   let isrec,mkelim =
-    if (Global.lookup_mind (fst ind)).mind_record
+    if (Global.lookup_mind (fst ind)).mind_record <> None
     then false,gl_make_case_dep
     else true,gl_make_elim
   in

@@ -122,8 +122,8 @@ type recipe = {
 type inline = bool
 
 type result =
-  constant_def * constant_type * Univ.constraints * inline
-    * Sign.section_context option
+  constant_def * constant_type * projection_body option * 
+  Univ.constraints * bool * Sign.section_context
 
 let on_body f = function
   | Undef inl -> Undef inl
@@ -135,6 +135,15 @@ let constr_of_def = function
   | Undef _ -> assert false
   | Def cs -> Lazyconstr.force cs
   | OpaqueDef lc -> Lazyconstr.force_opaque lc
+
+(* Apply the cooking substitution to a projections type. *)
+let rename_constant_type n c hyps =
+  CList.fold_left_i
+    (fun i c (id, body, t) -> 
+      match body with
+      | Some b -> replace_vars [(id, b)] c
+      | None -> replace_vars [(id, mkRel i)] c)
+    (n + 1) c hyps
 
 let cook_constant env r =
   let cb = r.d_from in
@@ -157,4 +166,16 @@ let cook_constant env r =
 	let j = make_judge (constr_of_def body) typ in
 	Typeops.make_polymorphic_if_constant_for_ind env j
   in
-  (body, typ, cb.const_constraints, cb.const_inline_code, Some const_hyps)
+  let projection pb =
+    let ty' = rename_constant_type pb.proj_npars (expmod_constr r.d_modlist pb.proj_type) hyps in
+    let (mind, _), n' =
+      try match kind_of_term (share (IndRef (pb.proj_ind,0)) r.d_modlist) with
+      | App (f,l) -> (destInd f, Array.length l)
+      | Ind ind -> ind, 0
+      | _ -> assert false 
+      with Not_found -> ((pb.proj_ind,0), 0)
+    in { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
+	 proj_type = ty' }
+  in
+    (body, typ, Option.map projection cb.const_proj, cb.const_constraints, 
+		    cb.const_inline_code, Some const_hyps)

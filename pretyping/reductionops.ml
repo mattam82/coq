@@ -31,6 +31,7 @@ exception Elimconst
 type 'a stack_member =
   | Zapp of 'a list
   | Zcase of case_info * 'a * 'a array * ('a * 'a list) option
+  | Zproj of int * int * projection
   | Zfix of fixpoint * 'a stack * ('a * 'a list) option
   | Zshift of int
   | Zupdate of 'a
@@ -333,6 +334,20 @@ let fix_recarg ((recindices,bodynum),_) stack =
   with Not_found ->
     None
 
+type 'a reduced_state = 
+  | NotReducible
+  | Reduced of constr
+
+let reduce_projection_state env whdfun sigma p c =
+  match (lookup_constant p env).Declarations.const_proj with
+  | None -> assert false
+  | Some pb -> 
+     let (cr,crargs), _ = whdfun sigma (c, empty_stack) in
+       if isConstruct cr then
+	 Reduced (stack_nth crargs (pb.Declarations.proj_npars + 
+				    pb.Declarations.proj_arg))
+       else NotReducible
+
 (** Generic reduction function with environment
 
     Here is where unfolded constant are stored in order to be
@@ -371,10 +386,14 @@ let rec whd_state_gen ?csts refold flags env sigma =
       (match safe_meta_value sigma ev with
       | Some body -> whrec cst_l (body, stack)
       | None -> fold ())
+    | Proj (p, c) ->
+      (match reduce_projection_state env (fun _ -> whrec cst_l) sigma p c with
+      | Reduced c -> whrec cst_l (c, stack)
+      | NotReducible -> fold ())
     | Const const when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST const) ->
-      (match constant_opt_value env const with
-      | Some  body -> whrec (Cst_stack.add_cst (mkConst const) cst_l) (body, stack)
-      | None -> fold ())
+       (match constant_opt_value env const with
+	| Some body -> whrec (Cst_stack.add_cst (mkConst const) cst_l) (body, stack)
+	| None -> fold ())
     | LetIn (_,b,_,c) when Closure.RedFlags.red_set flags Closure.RedFlags.fZETA ->
       apply_subst whrec [b] cst_l c stack
     | Cast (c,_,_) -> whrec cst_l (c, stack)
@@ -490,6 +509,8 @@ let local_whd_state_gen flags sigma =
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	|args, (Zproj (n,m,_) :: s') ->
+	  whrec (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
 	  whrec (contract_fix f cst, s' @ (append_stack_app_list [x'] s''))
@@ -625,9 +646,9 @@ let clos_norm_flags flgs env sigma t =
       (inject t)
   with e when is_anomaly e -> error "Tried to normalized ill-typed term"
 
-let nf_beta = clos_norm_flags Closure.beta empty_env
-let nf_betaiota = clos_norm_flags Closure.betaiota empty_env
-let nf_betaiotazeta = clos_norm_flags Closure.betaiotazeta empty_env
+let nf_beta = clos_norm_flags Closure.beta (Global.env ())
+let nf_betaiota = clos_norm_flags Closure.betaiota (Global.env ())
+let nf_betaiotazeta = clos_norm_flags Closure.betaiotazeta (Global.env ())
 let nf_betadeltaiota env sigma =
   clos_norm_flags Closure.betadeltaiota env sigma
 
@@ -677,6 +698,8 @@ let whd_betaiota_preserving_vm_cast env sigma t =
 	 match strip_app stack with
 	   |args, (Zcase(ci, _, lf,_)::s') ->
 	     whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	   |args, (Zproj (n,m,p) :: s') ->
+	     whrec (List.nth args (n+m), s')
 	   |args, (Zfix (f,s',cst)::s'') ->
 	     let x' = applist(x,args) in
 	     whrec (contract_fix f cst,s' @ (append_stack_app_list [x'] s''))

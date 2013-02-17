@@ -27,7 +27,9 @@ let meta_type evd mv =
 
 let constant_type_knowing_parameters env cst jl =
   let paramstyp = Array.map (fun j -> j.uj_type) jl in
-  type_of_constant_knowing_parameters env (constant_type env cst) paramstyp
+  let cb = lookup_constant cst env in
+  let typ, paramstyp = cb.Declarations.const_type, paramstyp in
+    type_of_constant_knowing_parameters env typ paramstyp
 
 let inductive_type_knowing_parameters env ind jl =
   let (mib,mip) = lookup_mind_specif env ind in
@@ -196,6 +198,10 @@ let rec execute env evdref cstr =
 
     | Sort (Type u) ->
 	judge_of_type u
+
+    | Proj (p, c) -> 
+        let cj = execute env evdref c in
+	  judge_of_projection env p cj
 
     | App (f,args) ->
         let jl = execute_array env evdref args in

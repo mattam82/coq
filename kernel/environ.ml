@@ -162,21 +162,23 @@ let add_constant kn cs env =
 	env_constants = new_constants } in
   { env with env_globals = new_globals }
 
+
 (* constant_type gives the type of a constant *)
 let constant_type env kn =
-  let cb = lookup_constant kn env in
-    cb.const_type
+  (lookup_constant kn env).const_type
 
-type const_evaluation_result = NoBody | Opaque
+type const_evaluation_result = NoBody | Opaque | IsProj
 
 exception NotEvaluableConst of const_evaluation_result
 
 let constant_value env kn =
   let cb = lookup_constant kn env in
-  match cb.const_body with
-    | Def l_body -> Lazyconstr.force l_body
-    | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
-    | Undef _ -> raise (NotEvaluableConst NoBody)
+    if cb.const_proj = None then
+      (match cb.const_body with
+      | Def l_body -> Lazyconstr.force l_body
+      | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
+      | Undef _ -> raise (NotEvaluableConst NoBody))
+    else raise (NotEvaluableConst IsProj)
 
 let constant_opt_value env cst =
   try Some (constant_value env cst)
@@ -186,6 +188,16 @@ let constant_opt_value env cst =
 let evaluable_constant cst env =
   try let _  = constant_value env cst in true
   with NotEvaluableConst _ -> false
+
+let lookup_projection cst env =
+  match (lookup_constant cst env).const_proj with 
+  | Some pb -> pb
+  | None -> anomaly (Pp.str "lookup_projection: constant is not a projection")
+
+let is_projection cst env =
+  match (lookup_constant cst env).const_proj with 
+  | Some _ -> true
+  | None -> false
 
 (* Mutual Inductives *)
 let lookup_mind = lookup_mind
@@ -212,6 +224,9 @@ let set_engagement c env = (* Unsafe *)
     { env.env_stratification with env_engagement = Some c } }
 
 (* Lookup of section variables *)
+
+let constant_body_hyps cb = cb.const_hyps
+
 let lookup_constant_variables c env =
   let cmap = lookup_constant c env in
   Sign.vars_of_named_context cmap.const_hyps

@@ -252,6 +252,16 @@ let pretype_sort evdref = function
 let new_type_evar evdref env loc =
   evd_comb0 (fun evd -> Evarutil.new_type_evar evd env ~src:(loc,Evar_kinds.InternalHole)) evdref
 
+let dest_proj env g = 
+  match g with
+  | GRef (loc, ConstRef cst) ->
+    let cb = lookup_constant cst env in
+      (match cb.Declarations.const_proj with
+      | Some {Declarations.proj_ind = mind; proj_npars = n; proj_arg = m; proj_type = ty} -> 
+        Some (cst,mind,n,m,ty)
+      | None -> None)
+  | _ -> None
+
 (* [pretype tycon env evdref lvar lmeta cstr] attempts to type [cstr] *)
 (* in environment [env], with existential variables [evdref] and *)
 (* the type constraint tycon *)
@@ -371,7 +381,39 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
 	inh_conv_coerce_to_tycon loc env evdref j tycon
 
   | GApp (loc,f,args) ->
-      let fj = pretype empty_tycon env evdref lvar f in
+      let fj, args =
+	match dest_proj env f with
+	| None -> pretype empty_tycon env evdref lvar f, args
+	| Some (cst, mind, n, m, ty) ->
+	  let arg, args =
+	    match args with
+	    | [] -> error "Partial application of projections is not allowed"
+	    | hd :: tl -> hd, tl
+	  in
+	  let tycon =
+	    match arg with
+	    | GHole (loc, k) -> (* Typeclass projection application: 
+				   create the necessary type constraint *)
+	      let mb = lookup_mind mind env in
+	      let args = 
+		let ctx = smash_rel_context mb.Declarations.mind_params_ctxt in
+		  List.fold_right (fun (n, b, ty) args ->
+		  let ev = e_new_evar evdref env ~src:(loc,k) (substl args ty) in
+		     ev :: args) ctx []
+	      in mk_tycon (applist (mkInd (mind, 0), List.rev args))
+	    | _ -> empty_tycon
+	  in
+	  let recty = pretype tycon env evdref lvar arg in
+	  let IndType (indf, _ (*[]*)) = 
+	    try find_rectype env !evdref recty.uj_type
+	    with Not_found -> error_case_not_inductive env recty
+	  in
+	  let ind, pars = dest_ind_family indf in
+	    assert(eq_mind mind (fst ind));
+	    let ty = substl (List.rev pars) ty in
+	    (* TODO: Universe polymorphism for projections *)
+	      {uj_val = mkProj (cst,recty.uj_val); uj_type = ty}, args
+      in
       let floc = loc_of_glob_constr f in
       let length = List.length args in
       let candargs =

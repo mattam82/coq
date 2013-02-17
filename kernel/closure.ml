@@ -229,6 +229,7 @@ type 'a infos = {
   i_tab : 'a KeyTable.t }
 
 let info_flags info = info.i_flags
+let info_env info = info.i_env
 
 let ref_value_cache info ref =
   try
@@ -332,6 +333,7 @@ and fterm =
   | FInd of inductive
   | FConstruct of constructor
   | FApp of fconstr * fconstr array
+  | FProj of constant * fconstr
   | FFix of fixpoint * fconstr subs
   | FCoFix of cofixpoint * fconstr subs
   | FCases of case_info * fconstr * fconstr * fconstr array
@@ -364,6 +366,7 @@ let update v1 (no,t) =
 type stack_member =
   | Zapp of fconstr array
   | Zcase of case_info * fconstr * fconstr array
+  | Zproj of int * int * constant
   | Zfix of fconstr * stack
   | Zshift of int
   | Zupdate of fconstr
@@ -496,6 +499,9 @@ let rec compact_constr (lg, subs as s) c k =
         let (f',s) = compact_constr s f k in
         let (v',s) = compact_vect s v k in
         if f==f' && v==v' then c,s else mkApp(f',v'), s
+    | Proj (p,t) ->
+        let (t',s) = compact_constr s t k in
+	  if t'==t then c,s else mkProj (p,t'),s
     | Lambda(n,a,b) ->
         let (a',s) = compact_constr s a k in
         let (b',s) = compact_constr s b (k+1) in
@@ -566,7 +572,7 @@ let mk_clos e t =
     | Meta _ | Sort _ ->  { norm = Norm; term = FAtom t }
     | Ind kn -> { norm = Norm; term = FInd kn }
     | Construct kn -> { norm = Cstr; term = FConstruct kn }
-    | (CoFix _|Lambda _|Fix _|Prod _|Evar _|App _|Case _|Cast _|LetIn _) ->
+    | (CoFix _|Lambda _|Fix _|Prod _|Evar _|App _|Case _|Cast _|LetIn _|Proj _) ->
         {norm = Red; term = FCLOS(t,e)}
 
 let mk_clos_vect env v = Array.map (mk_clos env) v
@@ -585,6 +591,9 @@ let mk_clos_deep clos_fun env t =
     | App (f,v) ->
         { norm = Red;
 	  term = FApp (clos_fun env f, Array.map (clos_fun env) v) }
+    | Proj (p,c) ->
+	{ norm = Red;
+	  term = FProj (p, clos_fun env c) }
     | Case (ci,p,c,v) ->
         { norm = Red;
 	  term = FCases (ci, clos_fun env p, clos_fun env c,
@@ -640,6 +649,9 @@ let rec to_constr constr_fun lfts v =
     | FApp (f,ve) ->
 	mkApp (constr_fun lfts f,
 	       Array.map (constr_fun lfts) ve)
+    | FProj (p,c) ->
+        mkProj (p,constr_fun lfts c)
+
     | FLambda _ ->
         let (na,ty,bd) = destFLambda mk_clos2 v in
 	mkLambda (na, constr_fun lfts ty,
@@ -692,6 +704,8 @@ let rec zip m stk =
     | Zcase(ci,p,br)::s ->
         let t = FCases(ci, p, m, br) in
         zip {norm=neutr m.norm; term=t} s
+    | Zproj (i,j,cst) :: s -> 
+        zip {norm=neutr m.norm; term=FProj (cst,m)} s
     | Zfix(fx,par)::s ->
         zip fx (par @ append_stack [|m|] s)
     | Zshift(n)::s ->
@@ -767,7 +781,7 @@ let rec get_args n tys f e stk =
 
 (* Eta expansion: add a reference to implicit surrounding lambda at end of stack *)
 let rec eta_expand_stack = function
-  | (Zapp _ | Zfix _ | Zcase _ | Zshift _ | Zupdate _ as e) :: s ->
+  | (Zapp _ | Zfix _ | Zcase _ | Zshift _ | Zupdate _ | Zproj _ as e) :: s ->
       e :: eta_expand_stack s
   | [] ->
       [Zshift 1; Zapp [|{norm=Norm; term= FRel 1}|]]
@@ -801,6 +815,16 @@ let rec drop_parameters depth n argstk =
     | _ -> assert false
 	(* strip_update_shift_app only produces Zapp and Zshift items *)
 
+let rec project_nth_arg n argstk =
+  match argstk with
+  | Zapp args :: s -> 
+      let q = Array.length args in
+	if n >= q then project_nth_arg (n - q) s
+	else (* n < q *) args.(n)
+  | _ -> assert false
+      (* After drop_parameters we have a purely applicative stack *)
+
+
 (* Iota reduction: expansion of a fixpoint.
  * Given a fixpoint and a substitution, returns the corresponding
  * fixpoint body, and the substitution in which it should be
@@ -825,39 +849,52 @@ let contract_fix_vect fix =
   in
   (subs_cons(Array.init nfix make_body, env), thisbody)
 
-
 (*********************************************************************)
 (* A machine that inspects the head of a term until it finds an
    atom or a subterm that may produce a redex (abstraction,
    constructor, cofix, letin, constant), or a neutral term (product,
    inductive) *)
-let rec knh m stk =
+let rec knh info m stk =
   match m.term with
-    | FLIFT(k,a) -> knh a (zshift k stk)
-    | FCLOS(t,e) -> knht e t (zupdate m stk)
+    | FLIFT(k,a) -> knh info a (zshift k stk)
+    | FCLOS(t,e) -> knht info e t (zupdate m stk)
     | FLOCKED -> assert false
-    | FApp(a,b) -> knh a (append_stack b (zupdate m stk))
-    | FCases(ci,p,t,br) -> knh t (Zcase(ci,p,br)::zupdate m stk)
+    | FApp(a,b) -> knh info a (append_stack b (zupdate m stk))
+    | FCases(ci,p,t,br) -> knh info t (Zcase(ci,p,br)::zupdate m stk)
     | FFix(((ri,n),(_,_,_)),_) ->
         (match get_nth_arg m ri.(n) stk with
-             (Some(pars,arg),stk') -> knh arg (Zfix(m,pars)::stk')
+             (Some(pars,arg),stk') -> knh info arg (Zfix(m,pars)::stk')
            | (None, stk') -> (m,stk'))
-    | FCast(t,_,_) -> knh t stk
+    | FCast(t,_,_) -> knh info t stk
+    | FProj (p,c) ->
+	(match try Some (lookup_projection p info.i_env) with Not_found -> None with
+	 | None -> (m, stk)
+	 | Some pb ->
+	     knh info c (Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+			 :: zupdate m stk))
+
 (* cases where knh stops *)
     | (FFlex _|FLetIn _|FConstruct _|FEvar _|
        FCoFix _|FLambda _|FRel _|FAtom _|FInd _|FProd _) ->
         (m, stk)
 
 (* The same for pure terms *)
-and knht e t stk =
+and knht info e t stk =
   match kind_of_term t with
     | App(a,b) ->
-        knht e a (append_stack (mk_clos_vect e b) stk)
+        knht info e a (append_stack (mk_clos_vect e b) stk)
     | Case(ci,p,t,br) ->
-        knht e t (Zcase(ci, mk_clos e p, mk_clos_vect e br)::stk)
-    | Fix _ -> knh (mk_clos2 e t) stk
-    | Cast(a,_,_) -> knht e a stk
-    | Rel n -> knh (clos_rel e n) stk
+        knht info e t (Zcase(ci, mk_clos e p, mk_clos_vect e br)::stk)
+    | Fix _ -> knh info (mk_clos2 e t) stk
+    | Cast(a,_,_) -> knht info e a stk
+    | Rel n -> knh info (clos_rel e n) stk
+    | Proj (p,c) ->
+	(match try Some (lookup_projection p info.i_env) with Not_found -> None with
+	 | None -> (mk_clos2 e t, stk)
+	 | Some pb ->
+	     knht info e c (Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+			 :: stk))
+
     | (Lambda _|Prod _|Construct _|CoFix _|Ind _|
        LetIn _|Const _|Var _|Evar _|Meta _|Sort _) ->
         (mk_clos2 e t, stk)
@@ -895,6 +932,10 @@ let rec knr info m stk =
             let stk' = par @ append_stack [|rarg|] s in
             let (fxe,fxbd) = contract_fix_vect fx.term in
             knit info fxe fxbd stk'
+	| (depth, args, Zproj (n, m, cst)::s) ->
+	    let rargs = drop_parameters depth n args in
+	    let rarg = project_nth_arg m rargs in
+	      kni info rarg s
         | (_,args,s) -> (m,args@s))
   | FCoFix _ when red_set info.i_flags fIOTA ->
       (match strip_update_shift_app m stk with
@@ -912,10 +953,10 @@ let rec knr info m stk =
 
 (* Computes the weak head normal form of a term *)
 and kni info m stk =
-  let (hm,s) = knh m stk in
+  let (hm,s) = knh info m stk in
   knr info hm s
 and knit info e t stk =
-  let (ht,s) = knht e t stk in
+  let (ht,s) = knht info e t stk in
   knr info ht s
 
 let kh info v stk = fapp_stack(kni info v stk)
@@ -930,6 +971,9 @@ let rec zip_term zfun m stk =
     | Zcase(ci,p,br)::s ->
         let t = mkCase(ci, zfun p, m, Array.map zfun br) in
         zip_term zfun t s
+    | Zproj(_,_,p)::s -> 
+        let t = mkProj (p, m) in 
+	zip_term zfun t s
     | Zfix(fx,par)::s ->
         let h = mkApp(zip_term zfun (zfun fx) par,[|m|]) in
         zip_term zfun h s

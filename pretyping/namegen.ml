@@ -77,6 +77,7 @@ let hdchar env c =
     | LetIn (_,_,_,c) -> hdrec (k+1) c
     | Cast (c,_,_)    -> hdrec k c
     | App (f,l)       -> hdrec k f
+    | Proj (kn, _)  
     | Const kn -> lowercase_first_char (Label.to_id (con_label kn))
     | Ind x -> lowercase_first_char (basename_of_global (IndRef x))
     | Construct x -> lowercase_first_char (basename_of_global (ConstructRef x))

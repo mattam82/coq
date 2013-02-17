@@ -273,8 +273,8 @@ let add_constant dir l decl senv =
       if DirPath.is_empty dir then Declareops.hcons_const_body cb else cb
   in
   let senv' = add_field (l,SFBconst cb) (C kn) senv in
-  let senv'' = match cb.const_body with
-    | Undef (Some lev) ->
+  let senv'' = match cb with
+    | {const_body = Undef (Some lev)} ->
       update_resolver (add_inline_delta_resolver (user_con kn) (lev,None)) senv'
     | _ -> senv'
   in

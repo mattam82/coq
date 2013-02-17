@@ -130,7 +130,8 @@ let cache_constant ((sp,kn),(cdt,dhyps,kind)) =
   let kn' = Global.add_constant dir id cdt in
   assert (eq_constant kn' (constant_of_kn kn));
   Nametab.push (Nametab.Until 1) sp (ConstRef (constant_of_kn kn));
-  add_section_constant kn' (Global.lookup_constant kn').const_hyps;
+  let const = Global.lookup_constant kn' in
+  add_section_constant (const.const_proj <> None) kn' const.const_hyps;
   Dischargedhypsmap.set_discharged_hyps sp dhyps;
   add_constant_kind (constant_of_kn kn) kind;
   !cache_hook sp
@@ -185,6 +186,7 @@ let declare_definition ?(internal=UserVerbose) ?(opaque=false) ?(kind=Decl_kinds
   let cb = 
     { Entries.const_entry_body = body;
       const_entry_type = types;
+      const_entry_proj = None;
       const_entry_opaque = opaque;
       const_entry_inline_code = false;
       const_entry_secctx = None }

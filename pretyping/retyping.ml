@@ -79,6 +79,13 @@ let retype ?(polyprop=true) sigma =
     | App(f,args) ->
         strip_outer_cast
           (subst_type env sigma (type_of env f) (Array.to_list args))
+    | Proj (p,c) -> 
+       let Inductiveops.IndType(pars,realargs) =
+         try Inductiveops.find_rectype env sigma (type_of env c)
+         with Not_found -> anomaly ~label:"type_of" (str "Bad recursive type") 
+       in
+       let _, pars = dest_ind_family pars in
+	 subst_type env sigma (Typeops.type_of_constant env p) pars
     | Cast (c,_, t) -> t
     | Sort _ | Prod _ -> mkSort (sort_of env cstr)
 

@@ -601,8 +601,57 @@ let used_section_variables env inds =
     (fun l c -> Id.Set.union (Environ.global_vars_set env c) l)
       Id.Set.empty inds in
   keep_hyps env ids
+let lift_decl n d = 
+  map_rel_declaration (lift n) d
 
-let build_inductive env env_ar params isrecord isfinite inds nmr recargs cst =
+let rel_vect n m = Array.init m (fun i -> mkRel(n+m-i))
+let rel_list n m = Array.to_list (rel_vect n m)
+let rel_appvect n m = rel_vect n (List.length m)
+
+(** From a rel context describing the constructor arguments,
+    build an expansion function.
+    The term built is expecting to be substituted first by 
+    a substitution of the form [params, x : ind params] *)
+let compute_expansion ind nparams nrealargs params ctx = 
+  let recbinder = (Name (id_of_string "rec"), None,
+		   mkApp (mkInd ind, rel_appvect 1 params)) in
+  let ci =
+    { ci_ind = ind;
+      ci_npar = nparams;
+      ci_cstr_ndecls = [|nrealargs|]; (** number of real args of each constructor *)
+      ci_pp_info = { ind_nargs = 0; (** length of the arity of the inductive type *)
+		     style = LetStyle }
+    }
+  in
+  let rec projections (na, b, t as d) (n, projctx, subst) = 
+    match b with
+    | Some c -> 
+      (n + 1, d :: projctx, mkRel 2 :: List.map (liftn 1 2) subst)
+    | None ->
+      let proj, ty = 
+	let pred = 
+	  it_mkLambda_or_LetIn (substl subst t) [lift_decl (n + 1) recbinder]
+	in
+	let case =
+	  let branch = it_mkLambda_or_LetIn (mkRel (nrealargs - n)) ctx in
+	    mkCase (ci, pred, mkRel 1, [| lift (n + 2) branch |])
+	in
+	  (it_mkLambda_or_LetIn case [lift_decl n recbinder],
+	   it_mkProd_or_LetIn (mkApp (pred, [| mkRel 1|])) [lift_decl n recbinder])
+      in 
+      let decl = (na, Some proj, ty) in
+      let subst' = List.map (liftn 1 2) subst in
+	(n + 1, decl :: projctx, mkApp (mkRel 3, [| mkRel 1 |]) :: subst')
+  in
+  let n, projs, _ = List.fold_right projections ctx (0, [], List.rev (rel_list 3 nparams)) in
+    it_mkLambda_or_LetIn
+      (mkApp (mkConstruct (ind, 1),
+	      Array.append (rel_appvect (n + 1) params)
+		  (Array.map (fun c -> mkApp (c, [|mkRel (n+1)|])) (rel_vect 0 (List.length projs)))))
+    projs
+  
+
+let build_inductive env env_ar params kn isrecord isfinite inds nmr recargs cst =
   let ntypes = Array.length inds in
   (* Compute the set of used section variables *)
   let hyps =  used_section_variables env inds in
@@ -660,6 +709,17 @@ let build_inductive env env_ar params isrecord isfinite inds nmr recargs cst =
 	mind_reloc_tbl = rtbl;
       } in
   let packets = Array.map2 build_one_packet inds recargs in
+  let isrecord = 
+    let pkt = packets.(0) in
+      if isrecord (* || (Array.length pkt.mind_consnames = 1 &&  *)
+        (* inductive_sort_family pkt <> InProp) *) then
+	let ctx, _ = decompose_prod_assum pkt.mind_nf_lc.(0) in
+	let exp = compute_expansion (kn, 0) nparamargs 
+	  pkt.mind_consnrealdecls.(0) params 
+	  (List.firstn pkt.mind_consnrealdecls.(0) ctx) 
+	in Some exp
+      else None
+  in
     (* Build the mutual inductive *)
     { mind_record = isrecord;
       mind_ntypes = ntypes;
@@ -682,5 +742,5 @@ let check_inductive env kn mie =
   (* Then check positivity conditions *)
   let (nmr,recargs) = check_positivity kn env_ar params inds in
   (* Build the inductive packets *)
-    build_inductive env env_ar params mie.mind_entry_record mie.mind_entry_finite
+    build_inductive env env_ar params kn mie.mind_entry_record mie.mind_entry_finite
       inds nmr recargs cst

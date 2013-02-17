@@ -36,6 +36,7 @@ let flex_kind_of_term c sk =
     | Lambda _ | Prod _ | Sort _ | Ind _ | Construct _ | CoFix _ -> Rigid
     | Meta _ -> Rigid
     | Fix _ -> Rigid (* happens when the fixpoint is partially applied *)
+    | Proj (p, c) -> MaybeFlexible
     | Cast _ | App _ | Case _ -> assert false
 
 let not_purely_applicative_stack args =
@@ -397,6 +398,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
             | LetIn (_,b,_,c) -> is_unnamed
 	      (fst (whd_betaiota_deltazeta_for_iota_state
 		      ts env i Cst_stack.empty (subst1 b c, args)))
+	    | Proj (p, c) -> false
             | Case _| Fix _| App _| Cast _ -> assert false in
           let rhs_is_stuck_and_unnamed () =
             match eval_flexible_term ts env term2 with
@@ -576,7 +578,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	| (Ind _ | Construct _ | Sort _ | Prod _ | CoFix _ | Fix _), _ -> UnifFailure (evd,NotSameHead)
 	| _, (Ind _ | Construct _ | Sort _ | Prod _ | CoFix _ | Fix _) -> UnifFailure (evd,NotSameHead)
 
-	| (App _ | Cast _ | Case _), _ -> assert false
+	| (App _ | Cast _ | Case _ | Proj _), _ -> assert false
 	| (LetIn _ | Rel _ | Var _ | Const _ | Evar _), _ -> assert false
 	| (Lambda _), _ -> assert false
 

@@ -18,6 +18,15 @@ val translate_local_def : env -> constr * types option ->
 
 val translate_local_assum : env -> types -> types * constraints
 
+val infer_declaration : env -> constant_entry ->
+  constant_def * constant_type * projection_body option * 
+  constraints * bool * Sign.section_context option
+
+val build_constant_declaration : env -> 'a ->
+  constant_def * constant_type * projection_body option * 
+  constraints * bool * Sign.section_context option -> 
+    constant_body
+
 val translate_constant : env -> constant_entry -> constant_body
 
 val translate_mind :

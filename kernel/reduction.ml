@@ -56,6 +56,8 @@ let compare_stack_shape stk1 stk2 =
     | (_, (Zupdate _|Zshift _)::s2) -> compare_rec bal stk1 s2
     | (Zapp l1::s1, _) -> compare_rec (bal+Array.length l1) s1 stk2
     | (_, Zapp l2::s2) -> compare_rec (bal-Array.length l2) stk1 s2
+    | (Zproj (n1,m1,p1)::s1, Zproj (n2,m2,p2)::s2) ->
+        Int.equal bal 0 && compare_rec 0 s1 s2
     | (Zcase(c1,_,_)::s1, Zcase(c2,_,_)::s2) ->
         Int.equal bal 0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
     | (Zfix(_,a1)::s1, Zfix(_,a2)::s2) ->
@@ -65,6 +67,7 @@ let compare_stack_shape stk1 stk2 =
 
 type lft_constr_stack_elt =
     Zlapp of (lift * fconstr) array
+  | Zlproj of constant * lift
   | Zlfix of (lift * fconstr) * lft_constr_stack
   | Zlcase of case_info * lift * fconstr * fconstr array
 and lft_constr_stack = lft_constr_stack_elt list
@@ -83,6 +86,8 @@ let pure_stack lfts stk =
             | (Zshift n,(l,pstk)) -> (el_shft n l, pstk)
             | (Zapp a, (l,pstk)) ->
                 (l,zlapp (Array.map (fun t -> (l,t)) a) pstk)
+	    | (Zproj (n,m,c), (l,pstk)) ->
+		(l, Zlproj (c,l)::pstk)
             | (Zfix(fx,a),(l,pstk)) ->
                 let (lfx,pa) = pure_rec l a in
                 (l, Zlfix((lfx,fx),pa)::pstk)
@@ -94,17 +99,17 @@ let pure_stack lfts stk =
 (*                   Reduction Functions                                    *)
 (****************************************************************************)
 
-let whd_betaiota t =
-  whd_val (create_clos_infos betaiota empty_env) (inject t)
+let whd_betaiota env t =
+  whd_val (create_clos_infos betaiota env) (inject t)
 
-let nf_betaiota t =
-  norm_val (create_clos_infos betaiota empty_env) (inject t)
+let nf_betaiota env t =
+  norm_val (create_clos_infos betaiota env) (inject t)
 
-let whd_betaiotazeta x =
+let whd_betaiotazeta env x =
   match kind_of_term x with
     | (Sort _|Var _|Meta _|Evar _|Const _|Ind _|Construct _|
        Prod _|Lambda _|Fix _|CoFix _) -> x
-    | _ -> whd_val (create_clos_infos betaiotazeta empty_env) (inject x)
+    | _ -> whd_val (create_clos_infos betaiotazeta env) (inject x)
 
 let whd_betadeltaiota env t =
   match kind_of_term t with
@@ -154,6 +159,10 @@ let compare_stacks f fmind lft1 stk1 lft2 stk2 cuniv =
           let cu1 = cmp_rec s1 s2 cuniv in
           (match (z1,z2) with
             | (Zlapp a1,Zlapp a2) -> Array.fold_right2 f a1 a2 cu1
+	    | (Zlproj (c1,l1),Zlproj (c2,l2)) -> 
+	      if not (c1 == c2 && l1 == l2) then (*FIXME*)
+		raise NotConvertible;
+	      cu1
             | (Zlfix(fx1,a1),Zlfix(fx2,a2)) ->
                 let cu2 = f fx1 fx2 cu1 in
                 cmp_rec a1 a2 cu2
@@ -210,6 +219,7 @@ let rec no_arg_available = function
   | Zupdate _ :: stk -> no_arg_available stk
   | Zshift _ :: stk -> no_arg_available stk
   | Zapp v :: stk -> Int.equal (Array.length v) 0 && no_arg_available stk
+  | Zproj _ :: _ -> true
   | Zcase _ :: _ -> true
   | Zfix _ :: _ -> true
 
@@ -221,6 +231,7 @@ let rec no_nth_arg_available n = function
       let k = Array.length v in
       if n >= k then no_nth_arg_available (n-k) stk
       else false
+  | Zproj _ :: _ -> true
   | Zcase _ :: _ -> true
   | Zfix _ :: _ -> true
 
@@ -229,12 +240,13 @@ let rec no_case_available = function
   | Zupdate _ :: stk -> no_case_available stk
   | Zshift _ :: stk -> no_case_available stk
   | Zapp _ :: stk -> no_case_available stk
+  | Zproj _ :: _ -> false
   | Zcase _ :: _ -> false
   | Zfix _ :: _ -> true
 
 let in_whnf (t,stk) =
   match fterm_of t with
-    | (FLetIn _ | FCases _ | FApp _ | FCLOS _ | FLIFT _ | FCast _) -> false
+    | (FLetIn _ | FCases _ | FApp _ | FProj _ | FCLOS _ | FLIFT _ | FCast _) -> false
     | FLambda _ -> no_arg_available stk
     | FConstruct _ -> no_case_available stk
     | FCoFix _ -> no_case_available stk

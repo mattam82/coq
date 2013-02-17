@@ -751,6 +751,7 @@ let rec has_evar x =
       has_evar t1 || has_evar t2 || has_evar_array ts
     | Fix ((_, tr)) | CoFix ((_, tr)) ->
       has_evar_prec tr
+    | Proj (p, c) -> has_evar c
 and has_evar_array x =
   Array.exists has_evar x
 and has_evar_prec (_, ts1, ts2) =

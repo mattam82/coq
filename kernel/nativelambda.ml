@@ -534,7 +534,7 @@ let rec lambda_of_constr env c =
   match kind_of_term c with
   | Meta _ -> raise (Invalid_argument "Nativelambda.lambda_of_constr: Meta")
   | Evar _ -> raise (Invalid_argument "Nativelambda.lambda_of_constr : Evar")
-	
+  | Proj _ -> assert false
   | Cast (c, _, _) -> lambda_of_constr env c
 	
   | Rel i -> Renv.get env i

@@ -206,6 +206,7 @@ let rec is_rigid_head t = match kind_of_term t with
   | Rel _ | Evar _ -> false
   | Ind _ | Const _ | Var _ | Sort _ -> true
   | Case (_,_,f,_) -> is_rigid_head f
+  | Proj (p,c) -> true
   | App (f,args) ->
       (match kind_of_term f with
 	| Fix ((fi,i),_) -> is_rigid_head (args.(fi.(i)))
@@ -392,7 +393,13 @@ let compute_semi_auto_implicits env f manual t =
 
 let compute_constant_implicits flags manual cst =
   let env = Global.env () in
-  compute_semi_auto_implicits env flags manual (Typeops.type_of_constant env cst)
+  let cb = lookup_constant cst env in
+  let ty = 
+    match cb.const_proj with
+    | None -> Typeops.type_of_constant env cst
+    | Some {proj_type = ty} -> ty
+  in
+    compute_semi_auto_implicits env flags manual ty
 
 (*s Inductives and constructors. Their implicit arguments are stored
    in an array, indexed by the inductive number, of pairs $(i,v)$ where
@@ -534,7 +541,11 @@ let discharge_implicits (_,(req,l)) =
       let con' = pop_con con in
       let vars = section_segment_of_constant con in
       let extra_impls = impls_of_context vars in
-      let l' = [ConstRef con',List.map (add_section_impls vars extra_impls) (snd (List.hd l))] in
+      let newimpls = 
+	if is_projection con (Global.env()) then (snd (List.hd l))
+	else List.map (add_section_impls vars extra_impls) (snd (List.hd l))
+      in
+      let l' = [ConstRef con',newimpls] in
 	Some (ImplConstant (con',flags),l')
     with Not_found -> (* con not defined in this section *) Some (req,l))
   | ImplMutualInductive (kn,flags) ->

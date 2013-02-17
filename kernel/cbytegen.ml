@@ -487,11 +487,11 @@ let rec compile_fv reloc l sz cont =
 (* Compiling constants *)
 
 let rec get_allias env kn =
-  let tps = (lookup_constant kn env).const_body_code in
-  match Cemitcodes.force tps with
-  | BCallias kn' -> get_allias env kn'
-  | _ -> kn
-
+  let cb = lookup_constant kn env in
+  let tps = cb.const_body_code in
+    (match Cemitcodes.force tps with
+    | BCallias kn' -> get_allias env kn'
+    | _ -> kn)
 
 (* Compiling expressions *)
 
@@ -499,6 +499,7 @@ let rec compile_constr reloc c sz cont =
   match kind_of_term c with
   | Meta _ -> raise (Invalid_argument "Cbytegen.compile_constr : Meta")
   | Evar _ -> raise (Invalid_argument "Cbytegen.compile_constr : Evar")
+  | Proj _ -> assert false
 
   | Cast(c,_,_) -> compile_constr reloc c sz cont
 
