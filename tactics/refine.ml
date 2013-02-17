@@ -191,6 +191,12 @@ let rec compute_metamap env sigma c = match kind_of_term c with
 	  TH (c,[],[])
       end
 
+  | Proj (p,t) -> 
+     let t' = compute_metamap env sigma t in
+       (match t' with
+       | TH (_,_,[]) -> TH (c,[],[])
+       | TH (c1,mm1,sgp1) -> TH(mkProj(p,c1),mm1,sgp1))
+
   | Case (ci,p,cc,v) ->
       (* bof... *)
       let nbr = Array.length v in

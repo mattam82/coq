@@ -950,7 +950,18 @@ let vernac_declare_arguments locality r l nargs flags =
     error "Arguments names must be distinct.";
   let sr = smart_global r in
   let inf_names =
-    Impargs.compute_implicits_names (Global.env()) (Global.type_of_global sr) in
+    let ty = Global.type_of_global sr in
+    let env, ty =
+      match sr with
+      | ConstRef cst when Environ.is_projection cst (Global.env ()) ->
+        let ctx, ty = 
+	  decompose_prod_n_assum 
+	    (Environ.lookup_projection cst (Global.env ())).Declarations.proj_npars
+	    ty
+	in Environ.push_rel_context ctx (Global.env ()), ty
+      | _ -> Global.env (), ty
+    in
+      Impargs.compute_implicits_names env ty in
   let string_of_name = function Anonymous -> "_" | Name id -> Id.to_string id in
   let rec check li ld ls = match li, ld, ls with
     | [], [], [] -> ()

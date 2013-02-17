@@ -67,6 +67,7 @@ and cbv_stack =
   | TOP
   | APP of cbv_value array * cbv_stack
   | CASE of constr * constr array * case_info * cbv_value subs * cbv_stack
+  | PROJ of projection * Declarations.projection_body * cbv_stack
 
 (* les vars pourraient etre des constr,
    cela permet de retarder les lift: utile ?? *)
@@ -121,6 +122,7 @@ let rec stack_concat stk1 stk2 =
       TOP -> stk2
     | APP(v,stk1') -> APP(v,stack_concat stk1' stk2)
     | CASE(c,b,i,s,stk1') -> CASE(c,b,i,s,stack_concat stk1' stk2)
+    | PROJ (p,pinfo,stk1') -> PROJ (p,pinfo,stack_concat stk1' stk2)
 
 (* merge stacks when there is no shifts in between *)
 let mkSTACK = function
@@ -193,6 +195,10 @@ let rec norm_head info env t stack =
       norm_head info env head (stack_app nargs stack)
   | Case (ci,p,c,v) -> norm_head info env c (CASE(p,v,ci,env,stack))
   | Cast (ct,_,_) -> norm_head info env ct stack
+  
+  | Proj (p, c) -> 
+    let pinfo = Option.get ((Environ.lookup_constant p (info_env info)).Declarations.const_proj) in
+    norm_head info env c (PROJ (p, pinfo, stack))
 
   (* constants, axioms
    * the first pattern is CRUCIAL, n=0 happens very often:
@@ -221,7 +227,7 @@ let rec norm_head info env t stack =
 	(CBN(t,env), stack) (* Considérer une coupure commutative ? *)
 
   | Evar ev ->
-      (match evar_value info ev with
+      (match evar_value info.i_cache ev with
           Some c -> norm_head info env c stack
         | None -> (VAL(0, t), stack))
 
@@ -312,6 +318,8 @@ let rec apply_stack info t = function
         (mkCase (ci, cbv_norm_term info env ty, t,
 		    Array.map (cbv_norm_term info env) br))
         st
+  | PROJ (p, pinfo, st) ->
+       apply_stack info (mkProj (p, t)) st
 
 (* performs the reduction on a constr, and returns a constr *)
 and cbv_norm_term info env t =

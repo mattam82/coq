@@ -91,6 +91,9 @@ val mkApp : constr * constr array -> constr
    The array of terms correspond to the variables introduced in the section *)
 val mkConst : constant -> constr
 
+(** Constructs a projection application *)
+val mkProj : (constant * constr) -> constr
+
 (** Inductive types *)
 
 (** Constructs the ith (co)inductive type of the block named kn 
@@ -175,6 +178,7 @@ type ('constr, 'types) kind_of_term =
   | Case      of case_info * 'constr * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
+  | Proj      of constant * 'constr
 
 (** User view of [constr]. For [App], it is ensured there is at
    least one argument and the function is not itself an applicative

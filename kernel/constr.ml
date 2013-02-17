@@ -84,7 +84,7 @@ type ('constr, 'types) kind_of_term =
   | Case      of case_info * 'constr * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
-
+  | Proj      of constant * 'constr
 (* constr is the fixpoint of the previous type. Requires option
    -rectypes of the Caml compiler to be set *)
 type t = (t,t) kind_of_term
@@ -144,6 +144,9 @@ let mkApp (f, a) =
 
 (* Constructs a constant *)
 let mkConst c = Const c
+
+(* Constructs an applied projection *)
+let mkProj (p,c) = Proj (p,c)
 
 (* Constructs an existential variable *)
 let mkEvar e = Evar e
@@ -228,6 +231,7 @@ let fold f acc c = match kind c with
   | Lambda (_,t,c) -> f (f acc t) c
   | LetIn (_,b,t,c) -> f (f (f acc b) t) c
   | App (c,l) -> Array.fold_left f (f acc c) l
+  | Proj (p,c) -> f acc c
   | Evar (_,l) -> Array.fold_left f acc l
   | Case (_,p,c,bl) -> Array.fold_left f (f (f acc p) c) bl
   | Fix (_,(lna,tl,bl)) ->
@@ -249,6 +253,7 @@ let iter f c = match kind c with
   | Lambda (_,t,c) -> f t; f c
   | LetIn (_,b,t,c) -> f b; f t; f c
   | App (c,l) -> f c; Array.iter f l
+  | Proj (p,c) -> f c
   | Evar (_,l) -> Array.iter f l
   | Case (_,p,c,bl) -> f p; f c; Array.iter f bl
   | Fix (_,(_,tl,bl)) -> Array.iter f tl; Array.iter f bl
@@ -268,6 +273,7 @@ let iter_with_binders g f n c = match kind c with
   | Lambda (_,t,c) -> f n t; f (g n) c
   | LetIn (_,b,t,c) -> f n b; f n t; f (g n) c
   | App (c,l) -> f n c; Array.iter (f n) l
+  | Proj (p,c) -> f n c
   | Evar (_,l) -> Array.iter (f n) l
   | Case (_,p,c,bl) -> f n p; f n c; Array.iter (f n) bl
   | Fix (_,(_,tl,bl)) ->
@@ -289,6 +295,7 @@ let map f c = match kind c with
   | Lambda (na,t,c) -> mkLambda (na, f t, f c)
   | LetIn (na,b,t,c) -> mkLetIn (na, f b, f t, f c)
   | App (c,l) -> mkApp (f c, Array.map f l)
+  | Proj (p,c) -> mkProj (p, f c)
   | Evar (e,l) -> mkEvar (e, Array.map f l)
   | Case (ci,p,c,bl) -> mkCase (ci, f p, f c, Array.map f bl)
   | Fix (ln,(lna,tl,bl)) ->
@@ -310,6 +317,7 @@ let map_with_binders g f l c = match kind c with
   | Lambda (na,t,c) -> mkLambda (na, f l t, f (g l) c)
   | LetIn (na,b,t,c) -> mkLetIn (na, f l b, f l t, f (g l) c)
   | App (c,al) -> mkApp (f l c, Array.map (f l) al)
+  | Proj (p,c) -> mkProj (p, f l c)
   | Evar (e,al) -> mkEvar (e, Array.map (f l) al)
   | Case (ci,p,c,bl) -> mkCase (ci, f l p, f l c, Array.map (f l) bl)
   | Fix (ln,(lna,tl,bl)) ->
@@ -341,6 +349,7 @@ let compare_head f t1 t2 =
   | App (c1,l1), App (c2,l2) ->
     Int.equal (Array.length l1) (Array.length l2) &&
       f c1 c2 && Array.equal f l1 l2
+  | Proj (p1,c1), Proj (p2,c2) -> eq_constant p1 p2 && f c1 c2
   | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 && Array.equal f l1 l2
   | Const c1, Const c2 -> eq_constant c1 c2
   | Ind c1, Ind c2 -> eq_ind c1 c2
@@ -390,6 +399,7 @@ let constr_ord_int f t1 t2 =
     | App (Cast(c1,_,_),l1), _ -> f (mkApp (c1,l1)) t2
     | _, App (Cast(c2, _,_),l2) -> f t1 (mkApp (c2,l2))
     | App (c1,l1), App (c2,l2) -> (f =? (Array.compare f)) c1 c2 l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> (con_ord =? f) p1 p2 c1 c2
     | Evar (e1,l1), Evar (e2,l2) ->
         ((-) =? (Array.compare f)) e1 e2 l1 l2
     | Const c1, Const c2 -> con_ord c1 c2
@@ -469,6 +479,7 @@ let hasheq t1 t2 =
     | LetIn (n1,b1,t1,c1), LetIn (n2,b2,t2,c2) ->
       n1 == n2 & b1 == b2 & t1 == t2 & c1 == c2
     | App (c1,l1), App (c2,l2) -> c1 == c2 & array_eqeq l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> p1 == p2 & c1 == c2
     | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 & array_eqeq l1 l2
     | Const c1, Const c2 -> c1 == c2
     | Ind (sp1,i1), Ind (sp2,i2) -> sp1 == sp2 && Int.equal i1 i2
@@ -542,6 +553,10 @@ let hashcons (sh_sort,sh_ci,sh_construct,sh_ind,sh_con,sh_na,sh_id) =
 	let c, hc = sh_rec c in
 	let hl = hash_term_array l in
 	(App (c, l), combinesmall 7 (combine hl hc))
+      | Proj (p,c) ->
+        let c, hc = sh_rec c in
+	let p' = sh_con p in
+	  (Proj (p', c), combinesmall 17 (Hashtbl.hash p'))
       | Evar (e,l) ->
 	let hl = hash_term_array l in
 	(* since the array have been hashed in place : *)
@@ -603,6 +618,8 @@ let rec hash t =
     | App (Cast(c, _, _),l) -> hash (mkApp (c,l))
     | App (c,l) ->
       combinesmall 7 (combine (hash_term_array l) (hash c))
+    | Proj (p,c) ->
+      combinesmall 17 (combine (Hashtbl.hash p) (hash c))
     | Evar (e,l) ->
       combinesmall 8 (combine (Hashtbl.hash e) (hash_term_array l))
     | Const c ->

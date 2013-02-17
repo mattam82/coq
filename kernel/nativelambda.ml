@@ -23,6 +23,7 @@ type lambda =
   | Llet          of name * lambda * lambda
   | Lapp          of lambda * lambda array
   | Lconst        of string * constant (* prefix, constant name *)
+  | Lproj         of string * constant (* prefix, projection name *)
   | Lcase         of annot_sw * lambda * lambda * lam_branches 
                   (* annotations, term being matched, accu, branches *)
   | Lif           of lambda * lambda * lambda
@@ -30,7 +31,7 @@ type lambda =
   | Lcofix        of int * fix_decl 
   | Lmakeblock    of string * constructor * int * lambda array
                   (* prefix, constructor name, constructor tag, arguments *)
-	(* A fully applied constructor *)
+	(* A fully applied constant constructor *)
   | Lconstruct    of string * constructor (* prefix, constructor name *)
 	(* A partially applied constructor *)
   | Lval          of Nativevalues.t
@@ -101,12 +102,12 @@ let get_const_prefix env c =
    | Linked s -> s
    | LinkedLazy s -> s
    | LinkedInteractive s -> s
-    
+
 (* A generic map function *)
 
 let map_lam_with_binders g f n lam =
   match lam with
-  | Lrel _ | Lvar _  | Lconst _ | Lval _
+  | Lrel _ | Lvar _  | Lconst _ | Lproj _ | Lval _
   | Lsort _ | Lind _ | Lconstruct _ | Llazy | Lforce -> lam
   | Lprod(dom,codom) -> 
       let dom' = f n dom in
@@ -202,7 +203,7 @@ let lam_subst_args subst args =
   
 let can_subst lam = 
   match lam with
-  | Lrel _ | Lvar _ | Lconst _
+  | Lrel _ | Lvar _ | Lconst _ | Lproj _
   | Lval _ | Lsort _ | Lind _ | Llam _ | Lconstruct _ -> true
   | _ -> false
 
@@ -276,6 +277,7 @@ and simplify_app substf f substa args =
       let args = Array.append 
 	  (lam_subst_args substf args') (lam_subst_args substa args) in
       simplify_app substf f subst_id args
+  (* TODO | Lproj -> simplify if the argument is known or a known global *)
   | _ -> mkLapp (simplify substf f) (simplify_args substa args)
   
 and simplify_args subst args = Array.smartmap (simplify subst) args
@@ -309,7 +311,7 @@ let rec occurence k kind lam =
       if Int.equal n k then 
 	if kind then false else raise Not_found
       else kind
-  | Lvar _  | Lconst _  | Lval _ | Lsort _ | Lind _
+  | Lvar _  | Lconst _ | Lproj _ | Lval _ | Lsort _ | Lind _
   | Lconstruct _ | Llazy | Lforce -> kind
   | Lprod(dom, codom) ->
       occurence k (occurence k kind dom) codom
@@ -559,6 +561,9 @@ let rec lambda_of_constr env c =
 
   | Construct _ ->  lambda_of_app env c empty_args
 
+  | Proj (p, c) ->
+      mkLapp (Lproj (get_const_prefix !global_env p, p)) [|lambda_of_constr env c|]
+
   | Case(ci,t,a,branches) ->  
       let (mind,i as ind) = ci.ci_ind in
       let mib = lookup_mind mind !global_env in
@@ -614,7 +619,7 @@ and lambda_of_app env f args =
       let kn = get_allias !global_env kn in
       let cb = lookup_constant kn !global_env in
       begin match cb.const_body with
-      | Def csubst ->
+      | Def csubst -> (* TODO optimize if f is a proj and argument is known *)
           if cb.const_inline_code then
             lambda_of_app env (Lazyconstr.force csubst) args
           else

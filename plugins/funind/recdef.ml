@@ -60,6 +60,7 @@ let (declare_fun : Id.t -> logical_kind -> constr -> global_reference) =
     let ce = {const_entry_body = value;
               const_entry_secctx = None;
 	      const_entry_type = None;
+	      const_entry_proj = None;
           const_entry_opaque = false;
           const_entry_inline_code = false} in
       ConstRef(declare_constant f_id (DefinitionEntry ce, kind));;
@@ -300,6 +301,7 @@ let check_not_nested forbidden e =
       | Lambda(_,t,b) -> check_not_nested t;check_not_nested b
       | LetIn(_,v,t,b) -> check_not_nested t;check_not_nested b;check_not_nested v
       | App(f,l) -> check_not_nested f;Array.iter check_not_nested l
+      | Proj (p,c) -> check_not_nested c
       | Const _ -> ()
       | Ind _ -> ()
       | Construct _ -> ()
@@ -410,6 +412,7 @@ let treat_case forbid_new_ids to_intros finalize_tac nb_lam e infos : tactic =
 let rec travel_aux jinfo continuation_tac (expr_info:constr infos) =
   match kind_of_term expr_info.info with 
     | CoFix _ | Fix _ -> error "Function cannot treat local fixpoint or cofixpoint"
+    | Proj _ -> error "Function cannot treat projections"
     | LetIn(na,b,t,e) -> 
       begin
 	let new_continuation_tac = 

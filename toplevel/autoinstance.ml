@@ -190,6 +190,7 @@ let declare_record_instance gr ctx params =
   let ce = { const_entry_body= def;
              const_entry_secctx = None;
 	     const_entry_type=None;
+	     const_entry_proj = None;
          const_entry_opaque=false;
          const_entry_inline_code = false } in
   let decl = (DefinitionEntry ce,Decl_kinds.IsDefinition Decl_kinds.StructureComponent) in
@@ -207,6 +208,7 @@ let declare_class_instance gr ctx params =
     {  const_entry_type = Some typ;
        const_entry_secctx = None;
        const_entry_body = def;
+       const_entry_proj = None;
        const_entry_opaque = false;
        const_entry_inline_code = false } in
   try

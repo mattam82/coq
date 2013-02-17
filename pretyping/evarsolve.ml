@@ -1049,7 +1049,7 @@ let check_evar_instance evd evk1 body conv_algo =
     try Retyping.get_type_of ~lax:true evenv evd body
     with Retyping.RetypeError _ -> error "Ill-typed evar instance"
   in
-  match conv_algo evenv evd Reduction.CUMUL ty evi.evar_concl with
+  match conv_algo evenv evd Reduction.CUMUL ty (Evarutil.nf_evar evd evi.evar_concl) with
   | Success evd -> evd
   | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
 

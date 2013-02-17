@@ -24,11 +24,10 @@ type recipe = {
 type inline = bool
 
 type result =
-  constant_def * constant_type * constraints * inline
-    * Context.section_context option
+  constant_def * constant_type * projection_body option * 
+    constraints * inline * Context.section_context option
 
 val cook_constant : env -> recipe -> result
-
 
 (** {6 Utility functions used in module [Discharge]. } *)
 

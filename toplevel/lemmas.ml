@@ -223,6 +223,7 @@ let save_remaining_recthms (locality,kind) body opaq i (id,(t_i,(_,imps))) =
           let const = { const_entry_body = body_i;
               const_entry_secctx = None;
               const_entry_type = Some t_i;
+	      const_entry_proj = None;
               const_entry_opaque = opaq;
               const_entry_inline_code = false
           } in
@@ -238,6 +239,7 @@ let save_remaining_recthms (locality,kind) body opaq i (id,(t_i,(_,imps))) =
         let const = { const_entry_body = body_i;
             const_entry_secctx = None;
             const_entry_type = Some t_i;
+	    const_entry_proj = None;
             const_entry_opaque = opaq;
             const_entry_inline_code = false
         } in

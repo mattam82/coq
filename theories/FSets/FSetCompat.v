@@ -60,11 +60,11 @@ Module Backport_WSets
  Definition In_1 : forall s x y, E.eq x y -> In x s -> In y s
   := MF.In_1.
  Definition eq_refl : forall s, eq s s
-  := @Equivalence_Reflexive _ _ M.eq_equiv.
+  := @Equivalence_Reflexive M.eq_equiv.
  Definition eq_sym : forall s s', eq s s' -> eq s' s
-  := @Equivalence_Symmetric _ _ M.eq_equiv.
+  := @Equivalence_Symmetric M.eq_equiv.
  Definition eq_trans : forall s s' s'', eq s s' -> eq s' s'' -> eq s s''
-  := @Equivalence_Transitive _ _ M.eq_equiv.
+  := @Equivalence_Transitive M.eq_equiv.
  Definition mem_1 : forall s x, In x s -> mem x s = true
   := MF.mem_1.
  Definition mem_2 : forall s x, mem x s = true -> In x s
@@ -199,7 +199,7 @@ Module Backport_Sets
    choose s = Some x -> choose s' = Some y -> Equal s s' -> E.eq x y
    := M.choose_spec3.
   Definition lt_trans : forall s s' s'', lt s s' -> lt s' s'' -> lt s s''
-   := @StrictOrder_Transitive _ _ M.lt_strorder.
+   := @StrictOrder_Transitive M.lt_strorder.
   Lemma lt_not_eq : forall s s',  lt s s' -> ~ eq s s'.
   Proof.
    unfold lt, eq. intros s s' Hlt Heq. rewrite Heq in Hlt.

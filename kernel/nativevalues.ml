@@ -58,6 +58,7 @@ type atom =
   | Acofix of t array * t array * int * t
   | Acofixe of t array * t array * int * t
   | Aprod of name * t * (t -> t)
+  | Aproj of constant * accumulator
 
 let accumulate_tag = 0
 
@@ -119,6 +120,9 @@ let mk_sw_accu annot c p ac =
 
 let mk_prod_accu s dom codom =
   mk_accu (Aprod (s,dom,codom))
+
+let mk_proj_accu kn c = 
+  mk_accu (Aproj (kn,c))
 
 let atom_of_accu (k:accumulator) =
   (Obj.magic (Obj.field (Obj.magic k) 2) : atom)

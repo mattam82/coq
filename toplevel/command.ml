@@ -64,6 +64,14 @@ let rec complete_conclusion a cs = function
 
 (* 1| Constant definitions *)
 
+let definition_entry ?(opaque=false) ?types body =
+  { const_entry_body = body;
+    const_entry_secctx = None;
+    const_entry_type = types;
+    const_entry_proj = None;
+    const_entry_opaque = opaque;
+    const_entry_inline_code = false}
+
 let red_constant_entry n ce = function
   | None -> ce
   | Some red ->
@@ -85,6 +93,7 @@ let interp_definition bl red_option c ctypopt =
 	{ const_entry_body = body;
           const_entry_secctx = None;
 	  const_entry_type = None;
+	  const_entry_proj = None;
           const_entry_opaque = false;
 	  const_entry_inline_code = false
 	}
@@ -103,6 +112,7 @@ let interp_definition bl red_option c ctypopt =
 	{ const_entry_body = body;
           const_entry_secctx = None;
 	  const_entry_type = Some typ;
+	  const_entry_proj = None;
           const_entry_opaque = false;
 	  const_entry_inline_code = false
 	}
@@ -524,6 +534,7 @@ let declare_fix kind f def t imps =
     const_entry_body = def;
     const_entry_secctx = None;
     const_entry_type = Some t;
+    const_entry_proj = None;
     const_entry_opaque = false;
     const_entry_inline_code = false
   } in
@@ -715,8 +726,9 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
           { const_entry_body = Evarutil.nf_evar !evdref body;
             const_entry_secctx = None;
 	    const_entry_type = Some ty;
-        const_entry_opaque = false;
-        const_entry_inline_code = false}
+	    const_entry_proj = None;
+            const_entry_opaque = false;
+            const_entry_inline_code = false}
 	in 
 	(** FIXME: include locality *)
 	let c = Declare.declare_constant recname (DefinitionEntry ce, IsDefinition Definition) in

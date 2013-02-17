@@ -30,6 +30,9 @@ val get_declare_definition_hook : unit -> (definition_entry -> unit)
 
 (** {6 Definitions/Let} *)
 
+(* Defaut definition entries, transparent with no secctx or proj information *)
+val definition_entry : ?opaque:bool -> ?types:types -> constr -> definition_entry
+
 val interp_definition :
   local_binder list -> red_expr option -> constr_expr ->
   constr_expr option -> definition_entry * Evd.evar_map * Impargs.manual_implicits

@@ -124,7 +124,8 @@ let head_constr_bound t =
   let _,ccl = decompose_prod_assum t in
   let hd,args = decompose_app ccl in
   match kind_of_term hd with
-    | Const _ | Ind _ | Construct _ | Var _ -> (hd,args)
+    | Const _ | Ind _ | Construct _ | Var _ -> hd
+    | Proj (p, _) -> mkConst p
     | _ -> raise Bound
 
 let head_constr c =
@@ -841,7 +842,7 @@ let is_record mind = (Global.lookup_mind (fst mind)).mind_record
 
 let find_eliminator c gl =
   let (ind,t) = pf_reduce_to_quantified_ind gl (pf_type_of gl c) in
-  if is_record ind then raise IsRecord;
+  if is_record ind <> None then raise IsRecord;
   let c = lookup_eliminator ind (elimination_sort_of_goal gl) in
   {elimindex = None; elimbody = (c,NoBindings)}
 
@@ -913,7 +914,7 @@ type conjunction_status =
   | DefinedRecord of constant option list
   | NotADefinedRecordUseScheme of constr
 
-let make_projection sigma params cstr sign elim i n c =
+let make_projection env sigma params cstr sign elim i n c =
   let elim = match elim with
   | NotADefinedRecordUseScheme elim ->
       (* bugs: goes from right to left when i increases! *)
@@ -927,20 +928,22 @@ let make_projection sigma params cstr sign elim i n c =
 	&& not (isEvar (fst (whd_betaiota_stack sigma t)))
       then
         let t = lift (i+1-n) t in
-	Some (beta_applist (elim,params@[t;branch]),t)
+	let abselim = beta_applist (elim,params@[t;branch]) in
+	let c = beta_applist (abselim, [mkApp (c, extended_rel_vect 0 sign)]) in
+	  Some (it_mkLambda_or_LetIn c sign, it_mkProd_or_LetIn t sign)
       else
 	None
   | DefinedRecord l ->
       (* goes from left to right when i increases! *)
       match List.nth l i with
       | Some proj ->
-	  let t = Typeops.type_of_constant (Global.env()) proj in
 	  let args = extended_rel_vect 0 sign in
-	  Some (beta_applist (mkConst proj,params),prod_applist t (params@[mkApp (c,args)]))
+	  let proj = mkProj (proj, mkApp (c, args)) in
+	  let app = it_mkLambda_or_LetIn proj sign in
+	  let t = Retyping.get_type_of env sigma app in
+	    Some (proj, t)
       | None -> None
-  in Option.map (fun (abselim,elimt) -> 
-    let c = beta_applist (abselim,[mkApp (c,extended_rel_vect 0 sign)]) in
-    (it_mkLambda_or_LetIn c sign, it_mkProd_or_LetIn elimt sign)) elim
+  in elim
 
 let descend_in_conjunctions tac exit c gl =
   try
@@ -961,7 +964,7 @@ let descend_in_conjunctions tac exit c gl =
 	    NotADefinedRecordUseScheme elim in
 	tclFIRST
 	  (List.init n (fun i gl ->
-	    match make_projection (project gl) params cstr sign elim i n c with
+	    match pf_apply make_projection gl params cstr sign elim i n c with
 	    | None -> tclFAIL 0 (mt()) gl
 	    | Some (p,pt) ->
 	    tclTHENS
@@ -2870,7 +2873,7 @@ let guess_elim isrec hyp0 gl =
   let mind,_ = pf_reduce_to_quantified_ind gl tmptyp0 in
   let s = elimination_sort_of_goal gl in
   let elimc =
-    if isrec && not (is_record mind) then lookup_eliminator mind s
+    if isrec && not (is_record mind <> None) then lookup_eliminator mind s
     else
       if use_dependent_propositions_elimination () &&
 	dependent_no_evar (mkVar hyp0) (pf_concl gl)
@@ -3627,8 +3630,10 @@ let unify ?(state=full_transparent_state) x y gl =
   try
     let flags =
       {default_unify_flags with
-	modulo_delta = state;
-	modulo_conv_on_closed_terms = Some state}
+       modulo_delta = state;
+       modulo_delta_types = state;
+       modulo_delta_in_merge = Some state;
+       modulo_conv_on_closed_terms = Some state}
     in
     let evd = w_unify (pf_env gl) (project gl) Reduction.CONV ~flags x y
     in tclEVARS evd gl

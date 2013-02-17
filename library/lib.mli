@@ -197,7 +197,8 @@ val is_in_section : Globnames.global_reference -> bool
 
 val add_section_variable : Names.Id.t -> Decl_kinds.binding_kind -> unit
 
-val add_section_constant : Names.constant -> Context.named_context -> unit
+val add_section_constant : bool (* is_projection *) -> 
+  Names.constant -> Context.named_context -> unit
 val add_section_kn : Names.mutual_inductive -> Context.named_context -> unit
 val replacement_context : unit ->
   (Names.Id.t array Names.Cmap.t * Names.Id.t array Names.Mindmap.t)

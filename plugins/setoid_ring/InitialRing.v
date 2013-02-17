@@ -581,7 +581,7 @@ Section GEN_DIV.
  Proof.
   constructor.
   intros a b;unfold triv_div.
-  assert (X:= morph.(morph_eq) a b);destruct (ceqb a b).
+  assert (X:= morph.(@morph_eq) a b);destruct (ceqb a b).
   Esimpl.
   rewrite X; trivial.
   rsimpl.

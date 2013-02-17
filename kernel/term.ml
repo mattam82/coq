@@ -79,6 +79,7 @@ type ('constr, 'types) kind_of_term = ('constr, 'types) Constr.kind_of_term =
   | Case      of case_info * 'constr * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
+  | Proj      of constant * 'constr
 
 type values = Constr.values
 
@@ -109,6 +110,7 @@ let mkLambda = Constr.mkLambda
 let mkLetIn = Constr.mkLetIn
 let mkApp = Constr.mkApp
 let mkConst = Constr.mkConst
+let mkProj = Constr.mkProj
 let mkInd = Constr.mkInd
 let mkConstruct = Constr.mkConstruct
 let mkCase = Constr.mkCase
@@ -643,6 +645,7 @@ let kind_of_type t = match kind_of_term t with
   | Prod (na,t,c) -> ProdType (na, t, c)
   | LetIn (na,b,t,c) -> LetInType (na, b, t, c)
   | App (c,l) -> AtomicType (c, l)
-  | (Rel _ | Meta _ | Var _ | Evar _ | Const _ | Case _ | Fix _ | CoFix _ | Ind _)
+  | (Rel _ | Meta _ | Var _ | Evar _ | Const _ 
+  | Proj _ | Case _ | Fix _ | CoFix _ | Ind _)
     -> AtomicType (t,[||])
   | (Lambda _ | Construct _) -> failwith "Not a type"

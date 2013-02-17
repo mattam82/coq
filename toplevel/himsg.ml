@@ -132,7 +132,7 @@ let explain_number_branches env sigma cj expn =
   str "expects " ++  int expn ++ str " branches."
 
 let explain_ill_formed_branch env sigma c ci actty expty =
-  let simp t = Reduction.nf_betaiota (Evarutil.nf_evar sigma t) in
+  let simp t = Reduction.nf_betaiota env (Evarutil.nf_evar sigma t) in
   let c = Evarutil.nf_evar sigma c in
   let env = make_all_name_different env in
   let pc = pr_lconstr_env env c in

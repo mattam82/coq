@@ -75,7 +75,7 @@ val declare_coercion :
 (** {6 Access to coercions infos } *)
 val coercion_exists : coe_typ -> bool
 
-val coercion_value : coe_index -> (unsafe_judgment * bool)
+val coercion_value : coe_index -> (unsafe_judgment * bool * bool)
 
 (** {6 Lookup functions for coercion paths } *)
 

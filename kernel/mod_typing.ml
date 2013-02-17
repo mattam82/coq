@@ -120,7 +120,7 @@ and check_with_def env sign (idl,c) mp equiv =
 		    Cemitcodes.from_val (compile_constant_body env' def);
 		  const_constraints = cst }
 	      in
-	      SEBstruct(before@(l,SFBconst(cb'))::after),cb',cst
+	      SEBstruct(before@(l,SFBconst cb')::after),cb',cst
       | _ ->
 	      (* Definition inside a sub-module *)
 	      let old = match spec with

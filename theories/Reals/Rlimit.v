@@ -346,7 +346,7 @@ Lemma single_limit :
 Proof.
   unfold limit1_in; unfold limit_in; intros.
   cut (forall eps:R, eps > 0 -> dist R_met l l' < 2 * eps).
-  clear H0 H1; unfold dist; unfold R_met; unfold R_dist;
+  clear H0 H1; simpl dist; unfold R_met; unfold R_dist;
     unfold Rabs; case (Rcase_abs (l - l')); intros.
   cut (forall eps:R, eps > 0 -> - (l - l') < eps).
   intro; generalize (prop_eps (- (l - l')) H1); intro;

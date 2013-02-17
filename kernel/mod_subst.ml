@@ -319,6 +319,11 @@ let rec map_kn f f' c =
   let func = map_kn f f' in
     match kind_of_term c with
       | Const kn -> (try snd (f' kn) with No_subst -> c)
+      | Proj (kn,t) -> 
+          let kn' = try fst (f' kn) with No_subst -> kn in
+	  let t' = func t in
+	    if kn' == kn && t' == t then c
+	    else mkProj (kn', t')
       | Ind (kn,i) ->
 	  let kn' = f kn in
 	  if kn'==kn then c else mkInd (kn',i)

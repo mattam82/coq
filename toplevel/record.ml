@@ -158,10 +158,11 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
   let paramdecls = mib.mind_params_ctxt in
   let r = mkInd indsp in
   let rp = applist (r, Termops.extended_rel_list 0 paramdecls) in
-  let paramargs = Termops.extended_rel_list 1 paramdecls in (*def in [[params;x:rp]]*)
+  let _paramargs = Termops.extended_rel_list 1 paramdecls in (*def in [[params;x:rp]]*)
   let x = match name with Some n -> Name n | None -> Namegen.named_hd (Global.env()) r Anonymous in
   let fields = instantiate_possibly_recursive_type indsp paramdecls fields in
   let lifted_fields = Termops.lift_rel_context 1 fields in
+  let nfields = List.length fields in
   let (_,kinds,sp_projs,_) =
     List.fold_left3
       (fun (nfi,kinds,sp_projs,subst) coe (fi,optci,ti) impls ->
@@ -188,10 +189,14 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
                 it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
 	      let kn =
 	        try
+		  let projinfo = 
+		    (fst indsp, mib.mind_nparams, nfields - nfi, ccl)
+		  in
 		  let cie = {
 		    const_entry_body = proj;
                     const_entry_secctx = None;
                     const_entry_type = Some projtyp;
+		    const_entry_proj = if optci = None then Some projinfo else None;
                     const_entry_opaque = false;
 		    const_entry_inline_code = false } in
 		  let k = (DefinitionEntry cie,IsDefinition kind) in
@@ -201,14 +206,12 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
                 with Type_errors.TypeError (ctx,te) ->
                   raise (NotDefinable (BadTypedProj (fid,ctx,te))) in
 	      let refi = ConstRef kn in
-	      let constr_fi = mkConst kn in
 	      Impargs.maybe_declare_manual_implicits false refi impls;
 	      if coe then begin
 	        let cl = Class.class_of_global (IndRef indsp) in
 	        Class.try_add_new_coercion_with_source refi ~local:false ~source:cl
 	      end;
-	      let proj_args = (*Rel 1 refers to "x"*) paramargs@[mkRel 1] in
-	      let constr_fip = applist (constr_fi,proj_args) in
+	      let constr_fip = mkProj (kn,mkRel 1) in
 	      (Some kn::sp_projs, Projection constr_fip::subst)
             with NotDefinable why ->
 	      warning_or_error coe indsp why;
@@ -282,36 +285,28 @@ let implicits_of_context ctx =
 let declare_class finite def infer id idbuild paramimpls params arity fieldimpls fields
     ?(kind=StructureComponent) ?name is_coe coers priorities sign =
   let fieldimpls =
-    (* Make the class and all params implicits in the projections *)
-    let ctx_impls = implicits_of_context params in
-    let len = succ (List.length params) in
-      List.map (fun x -> ctx_impls @ Impargs.lift_implicits len x) fieldimpls
+    (* Make the class implicit in the projections, and the params if applicable. *)
+    if def then
+      let len = List.length params in
+      let impls = implicits_of_context params in
+	 List.map (fun x -> impls @ Impargs.lift_implicits (succ len) x) fieldimpls
+    else List.map (fun x -> (ExplByPos (1, None), (true, true, true)) ::
+		     Impargs.lift_implicits 1 x) fieldimpls
   in
   let impl, projs =
     match fields with
     | [(Name proj_name, _, field)] when def ->
 	let class_body = it_mkLambda_or_LetIn field params in
 	let class_type = Option.map (fun ar -> it_mkProd_or_LetIn ar params) arity in
-	let class_entry =
-	  { const_entry_body = class_body;
-            const_entry_secctx = None;
-	    const_entry_type = class_type;
-	    const_entry_opaque = false;
-	    const_entry_inline_code = false }
-	in
+	let class_entry = Command.definition_entry ?types:class_type class_body in
 	let cst = Declare.declare_constant (snd id)
 	  (DefinitionEntry class_entry, IsDefinition Definition)
 	in
 	let inst_type = appvectc (mkConst cst) (Termops.rel_vect 0 (List.length params)) in
+
 	let proj_type = it_mkProd_or_LetIn (mkProd(Name (snd id), inst_type, lift 1 field)) params in
 	let proj_body = it_mkLambda_or_LetIn (mkLambda (Name (snd id), inst_type, mkRel 1)) params in
-	let proj_entry =
-	  { const_entry_body = proj_body;
-            const_entry_secctx = None;
-	    const_entry_type = Some proj_type;
-	    const_entry_opaque = false;
-	    const_entry_inline_code = false }
-	in
+	let proj_entry = Command.definition_entry ~types:proj_type proj_body in
 	let proj_cst = Declare.declare_constant proj_name
 	  (DefinitionEntry proj_entry, IsDefinition Definition)
 	in
@@ -394,7 +389,7 @@ let definition_structure (kind,finite,infer,(is_coe,(loc,idstruc)),ps,cfs,idbuil
     | _ ->
 	let arity = Option.default (Termops.new_Type ()) sc in
 	let implfs = List.map
-	  (fun impls -> implpars @ Impargs.lift_implicits (succ (List.length params)) impls) implfs in
+	  (fun impls -> (* implpars @  *)Impargs.lift_implicits (succ (List.length params)) impls) implfs in
 	let ind = declare_structure finite infer idstruc idbuild implpars params arity implfs 
 	  fields is_coe (List.map (fun coe -> not (Option.is_empty coe)) coers) sign in
 	if infer then search_record declare_record_instance (ConstructRef (ind,1)) sign;

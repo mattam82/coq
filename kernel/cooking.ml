@@ -102,6 +102,13 @@ let expmod_constr modlist c =
 	   with
 	    | Not_found -> map_constr substrec c)
 
+      | Proj (p, c') ->
+          (try 
+	     match kind_of_term (share (ConstRef p) modlist) with
+	     | Const p' -> mkProj (p', substrec c')
+	     | _ -> assert false
+	   with Not_found -> map_constr substrec c)
+
   | _ -> map_constr substrec c
 
   in
@@ -122,8 +129,8 @@ type recipe = {
 type inline = bool
 
 type result =
-  constant_def * constant_type * Univ.constraints * inline
-    * Context.section_context option
+  constant_def * constant_type * projection_body option * 
+    Univ.constraints * inline * Context.section_context option
 
 let on_body f = function
   | Undef inl -> Undef inl
@@ -136,6 +143,15 @@ let constr_of_def = function
   | Def cs -> Lazyconstr.force cs
   | OpaqueDef lc -> Lazyconstr.force_opaque lc
 
+(* Apply the cooking substitution to a projections type. *)
+let rename_constant_type n c hyps =
+  CList.fold_left_i
+    (fun i c (id, body, t) -> 
+      match body with
+      | Some b -> Vars.replace_vars [(id, b)] c
+      | None -> Vars.replace_vars [(id, mkRel i)] c)
+    (n + 1) c hyps
+
 let cook_constant env r =
   let cb = r.d_from in
   let hyps = Context.map_named_context (expmod_constr r.d_modlist) r.d_abstract in
@@ -147,14 +163,27 @@ let cook_constant env r =
     Context.fold_named_context (fun (h,_,_) hyps ->
       List.filter (fun (id,_,_) -> not (Id.equal id h)) hyps)
       hyps ~init:cb.const_hyps in
-  let typ = match cb.const_type with
+  let ty, typ = match cb.const_type with
     | NonPolymorphicType t ->
 	let typ = abstract_constant_type (expmod_constr r.d_modlist t) hyps in
-	NonPolymorphicType typ
+	typ, NonPolymorphicType typ
     | PolymorphicArity (ctx,s) ->
 	let t = mkArity (ctx,Type s.poly_level) in
 	let typ = abstract_constant_type (expmod_constr r.d_modlist t) hyps in
 	let j = make_judge (constr_of_def body) typ in
-	Typeops.make_polymorphic_if_constant_for_ind env j
+	typ, Typeops.make_polymorphic_if_constant_for_ind env j
   in
-  (body, typ, cb.const_constraints, cb.const_inline_code, Some const_hyps)
+  let projection pb =
+    let (mind, _), n' =
+      try match kind_of_term (share (IndRef (pb.proj_ind,0)) r.d_modlist) with
+      | App (f,l) -> (destInd f, Array.length l)
+      | Ind ind -> ind, 0
+      | _ -> assert false 
+      with Not_found -> ((pb.proj_ind,0), 0)
+    in 
+    let ctx, ty' = decompose_prod_n (n' + pb.proj_npars + 1) ty in
+      { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
+	 proj_type = ty' }
+  in
+    (body, typ, Option.map projection cb.const_proj, cb.const_constraints, 
+		    cb.const_inline_code, Some const_hyps)

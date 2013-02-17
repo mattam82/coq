@@ -432,7 +432,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	    List.length l = 1 && not (type_mem_kn kn (List.hd l))
 	then raise (I Singleton);
 	if l = [] then raise (I Standard);
-	if not mib.mind_record then raise (I Standard);
+	if mib.mind_record = None then raise (I Standard);
 	(* Now we're sure it's a record. *)
 	(* First, we find its field names. *)
 	let rec names_prod t = match kind_of_term t with
@@ -597,6 +597,8 @@ let rec extract_term env mle mlt c args =
 	  ast_pop (extract_term env' mle' mlt c2 args'))
     | Const kn ->
 	extract_cst_app env mle mlt kn args
+    | Proj (p, c) ->
+        extract_cst_app env mle mlt p (c :: args)
     | Construct cp ->
 	extract_cons_app env mle mlt cp args
     | Rel n ->

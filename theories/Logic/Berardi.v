@@ -67,18 +67,12 @@ Variables A B : Prop.
 
 Record retract : Prop :=
   {i : A -> B; j : B -> A; inv : forall a:A, j (i a) = a}.
-
 Record retract_cond : Prop :=
   {i2 : A -> B; j2 : B -> A; inv2 : retract -> forall a:A, j2 (i2 a) = a}.
 
-
 (** The dependent elimination above implies the axiom of choice: *)
-Lemma AC : forall r:retract_cond, retract -> forall a:A, j2 r (i2 r a) = a.
-Proof.
-intros r.
-case r; simpl.
-trivial.
-Qed.
+Lemma AC : forall r:retract_cond, retract -> forall a:A, r.(j2) (r.(i2) a) = a.
+Proof. intros r. exact r.(inv2). Qed.
 
 End Retracts.
 

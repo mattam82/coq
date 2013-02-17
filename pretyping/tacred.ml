@@ -43,7 +43,8 @@ let error_not_evaluable r =
      spc () ++ str "to an evaluable reference.")
 
 let is_evaluable_const env cst =
-  is_transparent (ConstKey cst) && evaluable_constant cst env
+  is_transparent (ConstKey cst) && 
+    (evaluable_constant cst env || is_projection cst env)
 
 let is_evaluable_var env id =
   is_transparent (VarKey id) && evaluable_named id env
@@ -52,8 +53,12 @@ let is_evaluable env = function
   | EvalConstRef cst -> is_evaluable_const env cst
   | EvalVarRef id -> is_evaluable_var env id
 
+exception IsProjection of projection
+
 let value_of_evaluable_ref env = function
-  | EvalConstRef con -> constant_value env con
+  | EvalConstRef con -> 
+    (try constant_value env con
+    with NotEvaluableConst IsProj -> raise (IsProjection con))
   | EvalVarRef id -> Option.get (pi2 (lookup_named id env))
 
 let constr_of_evaluable_ref = function
@@ -526,6 +531,38 @@ let special_red_case env sigma whfun (ci, p, c, lf)  =
   in
   redrec c
 
+let reduce_projection env sigma proj (recarg'hd,stack') stack =
+  (match kind_of_term recarg'hd with
+  | Construct _ -> 
+    let proj_narg = 
+      let pb = Option.get ((lookup_constant proj env).Declarations.const_proj) in
+	pb.Declarations.proj_npars + pb.Declarations.proj_arg
+    in Reduced (List.nth stack' proj_narg, stack)
+  | _ -> NotReducible)
+
+let special_red_proj env sigma whfun p c =
+  let rec redrec s =
+    let (constr, cargs) = whfun s in
+    if isEvalRef env constr then
+      let ref = destEvalRef constr in
+	(match reference_opt_value sigma env ref with
+	| None -> raise Redelimination
+	| Some gvalue ->
+          if reducible_mind_case gvalue then
+	    match reduce_projection env sigma p (gvalue,cargs) [] with
+	    | Reduced (v,_) -> v
+	    | NotReducible -> raise Redelimination
+	  else
+	    redrec (applist(gvalue, cargs)))
+    else
+      if reducible_mind_case constr then
+	match reduce_projection env sigma p (constr,cargs) [] with
+	| Reduced (v, _) -> v
+	| NotReducible -> raise Redelimination
+      else
+	raise Redelimination
+  in redrec c
+
 (* data structure to hold the map kn -> rec_args for simpl *)
 
 type behaviour = {
@@ -723,6 +760,11 @@ and whd_simpl_stack env sigma =
             | Reduced s' -> redrec (applist s')
 	    | NotReducible -> s'
 	  with Redelimination -> s')
+      | Proj (p, c) ->
+         (try match reduce_projection env sigma p (whd_construct_stack env sigma c) stack with
+	 | Reduced s' -> redrec (applist s')
+	 | NotReducible -> s'
+	 with Redelimination -> s')
       | _ when isEvalRef env x ->
 	  let ref = destEvalRef x in
           (try
@@ -781,6 +823,15 @@ let try_red_product env sigma c =
       | Prod (x,a,b) -> mkProd (x, a, redrec (push_rel (x,None,a) env) b)
       | LetIn (x,a,b,t) -> redrec env (subst1 a t)
       | Case (ci,p,d,lf) -> simpfun (mkCase (ci,p,redrec env d,lf))
+      | Proj (p, c) -> 
+	let c' = 
+	  match kind_of_term c with
+	  | Construct _ -> c
+	  | _ -> redrec env c
+	in
+          (match reduce_projection env sigma p (whd_betaiotazeta_stack sigma c') [] with
+	  | Reduced s -> simpfun (applist s)
+	  | NotReducible -> raise Redelimination)
       | _ when isEvalRef env x ->
           (* TO DO: re-fold fixpoints after expansion *)
           (* to get true one-step reductions *)
@@ -881,6 +932,7 @@ let simpl env sigma c = strong whd_simpl env sigma c
 let matches_head c t =
   match kind_of_term t with
     | App (f,_) -> matches c f
+    | Proj (p, _) -> matches c (mkConst p)
     | _ -> raise PatternMatchingFailure
 
 let contextually byhead (occs,c) f env sigma t =
@@ -901,8 +953,11 @@ let contextually byhead (occs,c) f env sigma t =
 	f subst' env sigma t
       else if byhead then
 	(* find other occurrences of c in t; TODO: ensure left-to-right *)
-        let (f,l) = destApp t in
-	mkApp (f, Array.map_left (traverse envc) l)
+	(match kind_of_term t with
+	| App (f,l) ->
+	  mkApp (f, Array.map_left (traverse envc) l)
+	| Proj (p,c) -> mkProj (p,traverse envc c)
+	| _ -> assert false)
       else
 	t
     with PatternMatchingFailure ->
@@ -918,24 +973,35 @@ let contextually byhead (occs,c) f env sigma t =
  * n is the number of the next occurence of name.
  * ol is the occurence list to find. *)
 
-let substlin env evalref n (nowhere_except_in,locs) c =
+let substlin env sigma evalref n (nowhere_except_in,locs) c =
   let maxocc = List.fold_right max locs 0 in
   let pos = ref n in
   assert (List.for_all (fun x -> x >= 0) locs);
-  let value = value_of_evaluable_ref env evalref in
-  let term = constr_of_evaluable_ref evalref in
+  let matches =   
+    let term = constr_of_evaluable_ref evalref in
+    try 
+      let value = value_of_evaluable_ref env evalref in
+	(fun c -> if eq_constr c term then Some value else None)
+    with IsProjection p ->
+      (fun c ->
+        match kind_of_term c with
+	| Proj (p',c') when eq_constant p p' ->
+          Some (whd_betaiotazeta sigma c)
+	| _ -> None)
+  in
   let rec substrec () c =
     if nowhere_except_in & !pos > maxocc then c
-    else if eq_constr c term then
-      let ok =
-	if nowhere_except_in then List.mem !pos locs
-	else not (List.mem !pos locs) in
-      incr pos;
-      if ok then value else c
-    else
-      map_constr_with_binders_left_to_right
-	(fun _ () -> ())
-        substrec () c
+    else match matches c with
+      | Some value ->
+        let ok =
+	  if nowhere_except_in then List.mem !pos locs
+	  else not (List.mem !pos locs) in
+	incr pos;
+	if ok then value else c
+      | None ->
+        map_constr_with_binders_left_to_right
+	  (fun _ () -> ())
+          substrec () c
   in
   let t' = substrec () c in
   (!pos, t')
@@ -958,7 +1024,7 @@ let unfold env sigma name =
  * Performs a betaiota reduction after unfolding. *)
 let unfoldoccs env sigma (occs,name) c =
   let unfo nowhere_except_in locs =
-    let (nbocc,uc) = substlin env name 1 (nowhere_except_in,locs) c in
+    let (nbocc,uc) = substlin env sigma name 1 (nowhere_except_in,locs) c in
     if Int.equal nbocc 1 then
       error ((string_of_evaluable_ref env name)^" does not occur.");
     let rest = List.filter (fun o -> o >= nbocc) locs in

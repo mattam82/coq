@@ -49,10 +49,13 @@ type mutual_inductive_entry = {
 (** {6 Constants (Definition/Axiom) } *)
 type const_entry_body = constr
 
+type projection = mutual_inductive * int * int * types
+
 type definition_entry = {
   const_entry_body   : const_entry_body;
   const_entry_secctx : Context.section_context option;
   const_entry_type        : types option;
+  const_entry_proj   : projection option;
   const_entry_opaque      : bool;
   const_entry_inline_code : bool }
 

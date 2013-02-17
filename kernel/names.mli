@@ -596,6 +596,8 @@ val kn_ord : kernel_name -> kernel_name -> int
 type constant = Constant.t
 (** @deprecated Alias type *)
 
+type projection = constant
+
 val constant_of_kn_equiv : KerName.t -> KerName.t -> constant
 (** @deprecated Same as [Constant.make] *)
 

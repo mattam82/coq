@@ -487,11 +487,11 @@ let rec compile_fv reloc l sz cont =
 (* Compiling constants *)
 
 let rec get_allias env kn =
-  let tps = (lookup_constant kn env).const_body_code in
-  match Cemitcodes.force tps with
-  | BCallias kn' -> get_allias env kn'
-  | _ -> kn
-
+  let cb = lookup_constant kn env in
+  let tps = cb.const_body_code in
+    (match Cemitcodes.force tps with
+    | BCallias kn' -> get_allias env kn'
+    | _ -> kn)
 
 (* Compiling expressions *)
 
@@ -499,6 +499,13 @@ let rec compile_constr reloc c sz cont =
   match kind_of_term c with
   | Meta _ -> invalid_arg "Cbytegen.compile_constr : Meta"
   | Evar _ -> invalid_arg "Cbytegen.compile_constr : Evar"
+  | Proj (p,c) -> 
+    (* compile_const reloc p [|c|] sz cont *)
+    let cb = lookup_constant p !global_env in
+      (* TODO: better representation of projections *)
+    let pb = Option.get cb.const_proj in
+    let args = Array.make pb.proj_npars mkProp in
+      compile_const reloc p (Array.append args [|c|]) sz cont
 
   | Cast(c,_,_) -> compile_constr reloc c sz cont
 

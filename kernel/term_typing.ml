@@ -67,11 +67,22 @@ let infer_declaration env = function
 	then OpaqueDef (Lazyconstr.opaque_from_val j.uj_val)
 	else Def (Lazyconstr.from_val j.uj_val)
       in
-      def, typ, cst, c.const_entry_inline_code, c.const_entry_secctx
+      let proj = 
+	match c.const_entry_proj with
+	| Some (ind, n, m, ty) ->
+        (* FIXME: check projection *)
+	let pb = { proj_ind = ind;
+		   proj_npars = n;
+		   proj_arg = m;
+		   proj_type = ty }
+	in Some pb
+	| None -> None
+      in
+      def, typ, proj, cst, c.const_entry_inline_code, c.const_entry_secctx
   | ParameterEntry (ctx,t,nl) ->
       let (j,cst) = infer env t in
       let t = hcons_constr (Typeops.assumption_of_judgment env j) in
-      Undef nl, NonPolymorphicType t, cst, false, ctx
+      Undef nl, NonPolymorphicType t, None, cst, false, ctx
 
 let global_vars_set_constant_type env = function
   | NonPolymorphicType t -> global_vars_set env t
@@ -89,8 +100,8 @@ let check_declared_variables declared inferred =
               (String.concat ", "
                  (List.map Id.to_string (Id.Set.elements undeclared_set))))
 
-let build_constant_declaration env (def,typ,cst,inline_code,ctx) =
-  let hyps =
+let build_constant_declaration env kn (def,typ,proj,cst,inline_code,ctx) =
+  let hyps = 
     let inferred =
       let ids_typ = global_vars_set_constant_type env typ in
       let ids_def = match def with
@@ -110,6 +121,7 @@ let build_constant_declaration env (def,typ,cst,inline_code,ctx) =
   { const_hyps = hyps;
     const_body = def;
     const_type = typ;
+    const_proj = proj;
     const_body_code = tps;
     const_constraints = cst;
     const_native_name = ref NotLinked;
@@ -117,11 +129,13 @@ let build_constant_declaration env (def,typ,cst,inline_code,ctx) =
 
 (*s Global and local constant declaration. *)
 
-let translate_constant env ce =
-  build_constant_declaration env (infer_declaration env ce)
+let translate_constant env kn ce =
+  build_constant_declaration env kn (infer_declaration env ce)
 
-let translate_recipe env r =
-  build_constant_declaration env (Cooking.cook_constant env r)
+let translate_recipe env kn r =
+  let (def,typ,proj,cst,inline,hyps) = Cooking.cook_constant env r in
+    build_constant_declaration env kn 
+      (def,typ,proj,cst,inline,hyps)
 
 (* Insertion of inductive types. *)
 

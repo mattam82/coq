@@ -327,11 +327,14 @@ let apply_coercion env sigma p hj typ_cl =
   try
     fst (List.fold_left
            (fun (ja,typ_cl) i ->
-	      let fv,isid = coercion_value i in
+	      let fv,isid,isproj = coercion_value i in
 	      let argl = (class_args_of env sigma typ_cl)@[ja.uj_val] in
 	      let jres = apply_coercion_args env argl fv in
 		(if isid then
 		   { uj_val = ja.uj_val; uj_type = jres.uj_type }
+		 else if isproj then
+		   { uj_val = mkProj (destConst fv.uj_val, ja.uj_val); 
+		     uj_type = jres.uj_type }
 		 else
 		   jres),
 	      jres.uj_type)

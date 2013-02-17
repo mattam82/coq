@@ -121,12 +121,16 @@ val add_constant : constant -> constant_body -> env -> env
 val lookup_constant    : constant -> env -> constant_body
 val evaluable_constant : constant -> env -> bool
 
+val lookup_projection    : Names.projection -> env -> projection_body
+val is_projection : constant -> env -> bool
+
 (** {6 ... } *)
 (** [constant_value env c] raises [NotEvaluableConst Opaque] if
    [c] is opaque and [NotEvaluableConst NoBody] if it has no
-   body and [Not_found] if it does not exist in [env] *)
+   body and [NotEvaluableConst IsProj] if [c] is a projection 
+   and [Not_found] if it does not exist in [env] *)
 
-type const_evaluation_result = NoBody | Opaque
+type const_evaluation_result = NoBody | Opaque | IsProj
 exception NotEvaluableConst of const_evaluation_result
 
 val constant_value     : env -> constant -> constr

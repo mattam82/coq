@@ -244,6 +244,9 @@ and nf_atom env atom =
       let env = push_rel (n,None,dom) env in
       let codom = nf_type env (codom vn) in
       mkProd(n,dom,codom)
+  | Aproj(p,c) ->
+      let c = nf_accu env c in
+      mkProj(p,c)
   | _ -> fst (nf_atom_type env atom)
 
 and nf_atom_type env atom = 
@@ -308,6 +311,12 @@ and nf_atom_type env atom =
       let env = push_rel (n,None,dom) env in
       let codom,s2 = nf_type_sort env (codom vn) in
       mkProd(n,dom,codom), mkSort (sort_of_product env s1 s2)
+  | Aproj(p,c) ->
+      let c,tc = nf_accu_type env c in
+      let cj = make_judge c tc in
+      let uj = Typeops.judge_of_projection env p cj in
+      uj.uj_val, uj.uj_type
+
 
 and  nf_predicate env ind mip params v pT =
   match kind_of_value v, kind_of_term pT with

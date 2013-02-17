@@ -443,9 +443,11 @@ let add_section_kn kn =
   let f x (l1,l2) = (l1,Names.Mindmap.add kn x l2) in
   add_section_replacement f f
 
-let add_section_constant kn =
+let add_section_constant is_projection kn =
+  let g x (l1,l2) = (Names.Cmap.add kn [||] l1,l2) in
   let f x (l1,l2) = (Names.Cmap.add kn x l1,l2) in
-  add_section_replacement f f
+    if is_projection then add_section_replacement g f
+    else add_section_replacement f f
 
 let replacement_context () = pi2 (List.hd !sectab)
 
