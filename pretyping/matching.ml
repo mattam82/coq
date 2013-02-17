@@ -194,6 +194,9 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
         (try Array.fold_left2 (sorec stk) (sorec stk subst c1 c2) arg1 arg2
          with Invalid_argument _ -> raise PatternMatchingFailure)
 
+      | PProj (p1,c1), Proj (p2,c2) when eq_constant p1 p2 ->
+          sorec stk subst c1 c2
+
       | PProd (na1,c1,d1), Prod(na2,c2,d2) ->
 	  sorec ((na1,na2,c2)::stk)
             (add_binders na1 na2 (sorec stk subst c1 c2)) d1 d2
@@ -331,6 +334,10 @@ let sub_match ?(partial_app=false) ?(closed=true) pat c =
         let mk_ctx le =
           mk_ctx (mkCase (ci,hd,List.hd le,Array.of_list (List.tl le))) in
         try_aux (c1::Array.to_list lc) mk_ctx next)
+  | Proj (p,c') ->
+      authorized_occ partial_app closed pat c mk_ctx (fun () ->
+        let mk_ctx le = mk_ctx (mkProj (p,List.hd le)) in
+	  try_aux [c'] mk_ctx next)
   | Construct _ | Fix _ | Ind _|CoFix _ |Evar _|Const _
   | Rel _|Meta _|Var _|Sort _ ->
       authorized_occ partial_app closed pat c mk_ctx next

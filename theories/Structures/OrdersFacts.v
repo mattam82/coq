@@ -31,7 +31,7 @@ Module Type CompareFacts (Import O:DecStrOrder').
 
  Lemma compare_lt_iff x y : (x ?= y) = Lt <-> x<y.
  Proof.
- case compare_spec; intro H; split; try easy; intro LT;
+  case compare_spec; intro H; split; try easy; intro LT;
   contradict LT; rewrite H; apply irreflexivity.
  Qed.
 

@@ -176,6 +176,7 @@ let constr_display csr =
   | App (c,l) -> "App("^(term_display c)^","^(array_display l)^")\n"
   | Evar (e,l) -> "Evar("^(string_of_int e)^","^(array_display l)^")"
   | Const c -> "Const("^(string_of_con c)^")"
+  | Proj (p, c) -> "Proj("^(string_of_con p)^","^term_display c ^")"
   | Ind (sp,i) ->
       "MutInd("^(string_of_mind sp)^","^(string_of_int i)^")"
   | Construct ((sp,i),j) ->
@@ -257,6 +258,11 @@ let print_pure_constr csr =
       print_string"}"
   | Const c -> print_string "Cons(";
       sp_con_display c;
+      print_string ")"
+  | Proj (p,c') -> print_string "Proj(";
+      sp_con_display p;
+      print_string ",";
+      box_display c';
       print_string ")"
   | Ind (sp,i) ->
       print_string "Ind(";

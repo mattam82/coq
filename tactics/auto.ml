@@ -158,9 +158,27 @@ let is_transparent_gr (ids, csts) = function
 
 let dummy_goal = Goal.V82.dummy_goal
 
+let strip_params env c = 
+  match kind_of_term c with
+  | App (f, args) -> 
+    (match kind_of_term f with
+    | Const p ->
+      let cb = lookup_constant p env in
+	(match cb.Declarations.const_proj with
+	| Some pb -> 
+	  let n = pb.Declarations.proj_npars in
+	    mkApp (mkProj (p, args.(n)), 
+		   Array.sub args (n+1) (Array.length args - (n + 1)))
+	| None -> c)
+    | _ -> c)
+  | _ -> c
+
 let translate_hint (go,p) =
   let mk_clenv (c,t) =
-    let cl = mk_clenv_from dummy_goal (c,t) in {cl with env = empty_env }
+    let cl = mk_clenv_from dummy_goal (c,t) in 
+      {cl with templval = 
+      { cl.templval with rebus = strip_params (Global.env()) cl.templval.rebus };
+      env = empty_env }
   in
   let code = match p.code with
     | Res_pf (c,t) -> Res_pf (c, mk_clenv (c,t))
@@ -485,7 +503,7 @@ let try_head_pattern c =
   try head_pattern_bound c
   with BoundPattern -> error "Bound head variable."
 
-let make_exact_entry sigma pri ?(name=PathAny) (c,cty) =
+let make_exact_entry env sigma pri ?(name=PathAny) (c,cty) =
   let cty = strip_outer_cast cty in
     match kind_of_term cty with
     | Prod _ -> failwith "make_exact_entry"
@@ -499,7 +517,7 @@ let make_exact_entry sigma pri ?(name=PathAny) (c,cty) =
 	  { pri = (match pri with None -> 0 | Some p -> p);
 	    pat = Some pat;
 	    name = name;
-	    code = Give_exact c })
+	    code = Give_exact (c) })
 
 let make_apply_entry env sigma (eapply,hnf,verbose) pri ?(name=PathAny) (c,cty) =
   let cty = if hnf then hnf_constr env sigma cty else cty in
@@ -540,7 +558,7 @@ let make_resolves env sigma flags pri ?name c =
   let try_apply f =
     try Some (f (c, cty)) with Failure _ -> None in
   let ents = List.map_filter try_apply
-      [make_exact_entry sigma pri ?name; make_apply_entry env sigma flags pri ?name]
+      [make_exact_entry env sigma pri ?name; make_apply_entry env sigma flags pri ?name]
   in
   if List.is_empty ents then
     errorlabstrm "Hint"

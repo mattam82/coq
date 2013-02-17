@@ -342,8 +342,8 @@ let build_branches_type ind (_,mip as specif) params p =
 
 (* [p] is the predicate, [c] is the match object, [realargs] is the
    list of real args of the inductive type *)
-let build_case_type n p c realargs =
-  whd_betaiota (betazeta_appvect (n+1) p (Array.of_list (realargs@[c])))
+let build_case_type env n p c realargs =
+  whd_betaiota env (betazeta_appvect (n+1) p (Array.of_list (realargs@[c])))
 
 let type_case_branches env (ind,largs) pj c =
   let specif = lookup_mind_specif env ind in
@@ -352,7 +352,7 @@ let type_case_branches env (ind,largs) pj c =
   let p = pj.uj_val in
   let univ = is_correct_arity env c pj ind specif params in
   let lc = build_branches_type ind specif params p in
-  let ty = build_case_type (snd specif).mind_nrealargs_ctxt p c realargs in
+  let ty = build_case_type env (snd specif).mind_nrealargs_ctxt p c realargs in
   (lc, ty, univ)
 
 
@@ -653,7 +653,7 @@ let check_one_fix renv recpos def =
     (* if [t] does not make recursive calls, it is guarded: *)
     if noccur_with_meta renv.rel_min nfi t then ()
     else
-      let (f,l) = decompose_app (whd_betaiotazeta t) in
+      let (f,l) = decompose_app (whd_betaiotazeta renv.env t) in
       match kind_of_term f with
         | Rel p ->
             (* Test if [p] is a fixpoint (recursive call) *)
@@ -770,6 +770,8 @@ let check_one_fix renv recpos def =
         | (Evar _ | Meta _) -> ()
 
         | (App _ | LetIn _ | Cast _) -> assert false (* beta zeta reduction *)
+	
+	| Proj (p, c) -> check_rec_call renv [] c
 
   and check_nested_fix_body renv decr recArgsDecrArg body =
     if Int.equal decr 0 then

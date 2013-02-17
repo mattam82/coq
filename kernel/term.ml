@@ -122,6 +122,7 @@ type ('constr, 'types) kind_of_term =
   | Case      of case_info * 'constr * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
+  | Proj      of constant * 'constr
 
 (* constr is the fixpoint of the previous type. Requires option
    -rectypes of the Caml compiler to be set *)
@@ -180,6 +181,8 @@ let mkApp (f, a) =
 
 (* Constructs a constant *)
 let mkConst c = Const c
+
+let mkProj (c, p) = Proj (c,p)
 
 (* Constructs an existential variable *)
 let mkEvar e = Evar e
@@ -262,7 +265,7 @@ let kind_of_type = function
   | Prod (na,t,c) -> ProdType (na, t, c)
   | LetIn (na,b,t,c) -> LetInType (na, b, t, c)
   | App (c,l) -> AtomicType (c, l)
-  | (Rel _ | Meta _ | Var _ | Evar _ | Const _ | Case _ | Fix _ | CoFix _ | Ind _ as c)
+  | (Proj _ | Rel _ | Meta _ | Var _ | Evar _ | Const _ | Case _ | Fix _ | CoFix _ | Ind _ as c)
     -> AtomicType (c,[||])
   | (Lambda _ | Construct _) -> failwith "Not a type"
 
@@ -479,6 +482,7 @@ let fold_constr f acc c = match kind_of_term c with
   | Lambda (_,t,c) -> f (f acc t) c
   | LetIn (_,b,t,c) -> f (f (f acc b) t) c
   | App (c,l) -> Array.fold_left f (f acc c) l
+  | Proj (p,c) -> f acc c
   | Evar (_,l) -> Array.fold_left f acc l
   | Case (_,p,c,bl) -> Array.fold_left f (f (f acc p) c) bl
   | Fix (_,(lna,tl,bl)) ->
@@ -500,6 +504,7 @@ let iter_constr f c = match kind_of_term c with
   | Lambda (_,t,c) -> f t; f c
   | LetIn (_,b,t,c) -> f b; f t; f c
   | App (c,l) -> f c; Array.iter f l
+  | Proj (p,c) -> f c
   | Evar (_,l) -> Array.iter f l
   | Case (_,p,c,bl) -> f p; f c; Array.iter f bl
   | Fix (_,(_,tl,bl)) -> Array.iter f tl; Array.iter f bl
@@ -519,6 +524,7 @@ let iter_constr_with_binders g f n c = match kind_of_term c with
   | Lambda (_,t,c) -> f n t; f (g n) c
   | LetIn (_,b,t,c) -> f n b; f n t; f (g n) c
   | App (c,l) -> f n c; Array.iter (f n) l
+  | Proj (p,c) -> f n c
   | Evar (_,l) -> Array.iter (f n) l
   | Case (_,p,c,bl) -> f n p; f n c; Array.iter (f n) bl
   | Fix (_,(_,tl,bl)) ->
@@ -540,6 +546,7 @@ let map_constr f c = match kind_of_term c with
   | Lambda (na,t,c) -> mkLambda (na, f t, f c)
   | LetIn (na,b,t,c) -> mkLetIn (na, f b, f t, f c)
   | App (c,l) -> mkApp (f c, Array.map f l)
+  | Proj (p,c) -> Proj (p,f c)
   | Evar (e,l) -> mkEvar (e, Array.map f l)
   | Case (ci,p,c,bl) -> mkCase (ci, f p, f c, Array.map f bl)
   | Fix (ln,(lna,tl,bl)) ->
@@ -561,6 +568,7 @@ let map_constr_with_binders g f l c = match kind_of_term c with
   | Lambda (na,t,c) -> mkLambda (na, f l t, f (g l) c)
   | LetIn (na,b,t,c) -> mkLetIn (na, f l b, f l t, f (g l) c)
   | App (c,al) -> mkApp (f l c, Array.map (f l) al)
+  | Proj (p,c) -> Proj (p, f l c)
   | Evar (e,al) -> mkEvar (e, Array.map (f l) al)
   | Case (ci,p,c,bl) -> mkCase (ci, f l p, f l c, Array.map (f l) bl)
   | Fix (ln,(lna,tl,bl)) ->
@@ -592,6 +600,7 @@ let compare_constr f t1 t2 =
   | App (c1,l1), App (c2,l2) ->
     Int.equal (Array.length l1) (Array.length l2) &&
       f c1 c2 && Array.equal f l1 l2
+  | Proj (p,c), Proj (p',c') -> eq_constant p p' && f c c'
   | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 && Array.equal f l1 l2
   | Const c1, Const c2 -> eq_constant c1 c2
   | Ind c1, Ind c2 -> eq_ind c1 c2
@@ -638,6 +647,9 @@ let constr_ord_int f t1 t2 =
     | App (c1,l1), _ when isCast c1 -> f (mkApp (pi1 (destCast c1),l1)) t2
     | _, App (c2,l2) when isCast c2 -> f t1 (mkApp (pi1 (destCast c2),l2))
     | App (c1,l1), App (c2,l2) -> (f =? (Array.compare f)) c1 c2 l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> 
+        let c = kn_ord (canonical_con p1) (canonical_con p2) in
+	  if Int.equal c 0 then f c1 c2 else c
     | Evar (e1,l1), Evar (e2,l2) ->
 	((-) =? (Array.compare f)) e1 e2 l1 l2
     | Const c1, Const c2 -> con_ord c1 c2
@@ -1230,6 +1242,7 @@ let equals_constr t1 t2 =
     | LetIn (n1,b1,t1,c1), LetIn (n2,b2,t2,c2) ->
       n1 == n2 & b1 == b2 & t1 == t2 & c1 == c2
     | App (c1,l1), App (c2,l2) -> c1 == c2 & array_eqeq l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> p1 == p2 & c1 == c2
     | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 & array_eqeq l1 l2
     | Const c1, Const c2 -> c1 == c2
     | Ind (sp1,i1), Ind (sp2,i2) -> sp1 == sp2 && Int.equal i1 i2
@@ -1303,6 +1316,10 @@ let hcons_term (sh_sort,sh_ci,sh_construct,sh_ind,sh_con,sh_na,sh_id) =
 	let c, hc = sh_rec c in
 	let hl = hash_term_array l in
 	(App (c, l), combinesmall 7 (combine hl hc))
+      | Proj (p,c) ->
+        let c, hc = sh_rec c in
+	let p' = sh_con p in
+	  (Proj (p', c), combinesmall 17 (Hashtbl.hash p'))
       | Evar (e,l) ->
 	let hl = hash_term_array l in
 	(* since the array have been hashed in place : *)
@@ -1364,6 +1381,8 @@ let rec hash_constr t =
     | App (c,l) when isCast c -> hash_constr (mkApp (pi1 (destCast c),l))
     | App (c,l) ->
       combinesmall 7 (combine (hash_term_array l) (hash_constr c))
+    | Proj (p,c) ->
+      combinesmall 17 (combine (Hashtbl.hash p) (hash_constr c))
     | Evar (e,l) ->
       combinesmall 8 (combine (Hashtbl.hash e) (hash_term_array l))
     | Const c ->

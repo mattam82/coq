@@ -120,6 +120,7 @@ let define id internal c t =
       { const_entry_body = c;
         const_entry_secctx = None;
         const_entry_type = t;
+	const_entry_proj = None;
         const_entry_opaque = false;
 	const_entry_inline_code = false
       },
@@ -459,7 +460,7 @@ let map_inductive_block f kn n = for i=0 to n-1 do f (kn,i) done
 let declare_default_schemes kn =
   let mib = Global.lookup_mind kn in
   let n = Array.length mib.mind_packets in
-  if !elim_flag && (not mib.mind_record || !record_elim_flag) then
+  if !elim_flag && (mib.mind_record = None || !record_elim_flag) then
     declare_induction_schemes kn;
   if !case_flag then map_inductive_block declare_one_case_analysis_scheme kn n;
   if is_eq_flag() then try_declare_beq_scheme kn;

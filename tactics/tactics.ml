@@ -815,7 +815,7 @@ let is_record mind = (Global.lookup_mind (fst mind)).mind_record
 
 let find_eliminator c gl =
   let (ind,t) = pf_reduce_to_quantified_ind gl (pf_type_of gl c) in
-  if is_record ind then raise IsRecord;
+  if is_record ind <> None then raise IsRecord;
   let c = lookup_eliminator ind (elimination_sort_of_goal gl) in
   {elimindex = None; elimbody = (c,NoBindings)}
 
@@ -2817,7 +2817,7 @@ let guess_elim isrec hyp0 gl =
   let mind,_ = pf_reduce_to_quantified_ind gl tmptyp0 in
   let s = elimination_sort_of_goal gl in
   let elimc =
-    if isrec && not (is_record mind) then lookup_eliminator mind s
+    if isrec && not (is_record mind <> None) then lookup_eliminator mind s
     else
       if use_dependent_propositions_elimination () &&
 	dependent_no_evar (mkVar hyp0) (pf_concl gl)
@@ -3571,8 +3571,10 @@ let unify ?(state=full_transparent_state) x y gl =
   try
     let flags =
       {default_unify_flags with
-	modulo_delta = state;
-	modulo_conv_on_closed_terms = Some state}
+       modulo_delta = state;
+       modulo_delta_types = state;
+       modulo_delta_in_merge = Some state;
+       modulo_conv_on_closed_terms = Some state}
     in
     let evd = w_unify (pf_env gl) (project gl) Reduction.CONV ~flags x y
     in tclEVARS evd gl

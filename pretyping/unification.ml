@@ -482,6 +482,22 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 	| App (f1,l1), App (f2,l2) ->
             unify_app curenvnb pb b substn cM f1 l1 cN f2 l2
 
+	| Proj (p1,c1), Proj (p2,c2) ->
+	    if eq_constant p1 p2 then
+	      try 
+	        let c1, c2, substn = 
+		   if isCast c1 && isCast c2 then
+		     let (c1,_,tc1) = destCast c1 in
+		     let (c2,_,tc2) = destCast c2 in
+		       c1, c2, unirec_rec curenvnb CONV true false substn tc1 tc2
+		   else c1, c2, substn
+		in
+		  unirec_rec curenvnb CONV true wt substn c1 c2
+	      with ex when precatchable_exception ex ->
+	        unify_not_same_head curenvnb pb b wt substn cM cN
+	    else
+	      unify_not_same_head curenvnb pb b wt substn cM cN
+
 	| _ ->
             unify_not_same_head curenvnb pb b wt substn cM cN
 
@@ -1046,6 +1062,8 @@ let w_unify_to_subterm env evd ?(flags=default_unify_flags) (op,cl) =
 	       with ex when precatchable_exception ex ->
 		 matchrec c2)
 
+	  | Proj (p,c) -> matchrec c
+
 	  | Fix(_,(_,types,terms)) ->
 	       (try
 		 iter_fail matchrec types
@@ -1114,6 +1132,8 @@ let w_unify_to_subterm_all env evd ?(flags=default_unify_flags) (op,cl) =
 
             | Case(_,_,c,lf) -> (* does not search in the predicate *)
 		bind (matchrec c) (bind_iter matchrec lf)
+
+	    | Proj (p,c) -> matchrec c
 
 	    | LetIn(_,c1,_,c2) ->
 		bind (matchrec c1) (matchrec c2)

@@ -146,6 +146,11 @@ let type_of_constant_type env t =
 let type_of_constant env cst =
   type_of_constant_type env (constant_type env cst)
 
+let type_of_projection env cst =
+  match (lookup_constant cst env).const_proj with
+  | Some pb -> pb.proj_type
+  | None -> raise (Invalid_argument "type_of_projection: not a projection")
+
 let judge_of_constant_knowing_parameters env cst jl =
   let c = mkConst cst in
   let cb = lookup_constant cst env in
@@ -337,6 +342,18 @@ let judge_of_case env ci pj cj lfj =
      uj_type = rslty },
   union_constraints univ univ')
 
+let judge_of_projection env p cj =
+  let pb = lookup_projection p env in
+  let ind, args =
+    try find_rectype env cj.uj_type
+    with Not_found -> error_case_not_inductive env cj
+  in
+    assert(eq_mind pb.proj_ind (fst ind));
+    let ty = substl (cj.uj_val :: List.rev args) pb.Declarations.proj_type in
+      (* TODO: Universe polymorphism for projections *)
+      {uj_val = mkProj (p,cj.uj_val);
+       uj_type = ty}
+
 (* Fixpoints. *)
 
 (* Checks the type of a general (co)fixpoint, i.e. without checking *)
@@ -380,6 +397,10 @@ let rec execute env cstr cu =
 
     | Const c ->
         (judge_of_constant env c, cu)
+	
+    | Proj (p, c) ->
+        let cj, cu = execute env c cu in
+          (judge_of_projection env p cj, cu)
 
     (* Lambda calculus operators *)
     | App (f,args) ->
