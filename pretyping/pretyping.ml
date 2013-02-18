@@ -410,7 +410,7 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
 	  in
 	  let ind, pars = dest_ind_family indf in
 	    assert(eq_mind mind (fst ind));
-	    let ty = substl (List.rev pars) ty in
+	    let ty = substl (recty.uj_val :: List.rev pars) ty in
 	    (* TODO: Universe polymorphism for projections *)
 	      {uj_val = mkProj (cst,recty.uj_val); uj_type = ty}, args
       in

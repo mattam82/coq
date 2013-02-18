@@ -198,9 +198,8 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
                 it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
 	      let kn =
 	        try
-		  let projty = mkProd (x,rp,ccl) in
 		  let projinfo = 
-		    (fst indsp, mib.mind_nparams, nfields - nfi, projty)
+		    (fst indsp, mib.mind_nparams, nfields - nfi, ccl)
 		  in
 		  let cie = {
 		    const_entry_body = proj;
@@ -216,15 +215,12 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
                 with Type_errors.TypeError (ctx,te) ->
                   raise (NotDefinable (BadTypedProj (fid,ctx,te))) in
 	      let refi = ConstRef kn in
-	      let constr_fi = mkConst kn in
 	      Impargs.maybe_declare_manual_implicits false refi impls;
 	      if coe then begin
 	        let cl = Class.class_of_global (IndRef indsp) in
 	        Class.try_add_new_coercion_with_source refi Global ~source:cl
 	      end;
-	      let proj_args = (*Rel 1 refers to "x"*) 
-		(* concat_argsl paramargs *) [mkRel 1] in
-	      let constr_fip = applist (constr_fi,proj_args) in
+	      let constr_fip = mkProj (kn,mkRel 1) in
 	      (Some kn::sp_projs, Projection constr_fip::subst)
             with NotDefinable why ->
 	      warning_or_error coe indsp why;

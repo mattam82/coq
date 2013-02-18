@@ -435,7 +435,10 @@ let is_projection nargs = function
       (try
 	let n = Recordops.find_projection_nparams r + 1 in
 	if n <= nargs then Some n else None
-      with Not_found -> None)
+      with Not_found -> 
+        (match r with
+	| ConstRef c when Environ.is_projection c (Global.env ()) -> Some 1
+	| _ -> None))
   | _ -> None
 
 let is_hole = function CHole _ -> true | _ -> false
@@ -481,8 +484,8 @@ let explicitize loc inctx impl (cf,f) args =
 	  let args2 = exprec (i+1) (args2,impl2) in
 	  CApp (loc,(Some (List.length args1),f),args1@args2)
     | None ->
-	let args = exprec 1 (args,impl) in
-	if List.is_empty args then f else CApp (loc, (None, f), args)
+	  let args = exprec 1 (args,impl) in
+	    if List.is_empty args then f else CApp (loc, (None, f), args)
 
 let extern_global loc impl f =
   if not !Constrintern.parsing_explicit &&

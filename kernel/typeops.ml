@@ -344,7 +344,7 @@ let judge_of_projection env p cj =
     with Not_found -> error_case_not_inductive env cj
   in
     assert(eq_mind pb.proj_ind (fst ind));
-    let ty = substl (List.rev args) pb.Declarations.proj_type in
+    let ty = substl (cj.uj_val :: List.rev args) pb.Declarations.proj_type in
       (* TODO: Universe polymorphism for projections *)
       {uj_val = mkProj (p,cj.uj_val);
        uj_type = ty}

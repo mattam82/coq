@@ -102,6 +102,13 @@ let expmod_constr modlist c =
 	   with
 	    | Not_found -> map_constr substrec c)
 
+      | Proj (p, c) ->
+          (try 
+	     match kind_of_term (share (ConstRef p) modlist) with
+	     | Const p' -> mkProj (p', map_constr substrec c)
+	     | _ -> mkProj (p, map_constr substrec c)
+	   with Not_found -> map_constr substrec c)
+
   | _ -> map_constr substrec c
 
   in
@@ -156,25 +163,26 @@ let cook_constant env r =
     Sign.fold_named_context (fun (h,_,_) hyps ->
       List.filter (fun (id,_,_) -> not (Id.equal id h)) hyps)
       hyps ~init:cb.const_hyps in
-  let typ = match cb.const_type with
+  let ty, typ = match cb.const_type with
     | NonPolymorphicType t ->
 	let typ = abstract_constant_type (expmod_constr r.d_modlist t) hyps in
-	NonPolymorphicType typ
+	typ, NonPolymorphicType typ
     | PolymorphicArity (ctx,s) ->
 	let t = mkArity (ctx,Type s.poly_level) in
 	let typ = abstract_constant_type (expmod_constr r.d_modlist t) hyps in
 	let j = make_judge (constr_of_def body) typ in
-	Typeops.make_polymorphic_if_constant_for_ind env j
+	typ, Typeops.make_polymorphic_if_constant_for_ind env j
   in
   let projection pb =
-    let ty' = rename_constant_type pb.proj_npars (expmod_constr r.d_modlist pb.proj_type) hyps in
     let (mind, _), n' =
       try match kind_of_term (share (IndRef (pb.proj_ind,0)) r.d_modlist) with
       | App (f,l) -> (destInd f, Array.length l)
       | Ind ind -> ind, 0
       | _ -> assert false 
       with Not_found -> ((pb.proj_ind,0), 0)
-    in { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
+    in 
+    let ctx, ty' = decompose_prod_n (n' + pb.proj_npars + 1) ty in
+      { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
 	 proj_type = ty' }
   in
     (body, typ, Option.map projection cb.const_proj, cb.const_constraints, 

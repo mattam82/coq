@@ -499,7 +499,7 @@ let rec compile_constr reloc c sz cont =
   match kind_of_term c with
   | Meta _ -> raise (Invalid_argument "Cbytegen.compile_constr : Meta")
   | Evar _ -> raise (Invalid_argument "Cbytegen.compile_constr : Evar")
-  | Proj _ -> assert false
+  | Proj (p,c) -> compile_const reloc p [|c|] sz cont
 
   | Cast(c,_,_) -> compile_constr reloc c sz cont
 
