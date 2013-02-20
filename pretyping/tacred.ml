@@ -540,6 +540,16 @@ let special_red_case env sigma whfun (ci, p, c, lf)  =
   in
   redrec c
 
+let reduce_projection whdfun env sigma proj c stack =
+  let (recarg'hd,stack') = whdfun sigma c in
+    (match kind_of_term recarg'hd with
+    | Construct _ -> 
+      let proj_narg = 
+	let pb = Option.get ((lookup_constant proj env).Declarations.const_proj) in
+	  pb.Declarations.proj_npars + pb.Declarations.proj_arg
+      in Reduced (List.nth stack' proj_narg, stack)
+    | _ -> NotReducible)
+
 (* data structure to hold the map kn -> rec_args for simpl *)
 
 type behaviour = {
@@ -742,6 +752,11 @@ and whd_simpl_stack env sigma =
             | Reduced s' -> redrec (applist s')
 	    | NotReducible -> s'
 	  with Redelimination -> s')
+      | Proj (p, c) ->
+         (try match reduce_projection (whd_construct_stack env) env sigma p c stack with
+	 | Reduced s' -> redrec (applist s')
+	 | NotReducible -> s'
+	 with Redelimination -> s')
       | _ when isEvalRef env x ->
 	  let ref = destEvalRef x in
           (try

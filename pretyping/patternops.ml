@@ -145,6 +145,9 @@ let pattern_of_constr sigma t =
             | Some n -> PSoApp (n,Array.to_list (Array.map pattern_of_constr a))
             | None -> PApp (pattern_of_constr f,Array.map (pattern_of_constr) a))
     | Const sp         -> PRef (ConstRef (constant_of_kn(canonical_con sp)))
+    | Proj (p, c) ->  
+        PApp (PRef (ConstRef (constant_of_kn(canonical_con p))), 
+	      [| pattern_of_constr c |])
     | Ind sp        -> PRef (canonical_gr (IndRef sp))
     | Construct sp -> PRef (canonical_gr (ConstructRef sp))
     | Evar (evk,ctxt as ev) ->

@@ -146,6 +146,11 @@ let type_of_constant_type env t =
 let type_of_constant env cst =
   type_of_constant_type env (constant_type env cst)
 
+let type_of_projection env cst =
+  match (lookup_constant cst env).const_proj with
+  | Some pb -> pb.proj_type
+  | None -> raise (Invalid_argument "type_of_projection: not a projection")
+
 let judge_of_constant_knowing_parameters env cst jl =
   let c = mkConst cst in
   let cb = lookup_constant cst env in

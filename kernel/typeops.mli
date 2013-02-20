@@ -98,6 +98,7 @@ val type_fixpoint : env -> Name.t array -> types array
 val typing : env -> constr -> unsafe_judgment
 
 val type_of_constant : env -> constant -> types
+val type_of_projection : env -> Names.projection -> types
 
 val type_of_constant_type : env -> constant_type -> types
 

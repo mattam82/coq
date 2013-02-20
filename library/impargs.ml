@@ -397,7 +397,7 @@ let compute_constant_implicits flags manual cst =
   let ty = 
     match cb.const_proj with
     | None -> Typeops.type_of_constant env cst
-    | Some {proj_type = ty} -> ty
+    | Some {proj_type = ty} -> mkProd (Anonymous, mkProp, ty)
   in
     compute_semi_auto_implicits env flags manual ty
 

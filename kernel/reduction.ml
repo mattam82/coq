@@ -160,9 +160,9 @@ let compare_stacks f fmind lft1 stk1 lft2 stk2 cuniv =
           (match (z1,z2) with
             | (Zlapp a1,Zlapp a2) -> Array.fold_right2 f a1 a2 cu1
 	    | (Zlproj (c1,l1),Zlproj (c2,l2)) -> 
-	      if not (c1 == c2 && l1 == l2) then (*FIXME*)
-		raise NotConvertible;
-	      cu1
+	      if not (eq_constant c1 c2) then 
+		raise NotConvertible
+	      else cu1
             | (Zlfix(fx1,a1),Zlfix(fx2,a2)) ->
                 let cu2 = f fx1 fx2 cu1 in
                 cmp_rec a1 a2 cu2
@@ -324,6 +324,13 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
                     | Some def1 -> ((lft1, whd_stack (snd infos) def1 v1), appr2)
 		    | None -> raise NotConvertible) in
           eqappr cv_pb l2r infos app1 app2 cuniv)
+
+    | (FProj (p1,c1), FProj (p2, c2)) ->
+       if eq_constant p1 p2 then
+	 let u1 = ccnv CONV l2r infos el1 el2 c1 c2 cuniv in
+	   convert_stacks l2r infos lft1 lft2 v1 v2 u1
+       else (* Two projections in WHNF: unfold *)
+	 raise NotConvertible
 
     (* other constructors *)
     | (FLambda _, FLambda _) ->

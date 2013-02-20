@@ -482,6 +482,12 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 	| App (f1,l1), App (f2,l2) ->
             unify_app curenvnb pb b substn cM f1 l1 cN f2 l2
 
+	| Proj (p1,c1), Proj (p2,c2) ->
+	    if eq_constant p1 p2 then
+	      unirec_rec curenvnb CONV true false substn c1 c2
+	    else
+	      unify_not_same_head curenvnb pb b wt substn cM cN
+
 	| _ ->
             unify_not_same_head curenvnb pb b wt substn cM cN
 
