@@ -205,7 +205,7 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
 		    const_entry_body = proj;
                     const_entry_secctx = None;
                     const_entry_type = Some projtyp;
-		    const_entry_proj = Some projinfo;
+		    const_entry_proj = if optci = None then Some projinfo else None;
                     const_entry_opaque = false;
 		    const_entry_inline_code = false } in
 		  let k = (DefinitionEntry cie,IsDefinition kind) in

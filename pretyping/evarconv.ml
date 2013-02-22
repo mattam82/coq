@@ -59,6 +59,7 @@ let eval_flexible_term ts env c =
        with Not_found -> None)
   | LetIn (_,b,_,c) -> Some (subst1 b c)
   | Lambda _ -> Some c
+  | Proj _ -> None
   | _ -> assert false
 
 let apprec_nohdbeta ts env evd c =
@@ -203,6 +204,9 @@ let ise_stack2 no_app env evd f sk1 sk2 =
 	| Success i'' -> ise_stack2 true i'' q1 q2
         | UnifFailure _ as x -> fail x)
       | UnifFailure _ as x -> fail x)
+    | Zproj (n1,a1,p1)::q1, Zproj (n2,a2,p2)::q2 ->
+       if eq_constant p1 p2 then ise_stack2 true i q1 q2
+       else fail (UnifFailure (i, NotSameHead))
     | Zfix (((li1, i1),(_,tys1,bds1 as recdef1)),a1,_)::q1, Zfix (((li2, i2),(_,tys2,bds2)),a2,_)::q2 ->
       if Int.equal i1 i2 && Array.equal Int.equal li1 li2 then
         match ise_and i [

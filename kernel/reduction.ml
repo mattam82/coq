@@ -209,6 +209,7 @@ let sort_cmp pb s0 s1 cuniv =
 	   | CUMUL -> enforce_leq u1 u2 cuniv)
     | (_, _) -> raise NotConvertible
 
+let sort_cmp _ _ _ cuniv = cuniv
 
 let conv_sort env s0 s1 = sort_cmp CONV s0 s1 empty_constraint
 

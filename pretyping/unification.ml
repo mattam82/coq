@@ -484,7 +484,17 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 
 	| Proj (p1,c1), Proj (p2,c2) ->
 	    if eq_constant p1 p2 then
-	      unirec_rec curenvnb CONV true false substn c1 c2
+	      try 
+	        let c1, c2, substn = 
+		   if isCast c1 && isCast c2 then
+		     let (c1,_,tc1) = destCast c1 in
+		     let (c2,_,tc2) = destCast c2 in
+		       c1, c2, unirec_rec curenvnb CONV true false substn tc1 tc2
+		   else c1, c2, substn
+		in
+		  unirec_rec curenvnb CONV true wt substn c1 c2
+	      with ex when precatchable_exception ex ->
+	        unify_not_same_head curenvnb pb b wt substn cM cN
 	    else
 	      unify_not_same_head curenvnb pb b wt substn cM cN
 

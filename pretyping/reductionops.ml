@@ -131,6 +131,7 @@ let rec zip ?(refold=false) = function
   | f, (Zfix (fix,st,_)::s) -> zip ~refold
     (mkFix fix, st @ (append_stack_app_list [f] s))
   | f, (Zshift n::s) -> zip ~refold (lift n f, s)
+  | f, (Zproj (n,m,p)::s) -> zip ~refold (mkProj (p,f),s)
   | _ -> assert false
 
 (** The type of (machine) states (= lambda-bar-calculus' cuts) *)
@@ -485,6 +486,12 @@ let local_whd_state_gen flags sigma =
 	  else s
 	| _ -> s)
       | _ -> s)
+      
+    | Proj (p,c) -> 
+      (match (lookup_constant p (Global.env ())).Declarations.const_proj with
+      | None -> assert false
+      | Some pb -> whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+        :: stack))
 
     | Case (ci,p,d,lf) ->
       whrec (d, Zcase (ci,p,lf,None) :: stack)
@@ -694,6 +701,11 @@ let whd_betaiota_preserving_vm_cast env sigma t =
        | Case (ci,p,d,lf) ->
 	 whrec (d, Zcase (ci,p,lf,None) :: stack)
 
+       | Proj (p,c) -> 
+          (match (lookup_constant p env).Declarations.const_proj with
+	  | None -> assert false
+	  | Some pb -> whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) :: stack))
+	 
        | Construct (ind,c) -> begin
 	 match strip_app stack with
 	   |args, (Zcase(ci, _, lf,_)::s') ->
@@ -963,6 +975,11 @@ let whd_betaiota_deltazeta_for_iota_state ts env sigma csts s =
 	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
 	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
 	if isConstruct t_o then whrec csts_o (t_o, stack_o@stack') else s,csts'
+      |args, (Zproj _ :: _ as stack') ->
+	let seq = (t,append_stack_app_list args empty_stack) in
+	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
+	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
+	if isConstruct t_o then whrec csts_o (t_o, stack_o@stack') else s,csts'
       |_ -> s,csts'
   in whrec csts s
 
@@ -990,6 +1007,13 @@ let whd_programs_stack env sigma =
           (match decomp_stack stack with
              | None -> s
              | Some (a,m) -> stacklam whrec [a] c m)
+      | Proj (p,c) ->
+          if occur_existential c then s
+	  else
+	    (match (lookup_constant p env).Declarations.const_proj with
+	    | None -> assert false
+	    | Some pb -> whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) :: stack))
+
       | Case (ci,p,d,lf) ->
 	  if occur_existential d then
 	    s
@@ -1099,6 +1123,17 @@ let meta_reducible_instance evd b =
           let is_coerce = match s with CoerceToType -> true | _ -> false in
           if not is_coerce then irec g else u
 	 with Not_found -> u)
+    | Proj (p,c) when isMeta c or isCast c & isMeta (pi1 (destCast c)) ->
+	let m = try destMeta c with _ -> destMeta (pi1 (destCast c)) in
+	  (match
+	  try
+	    let g, s = List.assoc m metas in
+            let is_coerce = match s with CoerceToType -> true | _ -> false in
+	    if isConstruct g || not is_coerce then Some g else None
+	  with Not_found -> None
+	  with
+	    | Some g -> irec (mkProj (p,g))
+	    | None -> mkProj (p,c))
     | _ -> map_constr irec u
   in
   match fm with

@@ -105,7 +105,7 @@ let unify_e_resolve flags (c,clenv) gls =
 let unify_resolve flags (c,clenv) gls =
   let clenv' = connect_clenv gls clenv in
   let clenv' = clenv_unique_resolver ~flags clenv' gls in
-    Clenvtac.clenv_refine false ~with_classes:false clenv' gls
+    Clenvtac.clenv_refine true ~with_classes:false clenv' gls
 
 let clenv_of_prods nprods (c, clenv) gls =
   if Int.equal nprods 0 then Some clenv
@@ -257,7 +257,7 @@ let make_resolve_hyp env sigma st flags only_classes pri (id, _, cty) =
       in
         (hints @ List.map_filter
 	 (fun f -> try Some (f (c, cty)) with Failure _ | UserError _ -> None) 
-	 [make_exact_entry ~name sigma pri; make_apply_entry ~name env sigma flags pri])
+	 [make_exact_entry ~name env sigma pri; make_apply_entry ~name env sigma flags pri])
     else []
 
 let pf_filtered_hyps gls = 

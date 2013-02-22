@@ -814,6 +814,7 @@ let try_red_product env sigma c =
       | Prod (x,a,b) -> mkProd (x, a, redrec (push_rel (x,None,a) env) b)
       | LetIn (x,a,b,t) -> redrec env (subst1 a t)
       | Case (ci,p,d,lf) -> simpfun (mkCase (ci,p,redrec env d,lf))
+      | Proj (p, c) -> simpfun (mkProj (p,redrec env c))
       | _ when isEvalRef env x ->
           (* TO DO: re-fold fixpoints after expansion *)
           (* to get true one-step reductions *)
