@@ -60,7 +60,7 @@ Lemma ceqb_rect : forall c1 c2 (A:Type) (x y:A) (P:A->Type),
   (phi c1 == phi c2 -> P x) -> P y -> P (if ceqb c1 c2 then x else y).
 Proof.
 intros.
-generalize (fun h => X (morph_eq CRmorph c1 c2 h)).
+generalize (fun h => X (morph_eq CRmorph h)).
 case (ceqb c1 c2); auto.
 Qed.
 
@@ -1628,7 +1628,7 @@ Lemma ceqb_rect_complete : forall c1 c2 (A:Type) (x y:A) (P:A->Type),
   P (if ceqb c1 c2 then x else y).
 Proof.
 intros.
-generalize (fun h => X (morph_eq CRmorph c1 c2 h)).
+generalize (fun h => X (morph_eq CRmorph h)).
 generalize (@ceqb_complete c1 c2).
 case (c1 ?=! c2); auto; intros.
 apply X0.

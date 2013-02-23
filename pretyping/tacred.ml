@@ -914,6 +914,7 @@ let simpl env sigma c = strong whd_simpl env sigma c
 let matches_head c t =
   match kind_of_term t with
     | App (f,_) -> matches c f
+    | Proj (p, _) -> matches c (mkConst p)
     | _ -> raise PatternMatchingFailure
 
 let contextually byhead (occs,c) f env sigma t =
@@ -933,8 +934,11 @@ let contextually byhead (occs,c) f env sigma t =
 	f subst env sigma t
       else if byhead then
 	(* find other occurrences of c in t; TODO: ensure left-to-right *)
-        let (f,l) = destApp t in
-	mkApp (f, Array.map_left (traverse envc) l)
+	(match kind_of_term t with
+	| App (f,l) ->
+	  mkApp (f, Array.map_left (traverse envc) l)
+	| Proj (p,c) -> mkProj (p,traverse envc c)
+	| _ -> assert false)
       else
 	t
     with PatternMatchingFailure ->

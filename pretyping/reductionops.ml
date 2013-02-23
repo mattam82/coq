@@ -388,9 +388,10 @@ let rec whd_state_gen ?csts refold flags env sigma =
       | Some body -> whrec cst_l (body, stack)
       | None -> fold ())
     | Proj (p, c) ->
-      (match reduce_projection_state env (fun _ -> whrec cst_l) sigma p c with
-      | Reduced c -> whrec cst_l (c, stack)
-      | NotReducible -> fold ())
+      (match (lookup_constant p env).Declarations.const_proj with
+      | None -> assert false
+      | Some pb -> whrec cst_l (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+        :: stack))
     | Const const when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST const) ->
        (match constant_opt_value env const with
 	| Some body -> whrec (Cst_stack.add_cst (mkConst const) cst_l) (body, stack)
@@ -437,6 +438,8 @@ let rec whd_state_gen ?csts refold flags env sigma =
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec noth (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	|args, (Zproj (n,m,p)::s') ->
+	  whrec noth (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
 	  whrec noth ((if refold then contract_fix ~env f else contract_fix f) cst,
@@ -1027,6 +1030,8 @@ let whd_programs_stack env sigma =
 	match strip_app stack with
 	  |args, (Zcase(ci, _, lf,_)::s') ->
 	    whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
+	  |args, (Zproj (n,m,p)::s') ->
+	    whrec (List.nth args (n+m),s')
 	  |args, (Zfix (f,s',cst)::s'') ->
 	    let x' = applist(x,args) in
 	    whrec (contract_fix f cst,s' @ (append_stack_app_list [x'] s''))

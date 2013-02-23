@@ -36,8 +36,7 @@ let flex_kind_of_term c sk =
     | Lambda _ | Prod _ | Sort _ | Ind _ | Construct _ | CoFix _ -> Rigid
     | Meta _ -> Rigid
     | Fix _ -> Rigid (* happens when the fixpoint is partially applied *)
-    | Proj (p, c) -> MaybeFlexible
-    | Cast _ | App _ | Case _ -> assert false
+    | Proj _ | Cast _ | App _ | Case _ -> assert false
 
 let not_purely_applicative_stack args =
   List.exists (function (Zfix _ | Zcase _) -> true | _ -> false) args
@@ -59,7 +58,6 @@ let eval_flexible_term ts env c =
        with Not_found -> None)
   | LetIn (_,b,_,c) -> Some (subst1 b c)
   | Lambda _ -> Some c
-  | Proj _ -> None
   | _ -> assert false
 
 let apprec_nohdbeta ts env evd c =
