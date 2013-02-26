@@ -1306,7 +1306,7 @@ Section POWER.
   case_eq (get_sign c);intros.
   assert (H1 := (@morph_eq CRmorph) c0  cI).
   destruct (c0 ?=! cI).
-   rewrite (CRmorph.(morph_eq) (get_sign_spec.(sign_spec) H)). Esimpl. rewrite H1;trivial.
+   rewrite (CRmorph.(morph_eq) _ _ (get_sign_spec.(sign_spec) _ H)). Esimpl. rewrite H1;trivial.
    rewrite <- r_list_pow_rev;trivial;Esimpl.
   apply mkmultm1_ok.
  rewrite <- r_list_pow_rev; apply mkmult_rec_ok.
@@ -1317,7 +1317,7 @@ Qed.
  Proof.
   intros;unfold mkadd_mult.
   case_eq (get_sign c);intros.
-  rewrite (CRmorph.(morph_eq) (get_sign_spec.(sign_spec) H));Esimpl.
+  rewrite (CRmorph.(morph_eq) _ _ (get_sign_spec.(sign_spec) _ H));Esimpl.
   rewrite mkmult_c_pos_ok;Esimpl.
   rewrite mkmult_c_pos_ok;Esimpl.
  Qed.

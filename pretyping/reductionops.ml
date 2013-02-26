@@ -339,16 +339,6 @@ type 'a reduced_state =
   | NotReducible
   | Reduced of constr
 
-let reduce_projection_state env whdfun sigma p c =
-  match (lookup_constant p env).Declarations.const_proj with
-  | None -> assert false
-  | Some pb -> 
-     let (cr,crargs), _ = whdfun sigma (c, empty_stack) in
-       if isConstruct cr then
-	 Reduced (stack_nth crargs (pb.Declarations.proj_npars + 
-				    pb.Declarations.proj_arg))
-       else NotReducible
-
 (** Generic reduction function with environment
 
     Here is where unfolded constant are stored in order to be
@@ -438,7 +428,7 @@ let rec whd_state_gen ?csts refold flags env sigma =
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec noth (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
-	|args, (Zproj (n,m,p)::s') ->
+	|args, (Zproj (n,m,p)::s') when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) ->
 	  whrec noth (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
@@ -519,7 +509,7 @@ let local_whd_state_gen flags sigma =
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
-	|args, (Zproj (n,m,_) :: s') ->
+	|args, (Zproj (n,m,p) :: s') when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) ->
 	  whrec (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
@@ -714,7 +704,8 @@ let whd_betaiota_preserving_vm_cast env sigma t =
 	   |args, (Zcase(ci, _, lf,_)::s') ->
 	     whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
 	   |args, (Zproj (n,m,p) :: s') ->
-	     whrec (List.nth args (n+m), s')
+	     (* no delta *) s
+	     (* whrec (List.nth args (n+m), s') *)
 	   |args, (Zfix (f,s',cst)::s'') ->
 	     let x' = applist(x,args) in
 	     whrec (contract_fix f cst,s' @ (append_stack_app_list [x'] s''))
@@ -982,7 +973,11 @@ let whd_betaiota_deltazeta_for_iota_state ts env sigma csts s =
 	let seq = (t,append_stack_app_list args empty_stack) in
 	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
 	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
-	if isConstruct t_o then whrec csts_o (t_o, stack_o@stack') else s,csts'
+	if isConstruct t_o then
+	  if is_transparent_constant ts p then
+	    whrec (stack_nth stack_o (n+m), stack'')
+	  else (* Won't unfold *) (whd_betaiota_state sigma (t_o, stack_o@stack'),csts')
+	else s,csts'
       |_ -> s,csts'
   in whrec csts s
 

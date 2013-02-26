@@ -194,7 +194,7 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
         (try Array.fold_left2 (sorec stk) (sorec stk subst c1 c2) arg1 arg2
          with Invalid_argument _ -> raise PatternMatchingFailure)
 
-      | PApp (PRef (ConstRef p1),[|c1|]), Proj (p2,c2) when eq_constant p1 p2 ->
+      | PProj (p1,c1), Proj (p2,c2) when eq_constant p1 p2 ->
           sorec stk subst c1 c2
 
       | PProd (na1,c1,d1), Prod(na2,c2,d2) ->

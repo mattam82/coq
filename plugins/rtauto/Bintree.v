@@ -209,7 +209,7 @@ Theorem get_Full_Eq : forall S, Full S -> get (index S) S = PNone.
 intros [index0 contents0] F.
 case F.
 unfold empty,index,get,contents;intros;apply Tget_Tempty.
-unfold index,get,push;simpl contents.
+unfold push,index,get;simpl contents.
 intros a S.
 rewrite Tget_Tadd.
 rewrite Psucc_Gt.
@@ -302,8 +302,8 @@ Arguments Tget_Tempty [A] p.
 Arguments Tget_Tadd [A] i j a T.
 
 Arguments mkStore [A] index contents.
-Arguments index [A] s.
-Arguments contents [A] s.
+Arguments index s.
+Arguments contents s.
 
 Arguments empty [A].
 Arguments get [A] i S.

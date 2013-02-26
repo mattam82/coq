@@ -3571,8 +3571,10 @@ let unify ?(state=full_transparent_state) x y gl =
   try
     let flags =
       {default_unify_flags with
-	modulo_delta = state;
-	modulo_conv_on_closed_terms = Some state}
+       modulo_delta = state;
+       modulo_delta_types = state;
+       modulo_delta_in_merge = Some state;
+       modulo_conv_on_closed_terms = Some state}
     in
     let evd = w_unify (pf_env gl) (project gl) Reduction.CONV ~flags x y
     in tclEVARS evd gl

@@ -1062,6 +1062,8 @@ let w_unify_to_subterm env evd ?(flags=default_unify_flags) (op,cl) =
 	       with ex when precatchable_exception ex ->
 		 matchrec c2)
 
+	  | Proj (p,c) -> matchrec c
+
 	  | Fix(_,(_,types,terms)) ->
 	       (try
 		 iter_fail matchrec types
@@ -1130,6 +1132,8 @@ let w_unify_to_subterm_all env evd ?(flags=default_unify_flags) (op,cl) =
 
             | Case(_,_,c,lf) -> (* does not search in the predicate *)
 		bind (matchrec c) (bind_iter matchrec lf)
+
+	    | Proj (p,c) -> matchrec c
 
 	    | LetIn(_,c1,_,c2) ->
 		bind (matchrec c1) (matchrec c2)

@@ -42,7 +42,8 @@ let error_not_evaluable r =
      spc () ++ str "to an evaluable reference.")
 
 let is_evaluable_const env cst =
-  is_transparent (ConstKey cst) && evaluable_constant cst env
+  is_transparent (ConstKey cst) && 
+    (evaluable_constant cst env || is_projection cst env)
 
 let is_evaluable_var env id =
   is_transparent (VarKey id) && evaluable_named id env
@@ -51,8 +52,12 @@ let is_evaluable env = function
   | EvalConstRef cst -> is_evaluable_const env cst
   | EvalVarRef id -> is_evaluable_var env id
 
+exception IsProjection of projection
+
 let value_of_evaluable_ref env = function
-  | EvalConstRef con -> constant_value env con
+  | EvalConstRef con -> 
+    (try constant_value env con
+    with NotEvaluableConst IsProj -> raise (IsProjection con))
   | EvalVarRef id -> Option.get (pi2 (lookup_named id env))
 
 let constr_of_evaluable_ref = function
@@ -954,24 +959,35 @@ let contextually byhead (occs,c) f env sigma t =
  * n is the number of the next occurence of name.
  * ol is the occurence list to find. *)
 
-let substlin env evalref n (nowhere_except_in,locs) c =
+let substlin env sigma evalref n (nowhere_except_in,locs) c =
   let maxocc = List.fold_right max locs 0 in
   let pos = ref n in
   assert (List.for_all (fun x -> x >= 0) locs);
-  let value = value_of_evaluable_ref env evalref in
-  let term = constr_of_evaluable_ref evalref in
+  let matches =   
+    let term = constr_of_evaluable_ref evalref in
+    try 
+      let value = value_of_evaluable_ref env evalref in
+	(fun c -> if eq_constr c term then Some value else None)
+    with IsProjection p ->
+      (fun c ->
+        match kind_of_term c with
+	| Proj (p',c') when eq_constant p p' ->
+          Some (whd_betaiotazeta sigma c)
+	| _ -> None)
+  in
   let rec substrec () c =
     if nowhere_except_in & !pos > maxocc then c
-    else if eq_constr c term then
-      let ok =
-	if nowhere_except_in then List.mem !pos locs
-	else not (List.mem !pos locs) in
-      incr pos;
-      if ok then value else c
-    else
-      map_constr_with_binders_left_to_right
-	(fun _ () -> ())
-        substrec () c
+    else match matches c with
+      | Some value ->
+        let ok =
+	  if nowhere_except_in then List.mem !pos locs
+	  else not (List.mem !pos locs) in
+	incr pos;
+	if ok then value else c
+      | None ->
+        map_constr_with_binders_left_to_right
+	  (fun _ () -> ())
+          substrec () c
   in
   let t' = substrec () c in
   (!pos, t')
@@ -994,7 +1010,7 @@ let unfold env sigma name =
  * Performs a betaiota reduction after unfolding. *)
 let unfoldoccs env sigma (occs,name) c =
   let unfo nowhere_except_in locs =
-    let (nbocc,uc) = substlin env name 1 (nowhere_except_in,locs) c in
+    let (nbocc,uc) = substlin env sigma name 1 (nowhere_except_in,locs) c in
     if Int.equal nbocc 1 then
       error ((string_of_evaluable_ref env name)^" does not occur.");
     let rest = List.filter (fun o -> o >= nbocc) locs in

@@ -1208,7 +1208,7 @@ let merge_impargs l args =
 
 let check_projection isproj nargs r =
   match (r,isproj) with
-  | GRef (loc, ref), Some _ ->
+  | GRef (loc, ref), Some npars ->
       (try
 	if not (Int.equal nargs 1) then
 	  user_err_loc (loc,"",str "Projection has not the right number of explicit parameters.");

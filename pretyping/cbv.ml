@@ -226,7 +226,7 @@ let rec norm_head info env t stack =
 	(CBN(t,env), stack) (* Considérer une coupure commutative ? *)
 
   | Evar ev ->
-      (match evar_value info ev with
+      (match evar_value info.i_cache ev with
           Some c -> norm_head info env c stack
         | None -> (VAL(0, t), stack))
 

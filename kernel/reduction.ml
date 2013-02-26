@@ -24,12 +24,6 @@ open Environ
 open Closure
 open Esubst
 
-let unfold_reference ((ids, csts), infos) k =
-  match k with
-    | VarKey id when not (Id.Pred.mem id ids) -> None
-    | ConstKey cst when not (Cpred.mem cst csts) -> None
-    | _ -> unfold_reference infos k
-
 let rec is_empty_stack = function
     [] -> true
   | Zupdate _::s -> is_empty_stack s
@@ -241,19 +235,28 @@ let rec no_case_available = function
   | Zupdate _ :: stk -> no_case_available stk
   | Zshift _ :: stk -> no_case_available stk
   | Zapp _ :: stk -> no_case_available stk
-  | Zproj _ :: _ -> false
+  | Zproj (_,_,p) :: _ -> false
   | Zcase _ :: _ -> false
   | Zfix _ :: _ -> true
 
 let in_whnf (t,stk) =
   match fterm_of t with
-    | (FLetIn _ | FCases _ | FApp _ | FProj _ | FCLOS _ | FLIFT _ | FCast _) -> false
+    | (FLetIn _ | FCases _ | FApp _ | FCLOS _ | FLIFT _ | FCast _) -> false
     | FLambda _ -> no_arg_available stk
     | FConstruct _ -> no_case_available stk
     | FCoFix _ -> no_case_available stk
     | FFix(((ri,n),(_,_,_)),_) -> no_nth_arg_available ri.(n) stk
-    | (FFlex _ | FProd _ | FEvar _ | FInd _ | FAtom _ | FRel _) -> true
+    | (FFlex _ | FProd _ | FEvar _ | FInd _ | FAtom _ | FRel _ | FProj _) -> true
     | FLOCKED -> assert false
+
+let unfold_projection infos p c =
+  if RedFlags.red_set infos.i_flags (RedFlags.fCONST p) then
+    (match try Some (lookup_projection p (info_env infos)) with Not_found -> None with
+    | Some pb -> 
+      let s = Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) in
+	Some (c, s)
+    | None -> None)
+  else None
 
 (* Conversion between  [lft1]term1 and [lft2]term2 *)
 let rec ccnv cv_pb l2r infos lft1 lft2 term1 term2 cuniv =
@@ -263,9 +266,10 @@ let rec ccnv cv_pb l2r infos lft1 lft2 term1 term2 cuniv =
 and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
   Util.check_for_interrupt ();
   (* First head reduce both terms *)
+  let whd = whd_stack (infos_with_reds infos betaiotazeta) in
   let rec whd_both (t1,stk1) (t2,stk2) =
-    let st1' = whd_stack (snd infos) t1 stk1 in
-    let st2' = whd_stack (snd infos) t2 stk2 in
+    let st1' = whd t1 stk1 in
+    let st2' = whd t2 stk2 in
     (* Now, whd_stack on term2 might have modified st1 (due to sharing),
        and st1 might not be in whnf anymore. If so, we iterate ccnv. *)
     if in_whnf st1' then (st1',st2') else whd_both st1' st2' in
@@ -312,27 +316,49 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
           let (app1,app2) =
             if Conv_oracle.oracle_order l2r fl1 fl2 then
               match unfold_reference infos fl1 with
-                | Some def1 -> ((lft1, whd_stack (snd infos) def1 v1), appr2)
+                | Some def1 -> ((lft1, whd def1 v1), appr2)
                 | None ->
                     (match unfold_reference infos fl2 with
-                      | Some def2 -> (appr1, (lft2, whd_stack (snd infos) def2 v2))
+                      | Some def2 -> (appr1, (lft2, whd def2 v2))
 		      | None -> raise NotConvertible)
             else
 	      match unfold_reference infos fl2 with
-                | Some def2 -> (appr1, (lft2, whd_stack (snd infos) def2 v2))
+                | Some def2 -> (appr1, (lft2, whd def2 v2))
                 | None ->
                     (match unfold_reference infos fl1 with
-                    | Some def1 -> ((lft1, whd_stack (snd infos) def1 v1), appr2)
+                    | Some def1 -> ((lft1, whd def1 v1), appr2)
 		    | None -> raise NotConvertible) in
           eqappr cv_pb l2r infos app1 app2 cuniv)
 
     | (FProj (p1,c1), FProj (p2, c2)) ->
-       if eq_constant p1 p2 then
-	 let u1 = ccnv CONV l2r infos el1 el2 c1 c2 cuniv in
-	   convert_stacks l2r infos lft1 lft2 v1 v2 u1
-       else (* Two projections in WHNF: unfold *)
-	 raise NotConvertible
+       (try 
+         if eq_constant p1 p2 then
+	   let u1 = ccnv CONV l2r infos el1 el2 c1 c2 cuniv in
+	     convert_stacks l2r infos lft1 lft2 v1 v2 u1
+	 else (* Two projections in WHNF: unfold *)
+	   raise NotConvertible
+       with NotConvertible ->
+         let app1, app2 = 
+	   match unfold_projection infos p1 c1 with
+	   | Some (def1,s1) -> ((lft1, whd def1 (s1 :: v1)), appr2)
+	   | None ->
+	     match unfold_projection infos p2 c2 with
+	     | Some (def2,s2) -> (appr1, (lft2, whd def2 (s2 :: v2)))
+	     | None -> raise NotConvertible
+	 in eqappr cv_pb l2r infos app1 app2 cuniv)
 
+    | (FProj (p1,c1), _) ->
+      (match unfold_projection infos p1 c1 with
+      | Some (def1,s1) ->
+         eqappr cv_pb l2r infos (lft1, whd def1 (s1 :: v1)) appr2 cuniv
+      | None -> raise NotConvertible)
+      
+    | (_, FProj (p2,c2)) ->
+      (match unfold_projection infos p2 c2 with
+      | Some (def2,s2) -> 
+         eqappr cv_pb l2r infos appr1 (lft2, whd def2 (s2 :: v2)) cuniv
+      | None -> raise NotConvertible)
+      
     (* other constructors *)
     | (FLambda _, FLambda _) ->
         (* Inconsistency: we tolerate that v1, v2 contain shift and update but
@@ -375,12 +401,12 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
     | (FFlex fl1, _)      ->
         (match unfold_reference infos fl1 with
            | Some def1 ->
-	       eqappr cv_pb l2r infos (lft1, whd_stack (snd infos) def1 v1) appr2 cuniv
+	       eqappr cv_pb l2r infos (lft1, whd def1 v1) appr2 cuniv
            | None -> raise NotConvertible)
     | (_, FFlex fl2)      ->
         (match unfold_reference infos fl2 with
            | Some def2 ->
-	       eqappr cv_pb l2r infos appr1 (lft2, whd_stack (snd infos) def2 v2) cuniv
+	       eqappr cv_pb l2r infos appr1 (lft2, whd def2 v2) cuniv
            | None -> raise NotConvertible)
 
     (* Inductive types:  MutInd MutConstruct Fix Cofix *)
@@ -455,7 +481,8 @@ and convert_vect l2r infos lft1 lft2 v1 v2 cuniv =
   else raise NotConvertible
 
 let clos_fconv trans cv_pb l2r evars env t1 t2 =
-  let infos = trans, create_clos_infos ~evars betaiotazeta env in
+  let reds = Closure.RedFlags.red_add_transparent betaiotazeta trans in
+  let infos = create_clos_infos ~evars reds env in
   ccnv cv_pb l2r infos el_id el_id (inject t1) (inject t2) empty_constraint
 
 let trans_fconv reds cv_pb l2r evars env t1 t2 =

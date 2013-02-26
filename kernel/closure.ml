@@ -219,8 +219,7 @@ module KeyTable = Hashtbl.Make(IdKeyHash)
 
 let eq_table_key = Names.eq_id_key
 
-type 'a infos = {
-  i_flags : reds;
+type 'a infos_cache = {
   i_repr : 'a infos -> constr -> 'a;
   i_env : env;
   i_sigma : existential -> constr option;
@@ -228,37 +227,41 @@ type 'a infos = {
   i_vars : (Id.t * constr) list;
   i_tab : 'a KeyTable.t }
 
-let info_flags info = info.i_flags
-let info_env info = info.i_env
+and 'a infos = { 
+  i_flags : reds;
+  i_cache : 'a infos_cache }
 
-let ref_value_cache info ref =
+let info_flags info = info.i_flags
+let info_env info = info.i_cache.i_env
+
+let ref_value_cache ({i_cache = cache} as infos)  ref =
   try
-    Some (KeyTable.find info.i_tab ref)
+    Some (KeyTable.find cache.i_tab ref)
   with Not_found ->
   try
     let body =
       match ref with
 	| RelKey n ->
-            let len = Array.length info.i_rels in
+            let len = Array.length cache.i_rels in
             let i = n - 1 in
             let () = if i < 0 || len <= i then raise Not_found in
-            begin match Array.unsafe_get info.i_rels i with
+            begin match Array.unsafe_get cache.i_rels i with
             | None -> raise Not_found
             | Some t -> lift n t
             end
-	| VarKey id -> List.assoc id info.i_vars
-	| ConstKey cst -> constant_value info.i_env cst
+	| VarKey id -> List.assoc id cache.i_vars
+	| ConstKey cst -> constant_value cache.i_env cst
     in
-    let v = info.i_repr info body in
-    KeyTable.add info.i_tab ref v;
+    let v = cache.i_repr infos body in
+    KeyTable.add cache.i_tab ref v;
     Some v
   with
     | Not_found (* List.assoc *)
     | NotEvaluableConst _ (* Const *)
       -> None
 
-let evar_value info ev =
-  info.i_sigma ev
+let evar_value cache ev =
+  cache.i_sigma ev
 
 let defined_vars flags env =
 (*  if red_local_const (snd flags) then*)
@@ -284,13 +287,15 @@ let defined_rels flags env =
 (*  else (0,[])*)
 
 let create mk_cl flgs env evars =
-  { i_flags = flgs;
-    i_repr = mk_cl;
-    i_env = env;
-    i_sigma = evars;
-    i_rels = defined_rels flgs env;
-    i_vars = defined_vars flgs env;
-    i_tab = KeyTable.create 17 }
+  let cache = 
+    { i_repr = mk_cl;
+      i_env = env;
+      i_sigma = evars;
+      i_rels = defined_rels flgs env;
+      i_vars = defined_vars flgs env;
+      i_tab = KeyTable.create 17 }
+  in { i_flags = flgs; i_cache = cache }
+    
 
 
 (**********************************************************************)
@@ -867,11 +872,13 @@ let rec knh info m stk =
            | (None, stk') -> (m,stk'))
     | FCast(t,_,_) -> knh info t stk
     | FProj (p,c) ->
-	(match try Some (lookup_projection p info.i_env) with Not_found -> None with
-	 | None -> (m, stk)
-	 | Some pb ->
+        if red_set info.i_flags (fCONST p) then
+          (match try Some (lookup_projection p (info_env info)) with Not_found -> None with
+	  | None -> (m, stk)
+	  | Some pb ->
 	     knh info c (Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
 			 :: zupdate m stk))
+	else (m,stk)
 
 (* cases where knh stops *)
     | (FFlex _|FLetIn _|FConstruct _|FEvar _|
@@ -888,13 +895,7 @@ and knht info e t stk =
     | Fix _ -> knh info (mk_clos2 e t) stk
     | Cast(a,_,_) -> knht info e a stk
     | Rel n -> knh info (clos_rel e n) stk
-    | Proj (p,c) ->
-	(match try Some (lookup_projection p info.i_env) with Not_found -> None with
-	 | None -> (mk_clos2 e t, stk)
-	 | Some pb ->
-	     knht info e c (Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
-			 :: stk))
-
+    | Proj (p,c) -> knh info (mk_clos2 e t) stk
     | (Lambda _|Prod _|Construct _|CoFix _|Ind _|
        LetIn _|Const _|Var _|Evar _|Meta _|Sort _) ->
         (mk_clos2 e t, stk)
@@ -946,7 +947,7 @@ let rec knr info m stk =
   | FLetIn (_,v,_,bd,e) when red_set info.i_flags fZETA ->
       knit info (subs_cons([|v|],e)) bd stk
   | FEvar(ev,env) ->
-      (match evar_value info ev with
+      (match evar_value info.i_cache ev with
           Some c -> knit info env c stk
         | None -> (m,stk))
   | _ -> (m,stk)
@@ -1022,6 +1023,8 @@ and norm_head info m =
           mkFix(n,(na, Array.map (kl info) ftys, Array.map (kl info) fbds))
       | FEvar((i,args),env) ->
           mkEvar(i, Array.map (fun a -> kl info (mk_clos env a)) args)
+      | FProj (p,c) ->
+          mkProj (p, kl info c)
       | t -> term_of_fconstr m
 
 (* Initialization and then normalization *)
@@ -1047,4 +1050,18 @@ type clos_infos = fconstr infos
 let create_clos_infos ?(evars=fun _ -> None) flgs env =
   create (fun _ -> inject) flgs env evars
 
-let unfold_reference = ref_value_cache
+let infos_with_reds infos reds = 
+  { infos with i_flags = reds }
+
+let unfold_reference info key = 
+  match key with
+  | ConstKey kn ->
+    if red_set info.i_flags (fCONST kn) then
+      ref_value_cache info key  
+    else None
+  | VarKey i -> 
+    if red_set info.i_flags (fVAR i) then
+      ref_value_cache info key
+    else None
+  | _ -> ref_value_cache info key
+  

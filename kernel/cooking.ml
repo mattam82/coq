@@ -105,8 +105,8 @@ let expmod_constr modlist c =
       | Proj (p, c') ->
           (try 
 	     match kind_of_term (share (ConstRef p) modlist) with
-	     | Const p' -> mkProj (p', map_constr substrec c')
-	     | _ -> mkProj (p, map_constr substrec c')
+	     | Const p' -> mkProj (p', substrec c')
+	     | _ -> assert false
 	   with Not_found -> map_constr substrec c)
 
   | _ -> map_constr substrec c

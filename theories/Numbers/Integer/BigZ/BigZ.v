@@ -27,7 +27,7 @@ Require Import ZProperties ZDivFloor ZSig ZSigZAxioms ZMake.
 Delimit Scope bigZ_scope with bigZ.
 
 Module BigZ <: ZType <: OrderedTypeFull <: TotalOrder.
- Include ZMake.Make BigN [scope abstract_scope to bigZ_scope].
+ Include ZMake.Make N [scope abstract_scope to bigZ_scope].
  Bind Scope bigZ_scope with t t_.
  Include ZTypeIsZAxioms
  <+ ZProp [no inline]

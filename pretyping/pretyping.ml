@@ -385,18 +385,30 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
 	match dest_proj env f with
 	| None -> pretype empty_tycon env evdref lvar f, args
 	| Some (cst, mind, n, m, ty) ->
-	  let arg, args =
+	  (* let pars, arg, args = *)
+	  (*   if List.length args < n then  *)
+	  (*     error "Partial application of projections is not allowed" *)
+	  (*   else  *)
+	  (*     let pars, rest = List.chop n args in *)
+	  (* 	match rest with *)
+	  (* 	| [] -> assert false *)
+	  (* 	| hd :: tl -> pars, hd, tl *)
+	  (* in *)
+	  let arg, args = 
 	    match args with
-	    | [] -> error "Partial application of projections is not allowed"
+	    | [] -> assert false
 	    | hd :: tl -> hd, tl
 	  in
 	  let mk_ty k = 
 	    let mb = lookup_mind mind env in
 	    let args = 
 	      let ctx = smash_rel_context mb.Declarations.mind_params_ctxt in
-		List.fold_right (fun (n, b, ty) args ->
-		let ev = e_new_evar evdref env ~src:(loc,k) (substl args ty) in
-		  ev :: args) ctx []
+		List.fold_right (fun (n, b, ty) (* par  *)args ->
+		  let ty = substl args ty in
+		  let ev = e_new_evar evdref env ~src:(loc,k) ty in
+		    ev :: args) ctx []
+		  (* let j = pretype (mk_tycon ty) env evdref lvar par in *)
+		    (* j.uj_val :: args) ctx pars [] *)
 	    in ((mind, 0), List.rev args)
 	  in
 	  let tycon =
