@@ -52,10 +52,15 @@ let subst_const_def sub = function
   | Def c -> Def (subst_constr_subst sub c)
   | OpaqueDef lc -> OpaqueDef (subst_lazy_constr sub lc)
 
+let subst_const_proj sub pb =
+  { pb with proj_ind = subst_ind sub pb.proj_ind;
+    proj_type = subst_mps sub pb.proj_type }
+
 let subst_const_body sub cb = {
   const_hyps = (match cb.const_hyps with [] -> [] | _ -> assert false);
   const_body = subst_const_def sub cb.const_body;
   const_type = subst_const_type sub cb.const_type;
+  const_proj = Option.map (subst_const_proj sub) cb.const_proj;
   const_body_code = Cemitcodes.subst_to_patch_subst sub cb.const_body_code;
   const_constraints = cb.const_constraints;
   const_native_name = ref NotLinked;

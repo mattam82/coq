@@ -969,13 +969,13 @@ let whd_betaiota_deltazeta_for_iota_state ts env sigma csts s =
 	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
 	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
 	if isConstruct t_o then whrec csts_o (t_o, stack_o@stack') else s,csts'
-      |args, (Zproj _ :: _ as stack') ->
+      |args, (Zproj (n,m,p) :: stack'' as stack') ->
 	let seq = (t,append_stack_app_list args empty_stack) in
 	let (t_o,stack_o),csts_o = whd_state_gen ~csts:csts' false
 	  (Closure.RedFlags.red_add_transparent betadeltaiota ts) env sigma seq in
 	if isConstruct t_o then
 	  if is_transparent_constant ts p then
-	    whrec (stack_nth stack_o (n+m), stack'')
+	    whrec csts_o (stack_nth stack_o (n+m), stack'')
 	  else (* Won't unfold *) (whd_betaiota_state sigma (t_o, stack_o@stack'),csts')
 	else s,csts'
       |_ -> s,csts'
