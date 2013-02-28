@@ -121,10 +121,10 @@ let type_of_constant env cst = constant_type env cst
 let type_of_constant_in env cst = constant_type_in env cst
 let type_of_constant_knowing_parameters env t _ = t
 
-let judge_of_constant env (_,u as cst) =
+let judge_of_constant env (kn,u as cst) =
   let ctx = universe_context_set_of_ulist u in
   let c = mkConstU cst in
-  let cb = lookup_constant cst env in
+  let cb = lookup_constant kn env in
   let _ = check_hyps_inclusion env c cb.const_hyps in
   let ty, cu = type_of_constant env cst in
     (make_judge c ty, add_constraints_ctx ctx cu)
