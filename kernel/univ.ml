@@ -315,7 +315,7 @@ module Hashconsing = struct
       val nil : t
       val tip : elt -> t
       val node : t -> t node
-      val cons : ?sorted:bool -> elt -> t -> t
+      val cons : (* ?sorted:bool -> *) elt -> t -> t
       val hd : t -> elt
       val tl : t -> t
       val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
@@ -378,8 +378,8 @@ module Hashconsing = struct
       
     let tip e = Node.make (Cons(e, nil))
 
-    let cons ?(sorted=true) e l =
-      if sorted then sorted_cons e l else cons e l
+    (* let cons ?(sorted=true) e l = *)
+    (*   if sorted then sorted_cons e l else cons e l *)
 
     let hd = function { Node.node = Cons(a,_) } -> a | _ -> failwith "hd"
     let tl = function { Node.node = Cons(_,a) } -> a | _ -> failwith "tl"
@@ -675,10 +675,10 @@ struct
     | _, Nil -> l1
     | Cons (h1, t1), Cons (h2, t2) ->
       (match Expr.super (Hunivelt.node h1) (Hunivelt.node h2) with
+      | Inl true (* h1 < h2 *) -> merge_univs t1 l2
       | Inl false -> merge_univs l1 t2
-      | Inl true -> merge_univs t1 l2
       | Inr c -> 
-        if c <= 0
+        if c <= 0 (* h1 < h2 is name order *)
 	then cons h1 (merge_univs t1 l2)
 	else cons h2 (merge_univs l1 t2))
 

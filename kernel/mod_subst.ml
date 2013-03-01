@@ -413,7 +413,7 @@ let rec map_kn f f' c =
 
 let subst_mps sub c =
   if is_empty_subst sub then c
-  else map_kn (subst_mind sub) (subst_con sub) c
+  else map_kn (subst_mind sub) (subst_con0 sub) c
 
 let rec replace_mp_in_mp mpfrom mpto mp =
   match mp with

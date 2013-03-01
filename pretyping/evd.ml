@@ -254,55 +254,11 @@ let evar_universe_context_set ctx = ctx.uctx_local
 let evar_context_universe_context ctx = Univ.context_of_universe_context_set ctx.uctx_local
 let evar_universe_context_of ctx = { empty_evar_universe_context with uctx_local = ctx }
 
-(* let nf_univ_level vars (l : Univ.universe_level) =  *)
-(*   let rec aux acc l = *)
-(*     match Univ.LMap.find_opt l vars with *)
-(*     | Some (Some b) ->  *)
-(*       (match Univ.Universe.level b with *)
-(*       | Some b -> aux (Univ.LSet.add l acc) b *)
-(*       | None -> acc, false, l) *)
-(*     | Some None -> acc, true, l *)
-(*     | None -> acc, false, l *)
-(*   in aux Univ.LSet.empty l *)
-
-(* let set_univ_variables vars undefs l' = *)
-(*   Univ.LSet.fold (fun u vars ->  *)
-(*     Univ.LMap.add u (Some (Univ.Universe.of_levels [l'])) vars) *)
-(*     undefs vars *)
-
-(* let process_constraints vars local cstrs = *)
-(*   Univ.Constraint.fold (fun (l,d,r as cstr) (vars, local) -> *)
-(*     if d = Univ.Eq then *)
-(*       let eql, undefl, l' = nf_univ_level vars l  *)
-(*       and eqr, undefr, r' = nf_univ_level vars r in *)
-(*       let eqs = Univ.LSet.union eql eqr in *)
-(*       let can, noncan = if undefl then r', l' else l', r' in *)
-(* 	if undefl || undefr then *)
-(* 	  let eqs =  *)
-(* 	    if Univ.Level.eq can noncan then eqs *)
-(* 	    else Univ.LSet.add noncan eqs *)
-(* 	  in *)
-(* 	  let vars' = set_univ_variables vars eqs can in *)
-(* 	    (vars', local) *)
-(* 	else *)
-(* 	  let vars' = set_univ_variables vars eqs can in *)
-(* 	  let local' =  *)
-(* 	    if Univ.Level.eq l' r' then local  *)
-(* 	    else Univ.Constraint.add (l',d,r') local *)
-(* 	  in (vars', local') *)
-(*     else *)
-(*       if Univ.Level.is_small r && *)
-(* 	not (Univ.Level.is_small l || Univ.LMap.mem l vars) then *)
-(* 	anomaly ("Trying to lower a rigid Type universe to a small universe") *)
-(*       else *)
-(* 	if d = Univ.Le && Univ.Constraint.mem (l,Univ.Lt,r) local then *)
-(* 	  (vars, local) *)
-(* 	else (vars, Univ.Constraint.add cstr local)) *)
-(*   cstrs (vars, local) *)
-
 let instantiate_variable l b v =
-  let b = Univ.subst_large_constraint (Univ.Universe.make l) Univ.type0m_univ b in
-    v := Univ.LMap.add l (Some b) !v
+  (* let b = Univ.subst_large_constraint (Univ.Universe.make l) Univ.type0m_univ b in *)
+  (* if Univ.univ_depends (Univ.Universe.make l) b then  *)
+  (*   error ("Occur-check in universe variable instantiation") *)
+  (* else *) v := Univ.LMap.add l (Some b) !v
 
 let process_universe_constraints univs postponed vars alg local cstrs =
   let vars = ref vars in
@@ -353,20 +309,7 @@ let process_universe_constraints univs postponed vars alg local cstrs =
 			       THIS IS WRONG: it should be postponed and the equality
 			       turned into a common lub constraint. *) -> 
 	   if Univ.check_eq univs l r then local, postponed
-	   else
-	   (* match Univ.Universe.unifies l r with *)
-	   (* | Some (l', r') when not (Univ.Universe.eq l' l || Univ.Universe.eq r' r) -> *)
-	   (*   unify_universes l' d r' local postponed *)
-	   (* | _ -> *)
-           (* (try *)
-	   (*  match Univ.Universe.to_levels x, Univ.Universe.to_levels y with *)
-	   (*  | Some levx, Some levy -> *)
-           (*    List.fold_left2 (fun (local,postponed) l l' -> unify_universes *)
-	   (*      (Univ.Universe.make l) false (Univ.Universe.make l') local postponed) *)
-           (*      (local,postponed) levx levy *)
-	   (* | _ -> raise Not_found *)
-           (* with _ -> *)
-	     local, Univ.UniverseConstraints.add (l,d,r) postponed
+	   else local, Univ.UniverseConstraints.add (l,d,r) postponed
   in
   let rec fixpoint local postponed cstrs =
     let local, postponed' =
@@ -376,7 +319,7 @@ let process_universe_constraints univs postponed vars alg local cstrs =
       if Univ.UniverseConstraints.is_empty postponed' then local, postponed'
       else if Univ.UniverseConstraints.equal cstrs postponed' then local, postponed'
       else (* Progress: *)
-	fixpoint local Univ.UniverseConstraints.empty postponed'
+	 fixpoint local Univ.UniverseConstraints.empty postponed'
   in
   let local, pbs = fixpoint Univ.empty_constraint postponed cstrs in
     !vars, local, pbs
@@ -920,44 +863,13 @@ let set_eq_sort d s1 s2 =
   | Some (u1, u2) -> add_universe_constraints d 
     (Univ.UniverseConstraints.singleton (u1,Univ.UEq,u2))
 
-let has_lub d u1 u2 =
-  let dref, norm = memo_normalize_universe d in
-  let u1 = norm u1 and u2 = norm u2 in
-    if Univ.Universe.eq u1 u2 then dref ()
-    else add_universe_constraints (dref ())
-      (Univ.UniverseConstraints.singleton (u1,Univ.ULub,u2))
-
-      (* match s1, s2 with *)
-      (* | Prop c, Type u when Univ.universe_level u <> None -> *)
-      (* 	  add_constraints d (Univ.enforce_eq u1 u2 Univ.empty_constraint) *)
-
-      (* | Type u, Type v -> *)
-
-      (*   (match is_univ_level_var us algs u, is_univ_level_var us algs v with *)
-      (*   | Variable (u,alg), Variable (v,alg') ->  *)
-
-      (* 	  (match u, v with *)
-      (* 	  | LocalUniv u, (LocalUniv v | GlobalUniv v) -> *)
-      (* 	    add_constraints d (Univ.enforce_eq u1 u2 Univ.empty_constraint) *)
-      (* 	  | GlobalUniv u, LocalUniv v ->  *)
-      (* 	    add_constraints d (Univ.enforce_eq u2 u1 Univ.empty_constraint) *)
-      (* 	    (\* {d with evars = (sigma, (Univ.subst_univs_context us v u, *\) *)
-      (* 	    (\* 			     Univ.enforce_eq u1 u2 sm)) } *\) *)
-      (* 	  | GlobalUniv u, GlobalUniv v ->  *)
-      (* 	    add_constraints d (Univ.enforce_eq u1 u2 Univ.empty_constraint)) *)
-
-      (* 	| (Variable (LocalUniv v', alg), Algebraic u)  *)
-      (* 	| (Algebraic u, Variable (LocalUniv v', alg)) when alg ->  *)
-      (* 	  instantiate_univ_variable d v' u *)
-
-      (* 	| _, _ -> *)
-      (* 	(\* Will fail *\) *)
-      (* 	  add_constraints d (Univ.enforce_eq u1 u2 Univ.empty_constraint)) *)
-
-      (* | Type u, Prop _ when Univ.universe_level u <> None ->  *)
-      (*   add_constraints d (Univ.enforce_eq u1 u2 Univ.empty_constraint) *)
-
-      (* | _, _ -> raise (Univ.UniverseInconsistency (Univ.Eq, u1, u2, [])) *)
+let has_lub ({evars = (evars,univs)} as d) u1 u2 = d
+  (* let normalize = Universes.normalize_universe_opt_subst (ref univs.uctx_univ_variables) in *)
+  (* (\* let dref, norm = memo_normalize_universe d in *\) *)
+  (* let u1 = normalize u1 and u2 = normalize u2 in *)
+  (*   if Univ.Universe.eq u1 u2 then d *)
+  (*   else add_universe_constraints d *)
+  (*     (Univ.UniverseConstraints.singleton (u1,Univ.ULub,u2)) *)
 
 let set_eq_level d u1 u2 =
   add_constraints d (Univ.enforce_eq_level u1 u2 Univ.empty_constraint)

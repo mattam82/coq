@@ -2215,6 +2215,9 @@ Section Int31_Specs.
  apply Nat2Z.is_nonneg.
  Qed.
 
+ (* Avoid expanding [iter312_sqrt] before variables in the context. *)
+ Strategy 1 [iter312_sqrt].
+
  Lemma spec_sqrt2 : forall x y,
        wB/ 4 <= [|x|] ->
        let (s,r) := sqrt312 x y in

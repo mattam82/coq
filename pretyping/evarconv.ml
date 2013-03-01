@@ -415,7 +415,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
             | LetIn (_,b,_,c) -> is_unnamed
 	     (fst (whd_betaiota_deltazeta_for_iota_state
 		      ts env i Cst_stack.empty (subst1 b c, args)))
-            | Case _| Fix _| App _| Cast _ -> assert false in
+	    | Fix _ -> true (* Partially applied fix can be the result of a whd call *)
+            | Case _ | App _| Cast _ -> assert false in
           let rhs_is_stuck_and_unnamed () =
             match eval_flexible_term ts env term2 with
             | None -> false

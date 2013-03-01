@@ -467,24 +467,6 @@ let normalize_context_set (ctx, csts) substdef us algs =
       else acc)
     us ([], noneqs)
   in  
-  (* let ussubstref = ref ussubst in *)
-  (* let norm = normalize_univ_variable_subst ussubstref in *)
-  (* let _normalize_subst = LMap.iter (fun u v -> ignore(norm u)) ussubst in *)
-  (* let ussubst = !ussubstref in *)
-  (* let rec normalize_univs_level_universe subst' us = *)
-  (*   let us' = subst_univs_level_universe subst' us in *)
-  (*     if us' == us then us' else normalize_univs_level_universe subst' us' *)
-  (* in *)
-
-  (* let subst', ussubst =  *)
-  (*   Univ.LMap.fold  *)
-  (*     (fun u r (subst,ussubst) ->  *)
-  (*       assert (not (Universe.eq (Universe.make u) r)); *)
-  (*       match Universe.level r with *)
-  (* 	| Some r' -> (Univ.LMap.add u r' subst, ussubst) *)
-  (* 	| None -> (subst, Univ.LMap.add u r ussubst)) *)
-  (*     ussubst (Univ.LMap.empty, Univ.LMap.empty) *)
-  (* in *)
   let uf = UF.create () in
   let subst, ussubst, noneqs =
     let rec aux subst ussubst =
@@ -520,12 +502,21 @@ let normalize_context_set (ctx, csts) substdef us algs =
     in fixpoint noneqs subst ussubst
   in
   let partition = UF.partition uf in
-  let subst = 
-    List.fold_left (fun acc s -> 
-      let x = LSet.choose s in
-      let others = LSet.remove x s in
-	LSet.fold (fun l' -> LMap.add l' x) others acc)
-      subst partition
+  let subst, noneqs =
+    List.fold_left (fun (subst, cstrs) s ->
+      let canon, (global, rigid, flexible) = choose_canonical ctx us s in
+      (* Add equalities for globals which can't be merged anymore. *)
+      let cstrs = LSet.fold (fun g cst ->
+        Constraint.add (canon, Univ.Eq, g) cst) global cstrs
+      in
+      (* Same for rigids, they can't be subsituted *)
+      let cstrs = LSet.fold (fun g cst ->
+        Constraint.add (canon, Univ.Eq, g) cst) rigid cstrs
+      in
+      let subst = LSet.fold (fun f -> LMap.add f canon)
+  	flexible subst
+      in (subst, cstrs))
+    (subst, noneqs) partition
   in
   let constraints = remove_trivial_constraints 
     (Constraint.union eqs (subst_univs_level_constraints subst noneqs))

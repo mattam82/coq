@@ -769,7 +769,7 @@ let trans_fconv pb reds env sigma x y =
     try let cst = f ~evars:(safe_evar_value sigma) reds env x y in
 	  Evd.add_universe_constraints sigma cst, true
     with NotConvertible -> sigma, false
-    (* | Anomaly _ -> error "Conversion test raised an anomaly" *)
+    | e when is_anomaly e -> error "Conversion test raised an anomaly"
     
 (********************************************************************)
 (*             Special-Purpose Reduction                            *)

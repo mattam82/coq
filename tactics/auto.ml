@@ -715,7 +715,7 @@ let subst_autohint (subst,(local,name,hintlist as obj)) =
       | Give_exact (c,t,ctx) ->
           let c' = subst_mps subst c in
 	  let t' = subst_mps subst t in
-          if c==c' then data.code else Give_exact (c',t',ctx)
+          if c==c' && t'== t then data.code else Give_exact (c',t',ctx)
       | Res_pf_THEN_trivial_fail (c,t,ctx) ->
           let c' = subst_mps subst c in
           let t' = subst_mps subst t in
