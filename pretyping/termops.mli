@@ -282,5 +282,5 @@ val on_judgment_value : (types -> types) -> unsafe_judgment -> unsafe_judgment
 val on_judgment_type  : (types -> types) -> unsafe_judgment -> unsafe_judgment
 
 (** {6 Functions to deal with impossible cases } *)
-val set_impossible_default_clause : constr * types -> unit
-val coq_unit_judge : unit -> unsafe_judgment
+val set_impossible_default_clause : (unit -> (constr * types) Univ.in_universe_context_set) -> unit
+val coq_unit_judge : unit -> unsafe_judgment Univ.in_universe_context_set

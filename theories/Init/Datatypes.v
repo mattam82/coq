@@ -339,8 +339,11 @@ Arguments identity_rect [A] a P f y i.
 
 (** Identity type *)
 
-Definition ID := forall A:Type, A -> A.
-Definition id : ID := fun A x => x.
+Polymorphic Definition ID := forall A:Type, A -> A.
+Polymorphic Definition id : ID := fun A x => x.
+
+Definition IDProp := forall A:Prop, A -> A.
+Definition idProp : IDProp := fun A x => x.
 
 
 (* begin hide *)

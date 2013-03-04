@@ -175,7 +175,7 @@ val jv_nf_betaiotaevar :
 (** Presenting terms without solved evars *)
 
 val nf_evars_and_universes : evar_map -> evar_map * (constr -> constr)
-val e_nf_evars_and_universes : evar_map ref -> (constr -> constr) * Univ.universe_subst
+val e_nf_evars_and_universes : evar_map ref -> (constr -> constr) * Universes.universe_opt_subst
 
 (** Normalize the evar map w.r.t. universes, after simplification of constraints.
     Return the substitution function for constrs as well. *)

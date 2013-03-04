@@ -131,10 +131,14 @@ let make_con dir id = Globnames.encode_con dir (Id.of_string id)
 
 (** Identity *)
 
-let id = make_con datatypes_module "id"
-let type_of_id = make_con datatypes_module "ID"
+let id = make_con datatypes_module "idProp"
+let type_of_id = make_con datatypes_module "IDProp"
 
-let _ = Termops.set_impossible_default_clause (mkConst id,mkConst type_of_id)
+let _ = Termops.set_impossible_default_clause 
+  (fun () -> 
+    let c, ctx = Universes.fresh_global_instance (Global.env()) (ConstRef id) in
+    let (_, u) = destConst c in
+      (c,mkConstU (type_of_id,u)), ctx)
 
 (** Natural numbers *)
 let nat_kn = make_ind datatypes_module "nat"

@@ -20,7 +20,7 @@ val set_start_hook : (types -> unit) -> unit
 
 val start_proof : Id.t -> goal_kind -> types Univ.in_universe_context_set ->
   ?init_tac:tactic -> ?compute_guard:lemma_possible_guards -> 
-   (Univ.universe_subst Univ.in_universe_context -> unit declaration_hook) -> unit
+   (Universes.universe_opt_subst Univ.in_universe_context -> unit declaration_hook) -> unit
 
 val start_proof_com : goal_kind ->
   (lident option * (local_binder list * constr_expr * (lident option * recursion_order_expr) option)) list ->

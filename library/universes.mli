@@ -68,25 +68,29 @@ val extend_context : 'a in_universe_context_set -> universe_context_set ->
 module UF : Unionfind.PartitionSig with type elt = universe_level
 
 val instantiate_univ_variables : 
+  LSet.t ->
   (Univ.constraint_type * Univ.universe_level) list
   Univ.LMap.t ->
   (Univ.constraint_type * Univ.universe_level) list
   Univ.LMap.t ->
   universe_level ->
-  (Univ.Level.t * universe) list * Univ.constraints ->
-  (Univ.Level.t * universe) list * Univ.constraints
-
-val choose_canonical : universe_set -> universe_set -> universe_set -> 
-  universe_level * (universe_set * universe_set * universe_set)
+  Univ.constraints ->
+  (universe option * Univ.constraints)
 
 
 type universe_opt_subst = universe option universe_map
 
+val make_opt_subst : universe_opt_subst -> universe_subst_fn
+
+val subst_opt_univs_constr : universe_opt_subst -> constr -> constr
+
+val choose_canonical : universe_set -> universe_opt_subst -> universe_set -> 
+  universe_level * (universe_set * universe_set * universe_set)
+
 val normalize_context_set : universe_context_set -> 
-  universe_subst (* Substitution for the defined variables *) ->
-  universe_set (* univ variables *) ->
+  universe_opt_subst (* The defined and undefined variables *) ->
   universe_set (* univ variables that can be substituted by algebraics *) -> 
-  universe_subst in_universe_context_set
+  universe_opt_subst in_universe_context_set
 
 val normalize_univ_variables : universe_opt_subst -> 
   universe_opt_subst * universe_set * universe_set * universe_subst

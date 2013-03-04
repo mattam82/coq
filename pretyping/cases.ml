@@ -915,13 +915,19 @@ let expand_arg tms (p,ccl) ((_,t),_,na) =
   let k = length_of_tomatch_type_sign na t in
   (p+k,liftn_predicate (k-1) (p+1) ccl tms)
 
+
+let use_unit_judge evd =
+  let j, ctx = coq_unit_judge () in
+  let evd' = Evd.merge_context_set Evd.univ_flexible_alg evd ctx in
+    evd', j
+
 let adjust_impossible_cases pb pred tomatch submat =
   match submat with
   | [] ->
     begin match kind_of_term (whd_evar !(pb.evdref) pred) with
     | Evar (evk,_) when snd (evar_source evk !(pb.evdref)) == Evar_kinds.ImpossibleCase ->
-	let default = (coq_unit_judge ()).uj_type in
-	pb.evdref := Evd.define evk default !(pb.evdref);
+	let evd, default = use_unit_judge !(pb.evdref) in
+	pb.evdref := Evd.define evk default.uj_type evd;
       (* we add an "assert false" case *)
       let pats = List.map (fun _ -> PatVar (Loc.ghost,Anonymous)) tomatch in
       let aliasnames =
@@ -1653,9 +1659,11 @@ let build_inversion_problem loc env sigma tms t =
       return type of the original problem Xi *)
   (* let sigma, s = Evd.new_sort_variable sigma in *)
 (*FIXME TRY *)
-  let sigma, s = Evd.new_sort_variable univ_rigid sigma in
+  let sigma, s = Evd.new_sort_variable univ_flexible_alg sigma in
+  let s' = Retyping.get_sort_of env sigma t in
+  (* let sigma, s' = Evd.new_sort_variable univ_flexible_alg sigma in *)
+  let sigma = Evd.set_leq_sort sigma s' s in
   let evdref = ref sigma in
-  (* let ty = Retyping.get_type_of env sigma t in *)
   (* let ty = evd_comb1 (refresh_universes false) evdref ty in *)
   let pb =
     { env       = pb_env;
@@ -1811,7 +1819,7 @@ let prepare_predicate loc typing_fun sigma env tomatchs arsign tycon pred =
     | Some rtntyp, _ ->
       (* We extract the signature of the arity *)
       let envar = List.fold_right push_rel_context arsign env in
-      let sigma, newt = new_sort_variable univ_flexible sigma in
+      let sigma, newt = new_sort_variable univ_flexible_alg sigma in
       let evdref = ref sigma in
       let predcclj = typing_fun (mk_tycon (mkSort newt)) envar evdref rtntyp in
       let sigma = !evdref in
@@ -2235,7 +2243,7 @@ let compile_program_cases loc style (typing_function, evdref) tycon env
     (predopt, tomatchl, eqns) =
   let typing_fun tycon env = function
     | Some t ->	typing_function tycon env evdref t
-    | None -> coq_unit_judge () in
+    | None -> Evarutil.evd_comb0 use_unit_judge evdref in
 
   (* We build the matrix of patterns and right-hand side *)
   let matx = matx_of_eqns env eqns in
@@ -2314,7 +2322,7 @@ let compile_program_cases loc style (typing_function, evdref) tycon env
     
   let typing_function tycon env evdref = function
     | Some t ->	typing_function tycon env evdref t
-    | None -> coq_unit_judge () in
+    | None -> evd_comb0 use_unit_judge evdref in
 
   let pb =
     { env      = env;
@@ -2388,7 +2396,7 @@ let compile_cases loc style (typing_fun, evdref) tycon env (predopt, tomatchl, e
     (* A typing function that provides with a canonical term for absurd cases*)
     let typing_fun tycon env evdref = function
     | Some t ->	typing_fun tycon env evdref t
-    | None -> coq_unit_judge () in
+    | None -> evd_comb0 use_unit_judge evdref in
 
     let myevdref = ref sigma in
 

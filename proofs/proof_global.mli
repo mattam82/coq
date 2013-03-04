@@ -57,7 +57,7 @@ val start_proof : Names.Id.t ->
                           Decl_kinds.goal_kind ->
                           (Environ.env * Term.types Univ.in_universe_context_set) list  ->
                           ?compute_guard:lemma_possible_guards -> 
-  (Univ.universe_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook) -> 
+  (Universes.universe_opt_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook) -> 
                           unit
 
 val close_proof : unit -> 
@@ -129,5 +129,5 @@ end
 module V82 : sig
   val get_current_initial_conclusions : unit -> Names.Id.t *
     (Term.types list * Decl_kinds.goal_kind *
-     (Univ.universe_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook))
+     (Universes.universe_opt_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook))
 end

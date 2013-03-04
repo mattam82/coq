@@ -1308,34 +1308,42 @@ let subst_univs_puniverses subst =
     let f = CList.smartmap (Univ.subst_univs_universe fn) in
       fun ((c, u) as x) -> let u' = f u in if u' == u then x else (c, u')
 
+let subst_univs_fn_puniverses fn =
+  let f = CList.smartmap (Univ.subst_univs_universe fn) in
+    fun ((c, u) as x) -> let u' = f u in if u' == u then x else (c, u')
+
+let subst_univs_fn_constr f c =
+  let changed = ref false in
+  let fu = Univ.subst_univs_universe f in
+  let f = CList.smartmap fu in
+  let rec aux t = 
+    match kind_of_term t with
+    | Const (c, u) -> 
+      let u' = f u in 
+	if u' == u then t
+	else (changed := true; mkConstU (c, u'))
+    | Ind (i, u) ->
+      let u' = f u in 
+	if u' == u then t
+	else (changed := true; mkIndU (i, u'))
+    | Construct (c, u) ->
+      let u' = f u in 
+	if u' == u then t
+	else (changed := true; mkConstructU (c, u'))
+    | Sort (Type u) -> 
+      let u' = fu u in
+	if u' == u then t else 
+	  (changed := true; mkSort (sort_of_univ u'))
+    | _ -> map_constr aux t
+  in 
+  let c' = aux c in
+    if !changed then c' else c
+
 let subst_univs_constr subst c =
   if Univ.is_empty_subst subst then c
   else 
-    let fn = Univ.make_subst subst in
-    let f = CList.smartmap (Univ.subst_univs_universe fn) in
-    let changed = ref false in
-    let rec aux t = 
-      match kind_of_term t with
-      | Const (c, u) -> 
-        let u' = f u in 
-	  if u' == u then t
-	  else (changed := true; mkConstU (c, u'))
-      | Ind (i, u) ->
-        let u' = f u in 
-	  if u' == u then t
-	  else (changed := true; mkIndU (i, u'))
-      | Construct (c, u) ->
-         let u' = f u in 
-	   if u' == u then t
-	   else (changed := true; mkConstructU (c, u'))
-      | Sort (Type u) -> 
-         let u' = subst_univs_universe fn u in
-	   if u' == u then t else 
-	     (changed := true; mkSort (sort_of_univ u'))
-      | _ -> map_constr aux t
-    in 
-    let c' = aux c in
-      if !changed then c' else c
+    let f = Univ.make_subst subst in
+      subst_univs_fn_constr f c
 
 let subst_univs_level_constr subst c =
   if Univ.is_empty_level_subst subst then c

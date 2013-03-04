@@ -270,6 +270,8 @@ val evar_universe_context_of : Univ.universe_context_set -> evar_universe_contex
 val empty_evar_universe_context : evar_universe_context
 val union_evar_universe_context : evar_universe_context -> evar_universe_context ->
   evar_universe_context
+val evar_universe_context_subst : evar_universe_context -> Universes.universe_opt_subst
+
 
 val add_constraints_context : evar_universe_context -> 
   Univ.constraints -> evar_universe_context
@@ -277,8 +279,8 @@ val add_constraints_context : evar_universe_context ->
 val normalize_evar_universe_context_variables : evar_universe_context -> 
   Univ.universe_subst in_evar_universe_context
 
-val normalize_evar_universe_context : evar_universe_context -> Univ.universe_subst ->
-  Univ.universe_subst in_evar_universe_context
+val normalize_evar_universe_context : evar_universe_context -> 
+  evar_universe_context
 
 val new_univ_variable : rigid -> evar_map -> evar_map * Univ.universe
 val new_sort_variable : rigid -> evar_map -> evar_map * sorts
@@ -302,6 +304,7 @@ val check_leq : evar_map -> Univ.universe -> Univ.universe -> bool
 val evar_universe_context : evar_map -> evar_universe_context
 val get_universe_context_set : ?with_algebraic:bool -> evar_map -> Univ.universe_context_set
 val universe_context : evar_map -> Univ.universe_context
+val universe_subst : evar_map -> Universes.universe_opt_subst
 
 val merge_universe_context : evar_map -> evar_universe_context -> evar_map
 
@@ -314,7 +317,7 @@ val abstract_undefined_variables : evar_map -> evar_map
 
 val refresh_undefined_universes : evar_map -> evar_map * Univ.universe_level_subst
 
-val nf_constraints : evar_map -> evar_map * Univ.universe_subst
+val nf_constraints : evar_map -> evar_map
 
 (** Polymorphic universes *)
 

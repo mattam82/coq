@@ -888,10 +888,16 @@ let rec solve_unconstrained_evars_with_canditates evd =
       let evd = aux (List.rev l) in
       solve_unconstrained_evars_with_canditates evd
 
-let solve_unconstrained_impossible_cases evd =
+let solve_unconstrained_impossible_cases env evd =
   Evd.fold_undefined (fun evk ev_info evd' ->
     match ev_info.evar_source with
-    | _,Evar_kinds.ImpossibleCase -> Evd.define evk (j_type (coq_unit_judge ())) evd'
+    | _,Evar_kinds.ImpossibleCase -> 
+      let j, ctx = coq_unit_judge () in
+      let evd' = Evd.merge_context_set Evd.univ_flexible_alg evd' ctx in
+      let ty = j_type j in
+      let conv_algo = evar_conv_x full_transparent_state in
+      let evd' = check_evar_instance evd' evk ty conv_algo in
+	Evd.define evk ty evd' 
     | _ -> evd') evd evd
 
 let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
@@ -923,7 +929,7 @@ let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
   let (evd,pbs) = extract_all_conv_pbs evd in
   let heuristic_solved_evd = aux evd pbs false [] in
   check_problems_are_solved env heuristic_solved_evd;
-  solve_unconstrained_impossible_cases heuristic_solved_evd
+  solve_unconstrained_impossible_cases env heuristic_solved_evd
 
 (* Main entry points *)
 

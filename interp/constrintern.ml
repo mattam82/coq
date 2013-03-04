@@ -1433,7 +1433,7 @@ let internalize sigma globalenv env allow_patvar lvar c =
 	  | [] -> Option.map (intern_type env') rtnpo (* Only PatVar in "in" clauses *)
 	  | l -> let thevars,thepats=List.split l in
 		 Some (
-		   GCases(Loc.ghost,Term.RegularStyle,Some (GSort (Loc.ghost,GType None)), (* "return Type" *)
+		   GCases(Loc.ghost,Term.RegularStyle,(* Some (GSort (Loc.ghost,GType None)) *)None, (* "return Type" *)
 			  List.map (fun id -> GVar (Loc.ghost,id),(Name id,None)) thevars, (* "match v1,..,vn" *)
 			  [Loc.ghost,[],thepats, (* "|p1,..,pn" *)
 			   Option.cata (intern_type env') (GHole(Loc.ghost,Evar_kinds.CasesType)) rtnpo; (* "=> P" is there were a P "=> _" else *)

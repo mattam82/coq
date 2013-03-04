@@ -74,22 +74,24 @@ let env_nf_betaiotaevar sigma env =
     (fun d e ->
       push_rel (map_rel_declaration (Reductionops.nf_betaiota sigma) d) e) env
 
-let nf_evars_universes evm subst =
-  Universes.nf_evars_and_universes_subst (Reductionops.safe_evar_value evm) subst
-
+let nf_evars_universes evm =
+  Universes.nf_evars_and_universes_opt_subst (Reductionops.safe_evar_value evm) 
+    (Evd.universe_subst evm)
+    
 let nf_evars_and_universes evm =
-  let evm, subst = Evd.nf_constraints evm in
-    evm, nf_evars_universes evm subst
+  let evm = Evd.nf_constraints evm in
+    evm, nf_evars_universes evm
 
 let e_nf_evars_and_universes evdref =
-  let subst = evd_comb0 Evd.nf_constraints evdref in
-    nf_evars_universes !evdref subst, subst
+  evdref := Evd.nf_constraints !evdref;
+  nf_evars_universes !evdref, Evd.universe_subst !evdref
 
 let nf_evar_map_universes evm =
-  let evm, subst = Evd.nf_constraints evm in
+  let evm = Evd.nf_constraints evm in
+  let subst = Evd.universe_subst evm in
     if Univ.LMap.is_empty subst then evm, nf_evar evm
     else
-      let f = nf_evars_universes evm subst in
+      let f = nf_evars_universes evm in
 	Evd.map (map_evar_info f) evm, f
 
 let nf_named_context_evar sigma ctx =

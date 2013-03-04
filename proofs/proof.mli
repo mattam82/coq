@@ -60,7 +60,7 @@ val partial_proof : proof -> Term.constr list
     Raises [HasUnresolvedEvar] if some evars have been left undefined. *)
 exception UnfinishedProof
 exception HasUnresolvedEvar
-val return : proof -> ((Term.constr * Term.types) list * Univ.universe_subst) Univ.in_universe_context
+val return : proof -> ((Term.constr * Term.types) list * Universes.universe_opt_subst) Univ.in_universe_context
 
 (* Interpretes the Undo command. Raises [EmptyUndoStack] if 
     the undo stack is empty. *)

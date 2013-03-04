@@ -44,7 +44,7 @@ val init : (Environ.env * Term.types Univ.in_universe_context_set) list -> proof
 val finished : proofview -> bool
 
 (* Returns the current value of the proofview partial proofs. *)
-val return : proofview -> ((constr*types) list * Univ.universe_subst) Univ.in_universe_context
+val return : proofview -> ((constr*types) list * Universes.universe_opt_subst) Univ.in_universe_context
 
 
 (*** Focusing operations ***)

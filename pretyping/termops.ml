@@ -1109,9 +1109,11 @@ let coq_unit_judge =
   let na2 = Name (Id.of_string "H") in
   fun () ->
     match !impossible_default_case with
-    | Some (id,type_of_id) ->
-	make_judge id type_of_id
+    | Some fn -> 
+        let (id,type_of_id), ctx = fn () in
+	  make_judge id type_of_id, ctx
     | None ->
 	(* In case the constants id/ID are not defined *)
 	make_judge (mkLambda (na1,mkProp,mkLambda(na2,mkRel 1,mkRel 1)))
-                 (mkProd (na1,mkProp,mkArrow (mkRel 1) (mkRel 2)))
+                 (mkProd (na1,mkProp,mkArrow (mkRel 1) (mkRel 2))), 
+       Univ.empty_universe_context_set

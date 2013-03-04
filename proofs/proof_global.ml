@@ -67,7 +67,7 @@ type lemma_possible_guards = int list list
 type proof_info = {
   strength : Decl_kinds.goal_kind ;
   compute_guard :  lemma_possible_guards;
-  hook : Univ.universe_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook ;
+  hook : Universes.universe_opt_subst Univ.in_universe_context -> unit Tacexpr.declaration_hook ;
   mode : proof_mode
 }
 

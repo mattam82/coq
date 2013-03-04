@@ -664,6 +664,9 @@ val compare_constr : (constr -> constr -> bool) -> constr -> constr -> bool
 val constr_ord : constr -> constr -> int
 val hash_constr : constr -> int
 
+val subst_univs_fn_constr : Univ.universe_subst_fn -> constr -> constr
+val subst_univs_fn_puniverses : Univ.universe_subst_fn -> 'a puniverses -> 'a puniverses
+
 val subst_univs_constr : Univ.universe_subst -> constr -> constr
 val subst_univs_puniverses : Univ.universe_subst -> 'a puniverses -> 'a puniverses
 val subst_univs_level_constr : Univ.universe_level_subst -> constr -> constr

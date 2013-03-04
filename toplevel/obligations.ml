@@ -322,7 +322,7 @@ type program_info = {
   prg_body: constr;
   prg_type: constr;
   prg_ctx:  Univ.universe_context_set;
-  prg_subst : Univ.universe_subst;
+  prg_subst : Universes.universe_opt_subst;
   prg_obligations: obligations;
   prg_deps : Id.t list;
   prg_fixkind : fixpoint_kind option ;
@@ -379,10 +379,10 @@ let get_body subst obl =
   | None -> assert false
   | Some (DefinedObl c) -> 
     let _, ctx = Environ.constant_type_in_ctx (Global.env ()) c in
-    let pc = subst_univs_puniverses subst (c, Univ.UList.of_llist (fst ctx)) in
+    let pc = subst_univs_fn_puniverses subst (c, Univ.UList.of_llist (fst ctx)) in
       DefinedObl pc
   | Some (TermObl c) -> 
-      TermObl (subst_univs_constr subst c)
+      TermObl (subst_univs_fn_constr subst c)
 
 let get_obligation_body expand subst obl =
   let c = get_body subst obl in
@@ -408,8 +408,9 @@ let obl_substitution expand subst obls deps =
     deps []
 
 let subst_deps expand subst obls deps t =
+  let subst = Universes.make_opt_subst subst in
   let osubst = obl_substitution expand subst obls deps in
-    subst_univs_constr subst
+    subst_univs_fn_constr subst
       (Term.replace_vars (List.map (fun (n, (_, b)) -> n, b) osubst) t)
 
 let rec prod_app t n =
@@ -438,7 +439,8 @@ let replace_appvars subst =
   in map_constr aux
        
 let subst_prog expand obls ints prg =
-  let subst = obl_substitution expand prg.prg_subst obls ints in
+  let usubst = Universes.make_opt_subst prg.prg_subst in
+  let subst = obl_substitution expand usubst obls ints in
     if get_hide_obligations () then
       (replace_appvars subst prg.prg_body,
        replace_appvars subst ((* Termops.refresh_universes *) prg.prg_type))
@@ -759,7 +761,7 @@ let solve_by_tac evi t poly subst ctx =
   try
     let substref = ref (Univ.LMap.empty,Univ.empty_universe_context) in
     Pfedit.start_proof id (goal_kind poly) evi.evar_hyps 
-      (subst_univs_constr subst evi.evar_concl, ctx)
+      (Universes.subst_opt_univs_constr subst evi.evar_concl, ctx)
     (fun subst-> substref:=subst; fun _ _ -> ());
     Pfedit.by (tclCOMPLETE t);
     let _,(const,_,_,_) = Pfedit.cook_proof ignore in
@@ -767,7 +769,7 @@ let solve_by_tac evi t poly subst ctx =
       Inductiveops.control_only_guard (Global.env ())
 	const.Entries.const_entry_body;
       let subst, ctx = !substref in
-	subst_univs_constr subst const.Entries.const_entry_body,
+	subst_univs_fn_constr (Universes.make_opt_subst subst) const.Entries.const_entry_body,
 	subst, const.Entries.const_entry_universes
   with e ->
     let e = Errors.push e in
@@ -787,7 +789,7 @@ let rec solve_obligation prg num tac =
 	  let obl = subst_deps_obl prg.prg_subst obls obl in
 	  let kind = kind_of_obligation (pi2 prg.prg_kind) obl.obl_status in
 	    Lemmas.start_proof obl.obl_name kind 
-	      (subst_univs_constr prg.prg_subst obl.obl_type, ctx)
+	      (Universes.subst_opt_univs_constr prg.prg_subst obl.obl_type, ctx)
 	      (fun (subst,ctx) strength gr ->
 		let cst = match gr with ConstRef cst -> cst | _ -> assert false in
 		let obl =
@@ -810,8 +812,8 @@ let rec solve_obligation prg num tac =
 		let _ = obls.(num) <- obl in
 		let ctx = Univ.universe_context_set_of_universe_context ctx in
 		let res = try update_obls 
-		  {prg with prg_body = subst_univs_constr subst prg.prg_body;
-		   prg_type = subst_univs_constr subst prg.prg_type;
+		  {prg with prg_body = Universes.subst_opt_univs_constr subst prg.prg_body;
+		   prg_type = Universes.subst_opt_univs_constr subst prg.prg_type;
 		   prg_ctx = ctx;
 		   prg_subst = Univ.LMap.union prg.prg_subst subst}
 		obls (pred rem)

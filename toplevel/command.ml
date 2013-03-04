@@ -296,13 +296,6 @@ let interp_ind_arity evdref env ind =
   (* let _ = evdref := Evd.abstract_undefined_variables !evdref in *)
     make_conclusion_flexible evdref ty; (ty, impls)
 
-let normalize_arity_universes evdref env params inds = 
-  let subst = Evarutil.evd_comb0 Evd.nf_constraints evdref in
-  let nf = subst_univs_constr subst in
-  let arities = List.map (fun (ty, impls) -> make_conclusion_flexible evdref ty, impls) inds in
-  let params = Sign.map_rel_context nf params in
-    params, arities
-
 let interp_cstrs evdref env impls mldata arity ind =
   let cnames,ctyps = List.split ind.ind_lc in
   (* Complete conclusions of constructor types if given in ML-style syntax *)
@@ -394,7 +387,6 @@ let interp_mutual_inductive (paramsl,indl) notations poly finite =
 
   (* Interpret the arities *)
   let arities = List.map (interp_ind_arity evdref env_params) indl in
-  (* let ctx_params, arities = normalize_arity_universes evdref ctx_params arities in *)
 
   let fullarities = List.map (fun (c, _) -> it_mkProd_or_LetIn c ctx_params) arities in
   let env_ar = push_types env0 indnames fullarities in
