@@ -46,7 +46,9 @@ let compare_stack_shape stk1 stk2 =
     | (Zapp l1::s1, _) -> compare_rec (bal+List.length l1) s1 stk2
     | (_, Zapp l2::s2) -> compare_rec (bal-List.length l2) stk1 s2
     | (Zcase(c1,_,_,_)::s1, Zcase(c2,_,_,_)::s2) ->
-        Int.equal bal 0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
+       Int.equal bal 0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
+    | (Zproj (n1,m1,p)::s1, Zproj(n2,m2,p2)::s2) ->
+       Int.equal bal 0 && compare_rec 0 s1 s2
     | (Zfix(_,a1,_)::s1, Zfix(_,a2,_)::s2) ->
         Int.equal bal 0 && compare_rec 0 a1 a2 && compare_rec 0 s1 s2
     | (_,_) -> false in

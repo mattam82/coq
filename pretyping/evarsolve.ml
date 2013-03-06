@@ -1127,7 +1127,6 @@ exception NotInvertibleUsingOurAlgorithm of constr
 exception NotEnoughInformationToProgress of (Id.t * evar_projection) list
 exception OccurCheckIn of evar_map * constr
 exception MetaOccurInBodyInternal
-exception InstanceNotSameType
 
 let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
   let aliases = make_alias_map env in

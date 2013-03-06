@@ -267,9 +267,9 @@ type global_declaration =
 let add_constant dir l decl senv =
   let kn = make_con senv.modinfo.modpath dir l in
   let cb = match decl with
-    | ConstantEntry ce -> Term_typing.translate_constant senv.env ce
+    | ConstantEntry ce -> Term_typing.translate_constant senv.env (Constant.user kn) ce
     | GlobalRecipe r ->
-      let cb = Term_typing.translate_recipe senv.env r in
+      let cb = Term_typing.translate_recipe senv.env (Constant.user kn) r in
       if DirPath.is_empty dir then Declareops.hcons_const_body cb else cb
   in
   let senv' = add_field (l,SFBconst cb) (C kn) senv in

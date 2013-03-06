@@ -130,7 +130,7 @@ type inline = bool
 
 type result =
   constant_def * constant_type * projection_body option * 
-  Univ.constraints * bool * Sign.section_context
+  Univ.constraints * inline * Sign.section_context option
 
 let on_body f = function
   | Undef inl -> Undef inl
