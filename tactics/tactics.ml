@@ -1774,7 +1774,8 @@ let make_pattern_test env sigma0 (sigma,c) =
       tclPUSHEVARUNIVCONTEXT (Evd.evar_universe_context evd), c
   | Some (sigma,_) -> 
      let univs, subst = nf_univ_variables sigma in
-       tclIDTAC, subst_univs_constr subst (nf_evar sigma c))
+       tclPUSHEVARUNIVCONTEXT (Evd.evar_universe_context univs),
+       subst_univs_constr subst (nf_evar sigma c))
 
 let letin_abstract id c (test,out) (occs,check_occs) gl =
   let env = pf_env gl in

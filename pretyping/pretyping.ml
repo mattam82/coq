@@ -240,7 +240,7 @@ let pretype_ref loc evdref env ref us =
             variables *)
          Pretype_errors.error_var_not_found_loc loc id)
   | ref ->
-      let evd, c = pretype_global univ_flexible_alg env !evdref ref us in
+      let evd, c = pretype_global univ_flexible env !evdref ref us in
 	evdref := evd;
 	make_judge c (Retyping.get_type_of env evd c)
 

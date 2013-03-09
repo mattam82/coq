@@ -178,7 +178,7 @@ let instantiate_constr_or_ref env sigma c =
 
 let instantiate_hint p =
   let mk_clenv c cty ctx =
-    let sigma = Evd.merge_context_set univ_flexible_alg dummy_goal.sigma ctx in
+    let sigma = Evd.merge_context_set univ_flexible dummy_goal.sigma ctx in
     let goal = { dummy_goal with sigma = sigma } in
     let cl = mk_clenv_from goal (c,cty) in {cl with env = empty_env}
   in

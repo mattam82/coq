@@ -808,9 +808,9 @@ Section MakeRingPol.
      P@l == Q@l + [c] * R@l.
  Proof.
  revert l.
- induction P as [c0 | j P IH | P1 IH1 i P2 IH2]; intros l; Esimpl.
- - assert (H := div_th.(div_eucl_th) c0 c).
-   destruct cdiv as (q,r). rewrite H; Esimpl. add_permut.
+ induction P as [c0 | j P IH | P1 IH1 i P2 IH2]; intros l; Esimpl. 
+ - assert (H := div_th.(div_eucl_th) c0 c). 
+   destruct cdiv as (q,r). rewrite H; Esimpl. add_permut. 
  - destr_factor. Esimpl.
  - destr_factor. Esimpl. add_permut.
  Qed.

@@ -1659,10 +1659,10 @@ let build_inversion_problem loc env sigma tms t =
       return type of the original problem Xi *)
   (* let sigma, s = Evd.new_sort_variable sigma in *)
 (*FIXME TRY *)
-  let sigma, s = Evd.new_sort_variable univ_flexible_alg sigma in
-  let s' = Retyping.get_sort_of env sigma t in
+  (* let sigma, s = Evd.new_sort_variable univ_flexible sigma in *)
+  let s = Retyping.get_sort_of env sigma t in
   (* let sigma, s' = Evd.new_sort_variable univ_flexible_alg sigma in *)
-  let sigma = Evd.set_leq_sort sigma s' s in
+  (* let sigma = Evd.set_leq_sort sigma s' s in *)
   let evdref = ref sigma in
   (* let ty = evd_comb1 (refresh_universes false) evdref ty in *)
   let pb =

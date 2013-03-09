@@ -727,6 +727,8 @@ struct
   (*   in x', y' *)
 
   let empty = nil
+  let is_empty n =
+    node n = Nil
 
   let exists f l = 
     Huniv.exists (fun x -> f (Hunivelt.node x)) l
@@ -1532,7 +1534,7 @@ let check_univ_leq u v =
 
 let enforce_leq u v c =
   match Huniv.node v with
-  | Universe.Huniv.Cons (v, n) when Universe.eq n Universe.empty -> 
+  | Universe.Huniv.Cons (v, n) when Universe.is_empty n -> 
     Universe.Huniv.fold (fun u -> constraint_add_leq (Hunivelt.node u) (Hunivelt.node v)) u c
   | _ -> anomaly (Pp.str"A universe bound can only be a variable")
 
@@ -1588,8 +1590,7 @@ let to_constraints g s =
     let add l d l' acc = Constraint.add (l,UniverseConstraints.tr_dir d,l') acc in
       match Universe.level x, d, Universe.level y with
       | Some l, (ULe | UEq), Some l' -> add l d l' acc
-      | None, ULe, Some l' -> 
-        LSet.fold (fun l acc -> add l d l' acc) (Universe.levels x) acc
+      | None, ULe, Some l' -> enforce_leq x y acc
       | _, ULub, _ -> acc
       | _, d, _ -> 
 	let f = if d = ULe then check_leq else check_eq in

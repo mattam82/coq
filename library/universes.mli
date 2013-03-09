@@ -68,14 +68,14 @@ val extend_context : 'a in_universe_context_set -> universe_context_set ->
 module UF : Unionfind.PartitionSig with type elt = universe_level
 
 val instantiate_univ_variables : 
-  LSet.t ->
+  (bool * universe) LMap.t ->
   (Univ.constraint_type * Univ.universe_level) list
   Univ.LMap.t ->
   (Univ.constraint_type * Univ.universe_level) list
   Univ.LMap.t ->
-  universe_level ->
+  universe_level -> 
   Univ.constraints ->
-  (universe option * Univ.constraints)
+  (universe option * universe_level * Univ.constraints option)
 
 
 type universe_opt_subst = universe option universe_map

@@ -282,13 +282,17 @@ let process_universe_constraints univs postponed vars alg local cstrs =
 		| _, _ -> local, postponed
 	      else local, postponed
 	    else
-	      match Univ.Universe.level r with
-	      | None -> (local, Univ.UniverseConstraints.add (l,d,r) postponed)
-	      | Some _ -> (Univ.enforce_leq l r local, postponed)
+	      if Univ.check_leq univs r l then 
+		(* Adding l <= r after r <= l: strenghten to l = r *)
+		unify_universes l Univ.UEq r local postponed
+	      else
+		match Univ.Universe.level r with
+		| None -> (local, Univ.UniverseConstraints.add (l,d,r) postponed)
+		| Some _ -> (Univ.enforce_leq l r local, postponed)
 	  else if d = Univ.ULub then
 	    match varinfo l, varinfo r with
-	    | (Inr (l, true, true), Inr (r, _, _)) 
-	    | (Inr (r, _, _), Inr (l, true, true)) -> 
+	    | (Inr (l, true, _), Inr (r, _, _)) 
+	    | (Inr (r, _, _), Inr (l, true, _)) -> 
 	      instantiate_variable l (Univ.Universe.make r) vars; local, postponed
 	    | _, _ -> 
 	      if Univ.check_eq univs l r then local, postponed
@@ -785,15 +789,23 @@ let fresh_sort_in_family env evd s =
   with_context_set univ_flexible evd (Universes.fresh_sort_in_family env s)
 
 let fresh_constant_instance env evd c = 
-  with_context_set univ_flexible_alg evd (Universes.fresh_constant_instance env c)
+  with_context_set univ_flexible evd (Universes.fresh_constant_instance env c)
 
 let fresh_inductive_instance env evd i =
-  with_context_set univ_flexible_alg evd (Universes.fresh_inductive_instance env i)
+  with_context_set univ_flexible evd (Universes.fresh_inductive_instance env i)
 
 let fresh_constructor_instance env evd c =
-  with_context_set univ_flexible_alg evd (Universes.fresh_constructor_instance env c)
+  with_context_set univ_flexible evd (Universes.fresh_constructor_instance env c)
 
 let fresh_global rigid env evd gr =
+  (* match gr with *)
+  (* | ConstructRef c -> let evd, c = fresh_constructor_instance env evd c in  *)
+  (* 			evd, mkConstructU c *)
+  (* | IndRef c -> let evd, c = fresh_inductive_instance env evd c in *)
+  (* 		  evd, mkIndU c *)
+  (* | ConstRef c -> let evd, c = fresh_constant_instance env evd c in *)
+  (* 		    evd, mkConstU c *)
+  (* | VarRef i -> evd, mkVar i *)
   with_context_set rigid evd (Universes.fresh_global_instance env gr)
 
 let whd_sort_variable {evars=(_,sm)} t = t
@@ -892,13 +904,7 @@ let set_leq_sort ({evars = (sigma, uctx)} as d) s1 s2 =
       | Prop c, Prop c' -> 
 	  if c = Null && c' = Pos then d
 	  else (raise (Univ.UniverseInconsistency (Univ.Le, u1, u2, [])))
-      | Type u, Prop c -> 
-          if c = Pos then 
-	    add_universe_constraints d 
-	      (Univ.UniverseConstraints.singleton (u,Univ.ULe,Univ.Universe.type0))
-	  else (* Lower u to Prop *)
-	    set_eq_sort d s1 s2
-      | _, Type u ->
+      | _, _ ->
         add_universe_constraints d (Univ.UniverseConstraints.singleton (u1,Univ.ULe,u2))
 	
 let check_leq {evars = (sigma,uctx)} s s' =
@@ -925,8 +931,16 @@ let mark_undefs_as_rigid uctx =
     uctx.uctx_univ_variables Univ.LMap.empty
   in { uctx with uctx_univ_variables = vars' }
 
+let mark_undefs_as_nonalg uctx =
+  let vars' = 
+    Univ.LMap.fold (fun u v acc ->
+      if v = None then Univ.LSet.remove u acc
+      else acc)
+    uctx.uctx_univ_variables uctx.uctx_univ_algebraic
+  in { uctx with uctx_univ_algebraic = vars' }
+
 let abstract_undefined_variables ({evars = (sigma, uctx)} as d) =
-  {d with evars = (sigma, mark_undefs_as_rigid uctx)}
+  {d with evars = (sigma, mark_undefs_as_nonalg uctx)}
 
 let refresh_undefined_univ_variables uctx =
   let subst, ctx' = Universes.fresh_universe_context_set_instance uctx.uctx_local in
@@ -962,34 +976,24 @@ let is_undefined_universe_variable l vars =
   with Not_found -> false
 
 let normalize_evar_universe_context uctx = 
-  let (vars', us') = 
-    Universes.normalize_context_set uctx.uctx_local uctx.uctx_univ_variables
-      uctx.uctx_univ_algebraic
-  in 
-  let uctx' = { uctx with uctx_local = us'; uctx_univ_variables = vars' } in
-  let postponed = 
-    Univ.subst_univs_universe_constraints (Universes.make_opt_subst vars') uctx'.uctx_postponed 
-  in
-  let cstrslevels = constraints_universes (snd us') in
-  let postponed, local = 
-    Univ.UniverseConstraints.fold (fun (l,d,r) (postponed,acc) ->
-      match Univ.Universe.level l, Univ.Universe.level r with
-      | Some l', Some r' when 
-        not (Univ.LSet.mem l' cstrslevels || Univ.LSet.mem r' cstrslevels) &&
-	is_undefined_universe_variable l' vars' && 
-	is_undefined_universe_variable r' vars' ->
-        (postponed, Univ.Constraint.add (l',Univ.Eq,r') acc)
-      | _, _ -> (Univ.UniverseConstraints.add (l,d,r) postponed, acc))
-    postponed (Univ.UniverseConstraints.empty, snd us')
-  in
-  let vars'', us'' = 
-    Universes.normalize_context_set (fst us', local) vars' uctx.uctx_univ_algebraic
-  in
-  let uctx'' = 
-    { uctx' with uctx_local = us''; 
-      uctx_univ_variables = vars'';
-      uctx_postponed = postponed}
-  in uctx''
+  let rec fixpoint uctx = 
+    let (vars', us') = 
+      Universes.normalize_context_set uctx.uctx_local uctx.uctx_univ_variables
+        uctx.uctx_univ_algebraic
+    in
+      if Univ.LSet.equal (fst us') (fst uctx.uctx_local) then 
+       (* No refinement *) uctx
+      else
+	let postponed = 
+	  Univ.subst_univs_universe_constraints (Universes.make_opt_subst vars') 
+	  uctx.uctx_postponed 
+	in
+	let uctx' = 
+	  { uctx with uctx_local = us'; 
+	    uctx_univ_variables = vars'; 
+	    uctx_postponed = postponed} 
+	in fixpoint uctx'
+  in fixpoint uctx
 
 let nf_univ_variables ({evars = (sigma, uctx)} as d) = 
   let subst, uctx' = normalize_evar_universe_context_variables uctx in
