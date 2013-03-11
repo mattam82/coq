@@ -325,7 +325,6 @@ let expand_table_key env = function
   | VarKey id -> (try named_body id env with Not_found -> None)
   | RelKey _ -> None
 
-
 let unfold_projection env p stk =
   (match try Some (lookup_projection p env) with Not_found -> None with
   | Some pb -> 
@@ -357,6 +356,10 @@ let key_of b flags f =
         Cpred.mem p (snd flags.modulo_delta) ->
       Some (IsProj (p, c))
   | _ -> None
+  
+let translate_key = function
+  | IsKey k -> k    
+  | IsProj (c, _) -> ConstKey c
 
 let translate_table_key = function
   | ConstKey (cst,u) -> ConstKey cst
@@ -385,7 +388,7 @@ let constr_cmp pb sigma t u =
   in 
     if b then Evd.add_universe_constraints sigma cstrs, b
     else sigma, b
-    
+
 let do_reduce ts (env, nb) sigma c =
   zip (fst (whd_betaiota_deltazeta_for_iota_state ts env sigma Cst_stack.empty (c, empty_stack)))
 

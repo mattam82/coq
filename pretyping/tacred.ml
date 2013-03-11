@@ -616,8 +616,7 @@ let special_red_proj env sigma whfun p c =
 	| NotReducible -> raise Redelimination
       else
 	raise Redelimination
-  in
-  redrec c
+  in redrec c
 
 (* data structure to hold the map kn -> rec_args for simpl *)
 
@@ -822,7 +821,9 @@ and whd_simpl_stack env sigma =
 	    | NotReducible -> s'
 	  with Redelimination -> s')
       | Proj (p, c) ->
-         (try redrec (applist(special_red_proj env sigma redrec p c, stack))
+         (try match reduce_projection env sigma p (whd_construct_stack env sigma c) stack with
+	 | Reduced s' -> redrec (applist s')
+	 | NotReducible -> s'
 	 with Redelimination -> s')
       | _ -> 
         match match_eval_ref env x with

@@ -103,7 +103,8 @@ let head_constr_bound t =
   let _,ccl = decompose_prod_assum t in
   let hd,args = decompose_app ccl in
   match kind_of_term hd with
-    | Const _ | Ind _ | Construct _ | Var _ -> (hd,args)
+    | Const _ | Ind _ | Construct _ | Var _ -> hd
+    | Proj (p, _) -> mkConst p
     | _ -> raise Bound
 
 let head_constr c =

@@ -42,14 +42,12 @@ let flex_kind_of_term c sk =
 let not_purely_applicative_stack args =
   List.exists (function (Zfix _ | Zcase _ | Zproj _) -> true | _ -> false) args
 
-
 let unfold_projection env p c stk =
   (match try Some (lookup_projection p env) with Not_found -> None with
   | Some pb -> 
     let s = Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) in
       Some c, s :: stk
   | None -> None, stk)
- 
 
 let eval_flexible_term ts env c stk =
   match kind_of_term c with
@@ -406,13 +404,13 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	    if is_transparent_constant ts p then
 	      match unfold_projection env p c sk1 with
 	      | Some c, sk1 -> 
-              let out1 = whd_betaiota_deltazeta_for_iota_state ts env i csts1 (c,sk1) in
-		evar_eqappr_x ts env i pbty out1 (appr2, csts2)
+		let out1 = whd_betaiota_deltazeta_for_iota_state ts env i csts1 (c,sk1) in
+		  evar_eqappr_x ts env i pbty out1 (appr2, csts2)
 	      | None, sk1 -> assert false
 	    else UnifFailure (i, NotSameHead)
 	  in
 	    ise_try evd [f1; f2]
-	    
+
 	| _, _ ->
 	let f1 i = 
 	  let b,univs = 
