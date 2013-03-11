@@ -61,6 +61,16 @@ let rec complete_conclusion a cs = function
 
 (* 1| Constant definitions *)
 
+let definition_entry ?(opaque=false) ?types ?(poly=false) ctx body =
+  { const_entry_body = body;
+    const_entry_secctx = None;
+    const_entry_type = types;
+    const_entry_polymorphic = poly;
+    const_entry_universes = ctx;
+    const_entry_proj = None;
+    const_entry_opaque = opaque;
+    const_entry_inline_code = false}
+
 let red_constant_entry n ce = function
   | None -> ce
   | Some red ->
@@ -88,6 +98,7 @@ let interp_definition bl p red_option c ctypopt =
 	  const_entry_type = None;
 	  const_entry_polymorphic = p;
 	  const_entry_universes = Evd.universe_context !evdref;
+	  const_entry_proj = None;
           const_entry_opaque = false;
 	  const_entry_inline_code = false }
     | Some ctyp ->
@@ -113,6 +124,7 @@ let interp_definition bl p red_option c ctypopt =
 	  const_entry_type = Some typ;
 	  const_entry_polymorphic = p;
 	  const_entry_universes = Evd.universe_context !evdref;
+	  const_entry_proj = None;
           const_entry_opaque = false;
 	  const_entry_inline_code = false
 	}
@@ -628,6 +640,7 @@ let declare_fix kind poly ctx f def t imps =
     const_entry_type = Some t;
     const_entry_polymorphic = poly;
     const_entry_universes = ctx;
+    const_entry_proj = None;
     const_entry_opaque = false;
     const_entry_inline_code = false
   } in
@@ -825,6 +838,7 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
 	    (* FIXME *)
 	    const_entry_polymorphic = false;
 	    const_entry_universes = Evd.universe_context !isevars;
+	    const_entry_proj = None;
         const_entry_opaque = false;
         const_entry_inline_code = false}
 	in 

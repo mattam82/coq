@@ -326,6 +326,8 @@ val merge_constraints : constraints -> universes -> universes
 val normalize_universes : universes -> universes
 val sort_universes : universes -> universes
 
+val constraints_of_universes : universes -> constraints
+
 val to_constraints : universes -> universe_constraints -> constraints
     
 

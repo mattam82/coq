@@ -535,6 +535,7 @@ let declare_definition prg =
       const_entry_type = Some typ;
       const_entry_polymorphic = pi2 prg.prg_kind;
       const_entry_universes = Univ.context_of_universe_context_set prg.prg_ctx;
+      const_entry_proj = None;
       const_entry_opaque = false;
       const_entry_inline_code = false}
   in
@@ -617,6 +618,7 @@ let declare_obligation prg obl body ctx =
 	  const_entry_type = Some ty;
 	  const_entry_polymorphic = pi2 prg.prg_kind;
 	  const_entry_universes = ctx;
+	  const_entry_proj = None;
 	  const_entry_opaque = opaque;
 	  const_entry_inline_code = false} 
       in

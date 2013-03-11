@@ -413,6 +413,8 @@ let rec detype (isgoal:bool) avoid env t =
 	GApp (dl,detype isgoal avoid env f,
               Array.map_to_list (detype isgoal avoid env) args)
     | Const (sp,u) -> GRef (dl, ConstRef sp, option_of_list u)
+    | Proj (p,c) ->
+        GApp (dl,GRef(dl,ConstRef p,None),[detype isgoal avoid env c])
     | Evar (ev,cl) ->
         GEvar (dl, ev,
                Some (List.map (detype isgoal avoid env) (Array.to_list cl)))

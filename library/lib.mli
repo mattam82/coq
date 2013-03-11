@@ -195,7 +195,7 @@ val is_in_section : Globnames.global_reference -> bool
 
 val add_section_variable : Names.Id.t -> Decl_kinds.binding_kind -> Univ.universe_context_set -> unit
 
-val add_section_constant : Decl_kinds.polymorphic -> Names.constant -> Sign.named_context -> unit
+val add_section_constant : bool (* is_projection *) -> Decl_kinds.polymorphic -> Names.constant -> Sign.named_context -> unit
 val add_section_kn : Decl_kinds.polymorphic -> Names.mutual_inductive -> Sign.named_context -> unit
 val replacement_context : unit -> Cooking.work_list
 

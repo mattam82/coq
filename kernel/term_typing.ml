@@ -70,7 +70,18 @@ let infer_declaration env = function
       else Def (Lazyconstr.from_val j.uj_val)
     in
     let univs = check_context_subset cst c.const_entry_universes in
-      def, typ, c.const_entry_polymorphic, univs,
+    let proj = 
+      match c.const_entry_proj with
+      | Some (ind, n, m, ty) ->
+        (* FIXME: check projection *)
+        let pb = { proj_ind = ind;
+		   proj_npars = n;
+		   proj_arg = m;
+		   proj_type = ty }
+	in Some pb
+      | None -> None
+    in
+      def, typ, proj, c.const_entry_polymorphic, univs,
         c.const_entry_inline_code, c.const_entry_secctx
   | ParameterEntry (ctx,(t,uctx),nl) ->
     let env' = push_constraints_to_env uctx env in
@@ -78,11 +89,11 @@ let infer_declaration env = function
     let t = hcons_constr (Typeops.assumption_of_judgment env j) in
     (* let univs = check_context_subset cst uctx in *) (*FIXME*)
     let univs = Univ.context_of_universe_context_set uctx in
-      Undef nl, t, false, univs, false, ctx
+      Undef nl, t, None, false, univs, false, ctx
       
 let global_vars_set_constant_type env = global_vars_set env
 
-let build_constant_declaration env kn (def,typ,poly,univs,inline_code,ctx) =
+let build_constant_declaration env kn (def,typ,proj,poly,univs,inline_code,ctx) =
   let hyps = 
     let inferred =
       let ids_typ = global_vars_set_constant_type env typ in
@@ -106,6 +117,7 @@ let build_constant_declaration env kn (def,typ,poly,univs,inline_code,ctx) =
   { const_hyps = hyps;
     const_body = def;
     const_type = typ;
+    const_proj = proj;
     const_body_code = tps;
     const_polymorphic = poly;
     const_universes = univs;
@@ -119,8 +131,8 @@ let translate_constant env kn ce =
 
 let translate_recipe env kn r =
   build_constant_declaration env kn 
-    (let def,typ,poly,cst,inline,hyps = Cooking.cook_constant env r in
-     def,typ,poly,cst,inline,hyps)
+    (let def,typ,proj,poly,cst,inline,hyps = Cooking.cook_constant env r in
+     def,typ,proj,poly,cst,inline,hyps)
 
 (* Insertion of inductive types. *)
 

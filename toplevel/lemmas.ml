@@ -226,6 +226,7 @@ let save_remaining_recthms (local,p,kind) body opaq i (id,((t_i,ctx_i),(_,imps))
               const_entry_type = Some t_i;
 	      const_entry_polymorphic = p;
 	      const_entry_universes = ctx;
+	      const_entry_proj = None;
               const_entry_opaque = opaq;
 	      const_entry_inline_code = false
 	    } in

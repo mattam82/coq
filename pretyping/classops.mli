@@ -71,7 +71,7 @@ val declare_coercion :
 (** {6 Access to coercions infos } *)
 val coercion_exists : coe_typ -> bool
 
-val coercion_value : coe_index -> (unsafe_judgment * bool) Univ.in_universe_context_set
+val coercion_value : coe_index -> (unsafe_judgment * bool * bool) Univ.in_universe_context_set
 
 (** {6 Lookup functions for coercion paths } *)
 val lookup_path_between_class : cl_index * cl_index -> inheritance_path

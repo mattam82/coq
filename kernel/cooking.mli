@@ -25,7 +25,8 @@ type recipe = {
 type inline = bool
 
 type result =
-  constant_def * constant_type * bool * universe_context * inline
+  constant_def * constant_type * projection_body option * 
+  bool * universe_context * inline
     * Sign.section_context option
 
 val cook_constant : env -> recipe -> result

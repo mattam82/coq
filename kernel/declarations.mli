@@ -27,6 +27,16 @@ type inline = int option
 (** A constant can have no body (axiom/parameter), or a
     transparent body, or an opaque one *)
 
+(** Projections are a particular kind of constant: 
+    always transparent. *)
+
+type projection_body = {
+  proj_ind : mutual_inductive;
+  proj_npars : int;
+  proj_arg : int;
+  proj_type : types; (* Type under params *)
+}
+
 type constant_def =
   | Undef of inline
   | Def of Lazyconstr.constr_substituted
@@ -45,6 +55,7 @@ type constant_body = {
     const_body_code : Cemitcodes.to_patch_substituted;
     const_polymorphic : bool; (** Is it polymorphic or not *)
     const_universes : Univ.universe_context;
+    const_proj : projection_body option;
     const_native_name : native_name ref;
     const_inline_code : bool }
 
@@ -115,7 +126,9 @@ type mutual_inductive_body = {
 
     mind_packets : one_inductive_body array;  (** The component of the mutual inductive block *)
 
-    mind_record : bool;  (** Whether the inductive type has been declared as a record *)
+    mind_record : constr option;  
+    (** Whether the inductive type has been declared as a record, 
+	In that case we get its canonical eta-expansion. *)
 
     mind_finite : bool;  (** Whether the type is inductive or coinductive *)
 

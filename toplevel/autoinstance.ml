@@ -178,6 +178,7 @@ let declare_record_instance gr ctx params =
 	     const_entry_type=None;
 	     const_entry_polymorphic = true;
 	     const_entry_universes = Univ.empty_universe_context;
+	     const_entry_proj = None;
          const_entry_opaque=false;
          const_entry_inline_code = false } in
   let cst = Declare.declare_constant ident
@@ -198,6 +199,7 @@ let declare_class_instance gr ctx params =
        (* FIXME *)
        const_entry_polymorphic = false;
        const_entry_universes = Univ.context_of_universe_context_set uctx;
+       const_entry_proj = None;
        const_entry_opaque = false;
        const_entry_inline_code = false } in
   try

@@ -747,7 +747,7 @@ let print_record env mind mib =
       pr_universe_ctx mib.mind_universes)
 
 let pr_mutual_inductive_body env mind mib =
-  if mib.mind_record & not !Flags.raw_print then
+  if mib.mind_record <> None & not !Flags.raw_print then
     print_record env mind mib
   else
     print_mutual_inductive env mind mib

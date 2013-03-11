@@ -451,9 +451,11 @@ let add_section_kn poly kn =
   let f x (l1,l2) = (l1,Names.Mindmap.add kn x l2) in
   add_section_replacement f f poly
 
-let add_section_constant poly kn =
+let add_section_constant is_projection poly kn =
+  let g x (l1,l2) = (Names.Cmap.add kn ([], [||]) l1,l2) in
   let f x (l1,l2) = (Names.Cmap.add kn x l1,l2) in
-  add_section_replacement f f poly
+    if is_projection then add_section_replacement g f poly
+    else add_section_replacement f f poly
 
 let replacement_context () = pi2 (List.hd !sectab)
 

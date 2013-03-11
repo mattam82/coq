@@ -1003,10 +1003,26 @@ let project_evar_on_evar g env evd aliases k2 (evk1,argsv1 as ev1) (evk2,argsv2 
   else
     raise (CannotProject filter1)
 
+
+exception IllTypedInstance of env * types * types
+
+let check_evar_instance evd evk1 body conv_algo =
+  let evi = Evd.find evd evk1 in
+  let evenv = evar_env evi in
+  (* FIXME: The body might be ill-typed when this is called from w_merge *)
+  let ty =
+    try Retyping.get_type_of evenv evd body
+    with _ -> error "Ill-typed evar instance"
+  in
+  match conv_algo evenv evd Reduction.CUMUL ty (Evarutil.nf_evar evd evi.evar_concl) with
+  | Success evd -> evd
+  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
+
 let solve_evar_evar_l2r f g env evd aliases ev1 (evk2,_ as ev2) =
   try
     let evd,body = project_evar_on_evar g env evd aliases 0 ev1 ev2 in
-    Evd.define evk2 body evd
+    let evd = Evd.define evk2 body evd in
+      check_evar_instance evd evk2 body g
   with EvarSolvedOnTheFly (evd,c) ->
     f env evd ev2 c
 
@@ -1015,7 +1031,9 @@ let solve_evar_evar ?(force=false) f g env evd (evk1,args1 as ev1) (evk2,args2 a
     (* If instances are canonical, we solve the problem in linear time *)
     let sign = evar_filtered_context (Evd.find evd evk2) in
     let id_inst = Array.map (fun (id,_,_) -> mkVar id) (Array.of_list sign) in
-    Evd.define evk2 (mkEvar(evk1,id_inst)) evd
+    let body = mkEvar(evk1,id_inst) in
+    let evd = Evd.define evk2 body evd in
+      check_evar_instance evd evk2 body g
   else
     let evd,ev1,ev2 =
       (* If an evar occurs in the instance of the other evar and the
@@ -1033,20 +1051,6 @@ type conv_fun =
 
 type conv_fun_bool =
   env ->  evar_map -> conv_pb -> constr -> constr -> bool
-
-exception IllTypedInstance of env * types * types
-
-let check_evar_instance evd evk1 body conv_algo =
-  let evi = Evd.find evd evk1 in
-  let evenv = evar_env evi in
-  (* FIXME: The body might be ill-typed when this is called from w_merge *)
-  let ty =
-    try Retyping.get_type_of evenv evd body
-    with _ -> error "Ill-typed evar instance"
-  in
-  match conv_algo evenv evd Reduction.CUMUL ty evi.evar_concl with
-  | Success evd -> evd
-  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
 
 let refresh_universes dir evd t =
   let evdref = ref evd in

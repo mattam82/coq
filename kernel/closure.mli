@@ -83,12 +83,18 @@ val unfold_red : evaluable_global_reference -> reds
 (***********************************************************************)
 type table_key = constant puniverses tableKey
 
-type 'a infos
+type 'a infos_cache
+type 'a infos = { 
+  i_flags : reds;
+  i_cache : 'a infos_cache }
+
 val ref_value_cache: 'a infos -> table_key -> 'a option
-val info_flags: 'a infos -> reds
 val create: ('a infos -> constr -> 'a) -> reds -> env ->
   (existential -> constr option) -> 'a infos
-val evar_value : 'a infos -> existential -> constr option
+val evar_value : 'a infos_cache -> existential -> constr option
+
+val info_env : 'a infos -> env
+val info_flags: 'a infos -> reds
 
 (***********************************************************************
   s Lazy reduction. *)
@@ -108,6 +114,7 @@ type fterm =
   | FInd of inductive puniverses
   | FConstruct of constructor puniverses
   | FApp of fconstr * fconstr array
+  | FProj of constant * fconstr
   | FFix of fixpoint * fconstr subs
   | FCoFix of cofixpoint * fconstr subs
   | FCases of case_info * fconstr * fconstr * fconstr array
@@ -127,6 +134,7 @@ type fterm =
 type stack_member =
   | Zapp of fconstr array
   | Zcase of case_info * fconstr * fconstr array
+  | Zproj of int * int * constant
   | Zfix of fconstr * stack
   | Zshift of int
   | Zupdate of fconstr
@@ -160,9 +168,11 @@ val destFLambda :
   (fconstr subs -> constr -> fconstr) -> fconstr -> Name.t * fconstr * fconstr
 
 (** Global and local constant cache *)
-type clos_infos
+type clos_infos = fconstr infos
 val create_clos_infos :
   ?evars:(existential->constr option) -> reds -> env -> clos_infos
+
+val infos_with_reds : clos_infos -> reds -> clos_infos
 
 (** Reduction function *)
 

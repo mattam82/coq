@@ -1883,6 +1883,17 @@ let univ_depends u v =
     | Some u -> Huniv.mem u v
     | _ -> anomaly (Pp.str"univ_depends given a non-atomic 1st arg")
 
+let constraints_of_universes g =
+  let constraints_of u v acc =
+    match v with
+    | Canonical {univ=u; lt=lt; le=le} ->
+      let acc = List.fold_left (fun acc v -> Constraint.add (u,Lt,v) acc) acc lt in
+      let acc = List.fold_left (fun acc v -> Constraint.add (u,Le,v) acc) acc le in
+	acc
+    | Equiv v -> Constraint.add (u,Eq,v) acc
+  in
+    LMap.fold constraints_of g Constraint.empty
+
 (* Pretty-printing *)
 
 let pr_arc = function

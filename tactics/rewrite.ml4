@@ -1793,6 +1793,7 @@ let declare_projection n instance_id r =
       const_entry_type = Some typ;
       const_entry_polymorphic = false;
       const_entry_universes = (Univ.context_of_universe_context_set uctx);
+      const_entry_proj = None;
       const_entry_opaque = false;
       const_entry_inline_code = false }
   in

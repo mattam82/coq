@@ -114,6 +114,13 @@ let expmod_constr modlist c =
 	   with
 	    | Not_found -> map_constr substrec c)
 
+      | Proj (p, c') ->
+          (try 
+	     match fst (share (ConstRef p) modlist) with
+	     | ConstRef p' -> mkProj (p', substrec c')
+	     | _ -> assert false
+	   with Not_found -> map_constr substrec c)
+
   | _ -> map_constr substrec c
 
   in
@@ -134,7 +141,7 @@ type recipe = {
 type inline = bool
 
 type result =
-  constant_def * constant_type * bool * Univ.universe_context * inline
+  constant_def * constant_type * projection_body option * bool * Univ.universe_context * inline
     * Sign.section_context option
 
 let on_body f = function
@@ -160,6 +167,15 @@ let univ_variables_of c =
     | _ -> fold_constr aux univs c
   in aux Univ.LSet.empty c
 
+(* Apply the cooking substitution to a projections type. *)
+let rename_constant_type n c hyps =
+  CList.fold_left_i
+    (fun i c (id, body, t) -> 
+      match body with
+      | Some b -> replace_vars [(id, b)] c
+      | None -> replace_vars [(id, mkRel i)] c)
+    (n + 1) c hyps
+
 let cook_constant env r =
   let cb = r.d_from in
   let to_abstract, abs_ctx = r.d_abstract in
@@ -180,5 +196,16 @@ let cook_constant env r =
       union_universe_context abs_ctx cb.const_universes
     else cb.const_universes
   in
-  (body, typ, cb.const_polymorphic, univs, cb.const_inline_code, 
-   Some const_hyps)
+  let projection pb =
+    let (mind, _), n' =
+      try match share (IndRef (pb.proj_ind,0)) r.d_modlist with
+      | (IndRef ind,(u,l)) -> (ind, Array.length l)
+      | _ -> assert false 
+      with Not_found -> ((pb.proj_ind,0), 0)
+    in 
+    let ctx, ty' = decompose_prod_n (n' + pb.proj_npars + 1) typ in
+      { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
+	 proj_type = ty' }
+  in
+  (body, typ, Option.map projection cb.const_proj, cb.const_polymorphic, univs, 
+   cb.const_inline_code, Some const_hyps)

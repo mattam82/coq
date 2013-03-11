@@ -67,17 +67,6 @@ val extend_context : 'a in_universe_context_set -> universe_context_set ->
 
 module UF : Unionfind.PartitionSig with type elt = universe_level
 
-val instantiate_univ_variables : 
-  (bool * universe) LMap.t ->
-  (Univ.constraint_type * Univ.universe_level) list
-  Univ.LMap.t ->
-  (Univ.constraint_type * Univ.universe_level) list
-  Univ.LMap.t ->
-  universe_level -> 
-  Univ.constraints ->
-  (universe option * universe_level * Univ.constraints option)
-
-
 type universe_opt_subst = universe option universe_map
 
 val make_opt_subst : universe_opt_subst -> universe_subst_fn
@@ -86,6 +75,30 @@ val subst_opt_univs_constr : universe_opt_subst -> constr -> constr
 
 val choose_canonical : universe_set -> universe_opt_subst -> universe_set -> 
   universe_level * (universe_set * universe_set * universe_set)
+
+val instantiate_with_lbound : 
+  Univ.LMap.key ->
+  Univ.universe ->
+  bool ->
+  bool ->
+  Univ.LSet.t * Univ.universe option Univ.LMap.t *
+    (bool * Univ.universe) Univ.LMap.t * Univ.constraints ->
+  (Univ.LSet.t * Univ.universe option Univ.LMap.t *
+     (bool * Univ.universe) Univ.LMap.t * Univ.constraints) *
+    (bool * Univ.universe)
+    
+val compute_lbound : (constraint_type * Univ.universe) list -> universe_level -> universe option
+
+val minimize_univ_variables : 
+           Univ.LSet.t ->
+           Univ.universe option Univ.LMap.t ->
+           Univ.LSet.t ->
+           (Univ.constraint_type * Univ.LMap.key) list Univ.LMap.t ->
+           'a Univ.LMap.t ->
+           Univ.constraints ->
+           Univ.LSet.t * Univ.universe option Univ.LMap.t *
+           (bool * Univ.universe) Univ.LMap.t * Univ.constraints
+
 
 val normalize_context_set : universe_context_set -> 
   universe_opt_subst (* The defined and undefined variables *) ->

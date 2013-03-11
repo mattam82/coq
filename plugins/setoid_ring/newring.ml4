@@ -153,6 +153,7 @@ let decl_constant na c =
       const_entry_type = None;
       const_entry_polymorphic = false;
       const_entry_universes = Univ.empty_universe_context;(*FIXME*)
+      const_entry_proj = None;
       const_entry_opaque = true;
       const_entry_inline_code = false},
     IsProof Lemma))

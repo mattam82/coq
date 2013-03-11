@@ -143,7 +143,7 @@ val pr_hint_db : Hint_db.t -> std_ppcmds
    [c] is the term given as an exact proof to solve the goal;
    [ctyp] is the type of [c]. *)
 
-val make_exact_entry : evar_map -> int option -> polymorphic -> ?name:hints_path_atom -> 
+val make_exact_entry : env -> evar_map -> int option -> polymorphic -> ?name:hints_path_atom -> 
   (constr * types * Univ.universe_context_set) -> hint_entry
 
 (** [make_apply_entry (eapply,hnf,verbose) pri (c,cty)].

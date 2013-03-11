@@ -992,7 +992,7 @@ let normalize_evar_universe_context uctx =
 	  { uctx with uctx_local = us'; 
 	    uctx_univ_variables = vars'; 
 	    uctx_postponed = postponed} 
-	in fixpoint uctx'
+	in uctx'
   in fixpoint uctx
 
 let nf_univ_variables ({evars = (sigma, uctx)} as d) = 

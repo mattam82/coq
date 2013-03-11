@@ -275,6 +275,7 @@ let close_proof () =
                       const_entry_type = Some t;
 		      const_entry_polymorphic = Util.pi2 str;
 		      const_entry_universes = ctx;
+		      const_entry_proj = None;
 		      const_entry_opaque = true;
 		      const_entry_inline_code = false })
       proofs_and_types

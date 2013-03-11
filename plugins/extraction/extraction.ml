@@ -432,7 +432,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	    List.length l = 1 && not (type_mem_kn kn (List.hd l))
 	then raise (I Singleton);
 	if l = [] then raise (I Standard);
-	if not mib.mind_record then raise (I Standard);
+	if mib.mind_record = None then raise (I Standard);
 	(* Now we're sure it's a record. *)
 	(* First, we find its field names. *)
 	let rec names_prod t = match kind_of_term t with
@@ -555,6 +555,7 @@ let record_constant_type env kn opt_typ =
 
 let rec extract_term env mle mlt c args =
   match kind_of_term c with
+  | Proj (p, c) -> Errors.error "Extract projection"
     | App (f,a) ->
 	extract_term env mle mlt f (Array.to_list a @ args)
     | Lambda (n, t, d) ->

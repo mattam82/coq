@@ -107,7 +107,7 @@ let unify_resolve poly flags (c,clenv) gls =
   let clenv' = if poly then fst (Clenv.refresh_undefined_univs clenv) else clenv in
   let clenv' = connect_clenv gls clenv' in
   let clenv' = clenv_unique_resolver ~flags clenv' gls in
-    Clenvtac.clenv_refine false ~with_classes:false clenv' gls
+    Clenvtac.clenv_refine true ~with_classes:false clenv' gls
 
 let clenv_of_prods nprods (c, clenv) gls =
   if Int.equal nprods 0 then Some clenv
@@ -266,7 +266,7 @@ let make_resolve_hyp env sigma st flags only_classes pri (id, _, cty) =
         (hints @ List.map_filter
 	 (fun f -> try Some (f (mkVar id, cty, Univ.empty_universe_context_set))
 	           with Failure _ | UserError _ -> None) 
-	 [make_exact_entry ~name sigma pri false; make_apply_entry ~name env sigma flags pri false])
+	 [make_exact_entry ~name env sigma pri false; make_apply_entry ~name env sigma flags pri false])
     else []
 
 let pf_filtered_hyps gls = 

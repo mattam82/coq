@@ -219,6 +219,7 @@ let build_id_coercion idf_opt source poly =
 	const_entry_type = Some typ_f;
 	const_entry_polymorphic = poly;
 	const_entry_universes = Univ.context_of_universe_context_set ctx;
+	const_entry_proj = None;
         const_entry_opaque = false;
 	const_entry_inline_code = true
       } in

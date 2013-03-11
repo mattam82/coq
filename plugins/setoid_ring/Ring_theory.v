@@ -391,9 +391,9 @@ Section ALMOST_RING.
  Variable Csth : Equivalence ceq.
  Variable Ceqe : ring_eq_ext cadd cmul copp ceq.
    Add Setoid C ceq Csth as C_setoid.
-   Add Morphism cadd : cadd_ext.  exact (Radd_ext Ceqe). Qed.
-   Add Morphism cmul : cmul_ext.  exact (Rmul_ext Ceqe). Qed.
-   Add Morphism copp : copp_ext.  exact (Ropp_ext Ceqe). Qed.
+   Add Morphism cadd : cadd_ext.  exact (@Radd_ext Ceqe). Qed.
+   Add Morphism cmul : cmul_ext.  exact (@Rmul_ext Ceqe). Qed.
+   Add Morphism copp : copp_ext.  exact (@Ropp_ext Ceqe). Qed.
  Variable Cth : ring_theory cO cI cadd cmul csub copp ceq.
  Variable Smorph : semi_morph 0 1 radd rmul req cO cI cadd cmul ceqb phi.
  Variable phi_ext : forall x y, ceq x y -> [x] == [y].
@@ -424,7 +424,7 @@ Section ALMOST_RING.
   (mkmorph 0 1 radd rmul rsub ropp req cO cI cadd cmul csub copp ceqb phi
         (Smorph0 Smorph) (Smorph1 Smorph)
          (Smorph_add Smorph) Smorph_sub (Smorph_mul Smorph) Smorph_opp
-         (Smorph_eq Smorph)).
+         (@Smorph_eq Smorph)).
 
  End RING.
 

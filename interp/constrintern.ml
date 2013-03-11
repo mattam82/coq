@@ -1210,8 +1210,7 @@ let check_projection isproj nargs r =
   match (r,isproj) with
   | GRef (loc, ref, _), Some _ ->
       (try
-	let n = Recordops.find_projection_nparams ref + 1 in
-	if not (Int.equal nargs n) then
+	if not (Int.equal nargs 1) then
 	  user_err_loc (loc,"",str "Projection has not the right number of explicit parameters.");
       with Not_found ->
 	user_err_loc
@@ -1373,7 +1372,7 @@ let internalize sigma globalenv env allow_patvar lvar c =
 	  intern_applied_reference intern env (Environ.named_context globalenv) lvar args ref in
 	check_projection isproj (List.length args) f;
 	(* Rem: GApp(_,f,[]) stands for @f *)
-	GApp (loc, f, intern_args env args_scopes (List.map fst args))
+	  GApp (loc, f, intern_args env args_scopes (List.map fst args))
     | CApp (loc, (isproj,f), args) ->
         let isproj,f,args = match f with
           (* Compact notations like "t.(f args') args" *)

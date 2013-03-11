@@ -50,12 +50,15 @@ type mutual_inductive_entry = {
 
 (** {6 Constants (Definition/Axiom) } *)
 
+type projection = mutual_inductive * int * int * types
+
 type definition_entry = {
   const_entry_body   : constr;
   const_entry_secctx : Sign.section_context option;
   const_entry_type   : types option;
   const_entry_polymorphic : bool;
   const_entry_universes : Univ.universe_context;
+  const_entry_proj   : projection option;
   const_entry_opaque : bool;
   const_entry_inline_code : bool }
 

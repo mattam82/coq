@@ -1722,15 +1722,15 @@ Proof.
   rewrite e0; unfold Rminus; rewrite Rplus_opp_r; rewrite Rabs_R0;
     apply Rle_trans with (Rabs (g t - phi2 n t)).
   apply Rabs_pos.
-  pattern a at 3; rewrite <- e0; apply H3; assumption.
+  pattern a; rewrite <- e0; apply H3; assumption.
   rewrite e; unfold Rminus; rewrite Rplus_opp_r; rewrite Rabs_R0;
     apply Rle_trans with (Rabs (g t - phi2 n t)).
   apply Rabs_pos.
-  pattern a at 3; rewrite <- e; apply H3; assumption.
+  pattern a; rewrite <- e; apply H3; assumption.
   rewrite e; unfold Rminus; rewrite Rplus_opp_r; rewrite Rabs_R0;
     apply Rle_trans with (Rabs (g t - phi2 n t)).
   apply Rabs_pos.
-  pattern b at 3; rewrite <- e; apply H3; assumption.
+  pattern b; rewrite <- e; apply H3; assumption.
   replace (f t) with (g t).
   apply H3; assumption.
   symmetry ; apply H0; elim H5; clear H5; intros.
@@ -3301,5 +3301,5 @@ Proof.
       | assert (H : b <= a);
         [ auto with real
           | assert (H0 := RiemannInt_P1 pr); rewrite (RiemannInt_P8 pr H0);
-            rewrite (RiemannInt_P33 _ H0 H); ring ] ].
+            rewrite (RiemannInt_P33 H0 H); ring ] ].
 Qed.

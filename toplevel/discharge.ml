@@ -88,7 +88,7 @@ let process_inductive (sechyps,abs_ctx) modlist mib =
       Univ.union_universe_context abs_ctx mib.mind_universes
     else mib.mind_universes
   in
-  { mind_entry_record = mib.mind_record;
+  { mind_entry_record = mib.mind_record <> None;
     mind_entry_finite = mib.mind_finite;
     mind_entry_params = params';
     mind_entry_inds = inds';

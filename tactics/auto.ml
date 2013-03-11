@@ -176,11 +176,29 @@ let instantiate_constr_or_ref env sigma c =
   let cty = Retyping.get_type_of env sigma c in
     (c, cty), ctx
 
+let strip_params env c = 
+  match kind_of_term c with
+  | App (f, args) -> 
+    (match kind_of_term f with
+    | Const (p,_) ->
+      let cb = lookup_constant p env in
+	(match cb.Declarations.const_proj with
+	| Some pb -> 
+	  let n = pb.Declarations.proj_npars in
+	    mkApp (mkProj (p, args.(n)), 
+		   Array.sub args (n+1) (Array.length args - (n + 1)))
+	| None -> c)
+    | _ -> c)
+  | _ -> c
+
 let instantiate_hint p =
   let mk_clenv c cty ctx =
     let sigma = Evd.merge_context_set univ_flexible dummy_goal.sigma ctx in
     let goal = { dummy_goal with sigma = sigma } in
-    let cl = mk_clenv_from goal (c,cty) in {cl with env = empty_env}
+    let cl = mk_clenv_from goal (c,cty) in 
+      {cl with env = empty_env;
+        templval = 
+      { cl.templval with rebus = strip_params (Global.env()) cl.templval.rebus } }
   in
   let code = match p.code with
     | Res_pf (c, cty, ctx) -> Res_pf (c, mk_clenv c cty ctx)
@@ -507,7 +525,7 @@ let try_head_pattern c =
   try head_pattern_bound c
   with BoundPattern -> error "Bound head variable."
 
-let make_exact_entry sigma pri poly ?(name=PathAny) (c, cty, ctx) =
+let make_exact_entry env sigma pri poly ?(name=PathAny) (c, cty, ctx) =
   let cty = strip_outer_cast cty in
     match kind_of_term cty with
     | Prod _ -> failwith "make_exact_entry"
@@ -572,7 +590,7 @@ let make_resolves env sigma flags pri poly ?name cr =
   let try_apply f =
     try Some (f (c, cty, ctx)) with Failure _ -> None in
   let ents = List.map_filter try_apply
-    [make_exact_entry sigma pri poly ?name; make_apply_entry env sigma flags pri poly ?name]
+    [make_exact_entry env sigma pri poly ?name; make_apply_entry env sigma flags pri poly ?name]
   in
   if List.is_empty ents then
     errorlabstrm "Hint"

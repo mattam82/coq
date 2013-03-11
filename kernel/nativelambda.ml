@@ -534,7 +534,7 @@ let rec lambda_of_constr env c =
   match kind_of_term c with
   | Meta _ -> raise (Invalid_argument "Nativelambda.lambda_of_constr: Meta")
   | Evar _ -> raise (Invalid_argument "Nativelambda.lambda_of_constr : Evar")
-	
+
   | Cast (c, _, _) -> lambda_of_constr env c
 	
   | Rel i -> Renv.get env i
@@ -573,6 +573,8 @@ let rec lambda_of_constr env c =
   | Const _ -> lambda_of_app env c empty_args
 
   | Construct _ ->  lambda_of_app env c empty_args
+
+  | Proj (p, c) -> lambda_of_app env (mkConst p) [|c|]
 
   | Case(ci,t,a,branches) ->  
       let (mind,i as ind) = ci.ci_ind in

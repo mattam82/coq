@@ -47,6 +47,7 @@ type coe_info_typ = {
   coe_context : Univ.universe_context_set;
   coe_strength : locality;
   coe_is_identity : bool;
+  coe_is_projection : bool;
   coe_param : int }
 
 let coe_info_typ_equal c1 c2 =
@@ -54,6 +55,7 @@ let coe_info_typ_equal c1 c2 =
     eq_constr c1.coe_type c2.coe_type &&
     c1.coe_strength == c2.coe_strength &&
     c1.coe_is_identity == c2.coe_is_identity &&
+    c1.coe_is_projection == c2.coe_is_projection &&
     Int.equal c1.coe_param c2.coe_param
 
 let cl_typ_ord t1 t2 = match t1, t2 with
@@ -275,10 +277,11 @@ let lookup_pattern_path_between (s,t) =
 
 (* coercion_value : coe_index -> unsafe_judgment * bool *)
 
-let coercion_value { coe_value = c; coe_type = t; coe_context = ctx; coe_is_identity = b } =
+let coercion_value { coe_value = c; coe_type = t; coe_context = ctx; coe_is_identity = b;
+		     coe_is_projection = b' } =
   let subst, ctx = Universes.fresh_universe_context_set_instance ctx in
   let c' = subst_univs_level_constr subst c and t' = subst_univs_level_constr subst t in
-    (make_judge c' t', b), ctx
+    (make_judge c' t', b, b'), ctx
 
 (* pretty-print functions are now in Pretty *)
 (* rajouter une coercion dans le graphe *)
@@ -344,7 +347,7 @@ let add_coercion_in_graph (ic,source,target) =
   if is_ambig && is_verbose () then
     msg_warning (message_ambig !ambig_paths)
 
-type coercion = coe_typ * locality * bool * cl_typ * cl_typ * int
+type coercion = coe_typ * locality * bool * bool * cl_typ * cl_typ * int
 
 (* Calcul de l'arité d'une classe *)
 
@@ -375,7 +378,7 @@ let _ =
       optread  = (fun () -> !automatically_import_coercions);
       optwrite = (:=) automatically_import_coercions }
 
-let cache_coercion (_,(coe,stre,isid,cls,clt,ps)) =
+let cache_coercion (_,(coe,stre,isid,isproj,cls,clt,ps)) =
   add_class cls;
   add_class clt;
   let is,_ = class_info cls in
@@ -388,6 +391,7 @@ let cache_coercion (_,(coe,stre,isid,cls,clt,ps)) =
       coe_context = ctx;
       coe_strength = stre;
       coe_is_identity = isid;
+      coe_is_projection = isproj;
       coe_param = ps } in
   add_new_coercion coe xf;
   add_coercion_in_graph (xf,is,it)
@@ -404,19 +408,19 @@ let open_coercion i o =
   then
     cache_coercion o
 
-let subst_coercion (subst,(coe,stre,isid,cls,clt,ps as obj)) =
+let subst_coercion (subst,(coe,stre,isid,isproj,cls,clt,ps as obj)) =
   let coe' = subst_coe_typ subst coe in
   let cls' = subst_cl_typ subst cls in
   let clt' = subst_cl_typ subst clt in
     if coe' == coe && cls' == cls & clt' == clt then obj else
-      (coe',stre,isid,cls',clt',ps)
+      (coe',stre,isid,isproj,cls',clt',ps)
 
 let discharge_cl = function
   | CL_CONST kn -> CL_CONST (Lib.discharge_con kn)
   | CL_IND ind -> CL_IND (Lib.discharge_inductive ind)
   | cl -> cl
 
-let discharge_coercion (_,(coe,stre,isid,cls,clt,ps)) =
+let discharge_coercion (_,(coe,stre,isid,isproj,cls,clt,ps)) =
   match stre with
   | Local -> None
   | Global ->
@@ -424,11 +428,12 @@ let discharge_coercion (_,(coe,stre,isid,cls,clt,ps)) =
     Some (Lib.discharge_global coe,
           stre,
 	  isid,
+	  isproj,
           discharge_cl cls,
 	  discharge_cl clt,
           n + ps)
 
-let classify_coercion (coe,stre,isid,cls,clt,ps as obj) =
+let classify_coercion (coe,stre,isid,isproj,cls,clt,ps as obj) =
   match stre with
   | Local -> Dispose
   | Global -> Substitute obj
@@ -443,7 +448,11 @@ let inCoercion : coercion -> obj =
     discharge_function = discharge_coercion }
 
 let declare_coercion coef stre ~isid ~src:cls ~target:clt ~params:ps =
-  Lib.add_anonymous_leaf (inCoercion (coef,stre,isid,cls,clt,ps))
+  let isproj = 
+    match coef with
+    | ConstRef c -> Environ.is_projection c (Global.env ())
+    | _ -> false
+  in Lib.add_anonymous_leaf (inCoercion (coef,stre,isid,isproj,cls,clt,ps))
 
 (* For printing purpose *)
 let get_coercion_value v = v.coe_value

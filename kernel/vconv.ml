@@ -200,6 +200,8 @@ let rec conv_eq pb t1 t2 cu =
     | Evar (e1,l1), Evar (e2,l2) ->
 	if e1 = e2 then conv_eq_vect l1 l2 cu
 	else raise NotConvertible
+    | Proj (p1,c1), Proj (p2,c2) ->
+	if eq_constant p1 p2 then conv_eq pb c1 c2 cu else raise NotConvertible
     | Const c1, Const c2 -> eq_puniverses eq_constant c1 c2 cu
     | Ind c1, Ind c2 ->
        eq_puniverses eq_ind c1 c2 cu
