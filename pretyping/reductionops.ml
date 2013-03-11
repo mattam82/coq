@@ -379,15 +379,15 @@ let rec whd_state_gen ?csts refold flags env sigma =
       (match safe_meta_value sigma ev with
       | Some body -> whrec cst_l (body, stack)
       | None -> fold ())
-    | Proj (p, c) ->
-      (match (lookup_constant p env).Declarations.const_proj with
-      | None -> assert false
-      | Some pb -> whrec cst_l (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
-        :: stack))
     | Const const when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST const) ->
        (match constant_opt_value env const with
 	| Some body -> whrec (Cst_stack.add_cst (mkConst const) cst_l) (body, stack)
 	| None -> fold ())
+    | Proj (p, c) when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) ->
+      (match (lookup_constant p env).Declarations.const_proj with
+      | None -> assert false
+      | Some pb -> whrec cst_l (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
+        :: stack))
     | LetIn (_,b,_,c) when Closure.RedFlags.red_set flags Closure.RedFlags.fZETA ->
       apply_subst whrec [b] cst_l c stack
     | Cast (c,_,_) -> whrec cst_l (c, stack)
@@ -430,7 +430,7 @@ let rec whd_state_gen ?csts refold flags env sigma =
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec noth (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
-	|args, (Zproj (n,m,p)::s') when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) ->
+	|args, (Zproj (n,m,p)::s') ->
 	  whrec noth (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in
@@ -449,7 +449,7 @@ let rec whd_state_gen ?csts refold flags env sigma =
 	|_ -> fold ()
       else fold ()
 
-    | Rel _ | Var _ | Const _ | LetIn _ -> fold ()
+    | Rel _ | Var _ | Const _ | LetIn _ | Proj _ -> fold ()
     | Sort _ | Ind _ | Prod _ -> fold ()
   in
   whrec (Option.default noth csts)
@@ -482,7 +482,7 @@ let local_whd_state_gen flags sigma =
 	| _ -> s)
       | _ -> s)
       
-    | Proj (p,c) -> 
+    | Proj (p,c) when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) -> 
       (match (lookup_constant p (Global.env ())).Declarations.const_proj with
       | None -> assert false
       | Some pb -> whrec (c, Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
@@ -511,7 +511,7 @@ let local_whd_state_gen flags sigma =
 	match strip_app stack with
 	|args, (Zcase(ci, _, lf,_)::s') ->
 	  whrec (lf.(c-1), append_stack_app_list (List.skipn ci.ci_npar args) s')
-	|args, (Zproj (n,m,p) :: s') when Closure.RedFlags.red_set flags (Closure.RedFlags.fCONST p) ->
+	|args, (Zproj (n,m,p) :: s') ->
 	  whrec (List.nth args (n+m), s')
 	|args, (Zfix (f,s',cst)::s'') ->
 	  let x' = applist(x,args) in

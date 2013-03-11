@@ -184,13 +184,13 @@ and e_my_find_search db_list local_db hdc complete concl =
 and e_trivial_resolve db_list local_db gl =
   try
     e_my_find_search db_list local_db
-    (fst (head_constr_bound gl)) true gl
+    (head_constr_bound gl) true gl
   with Bound | Not_found -> []
 
 let e_possible_resolve db_list local_db gl =
   try
     e_my_find_search db_list local_db
-      (fst (head_constr_bound gl)) false gl
+      (head_constr_bound gl) false gl
   with Bound | Not_found -> []
 
 let rec catchable = function

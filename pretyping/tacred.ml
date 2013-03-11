@@ -545,15 +545,37 @@ let special_red_case env sigma whfun (ci, p, c, lf)  =
   in
   redrec c
 
-let reduce_projection whdfun env sigma proj c stack =
-  let (recarg'hd,stack') = whdfun sigma c in
-    (match kind_of_term recarg'hd with
-    | Construct _ -> 
-      let proj_narg = 
-	let pb = Option.get ((lookup_constant proj env).Declarations.const_proj) in
-	  pb.Declarations.proj_npars + pb.Declarations.proj_arg
-      in Reduced (List.nth stack' proj_narg, stack)
-    | _ -> NotReducible)
+let reduce_projection env sigma proj (recarg'hd,stack') stack =
+  (match kind_of_term recarg'hd with
+  | Construct _ -> 
+    let proj_narg = 
+      let pb = Option.get ((lookup_constant proj env).Declarations.const_proj) in
+	pb.Declarations.proj_npars + pb.Declarations.proj_arg
+    in Reduced (List.nth stack' proj_narg, stack)
+  | _ -> NotReducible)
+
+let special_red_proj env sigma whfun p c =
+  let rec redrec s =
+    let (constr, cargs) = whfun s in
+    if isEvalRef env constr then
+      let ref = destEvalRef constr in
+	(match reference_opt_value sigma env ref with
+	| None -> raise Redelimination
+	| Some gvalue ->
+          if reducible_mind_case gvalue then
+	    match reduce_projection env sigma p (gvalue,cargs) [] with
+	    | Reduced (v,_) -> v
+	    | NotReducible -> raise Redelimination
+	  else
+	    redrec (applist(gvalue, cargs)))
+    else
+      if reducible_mind_case constr then
+	match reduce_projection env sigma p (constr,cargs) [] with
+	| Reduced (v, _) -> v
+	| NotReducible -> raise Redelimination
+      else
+	raise Redelimination
+  in redrec c
 
 (* data structure to hold the map kn -> rec_args for simpl *)
 
@@ -758,7 +780,7 @@ and whd_simpl_stack env sigma =
 	    | NotReducible -> s'
 	  with Redelimination -> s')
       | Proj (p, c) ->
-         (try match reduce_projection (whd_construct_stack env) env sigma p c stack with
+         (try match reduce_projection env sigma p (whd_construct_stack env sigma c) stack with
 	 | Reduced s' -> redrec (applist s')
 	 | NotReducible -> s'
 	 with Redelimination -> s')
@@ -819,7 +841,15 @@ let try_red_product env sigma c =
       | Prod (x,a,b) -> mkProd (x, a, redrec (push_rel (x,None,a) env) b)
       | LetIn (x,a,b,t) -> redrec env (subst1 a t)
       | Case (ci,p,d,lf) -> simpfun (mkCase (ci,p,redrec env d,lf))
-      | Proj (p, c) -> simpfun (mkProj (p,redrec env c))
+      | Proj (p, c) -> 
+	let c' = 
+	  match kind_of_term c with
+	  | Construct _ -> c
+	  | _ -> redrec env c
+	in
+          (match reduce_projection env sigma p (whd_betaiotazeta_stack sigma c') [] with
+	  | Reduced s -> simpfun (applist s)
+	  | NotReducible -> raise Redelimination)
       | _ when isEvalRef env x ->
           (* TO DO: re-fold fixpoints after expansion *)
           (* to get true one-step reductions *)

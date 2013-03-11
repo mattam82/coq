@@ -597,7 +597,7 @@ let make_extern pri pat tacast =
 let make_trivial env sigma ?(name=PathAny) r =
   let c = constr_of_global_or_constr r in
   let t = hnf_constr env sigma (type_of env sigma c) in
-  let hd = head_of_constr_reference (fst (head_constr t)) in
+  let hd = head_of_constr_reference (head_constr t) in
   let ce = mk_clenv_from dummy_goal (c,t) in
   (Some hd, { pri=1;
               pat = Some (snd (Patternops.pattern_of_constr sigma (clenv_type ce)));
@@ -669,7 +669,7 @@ let subst_autohint (subst,(local,name,hintlist as obj)) =
   let subst_key gr =
     let (lab'', elab') = subst_global subst gr in
     let gr' =
-      (try head_of_constr_reference (fst (head_constr_bound elab'))
+      (try head_of_constr_reference (head_constr_bound elab')
        with Tactics.Bound -> lab'')
     in if gr' == gr then gr else gr'
   in
@@ -966,11 +966,11 @@ let pr_hint_term cl =
     let dbs = Hintdbmap.to_list !searchtable in
     let valid_dbs =
       let fn = try
-	  let (hdc,args) = head_constr_bound cl in
+	  let hdc = head_constr_bound cl in
 	  let hd = head_of_constr_reference hdc in
 	    if occur_existential cl then
 	      Hint_db.map_all hd
-	    else Hint_db.map_auto (hd, applist (hdc,args))
+	    else Hint_db.map_auto (hd, cl)
 	with Bound -> Hint_db.map_none
       in
       let fn db = List.map (fun x -> 0, x) (fn db) in
@@ -1362,7 +1362,7 @@ and tac_of_hint dbg db_list local_db concl (flags, ({pat=p; code=t})) =
 and trivial_resolve dbg mod_delta db_list local_db cl =
   try
     let head =
-      try let hdconstr,_ = head_constr_bound cl in
+      try let hdconstr = head_constr_bound cl in
 	    Some (head_of_constr_reference hdconstr)
       with Bound -> None
     in
@@ -1410,7 +1410,7 @@ let h_trivial ?(debug=Off) lems l = gen_trivial ~debug lems l
 let possible_resolve dbg mod_delta db_list local_db cl =
   try
     let head =
-      try let hdconstr,_ = head_constr_bound cl in
+      try let hdconstr = head_constr_bound cl in
 	    Some (head_of_constr_reference hdconstr)
       with Bound -> None
     in
