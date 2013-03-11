@@ -36,8 +36,8 @@ open Locus
 (** {6 General functions. } *)
 
 val string_of_inductive : constr -> string
-val head_constr       : constr -> constr * constr list
-val head_constr_bound : constr -> constr * constr list
+val head_constr       : constr -> constr
+val head_constr_bound : constr -> constr
 val is_quantified_hypothesis : Id.t -> goal sigma -> bool
 
 exception Bound

@@ -144,13 +144,13 @@ and e_trivial_resolve db_list local_db gl =
   try
     priority
       (e_my_find_search db_list local_db
-	 (fst (head_constr_bound gl)) gl)
+	 (head_constr_bound gl) gl)
   with Bound | Not_found -> []
 
 let e_possible_resolve db_list local_db gl =
   try List.map snd
     (e_my_find_search db_list local_db
-	(fst (head_constr_bound gl)) gl)
+	(head_constr_bound gl) gl)
   with Bound | Not_found -> []
 
 let find_first_goal gls =
