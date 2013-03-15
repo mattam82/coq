@@ -906,7 +906,7 @@ type conjunction_status =
   | DefinedRecord of constant option list
   | NotADefinedRecordUseScheme of constr
 
-let make_projection sigma params cstr sign elim i n c =
+let make_projection sigma env params cstr sign elim i n c =
   let elim = match elim with
   | NotADefinedRecordUseScheme elim ->
       (* bugs: goes from right to left when i increases! *)
@@ -920,22 +920,23 @@ let make_projection sigma params cstr sign elim i n c =
 	&& not (isEvar (fst (whd_betaiota_stack sigma t)))
       then
         let t = lift (i+1-n) t in
-	Some (beta_applist (elim,params@[t;branch]),t)
+	let abselim = beta_applist (elim,params@[t;branch]) in
+	let c = beta_applist (abselim,[mkApp (c,extended_rel_vect 0 sign)]) in
+	  Some (it_mkLambda_or_LetIn c sign, it_mkProd_or_LetIn t sign)
       else
 	None
   | DefinedRecord l ->
       (* goes from left to right when i increases! *)
       match List.nth l i with
       | Some proj ->
-         let proj = Universes.constr_of_global (ConstRef proj) in
-	 let t = Retyping.get_type_of (Global.env()) sigma proj in
 	 let args = extended_rel_vect 0 sign in
-	  Some (beta_applist (proj,params),prod_applist t (params@[mkApp (c,args)]))
+         let proj = mkProj (proj, mkApp (c, args)) in
+	 let app = it_mkLambda_or_LetIn proj sign in
+	 let t = Retyping.get_type_of env sigma app in
+	   Some (proj,t)
       | None -> None
-  in Option.map (fun (abselim,elimt) -> 
-    let c = beta_applist (abselim,[mkApp (c,extended_rel_vect 0 sign)]) in
-    (it_mkLambda_or_LetIn c sign, it_mkProd_or_LetIn elimt sign)) elim
-
+  in elim
+    
 let descend_in_conjunctions tac exit c gl =
   try
     let ((ind,u),t) = pf_reduce_to_quantified_ind gl (pf_type_of gl c) in
@@ -955,7 +956,7 @@ let descend_in_conjunctions tac exit c gl =
 	    NotADefinedRecordUseScheme (snd elim) in
 	tclFIRST
 	  (List.tabulate (fun i gl ->
-	    match make_projection (project gl) params cstr sign elim i n c with
+	    match make_projection (project gl) (pf_env gl) params cstr sign elim i n c with
 	    | None -> tclFAIL 0 (mt()) gl
 	    | Some (p,pt) ->
 	    tclTHENS

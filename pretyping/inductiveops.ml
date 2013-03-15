@@ -98,7 +98,11 @@ let mis_nf_constructor_type ((ind,u),mib,mip) j =
   and nconstr = Array.length mip.mind_consnames in
   let make_Ik k = mkIndU (((fst ind),ntypes-k-1),u) in
   if j > nconstr then error "Not enough constructors in the type.";
-  substl (List.tabulate make_Ik ntypes) specif.(j-1)
+  let specif = 
+    let subst = Inductive.make_inductive_subst mib u in
+      subst_univs_constr subst specif.(j-1)
+  in
+    substl (List.tabulate make_Ik ntypes) specif
 
 (* Arity of constructors excluding parameters and local defs *)
 
