@@ -356,10 +356,6 @@ let key_of b flags f =
         Cpred.mem p (snd flags.modulo_delta) ->
       Some (IsProj (p, c))
   | _ -> None
-  
-let translate_key = function
-  | IsKey k -> k    
-  | IsProj (c, _) -> ConstKey c
 
 let translate_table_key = function
   | ConstKey (cst,u) -> ConstKey cst
