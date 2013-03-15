@@ -106,17 +106,17 @@ let typecheck_params_and_fields def id t ps nots fs =
   let evars = Evarconv.consider_remaining_unif_problems env_ar !evars in
   let evars = Typeclasses.resolve_typeclasses env_ar evars in
   let evars, nf = Evarutil.nf_evars_and_universes evars in
-  let newps = Sign.map_rel_context nf newps in
-  let newfs = Sign.map_rel_context nf newfs in
   let arity = nf t' in
   let evars = 
     let _, univ = compute_constructor_level evars env_ar newfs in
     let ty = mkSort (Type univ) in
-      try Evarconv.the_conv_x_leq env_ar ty t' evars 
+      try Evarconv.the_conv_x_leq env_ar ty arity evars 
       with Reduction.NotConvertible ->
-        Pretype_errors.error_cannot_unify env_ar evars (ty, t')
+        Pretype_errors.error_cannot_unify env_ar evars (ty, arity)
   in
   let evars, nf = Evarutil.nf_evars_and_universes evars in
+  let newps = Sign.map_rel_context nf newps in
+  let newfs = Sign.map_rel_context nf newfs in
   let ce t = Evarutil.check_evars env0 Evd.empty evars t in
     List.iter (fun (n, b, t) -> Option.iter ce b; ce t) (List.rev newps);
     List.iter (fun (n, b, t) -> Option.iter ce b; ce t) (List.rev newfs);
