@@ -82,12 +82,12 @@ val instantiate_with_lbound :
   bool ->
   bool ->
   Univ.LSet.t * Univ.universe option Univ.LMap.t *
-    (bool * Univ.universe) Univ.LMap.t * Univ.constraints ->
+    (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints ->
   (Univ.LSet.t * Univ.universe option Univ.LMap.t *
-     (bool * Univ.universe) Univ.LMap.t * Univ.constraints) *
-    (bool * Univ.universe)
+     (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints) *
+    (bool * bool * Univ.universe)
     
-val compute_lbound : (constraint_type * Univ.universe) list -> universe_level -> universe option
+val compute_lbound : (constraint_type * Univ.universe) list -> universe option
 
 val minimize_univ_variables : 
            Univ.LSet.t ->
@@ -97,7 +97,7 @@ val minimize_univ_variables :
            'a Univ.LMap.t ->
            Univ.constraints ->
            Univ.LSet.t * Univ.universe option Univ.LMap.t *
-           (bool * Univ.universe) Univ.LMap.t * Univ.constraints
+           (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints
 
 
 val normalize_context_set : universe_context_set -> 

@@ -371,19 +371,19 @@ let subst_univs_subst u l s =
     
 exception Found of Level.t
 let find_inst insts v =
-  try LMap.iter (fun k (b,v') ->
-    if not b && Universe.eq v' v then raise (Found k))
+  try LMap.iter (fun k (enf,alg,v') ->
+    if not alg && enf && Universe.eq v' v then raise (Found k))
 	insts; raise Not_found
   with Found l -> l
 
-let add_inst u (b,lbound) insts =
+let add_inst u (enf,b,lbound) insts =
   match lbound with
-  | Some v -> LMap.add u (b,v) insts
+  | Some v -> LMap.add u (enf,b,v) insts
   | None -> insts
 
 exception Stays
 
-let compute_lbound left u =
+let compute_lbound left =
  (** The universe variable was not fixed yet.
      Compute its level using its lower bound. *)
   if left = [] then None
@@ -406,19 +406,33 @@ let instantiate_with_lbound u lbound alg enforce (ctx, us, insts, cstrs) =
   if enforce then
     let inst = Universe.make u in
     let cstrs' = enforce_leq lbound inst cstrs in
-      (ctx, us, LMap.add u (alg,lbound) insts, cstrs'), (alg, inst)
+      (ctx, us, LMap.add u (enforce,alg,lbound) insts, cstrs'), (enforce, alg, inst)
   else (* Actually instantiate *)
     (Univ.LSet.remove u ctx, Univ.LMap.add u (Some lbound) us, 
-     LMap.add u (alg,lbound) insts, cstrs), (alg, lbound)
+     LMap.add u (enforce,alg,lbound) insts, cstrs), (enforce, alg, lbound)
 	
 let minimize_univ_variables ctx us algs left right cstrs =
+  let left, lbounds = 
+    Univ.LMap.fold (fun r lower (left, lbounds as acc)  ->
+      if Univ.LMap.mem r us then acc
+      else (* Fixed universe, just compute its glb for sharing *)
+	let lbounds' = 
+	  match compute_lbound (List.map (fun (d,l) -> d, Universe.make l) lower) with
+	  | None -> lbounds
+	  | Some lbound -> LMap.add r (true, false, lbound) lbounds
+	in (Univ.LMap.remove r left, lbounds'))
+      left (left, Univ.LMap.empty)
+  in
   let rec instance (ctx', us, insts, cstrs as acc) u =
     let acc, left = 
       try let l = LMap.find u left in
 	    List.fold_left (fun (acc, left') (d, l) -> 
-	      let acc', (alg, l') = aux acc l in
+	      let acc', (enf,alg,l') = aux acc l in
 		assert(not alg);
-		let l' = match Universe.level l' with Some _ -> l' | None -> Universe.make l in
+		let l' = 
+		  if enf then Universe.make l 
+		  else match Universe.level l' with Some _ -> l' | None -> Universe.make l 
+		in
 		  acc', (d, l') :: left') (acc, []) l
       with Not_found -> acc, []
     and right =
@@ -438,7 +452,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	     different level, otherwise we keep it. *)
 	  if not (Level.eq l u) then
 	    instantiate_with_lbound u lbound false false acc
-	  else acc, (false, lbound)
+	  else acc, (true, false, lbound)
 	| None -> 
 	  try 
 	    (* Another universe represents the same lower bound, 
@@ -449,10 +463,10 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	    (* We set u as the canonical universe representing lbound *)
 	    instantiate_with_lbound u lbound false true acc
     in
-    let lbound = compute_lbound left u in
+    let lbound = compute_lbound left in
       match lbound with
       | None -> (* Nothing to do *)
-	acc, (false, Universe.make u)
+	acc, (true, false, Universe.make u)
       | Some lbound ->
 	instantiate_lbound lbound
   and aux (ctx', us, seen, cstrs as acc) u =
@@ -464,7 +478,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
     LMap.fold (fun u v (ctx', us, seen, cstrs as acc) -> 
       if v = None then fst (aux acc u)
       else LSet.remove u ctx', us, seen, cstrs)
-      us (ctx, us, LMap.empty, cstrs)
+      us (ctx, us, lbounds, cstrs)
       
     
     (* LMap.fold (fun u v (ctx', us, insts, cstrs as acc) ->  *)
@@ -541,8 +555,7 @@ let normalize_context_set (ctx, csts) us algs =
 	if lus then add_list_map l (d, r) ucstrsl
 	else ucstrsl
       and ucstrsr' = 
-	if rus then add_list_map r (d, l) ucstrsr
-	else ucstrsr
+	add_list_map r (d, l) ucstrsr
       in 
       let noneqs = 
 	if lus || rus then noneq 
