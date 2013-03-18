@@ -410,6 +410,9 @@ TACTIC EXTEND instantiate
 | [ "instantiate" ] -> [ tclNORMEVAR ]
 END
 
+TACTIC EXTEND normunivs
+  [ "norm_universes" ] -> [ Refiner.tclNORMUNIVS ]
+END
 
 (**********************************************************************)
 (** Nijmegen "step" tactic for setoid rewriting                       *)

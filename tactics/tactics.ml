@@ -3579,12 +3579,12 @@ let abstract_subproof id tac gl =
     (applist (lem,List.rev (Array.to_list (instance_from_named_context sign))))
     gl
 
-let tclABSTRACT name_op tac gl =
+let tclABSTRACT name_op tac =
   let s = match name_op with
     | Some s -> s
     | None   -> add_suffix (get_current_proof_name ()) "_subproof"
   in
-  abstract_subproof s tac gl
+    tclTHEN Refiner.tclNORMUNIVS (abstract_subproof s tac)
 
 
 let admit_as_an_axiom gl =

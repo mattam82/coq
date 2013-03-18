@@ -399,6 +399,11 @@ let tclPUSHCONSTRAINTS cst gl =
 let tclPUSHUNIVERSECONSTRAINTS cst gl = 
   tclEVARS (Evd.add_universe_constraints (project gl) cst) gl
 
+let tclNORMUNIVS gl = 
+  let sigma = gl.sigma in
+  let sigma' = Evd.nf_constraints sigma in
+    tclEVARS sigma' gl
+
 (* Pretty-printers. *)
 
 let pp_info = ref (fun _ _ _ -> assert false)
