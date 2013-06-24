@@ -279,6 +279,7 @@ let close_proof () =
 	  { Entries.const_entry_body = c;
             const_entry_secctx = section_vars;
             const_entry_type = Some t;
+	    const_entry_proj = None;
 	    const_entry_polymorphic = Util.pi2 str;
 	    const_entry_universes = Univ.ContextSet.to_context ctx;
 	    const_entry_opaque = true;

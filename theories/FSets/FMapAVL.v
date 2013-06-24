@@ -1930,7 +1930,7 @@ Module IntMake (I:Int)(X: OrderedType) <: S with Module E := X.
  Lemma Equivb_Equivb : forall cmp m m',
   Equivb cmp m m' <-> Raw.Proofs.Equivb cmp m m'.
  Proof.
- intros; unfold Equivb, Equiv, Raw.Proofs.Equivb, In; intuition.
+ intros; unfold Equivb, Equiv, Raw.Proofs.Equivb, In. intuition. 
  generalize (H0 k); do 2 rewrite In_alt; intuition.
  generalize (H0 k); do 2 rewrite In_alt; intuition.
  generalize (H0 k); do 2 rewrite <- In_alt; intuition.

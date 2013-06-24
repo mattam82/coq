@@ -70,6 +70,7 @@ val inductive_nargs_env : env -> inductive -> int * int
 
 (** @return nb of params without letin *)
 val inductive_nparams : inductive -> int
+val inductive_params_ctxt : pinductive -> rel_context
 
 (** @return param + args without letin *)
 val mis_constructor_nargs : constructor -> int

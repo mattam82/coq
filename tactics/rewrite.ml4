@@ -1790,6 +1790,7 @@ let declare_projection n instance_id r =
       const_entry_type = Some typ;
       const_entry_polymorphic = poly;
       const_entry_universes = Univ.ContextSet.to_context uctx;
+      const_entry_proj = None;
       const_entry_opaque = false;
       const_entry_inline_code = false }
   in

@@ -220,6 +220,7 @@ let build_id_coercion idf_opt source poly =
       { const_entry_body = mkCast (val_f, DEFAULTcast, typ_f);
         const_entry_secctx = None;
 	const_entry_type = Some typ_f;
+	const_entry_proj = None;
 	const_entry_polymorphic = poly;
 	const_entry_universes = Univ.ContextSet.to_context ctx;
         const_entry_opaque = false;

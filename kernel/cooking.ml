@@ -114,6 +114,14 @@ let expmod_constr modlist c =
 	   with
 	    | Not_found -> map_constr substrec c)
 
+      | Proj (p, c') ->
+          (try 
+	     let p' = share_univs (ConstRef p) Univ.Instance.empty modlist in
+	     match kind_of_term p' with
+	     | Const (p',_) -> mkProj (p', substrec c')
+	     | _ -> assert false
+	   with Not_found -> map_constr substrec c)
+
   | _ -> map_constr substrec c
 
   in
@@ -134,7 +142,8 @@ type recipe = {
 type inline = bool
 
 type result =
-  constant_def * constant_type * bool * Univ.universe_context * inline
+  constant_def * constant_type * projection_body option * 
+    bool * Univ.universe_context * inline
     * Context.section_context option
 
 let on_body f = function
@@ -147,6 +156,15 @@ let constr_of_def = function
   | Undef _ -> assert false
   | Def cs -> Lazyconstr.force cs
   | OpaqueDef lc -> Lazyconstr.force_opaque lc
+
+(* Apply the cooking substitution to a projections type. *)
+let rename_constant_type n c hyps =
+  CList.fold_left_i
+    (fun i c (id, body, t) -> 
+      match body with
+      | Some b -> Vars.replace_vars [(id, b)] c
+      | None -> Vars.replace_vars [(id, mkRel i)] c)
+    (n + 1) c hyps
 
 let cook_constant env r =
   let cb = r.d_from in
@@ -163,6 +181,21 @@ let cook_constant env r =
   let typ = 
     abstract_constant_type (expmod_constr r.d_modlist cb.const_type) hyps 
   in
+  let projection pb =
+    let ((mind, _), _), n' =
+      try 
+	let c' = share_univs (IndRef (pb.proj_ind,0)) Univ.Instance.empty r.d_modlist in
+	  match kind_of_term c' with
+	  | App (f,l) -> (destInd f, Array.length l)
+	  | Ind ind -> ind, 0
+	  | _ -> assert false 
+      with Not_found -> (((pb.proj_ind,0),Univ.Instance.empty), 0)
+    in 
+    let ctx, ty' = decompose_prod_n (n' + pb.proj_npars + 1) typ in
+      { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
+	 proj_type = ty' }
+  in
   let univs = UContext.union abs_ctx cb.const_universes in
-  (body, typ, cb.const_polymorphic, univs, cb.const_inline_code, 
-   Some const_hyps)
+    (body, typ, Option.map projection cb.const_proj, 
+     cb.const_polymorphic, univs, cb.const_inline_code, 
+     Some const_hyps)

@@ -373,7 +373,6 @@ module KerName = struct
   let hcons =
     Hashcons.simple_hcons HashKN.generate
       (ModPath.hcons,DirPath.hcons,String.hcons)
-
 end
 
 module KNmap = Map.Make(KerName)
@@ -707,6 +706,7 @@ let kn_equal = KerName.equal
 (** Compatibility layer for [Constant] *)
 
 type constant = Constant.t
+type projection = constant
 
 let constant_of_kn = Constant.make1
 let constant_of_kn_equiv = Constant.make

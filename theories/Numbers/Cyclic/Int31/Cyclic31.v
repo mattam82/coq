@@ -1629,7 +1629,7 @@ Section Int31_Specs.
  Lemma spec_pos_mod : forall w p,
        [|ZnZ.pos_mod p w|] = [|w|] mod (2 ^ [|p|]).
  Proof.
- unfold ZnZ.pos_mod, int31_ops, compare31.
+ unfold int31_ops, ZnZ.pos_mod, compare31.
  change [|31|] with 31%Z.
  assert (forall w p, 31<=p -> [|w|] = [|w|] mod 2^p).
   intros.

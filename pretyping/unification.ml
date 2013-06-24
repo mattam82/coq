@@ -317,10 +317,28 @@ let use_metas_pattern_unification flags nb l =
       flags.use_meta_bound_pattern_unification) &&
      Array.for_all (fun c -> isRel c && destRel c <= nb) l
 
-let expand_key env = function
-  | Some (ConstKey cst) -> constant_opt_value_in env cst
-  | Some (VarKey id) -> (try named_body id env with Not_found -> None)
-  | Some (RelKey _) -> None
+type key = 
+  | IsKey of Closure.table_key
+  | IsProj of constant * constr
+
+let expand_table_key env = function
+  | ConstKey cst -> constant_opt_value_in env cst
+  | VarKey id -> (try named_body id env with Not_found -> None)
+  | RelKey _ -> None
+
+let unfold_projection env p stk =
+  (match try Some (lookup_projection p env) with Not_found -> None with
+  | Some pb -> 
+    let s = Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) in
+      s :: stk
+  | None -> assert false)
+
+let expand_key ts env sigma = function
+  | Some (IsKey k) -> expand_table_key env k
+  | Some (IsProj (p, c)) -> 
+    let red = zip (fst (whd_betaiota_deltazeta_for_iota_state ts env sigma 
+			  Cst_stack.empty (c, unfold_projection env p [])))
+    in if eq_constr (mkProj (p, c)) red then None else Some red
   | None -> None
 
 let subterm_restriction is_subterm flags =
@@ -331,16 +349,24 @@ let key_of b flags f =
   match kind_of_term f with
   | Const (cst,u) when is_transparent (ConstKey cst) &&
         Cpred.mem cst (snd flags.modulo_delta) ->
-      Some (ConstKey (cst,u))
+    Some (IsKey (ConstKey (cst,u)))
   | Var id when is_transparent (VarKey id) &&
-        Id.Pred.mem id (fst flags.modulo_delta) ->
-      Some (VarKey id)
+      Id.Pred.mem id (fst flags.modulo_delta) ->
+    Some (IsKey (VarKey id))
+  | Proj (p, c) when is_transparent (ConstKey p) &&
+      Cpred.mem p (snd flags.modulo_delta) ->
+    Some (IsProj (p, c))
   | _ -> None
+  
 
 let translate_key = function
   | ConstKey (cst,u) -> ConstKey cst
   | VarKey id -> VarKey id
   | RelKey n -> RelKey n
+
+let translate_key = function
+  | IsKey k -> translate_key k    
+  | IsProj (c, _) -> ConstKey c
   
 let oracle_order env cf1 cf2 =
   match cf1 with
@@ -510,6 +536,22 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 	| App (f1,l1), App (f2,l2) ->
             unify_app curenvnb pb b substn cM f1 l1 cN f2 l2
 
+	| Proj (p1,c1), Proj (p2,c2) ->
+	    if eq_constant p1 p2 then
+	      try 
+	        let c1, c2, substn = 
+		   if isCast c1 && isCast c2 then
+		     let (c1,_,tc1) = destCast c1 in
+		     let (c2,_,tc2) = destCast c2 in
+		       c1, c2, unirec_rec curenvnb CONV true false substn tc1 tc2
+		   else c1, c2, substn
+		in
+		  unirec_rec curenvnb CONV true wt substn c1 c2
+	      with ex when precatchable_exception ex ->
+	        unify_not_same_head curenvnb pb b wt substn cM cN
+	    else
+	      unify_not_same_head curenvnb pb b wt substn cM cN
+
 	| _ ->
             unify_not_same_head curenvnb pb b wt substn cM cN
 
@@ -591,24 +633,24 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 	match oracle_order curenv cf1 cf2 with
 	| None -> error_cannot_unify curenv sigma (cM,cN)
 	| Some true ->
-	    (match expand_key curenv cf1 with
+	    (match expand_key flags.modulo_delta curenv sigma cf1 with
 	    | Some c ->
 		unirec_rec curenvnb pb b wt substn
                   (whd_betaiotazeta sigma (mkApp(c,l1))) cN
 	    | None ->
-		(match expand_key curenv cf2 with
+		(match expand_key flags.modulo_delta curenv sigma cf2 with
 		| Some c ->
 		    unirec_rec curenvnb pb b wt substn cM
                       (whd_betaiotazeta sigma (mkApp(c,l2)))
 		| None ->
 		    error_cannot_unify curenv sigma (cM,cN)))
 	| Some false ->
-	    (match expand_key curenv cf2 with
+	    (match expand_key flags.modulo_delta curenv sigma cf2 with
 	    | Some c ->
 		unirec_rec curenvnb pb b wt substn cM
                   (whd_betaiotazeta sigma (mkApp(c,l2)))
 	    | None ->
-		(match expand_key curenv cf1 with
+		(match expand_key flags.modulo_delta curenv sigma cf1 with
 		| Some c ->
 		    unirec_rec curenvnb pb b wt substn
                       (whd_betaiotazeta sigma (mkApp(c,l1))) cN
@@ -1083,6 +1125,8 @@ let w_unify_to_subterm env evd ?(flags=default_unify_flags) (op,cl) =
 	       with ex when precatchable_exception ex ->
 		 matchrec c2)
 
+	  | Proj (p,c) -> matchrec c
+
 	  | Fix(_,(_,types,terms)) ->
 	       (try
 		 iter_fail matchrec types
@@ -1151,6 +1195,8 @@ let w_unify_to_subterm_all env evd ?(flags=default_unify_flags) (op,cl) =
 
             | Case(_,_,c,lf) -> (* does not search in the predicate *)
 		bind (matchrec c) (bind_iter matchrec lf)
+
+	    | Proj (p,c) -> matchrec c
 
 	    | LetIn(_,c1,_,c2) ->
 		bind (matchrec c1) (matchrec c2)

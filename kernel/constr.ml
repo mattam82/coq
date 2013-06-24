@@ -88,7 +88,7 @@ type ('constr, 'types) kind_of_term =
   | Case      of case_info * 'constr * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
-
+  | Proj      of constant * 'constr
 (* constr is the fixpoint of the previous type. Requires option
    -rectypes of the Caml compiler to be set *)
 type t = (t,t) kind_of_term
@@ -153,6 +153,9 @@ let in_punivs a = (a, Instance.empty)
 (* Constructs a constant *)
 let mkConst c = Const (in_punivs c)
 let mkConstU c = Const c
+
+(* Constructs an applied projection *)
+let mkProj (p,c) = Proj (p,c)
 
 (* Constructs an existential variable *)
 let mkEvar e = Evar e
@@ -239,6 +242,7 @@ let fold f acc c = match kind c with
   | Lambda (_,t,c) -> f (f acc t) c
   | LetIn (_,b,t,c) -> f (f (f acc b) t) c
   | App (c,l) -> Array.fold_left f (f acc c) l
+  | Proj (p,c) -> f acc c
   | Evar (_,l) -> Array.fold_left f acc l
   | Case (_,p,c,bl) -> Array.fold_left f (f (f acc p) c) bl
   | Fix (_,(lna,tl,bl)) ->
@@ -260,6 +264,7 @@ let iter f c = match kind c with
   | Lambda (_,t,c) -> f t; f c
   | LetIn (_,b,t,c) -> f b; f t; f c
   | App (c,l) -> f c; Array.iter f l
+  | Proj (p,c) -> f c
   | Evar (_,l) -> Array.iter f l
   | Case (_,p,c,bl) -> f p; f c; Array.iter f bl
   | Fix (_,(_,tl,bl)) -> Array.iter f tl; Array.iter f bl
@@ -279,6 +284,7 @@ let iter_with_binders g f n c = match kind c with
   | Lambda (_,t,c) -> f n t; f (g n) c
   | LetIn (_,b,t,c) -> f n b; f n t; f (g n) c
   | App (c,l) -> f n c; Array.iter (f n) l
+  | Proj (p,c) -> f n c
   | Evar (_,l) -> Array.iter (f n) l
   | Case (_,p,c,bl) -> f n p; f n c; Array.iter (f n) bl
   | Fix (_,(_,tl,bl)) ->
@@ -300,6 +306,7 @@ let map f c = match kind c with
   | Lambda (na,t,c) -> mkLambda (na, f t, f c)
   | LetIn (na,b,t,c) -> mkLetIn (na, f b, f t, f c)
   | App (c,l) -> mkApp (f c, Array.map f l)
+  | Proj (p,c) -> mkProj (p, f c)
   | Evar (e,l) -> mkEvar (e, Array.map f l)
   | Case (ci,p,c,bl) -> mkCase (ci, f p, f c, Array.map f bl)
   | Fix (ln,(lna,tl,bl)) ->
@@ -321,6 +328,7 @@ let map_with_binders g f l c = match kind c with
   | Lambda (na,t,c) -> mkLambda (na, f l t, f (g l) c)
   | LetIn (na,b,t,c) -> mkLetIn (na, f l b, f l t, f (g l) c)
   | App (c,al) -> mkApp (f l c, Array.map (f l) al)
+  | Proj (p,c) -> mkProj (p, f l c)
   | Evar (e,al) -> mkEvar (e, Array.map (f l) al)
   | Case (ci,p,c,bl) -> mkCase (ci, f l p, f l c, Array.map (f l) bl)
   | Fix (ln,(lna,tl,bl)) ->
@@ -352,6 +360,7 @@ let compare_head_gen eq_universes eq_sorts f t1 t2 =
   | App (c1,l1), App (c2,l2) ->
     Int.equal (Array.length l1) (Array.length l2) &&
       f c1 c2 && Array.equal f l1 l2
+  | Proj (p1,c1), Proj (p2,c2) -> eq_constant p1 p2 && f c1 c2
   | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 && Array.equal f l1 l2
   | Const (c1,u1), Const (c2,u2) -> eq_constant c1 c2 && eq_universes true u1 u2
   | Ind (c1,u1), Ind (c2,u2) -> eq_ind c1 c2 && eq_universes false u1 u2
@@ -509,6 +518,7 @@ let constr_ord_int f t1 t2 =
     | App (Cast(c1,_,_),l1), _ -> f (mkApp (c1,l1)) t2
     | _, App (Cast(c2, _,_),l2) -> f t1 (mkApp (c2,l2))
     | App (c1,l1), App (c2,l2) -> (f =? (Array.compare f)) c1 c2 l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> (con_ord =? f) p1 p2 c1 c2
     | Evar (e1,l1), Evar (e2,l2) ->
         ((-) =? (Array.compare f)) e1 e2 l1 l2
     | Const (c1,u1), Const (c2,u2) -> con_ord c1 c2
@@ -588,6 +598,7 @@ let hasheq t1 t2 =
     | LetIn (n1,b1,t1,c1), LetIn (n2,b2,t2,c2) ->
       n1 == n2 & b1 == b2 & t1 == t2 & c1 == c2
     | App (c1,l1), App (c2,l2) -> c1 == c2 & array_eqeq l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> p1 == p2 & c1 == c2
     | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 & array_eqeq l1 l2
     | Const (c1,u1), Const (c2,u2) -> c1 == c2 && Univ.Instance.eqeq u1 u2
     | Ind ((sp1,i1),u1), Ind ((sp2,i2),u2) -> 
@@ -618,6 +629,8 @@ let term_table = HashsetTerm.create 19991
 (* The associative table to hashcons terms. *)
 
 open Hashset.Combine
+
+let hash_instance = Univ.Instance.hcons
 
 (* [hashcons hash_consing_functions constr] computes an hash-consed
    representation for [constr] using [hash_consing_functions] on
@@ -662,16 +675,21 @@ let hashcons (sh_sort,sh_ci,sh_construct,sh_ind,sh_con,sh_na,sh_id) =
 	let c, hc = sh_rec c in
 	let hl = hash_term_array l in
 	(App (c, l), combinesmall 7 (combine hl hc))
+      | Proj (p,c) ->
+        let c, hc = sh_rec c in
+	let p' = sh_con p in
+	  (Proj (p', c), combinesmall 17 (Hashtbl.hash p'))
       | Evar (e,l) ->
 	let hl = hash_term_array l in
 	(* since the array have been hashed in place : *)
 	(t, combinesmall 8 (combine (Hashtbl.hash e) hl))
-      | Const c ->
-	(Const (sh_con c), combinesmall 9 (Hashtbl.hash c))
-      | Ind ((kn,i),u as ind) ->
-	(Ind (sh_ind ind), combinesmall 10 (combine (Hashtbl.hash kn) i))
-      | Construct ((((kn,i),j),u) as c)->
-	(Construct (sh_construct c), combinesmall 11 (combine3 (Hashtbl.hash kn) i j))
+      | Const (c,u) ->
+	(Const (sh_con c, hash_instance u), combinesmall 9 (Hashtbl.hash c))
+      | Ind ((kn,i) as ind,u) ->
+	(Ind (sh_ind ind, hash_instance u), combinesmall 10 (combine (Hashtbl.hash kn) i))
+      | Construct ((((kn,i),j) as c,u))->
+	(Construct (sh_construct c, hash_instance u), 
+	 combinesmall 11 (combine3 (Hashtbl.hash kn) i j))
       | Case (ci,p,c,bl) ->
 	let p, hp = sh_rec p
 	and c, hc = sh_rec c in
@@ -723,6 +741,8 @@ let rec hash t =
     | App (Cast(c, _, _),l) -> hash (mkApp (c,l))
     | App (c,l) ->
       combinesmall 7 (combine (hash_term_array l) (hash c))
+    | Proj (p,c) ->
+      combinesmall 17 (combine (Hashtbl.hash p) (hash c))
     | Evar (e,l) ->
       combinesmall 8 (combine (Hashtbl.hash e) (hash_term_array l))
     | Const (c,u) ->
@@ -781,9 +801,9 @@ module Hcaseinfo =
 let hcons_sorts = Hashcons.simple_hcons Hsorts.generate hcons_univ
 let hcons_caseinfo = Hashcons.simple_hcons Hcaseinfo.generate hcons_ind
 
-let hcons_construct (c,u) = (hcons_construct c, Univ.Instance.hcons u)
-let hcons_ind (i,u) = (hcons_ind i, Univ.Instance.hcons u)
-let hcons_con (c,u) = (hcons_con c, Univ.Instance.hcons u)
+let hcons_pconstruct (c,u) = (hcons_construct c, Univ.Instance.hcons u)
+let hcons_pind (i,u) = (hcons_ind i, Univ.Instance.hcons u)
+let hcons_pcon (c,u) = (hcons_con c, Univ.Instance.hcons u)
 
 let hcons =
   hashcons

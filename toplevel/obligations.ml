@@ -529,6 +529,7 @@ let declare_definition prg =
     { const_entry_body = body;
       const_entry_secctx = None;
       const_entry_type = Some typ;
+      const_entry_proj = None;
       const_entry_polymorphic = pi2 prg.prg_kind;
       const_entry_universes = Univ.ContextSet.to_context prg.prg_ctx;
       const_entry_opaque = false;
@@ -627,6 +628,7 @@ let declare_obligation prg obl body uctx =
 	{ const_entry_body = body;
           const_entry_secctx = None;
 	  const_entry_type = if ctx = [] then Some ty else None;
+	  const_entry_proj = None;
 	  const_entry_polymorphic = poly;
 	  const_entry_universes = uctx;
 	  const_entry_opaque = opaque;

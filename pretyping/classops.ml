@@ -47,6 +47,7 @@ type coe_info_typ = {
   coe_local : bool;
   coe_context : Univ.universe_context_set;
   coe_is_identity : bool;
+  coe_is_projection : bool;
   coe_param : int }
 
 let coe_info_typ_equal c1 c2 =
@@ -54,6 +55,7 @@ let coe_info_typ_equal c1 c2 =
     eq_constr c1.coe_type c2.coe_type &&
     c1.coe_local == c2.coe_local &&
     c1.coe_is_identity == c2.coe_is_identity &&
+    c1.coe_is_projection == c2.coe_is_projection &&
     Int.equal c1.coe_param c2.coe_param
 
 let cl_typ_ord t1 t2 = match t1, t2 with
@@ -285,11 +287,12 @@ let lookup_pattern_path_between (s,t) =
 
 (* coercion_value : coe_index -> unsafe_judgment * bool *)
 
-let coercion_value { coe_value = c; coe_type = t; coe_context = ctx; coe_is_identity = b } =
+let coercion_value { coe_value = c; coe_type = t; coe_context = ctx; 
+		     coe_is_identity = b; coe_is_projection = b' } =
   let subst, ctx = Universes.fresh_universe_context_set_instance ctx in
   let c' = Vars.subst_univs_level_constr subst c 
   and t' = Vars.subst_univs_level_constr subst t in
-    (make_judge c' t', b), ctx
+    (make_judge c' t', b, b'), ctx
 
 (* pretty-print functions are now in Pretty *)
 (* rajouter une coercion dans le graphe *)
@@ -359,6 +362,7 @@ type coercion = {
   coercion_type   : coe_typ;
   coercion_local  : bool;
   coercion_is_id  : bool;
+  coercion_is_proj  : bool;
   coercion_source : cl_typ;
   coercion_target : cl_typ;
   coercion_params : int;
@@ -406,6 +410,7 @@ let cache_coercion (_, c) =
       coe_context = ctx;
       coe_local = c.coercion_local;
       coe_is_identity = c.coercion_is_id;
+      coe_is_projection = c.coercion_is_proj;
       coe_param = c.coercion_params } in
   let () = add_new_coercion c.coercion_type xf in
   add_coercion_in_graph (xf,is,it)
@@ -428,7 +433,6 @@ let subst_coercion (subst, c) =
   let clt = subst_cl_typ subst c.coercion_target in
   if c.coercion_type == coe && c.coercion_source == cls && c.coercion_target == clt then c
   else { c with coercion_type = coe; coercion_source = cls; coercion_target = clt }
-
 
 let discharge_cl = function
   | CL_CONST kn -> CL_CONST (Lib.discharge_con kn)
@@ -465,10 +469,16 @@ let inCoercion : coercion -> obj =
     discharge_function = discharge_coercion }
 
 let declare_coercion coef ?(local = false) ~isid ~src:cls ~target:clt ~params:ps =
+  let isproj = 
+    match coef with
+    | ConstRef c -> Environ.is_projection c (Global.env ())
+    | _ -> false
+  in
   let c = {
     coercion_type = coef;
     coercion_local = local;
     coercion_is_id = isid;
+    coercion_is_proj = isproj;
     coercion_source = cls;
     coercion_target = clt;
     coercion_params = ps;

@@ -42,3 +42,6 @@ val check_inductive : env -> mutual_inductive -> mutual_inductive_entry -> mutua
 
 val enforce_indices_matter : unit -> unit
 val is_indices_matter : unit -> bool
+
+val compute_expansion : inductive -> 
+  Context.rel_context -> Context.rel_context -> constr

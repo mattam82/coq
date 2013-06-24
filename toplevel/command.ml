@@ -64,6 +64,17 @@ let rec complete_conclusion a cs = function
 
 (* 1| Constant definitions *)
 
+let definition_entry ?(opaque=false) ?types 
+    ?(poly=false) ?(univs=Univ.UContext.empty) body =
+  { const_entry_body = body;
+    const_entry_secctx = None;
+    const_entry_type = types;
+    const_entry_proj = None;
+    const_entry_polymorphic = poly;
+    const_entry_universes = univs;
+    const_entry_opaque = opaque;
+    const_entry_inline_code = false}
+
 let red_constant_entry n ce = function
   | None -> ce
   | Some red ->
@@ -92,6 +103,7 @@ let interp_definition bl p red_option c ctypopt =
 	{ const_entry_body = body;
           const_entry_secctx = None;
 	  const_entry_type = None;
+	  const_entry_proj = None;
 	  const_entry_polymorphic = p;
 	  const_entry_universes = Univ.ContextSet.to_context ctx;
           const_entry_opaque = false;
@@ -119,6 +131,7 @@ let interp_definition bl p red_option c ctypopt =
 	{ const_entry_body = body;
           const_entry_secctx = None;
 	  const_entry_type = Some typ;
+	  const_entry_proj = None;
 	  const_entry_polymorphic = p;
 	  const_entry_universes = Univ.ContextSet.to_context ctx;
           const_entry_opaque = false;
@@ -659,6 +672,7 @@ let declare_fix (_,poly,_ as kind) ctx f def t imps =
     const_entry_type = Some t;
     const_entry_polymorphic = poly;
     const_entry_universes = ctx;
+    const_entry_proj = None;
     const_entry_opaque = false;
     const_entry_inline_code = false
   } in
@@ -856,6 +870,7 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
             const_entry_secctx = None;
 	    const_entry_type = Some ty;
 	    (* FIXME *)
+	    const_entry_proj = None;
 	    const_entry_polymorphic = false;
 	    const_entry_universes = Evd.universe_context !evdref;
         const_entry_opaque = false;

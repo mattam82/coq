@@ -292,6 +292,16 @@ let new_type_evar evdref env loc =
     evd_comb0 (fun evd -> Evarutil.new_type_evar univ_flexible_alg evd env ~src:(loc,Evar_kinds.InternalHole)) evdref
   in e
 
+let dest_proj env g = 
+  match g with
+  | GRef (loc, ConstRef cst,_) ->
+    let cb = lookup_constant cst env in
+      (match cb.Declarations.const_proj with
+      | Some {Declarations.proj_ind = mind; proj_npars = n; proj_arg = m; proj_type = ty} -> 
+        Some (cst,mind,n,m,ty)
+      | None -> None)
+  | _ -> None
+
 (* [pretype tycon env evdref lvar lmeta cstr] attempts to type [cstr] *)
 (* in environment [env], with existential variables [evdref] and *)
 (* the type constraint tycon *)
@@ -414,7 +424,70 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
 	inh_conv_coerce_to_tycon loc env evdref j tycon
 
   | GApp (loc,f,args) ->
-      let fj = pretype empty_tycon env evdref lvar f in
+      let fj, args =
+	match dest_proj env f with
+	| None -> pretype empty_tycon env evdref lvar f, args
+	| Some (cst, mind, n, m, ty) ->
+	  (* let pars, arg, args = *)
+	  (*   if List.length args < n then  *)
+	  (*     error "Partial application of projections is not allowed" *)
+	  (*   else  *)
+	  (*     let pars, rest = List.chop n args in *)
+	  (* 	match rest with *)
+	  (* 	| [] -> assert false *)
+	  (* 	| hd :: tl -> pars, hd, tl *)
+	  (* in *)
+	  let arg, args = 
+	    match args with
+	    | [] -> assert false
+	    | hd :: tl -> hd, tl
+	  in
+	  let mk_ty k = 
+	    let ind = 
+	      Evarutil.evd_comb1 (Evd.fresh_inductive_instance env) evdref (mind,0)
+	    in
+	    let args = 
+	      let ctx = smash_rel_context (Inductiveops.inductive_params_ctxt ind) in
+		List.fold_right (fun (n, b, ty) (* par  *)args ->
+		  let ty = substl args ty in
+		  let ev = e_new_evar evdref env ~src:(loc,k) ty in
+		    ev :: args) ctx []
+		  (* let j = pretype (mk_tycon ty) env evdref lvar par in *)
+		    (* j.uj_val :: args) ctx pars [] *)
+	    in (ind, List.rev args)
+	  in
+	  let tycon =
+	    match arg with
+	    | GHole (loc, k) -> (* Typeclass projection application: 
+				   create the necessary type constraint *)
+	      let ind, args = mk_ty k in
+		mk_tycon (applist (mkIndU ind, args))
+	    | _ -> empty_tycon
+	  in
+	  let recty = pretype tycon env evdref lvar arg in
+	  let recty, ((ind,u), pars) = 
+	    try
+	      let IndType (indf, _ (*[]*)) = 
+		find_rectype env !evdref recty.uj_type
+	      in recty, dest_ind_family indf
+	    with Not_found -> 
+	      (match tycon with
+	      | Some ty -> 
+	        let IndType (indf, _) = find_rectype env !evdref ty in
+		  recty, dest_ind_family indf
+	      | None -> 
+	        let ind, args = mk_ty Evar_kinds.InternalHole in
+		let j' = 
+		  inh_conv_coerce_to_tycon loc env evdref recty 
+		    (mk_tycon (applist (mkIndU ind, args))) in
+		  j', (ind, args))
+	  in
+	    assert(eq_mind mind (fst ind));
+	    let usubst = make_inductive_subst (fst (lookup_mind_specif env ind)) u in
+	    let ty = Vars.subst_univs_constr usubst ty in
+	    let ty = substl (recty.uj_val :: List.rev pars) ty in
+	      {uj_val = mkProj (cst,recty.uj_val); uj_type = ty}, args
+      in
       let floc = loc_of_glob_constr f in
       let length = List.length args in
       let candargs =

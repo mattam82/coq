@@ -61,7 +61,7 @@ Lemma ceqb_rect : forall c1 c2 (A:Type) (x y:A) (P:A->Type),
   (phi c1 == phi c2 -> P x) -> P y -> P (if ceqb c1 c2 then x else y).
 Proof.
 intros.
-generalize (fun h => X (morph_eq CRmorph c1 c2 h)).
+generalize (fun h => X (morph_eq CRmorph _ _ h)).
 case (ceqb c1 c2); auto.
 Qed.
 
@@ -896,7 +896,7 @@ Lemma split_aux_correct_1 : forall l e1 p e2,
    /\
        NPEeval l e2 == NPEeval l (NPEmul (right res) (common res)).
 Proof.
- intros. unfold res;clear res; generalize (isIn_correct l e1 p e2 xH).
+ intros. unfold res. clear res; generalize (isIn_correct l e1 p e2 xH).
  destruct (isIn e1 p e2 1). destruct p0.
  Opaque NPEpow NPEmul.
   destruct n;simpl;
@@ -1630,7 +1630,7 @@ Lemma ceqb_rect_complete : forall c1 c2 (A:Type) (x y:A) (P:A->Type),
   P (if ceqb c1 c2 then x else y).
 Proof.
 intros.
-generalize (fun h => X (morph_eq CRmorph c1 c2 h)).
+generalize (fun h => X (morph_eq CRmorph _ _ h)).
 generalize (@ceqb_complete c1 c2).
 case (c1 ?=! c2); auto; intros.
 apply X0.

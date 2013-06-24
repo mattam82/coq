@@ -172,6 +172,10 @@ let inductive_has_local_defs ind =
 let inductive_nparams ind =
   (fst (Global.lookup_inductive ind)).mind_nparams
 
+let inductive_params_ctxt (ind,u) =
+  let (mib,mip) = Global.lookup_inductive ind in
+    Inductive.inductive_params_ctxt (mib,u)
+
 let inductive_nargs ind =
   let (mib,mip) = Global.lookup_inductive ind in
   (rel_context_length (mib.mind_params_ctxt), mip.mind_nrealargs_ctxt)

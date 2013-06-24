@@ -56,6 +56,8 @@ val judge_of_constant : env -> constant puniverses -> unsafe_judgment
 (* val judge_of_constant_knowing_parameters : *)
 (*   env -> constant -> unsafe_judgment array -> unsafe_judgment *)
 
+val judge_of_projection : env -> Names.projection -> unsafe_judgment -> unsafe_judgment
+
 (** {6 Type of application. } *)
 val judge_of_apply :
   env -> unsafe_judgment -> unsafe_judgment array
@@ -103,6 +105,8 @@ val type_fixpoint : env -> Name.t array -> types array
 val typing : env -> constr -> unsafe_judgment
 
 val type_of_constant : env -> constant puniverses -> types constrained
+
+val type_of_projection : env -> Names.projection puniverses -> types
 
 val type_of_constant_in : env -> constant puniverses -> types
 

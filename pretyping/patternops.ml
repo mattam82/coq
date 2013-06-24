@@ -81,6 +81,7 @@ and rec_declaration_eq (n1, c1, r1) (n2, c2, r2) =
 let rec occur_meta_pattern = function
   | PApp (f,args) ->
       (occur_meta_pattern f) or (Array.exists occur_meta_pattern args)
+  | PProj (_,arg) -> occur_meta_pattern arg
   | PLambda (na,t,c)  -> (occur_meta_pattern t) or (occur_meta_pattern c)
   | PProd (na,t,c)  -> (occur_meta_pattern t) or (occur_meta_pattern c)
   | PLetIn (na,t,c)  -> (occur_meta_pattern t) or (occur_meta_pattern c)
@@ -105,6 +106,7 @@ let rec head_pattern_bound t =
     | PCase (_,p,c,br) -> head_pattern_bound c
     | PRef r         -> r
     | PVar id        -> VarRef id
+    | PProj (p,c)    -> ConstRef p
     | PEvar _ | PRel _ | PMeta _ | PSoApp _  | PSort _ | PFix _
 	-> raise BoundPattern
     (* Perhaps they were arguments, but we don't beta-reduce *)
@@ -148,6 +150,8 @@ let pattern_of_constr sigma t =
     | Const (sp,u)  -> PRef (ConstRef (constant_of_kn(canonical_con sp)))
     | Ind (sp,u)    -> PRef (canonical_gr (IndRef sp))
     | Construct (sp,u) -> PRef (canonical_gr (ConstructRef sp))
+    | Proj (p, c) ->  
+        PProj (constant_of_kn(canonical_con p), pattern_of_constr c)
     | Evar (evk,ctxt as ev) ->
         (match snd (Evd.evar_source evk sigma) with
           | Evar_kinds.MatchingVar (b,id) ->
@@ -185,6 +189,7 @@ let map_pattern_with_binders g f l = function
   | PIf (c,b1,b2) -> PIf (f l c,f l b1,f l b2)
   | PCase (ci,po,p,pl) ->
     PCase (ci,f l po,f l p, List.map (fun (i,n,c) -> (i,n,f l c)) pl)
+  | PProj (p,pc) -> PProj (p, f l pc)
   (* Non recursive *)
   | (PVar _ | PEvar _ | PRel _ | PRef _  | PSort _  | PMeta _
   (* Bound to terms *)
@@ -237,6 +242,12 @@ let rec subst_pattern subst pat =
   | PVar _
   | PEvar _
   | PRel _ -> pat
+  | PProj (p,c) -> 
+      let p',t = subst_global subst (ConstRef p) in
+      let p' = destConstRef p' in
+      let c' = subst_pattern subst c in
+	if p' == p && c' == c then pat else
+	  PProj(p',c')
   | PApp (f,args) ->
       let f' = subst_pattern subst f in
       let args' = Array.smartmap (subst_pattern subst) args in

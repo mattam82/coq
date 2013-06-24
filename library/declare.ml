@@ -138,7 +138,7 @@ let cache_constant ((sp,kn), obj) =
   assert (eq_constant kn' (constant_of_kn kn));
   Nametab.push (Nametab.Until 1) sp (ConstRef (constant_of_kn kn));
   let cst = Global.lookup_constant kn' in
-  add_section_constant kn' cst.const_hyps;
+  add_section_constant (cst.const_proj <> None) kn' cst.const_hyps;
   Dischargedhypsmap.set_discharged_hyps sp obj.cst_hyps;
   add_constant_kind (constant_of_kn kn) obj.cst_kind
 
@@ -206,6 +206,7 @@ let declare_definition ?(internal=UserVerbose)
   let cb = 
     { Entries.const_entry_body = body;
       const_entry_type = types;
+      const_entry_proj = None;
       const_entry_opaque = opaque;
       const_entry_polymorphic = poly;
       const_entry_universes = Univ.ContextSet.to_context ctx;

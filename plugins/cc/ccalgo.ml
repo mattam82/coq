@@ -366,7 +366,7 @@ let cc_product s1 s2 =
 	   mkLambda(_B_,mkSort(Universes.new_sort_in_family s2),_body_))
 
 let rec constr_of_term = function
-    Symb s->s
+    Symb s-> applist_projection s []
   | Product(s1,s2) -> cc_product s1 s2
   | Eps id -> mkVar id
   | Constructor cinfo -> mkConstructU cinfo.ci_constr
@@ -374,7 +374,25 @@ let rec constr_of_term = function
       make_app [(constr_of_term s2)] s1
 and make_app l=function
     Appli (s1,s2)->make_app ((constr_of_term s2)::l) s1
-  | other -> applistc (constr_of_term other) l
+  | other -> 
+    applist_proj other l
+and applist_proj c l =
+  match c with
+  | Symb s -> applist_projection s l
+  | _ -> applistc (constr_of_term c) l
+and applist_projection c l =
+  match kind_of_term c with
+  | Const c when Environ.is_projection (fst c) (Global.env()) ->
+    (match l with 
+    | [] -> (* Expand the projection *)
+      let kn = fst c in
+      let ty,_ = Typeops.type_of_constant (Global.env ()) c in
+      let pb = Environ.lookup_projection kn (Global.env()) in
+      let ctx,_ = Term.decompose_prod_n_assum (pb.Declarations.proj_npars + 1) ty in
+	it_mkLambda_or_LetIn (mkProj(kn,mkRel 1)) ctx
+    | hd :: tl ->
+      applistc (mkProj (fst c, hd)) tl)
+  | _ -> applistc c l
 
 let rec canonize_name c =
   let func =  canonize_name in
@@ -396,6 +414,9 @@ let rec canonize_name c =
 	  mkLetIn (na, func b,func t,func ct)
       | App (ct,l) ->
 	  mkApp (func ct,Array.smartmap func l)
+      | Proj(kn,c) ->
+        let canon_const = constant_of_kn (canonical_con kn) in 
+	  (mkProj (canon_const, func c))
       | _ -> c
 
 (* rebuild a term from a pattern and a substitution *)

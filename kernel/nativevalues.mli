@@ -50,6 +50,7 @@ type atom =
   | Acofix of t array * t array * int * t
   | Acofixe of t array * t array * int * t
   | Aprod of name * t * (t -> t)
+  | Aproj of constant * accumulator
 
 (* Constructors *)
 
@@ -64,6 +65,7 @@ val mk_sw_accu : annot_sw -> accumulator -> t -> (t -> t)
 val mk_prod_accu : name -> t -> t -> t
 val mk_fix_accu : rec_pos  -> int -> t array -> t array -> t
 val mk_cofix_accu : int -> t array -> t array -> t 
+val mk_proj_accu : constant -> accumulator -> t
 val upd_cofix : t -> t -> unit
 val force_cofix : t -> t 
 val mk_const : tag -> t

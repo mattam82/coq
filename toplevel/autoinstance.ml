@@ -184,6 +184,7 @@ let declare_record_instance gr ctx params =
   let ce = { const_entry_body= def;
              const_entry_secctx = None;
 	     const_entry_type=None;
+	     const_entry_proj = None;
 	     const_entry_polymorphic = true;
 	     const_entry_universes = Univ.UContext.empty (*FIXME*);
          const_entry_opaque=false;
@@ -203,6 +204,7 @@ let declare_class_instance gr ctx params =
     {  const_entry_type = Some typ;
        const_entry_secctx = None;
        const_entry_body = def;
+       const_entry_proj = None;
        (* FIXME *)
        const_entry_polymorphic = false;
        const_entry_universes = Univ.ContextSet.to_context uctx;

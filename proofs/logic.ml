@@ -324,6 +324,7 @@ let collect_meta_variables c =
     | Meta mv -> if deep then error_unsupported_deep_meta () else mv::acc
     | Cast(c,_,_) -> collrec deep acc c
     | (App _| Case _) -> fold_constr (collrec deep) acc c
+    | Proj (_, c) -> collrec deep acc c
     | _ -> fold_constr (collrec true) acc c
   in
   List.rev (collrec false [] c)
@@ -387,6 +388,11 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
         (acc'',conclty',sigma, Term.mkApp (applicand, Array.of_list args))
 
+    | Proj (p,c) ->
+      let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
+      let j = Typeops.judge_of_projection env p {uj_val=c';uj_type=cty} in
+	(acc',j.uj_type,sigma,Term.mkProj (p, c'))
+	
     | Case (ci,p,c,lf) ->
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
 	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
@@ -445,6 +451,11 @@ and mk_hdgoals sigma goal goalacc trm =
             (acc',sigma,[]) lbrty lf
 	in
 	(acc'',conclty',sigma, Term.mkCase (ci,p',c',Array.of_list (List.rev rbranches)))
+
+    | Proj (p,c) ->
+         let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
+         let j = Typeops.judge_of_projection env p {uj_val=c';uj_type=cty} in
+	   (acc',j.uj_type,sigma,Term.mkProj (p, c'))
 
     | _ ->
 	if !check && occur_meta trm then

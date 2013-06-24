@@ -206,6 +206,7 @@ let build_beq_scheme kn =
 	    (match Environ.constant_opt_value_in env kn with
 	      | None -> raise (ParameterWithoutEquality (fst kn))
 	      | Some c -> aux (applist (c,a)))
+        | Proj _ -> raise (EqUnknown "Proj")
         | Construct _ -> raise (EqUnknown "Construct")
         | Case _ -> raise (EqUnknown "Case")
         | CoFix _ -> raise (EqUnknown "CoFix")

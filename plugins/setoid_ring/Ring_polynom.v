@@ -571,12 +571,12 @@ Section MakeRingPol.
  Lemma pow_pos_add x i j : x^(j + i) == x^i * x^j.
  Proof.
   rewrite Pos.add_comm.
-  apply (pow_pos_add Rsth Reqe.(Rmul_ext) ARth.(ARmul_assoc)).
+  apply (pow_pos_add Rsth Reqe.(Rmul_ext) (ARmul_assoc ARth)).
  Qed.
 
  Lemma ceqb_spec c c' : BoolSpec ([c] == [c']) True (c ?=! c').
  Proof.
-  generalize (morph_eq CRmorph c c').
+  generalize (@morph_eq CRmorph c c').
   destruct (c ?=! c'); auto.
  Qed.
 
@@ -1107,7 +1107,7 @@ Section POWER.
               forall l, [fst m] * Mphi l (snd m) == P@l.
   Proof.
     induction P;simpl;intros;Esimpl.
-    assert (H1 := (morph_eq CRmorph) c cO).
+    assert (H1 := (@morph_eq CRmorph) c cO).
     destruct (c ?=! cO).
     discriminate.
     inversion H;trivial;Esimpl.
@@ -1296,7 +1296,7 @@ Section POWER.
  Lemma mkmult_c_pos_ok : forall c lm, mkmult_c_pos c lm == [c]* r_list_pow lm.
  Proof.
   intros;unfold mkmult_c_pos;simpl.
-   assert (H := (morph_eq CRmorph) c cI).
+   assert (H := (@morph_eq CRmorph) c cI).
    rewrite <- r_list_pow_rev; destruct (c ?=! cI).
   rewrite H;trivial;Esimpl.
   apply mkmult1_ok.  apply mkmult_rec_ok.
@@ -1306,7 +1306,7 @@ Section POWER.
  Proof.
   intros;unfold mkmult_c;simpl.
   case_eq (get_sign c);intros.
-  assert (H1 := (morph_eq CRmorph) c0  cI).
+  assert (H1 := (@morph_eq CRmorph) c0  cI).
   destruct (c0 ?=! cI).
    rewrite (CRmorph.(morph_eq) _ _ (get_sign_spec.(sign_spec) _ H)). Esimpl. rewrite H1;trivial.
    rewrite <- r_list_pow_rev;trivial;Esimpl.

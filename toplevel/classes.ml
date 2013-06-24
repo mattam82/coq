@@ -110,6 +110,7 @@ let declare_instance_constant k pri global imps ?hook id poly uctx term termtype
     { const_entry_body   = term;
       const_entry_secctx = None;
       const_entry_type   = Some termtype;
+      const_entry_proj   = None;
       const_entry_polymorphic = poly;
       const_entry_universes = uctx;
       const_entry_opaque = false;

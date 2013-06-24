@@ -440,10 +440,13 @@ let occur_name na aty =
 
 let is_projection nargs = function
   | Some r when not !Flags.raw_print & !print_projections ->
-      (try
-	let n = Recordops.find_projection_nparams r + 1 in
-	if n <= nargs then Some n else None
-      with Not_found -> None)
+      (* (try *)
+      (* 	let n = Recordops.find_projection_nparams r + 1 in *)
+      (* 	if n <= nargs then Some n else None *)
+      (* with Not_found ->  *)
+        (match r with
+	| ConstRef c when Environ.is_projection c (Global.env ()) -> Some 1
+	| _ -> None)
   | _ -> None
 
 let is_hole = function CHole _ -> true | _ -> false
@@ -489,8 +492,8 @@ let explicitize loc inctx impl (cf,f) args =
 	  let args2 = exprec (i+1) (args2,impl2) in
 	  CApp (loc,(Some (List.length args1),f),args1@args2)
     | None ->
-	let args = exprec 1 (args,impl) in
-	if List.is_empty args then f else CApp (loc, (None, f), args)
+	  let args = exprec 1 (args,impl) in
+	    if List.is_empty args then f else CApp (loc, (None, f), args)
 
 let extern_global loc impl f us =
   if not !Constrintern.parsing_explicit &&
@@ -951,6 +954,7 @@ let rec glob_of_pat env = function
       GVar (loc,id)
   | PMeta None -> GHole (loc,Evar_kinds.InternalHole)
   | PMeta (Some n) -> GPatVar (loc,(false,n))
+  | PProj (p,c) -> GApp (loc,GRef (loc, ConstRef p,None),[glob_of_pat env c])
   | PApp (f,args) ->
       GApp (loc,glob_of_pat env f,Array.map_to_list (glob_of_pat env) args)
   | PSoApp (n,args) ->

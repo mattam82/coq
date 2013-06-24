@@ -177,11 +177,29 @@ let instantiate_constr_or_ref env sigma c =
   let cty = Retyping.get_type_of env sigma c in
     (c, cty), ctx
 
+let strip_params env c = 
+  match kind_of_term c with
+  | App (f, args) -> 
+    (match kind_of_term f with
+    | Const (p,_) ->
+      let cb = lookup_constant p env in
+	(match cb.Declarations.const_proj with
+	| Some pb -> 
+	  let n = pb.Declarations.proj_npars in
+	    mkApp (mkProj (p, args.(n)), 
+		   Array.sub args (n+1) (Array.length args - (n + 1)))
+	| None -> c)
+    | _ -> c)
+  | _ -> c
+
 let instantiate_hint p =
   let mk_clenv c cty ctx =
     let sigma = Evd.merge_context_set univ_flexible dummy_goal.sigma ctx in
     let goal = { dummy_goal with sigma = sigma } in
-    let cl = mk_clenv_from goal (c,cty) in {cl with env = empty_env}
+    let cl = mk_clenv_from goal (c,cty) in 
+      {cl with templval = 
+	  { cl.templval with rebus = strip_params (Global.env()) cl.templval.rebus };
+	env = empty_env}
   in
   let code = match p.code with
     | Res_pf (c, cty, ctx) -> Res_pf (c, mk_clenv c cty ctx)
@@ -513,7 +531,7 @@ let try_head_pattern c =
   try head_pattern_bound c
   with BoundPattern -> error "Bound head variable."
 
-let make_exact_entry sigma pri poly ?(name=PathAny) (c, cty, ctx) =
+let make_exact_entry env sigma pri poly ?(name=PathAny) (c, cty, ctx) =
   let cty = strip_outer_cast cty in
     match kind_of_term cty with
     | Prod _ -> failwith "make_exact_entry"
@@ -578,7 +596,7 @@ let make_resolves env sigma flags pri poly ?name cr =
   let try_apply f =
     try Some (f (c, cty, ctx)) with Failure _ -> None in
   let ents = List.map_filter try_apply
-    [make_exact_entry sigma pri poly ?name; make_apply_entry env sigma flags pri poly ?name]
+    [make_exact_entry env sigma pri poly ?name; make_apply_entry env sigma flags pri poly ?name]
   in
   if List.is_empty ents then
     errorlabstrm "Hint"
@@ -619,7 +637,7 @@ let make_extern pri pat tacast =
 let make_trivial env sigma poly ?(name=PathAny) r =
   let c,ctx = fresh_global_or_constr env sigma poly r in
   let t = hnf_constr env sigma (type_of env sigma c) in
-  let hd = head_of_constr_reference (fst (head_constr t)) in
+  let hd = head_of_constr_reference (head_constr t) in
   let ce = mk_clenv_from dummy_goal (c,t) in
   (Some hd, { pri=1;
 	      poly = poly;
@@ -699,7 +717,7 @@ let subst_autohint (subst,(local,name,hintlist as obj)) =
   let subst_key gr =
     let (lab'', elab') = subst_global subst gr in
     let gr' =
-      (try head_of_constr_reference (fst (head_constr_bound elab'))
+      (try head_of_constr_reference (head_constr_bound elab')
        with Tactics.Bound -> lab'')
     in if gr' == gr then gr else gr'
   in
@@ -1004,11 +1022,11 @@ let pr_hint_term cl =
     let dbs = current_db () in
     let valid_dbs =
       let fn = try
-	  let (hdc,args) = head_constr_bound cl in
+	  let hdc = head_constr_bound cl in
 	  let hd = head_of_constr_reference hdc in
 	    if occur_existential cl then
 	      Hint_db.map_all hd
-	    else Hint_db.map_auto (hd, applist (hdc,args))
+	    else Hint_db.map_auto (hd, cl)
 	with Bound -> Hint_db.map_none
       in
       let fn db = List.map (fun x -> 0, x) (fn db) in
@@ -1410,7 +1428,7 @@ and tac_of_hint dbg db_list local_db concl (flags, ({pat=p; code=t;poly=poly})) 
 and trivial_resolve dbg mod_delta db_list local_db cl =
   try
     let head =
-      try let hdconstr,_ = head_constr_bound cl in
+      try let hdconstr = head_constr_bound cl in
 	    Some (head_of_constr_reference hdconstr)
       with Bound -> None
     in
@@ -1458,7 +1476,7 @@ let h_trivial ?(debug=Off) lems l = gen_trivial ~debug lems l
 let possible_resolve dbg mod_delta db_list local_db cl =
   try
     let head =
-      try let hdconstr,_ = head_constr_bound cl in
+      try let hdconstr = head_constr_bound cl in
 	    Some (head_of_constr_reference hdconstr)
       with Bound -> None
     in

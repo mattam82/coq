@@ -74,21 +74,30 @@ let infer_declaration env = function
       then OpaqueDef (Lazyconstr.opaque_from_val j.uj_val)
       else Def (Lazyconstr.from_val j.uj_val)
     in
-      def, typ, c.const_entry_polymorphic, c.const_entry_universes,
+    let proj = 
+      match c.const_entry_proj with
+      | Some (ind, n, m, ty) ->
+        (* FIXME: check projection *)
+	let pb = { proj_ind = ind;
+		   proj_npars = n;
+		   proj_arg = m;
+		   proj_type = ty }
+	in Some pb
+      | None -> None
+    in
+      def, typ, proj, c.const_entry_polymorphic, c.const_entry_universes,
         c.const_entry_inline_code, c.const_entry_secctx
   | ParameterEntry (ctx,poly,(t,uctx),nl) ->
     let env' = push_context uctx env in
     let j = infer env' t in
     let t = hcons_constr (Typeops.assumption_of_judgment env j) in
     (* let univs = check_context_subset cst uctx in *) (*FIXME*)
-      Undef nl, t, poly, uctx, false, ctx
-      
-let global_vars_set_constant_type env = global_vars_set env
+      Undef nl, t, None, poly, uctx, false, ctx
 
-let build_constant_declaration env kn (def,typ,poly,univs,inline_code,ctx) =
+let build_constant_declaration env kn (def,typ,proj,poly,univs,inline_code,ctx) =
   let hyps = 
     let inferred =
-      let ids_typ = global_vars_set_constant_type env typ in
+      let ids_typ = global_vars_set env typ in
       let ids_def = match def with
         | Undef _ -> Id.Set.empty
         | Def cs -> global_vars_set env (Lazyconstr.force cs)
@@ -106,6 +115,7 @@ let build_constant_declaration env kn (def,typ,poly,univs,inline_code,ctx) =
   { const_hyps = hyps;
     const_body = def;
     const_type = typ;
+    const_proj = proj;
     const_body_code = tps;
     const_polymorphic = poly;
     const_universes = univs;
@@ -119,8 +129,8 @@ let translate_constant env kn ce =
 
 let translate_recipe env kn r =
   build_constant_declaration env kn 
-    (let def,typ,poly,cst,inline,hyps = Cooking.cook_constant env r in
-     def,typ,poly,cst,inline,hyps)
+    (let def,typ,proj,poly,cst,inline,hyps = Cooking.cook_constant env r in
+     def,typ,proj,poly,cst,inline,hyps)
 
 (* Insertion of inductive types. *)
 

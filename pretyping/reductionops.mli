@@ -23,6 +23,7 @@ exception Elimconst
 type 'a stack_member =
 | Zapp of 'a list
 | Zcase of case_info * 'a * 'a array * ('a * 'a list) option
+| Zproj of int * int * projection
 | Zfix of fixpoint * 'a stack * ('a * 'a list) option
 | Zshift of int
 | Zupdate of 'a

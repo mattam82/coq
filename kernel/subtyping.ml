@@ -190,8 +190,8 @@ let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2
     else error NotEqualInductiveAliases
   end;
   (* we check that records and their field names are preserved. *)
-  check (fun mib -> mib.mind_record) (==) (fun x -> RecordFieldExpected x);
-  if mib1.mind_record then begin
+  check (fun mib -> mib.mind_record <> None) (==) (fun x -> RecordFieldExpected x);
+  if mib1.mind_record <> None then begin
     let rec names_prod_letin t = match kind_of_term t with
       | Prod(n,_,t) -> n::(names_prod_letin t)
       | LetIn(n,_,_,t) -> n::(names_prod_letin t)
@@ -271,7 +271,6 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
         (t1,t2) in
     check_conv err cst infer_conv_leq env t1 t2
   in
-
   match info1 with
     | Constant cb1 ->
       let () = assert (List.is_empty cb1.const_hyps && List.is_empty cb2.const_hyps) in

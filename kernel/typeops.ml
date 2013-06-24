@@ -127,6 +127,18 @@ let judge_of_constant env (kn,u as cst) =
   let _ = Environ.check_constraints cu env in
     (make_judge c ty)
 
+let type_of_projection env (cst,u) =
+  let cb = lookup_constant cst env in
+  match cb.const_proj with
+  | Some pb -> 
+    if cb.const_polymorphic then
+      let mib,_ = lookup_mind_specif env (pb.proj_ind,0) in
+      let subst = make_inductive_subst mib u in
+	Vars.subst_univs_constr subst pb.proj_type
+    else pb.proj_type
+  | None -> raise (Invalid_argument "type_of_projection: not a projection")
+
+
 (* Type of a lambda-abstraction. *)
 
 (* [judge_of_abstraction env name var j] implements the rule
@@ -309,6 +321,20 @@ let judge_of_case env ci pj cj lfj =
                        Array.map j_val lfj);
      uj_type = rslty })
 
+let judge_of_projection env p cj =
+  let pb = lookup_projection p env in
+  let (ind,u), args =
+    try find_rectype env cj.uj_type
+    with Not_found -> error_case_not_inductive env cj
+  in
+    assert(eq_mind pb.proj_ind (fst ind));
+    let usubst = make_inductive_subst (fst (lookup_mind_specif env ind)) u in
+    let ty = Vars.subst_univs_constr usubst pb.Declarations.proj_type in
+    let ty = substl (cj.uj_val :: List.rev args) ty in
+      (* TODO: Universe polymorphism for projections *)
+      {uj_val = mkProj (p,cj.uj_val);
+       uj_type = ty}
+
 (* Fixpoints. *)
 
 (* Checks the type of a general (co)fixpoint, i.e. without checking *)
@@ -355,6 +381,10 @@ let rec execute env cstr =
 
     | Const c ->
       judge_of_constant env c
+	
+    | Proj (p, c) ->
+        let cj = execute env c in
+          judge_of_projection env p cj
 
     (* Lambda calculus operators *)
     | App (f,args) ->

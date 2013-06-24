@@ -121,6 +121,7 @@ let define internal id c p univs =
     const_entry_body = c;
     const_entry_secctx = None;
     const_entry_type = None;
+    const_entry_proj = None;
     const_entry_polymorphic = p;
     const_entry_universes = Evd.evar_context_universe_context ctx;
     const_entry_opaque = false;

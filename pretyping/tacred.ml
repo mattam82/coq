@@ -43,7 +43,8 @@ let error_not_evaluable r =
      spc () ++ str "to an evaluable reference.")
 
 let is_evaluable_const env cst =
-  is_transparent (ConstKey cst) && evaluable_constant cst env
+  is_transparent (ConstKey cst) && 
+    (evaluable_constant cst env || is_projection cst env)
 
 let is_evaluable_var env id =
   is_transparent (VarKey id) && evaluable_named id env
@@ -54,7 +55,10 @@ let is_evaluable env = function
 
 let value_of_evaluable_ref env evref u =
   match evref with
-  | EvalConstRef con -> constant_value_in env (con,u)
+  | EvalConstRef con -> 
+    (try constant_value_in env (con,u)
+    with NotEvaluableConst IsProj -> 
+      raise (Invalid_argument "value_of_evaluable_ref"))
   | EvalVarRef id -> Option.get (pi2 (lookup_named id env))
 
 let constr_of_evaluable_ref evref u =
@@ -567,6 +571,15 @@ let special_red_case env sigma whfun (ci, p, c, lf)  =
   in
   redrec c
 
+let reduce_projection env sigma proj (recarg'hd,stack') stack =
+  (match kind_of_term recarg'hd with
+  | Construct _ -> 
+    let proj_narg = 
+      let pb = Option.get ((lookup_constant proj env).Declarations.const_proj) in
+	pb.Declarations.proj_npars + pb.Declarations.proj_arg
+    in Reduced (List.nth stack' proj_narg, stack)
+  | _ -> NotReducible)
+
 (* data structure to hold the map kn -> rec_args for simpl *)
 
 type behaviour = {
@@ -764,6 +777,13 @@ and whd_simpl_stack env sigma =
             | Reduced s' -> redrec (applist s')
 	    | NotReducible -> s'
 	  with Redelimination -> s')
+
+      | Proj (p, c) ->
+         (try match reduce_projection env sigma p (whd_construct_stack env sigma c) stack with
+	 | Reduced s' -> redrec (applist s')
+	 | NotReducible -> s'
+	 with Redelimination -> s')
+
       | _ -> 
         match match_eval_ref env x with
 	| Some (ref, u) ->
@@ -821,6 +841,15 @@ let try_red_product env sigma c =
       | Prod (x,a,b) -> mkProd (x, a, redrec (push_rel (x,None,a) env) b)
       | LetIn (x,a,b,t) -> redrec env (subst1 a t)
       | Case (ci,p,d,lf) -> simpfun (mkCase (ci,p,redrec env d,lf))
+      | Proj (p, c) -> 
+	let c' = 
+	  match kind_of_term c with
+	  | Construct _ -> c
+	  | _ -> redrec env c
+	in
+          (match reduce_projection env sigma p (whd_betaiotazeta_stack sigma c') [] with
+	  | Reduced s -> simpfun (applist s)
+	  | NotReducible -> raise Redelimination)
       | _ -> 
         (match match_eval_ref env x with
         | Some (ref, u) ->
@@ -921,6 +950,7 @@ let simpl env sigma c = strong whd_simpl env sigma c
 let matches_head c t =
   match kind_of_term t with
     | App (f,_) -> matches c f
+    | Proj (p, _) -> matches c (mkConst p)
     | _ -> raise PatternMatchingFailure
 
 let e_contextually byhead (occs,c) f env sigma t =
@@ -943,8 +973,11 @@ let e_contextually byhead (occs,c) f env sigma t =
 	  (evd := evm; t)
       else if byhead then
 	(* find other occurrences of c in t; TODO: ensure left-to-right *)
-        let (f,l) = destApp t in
-	mkApp (f, Array.map_left (traverse envc) l)
+	(match kind_of_term t with
+	| App (f,l) ->
+	  mkApp (f, Array.map_left (traverse envc) l)
+	| Proj (p,c) -> mkProj (p,traverse envc c)
+	| _ -> assert false)
       else
 	t
     with PatternMatchingFailure ->
@@ -964,21 +997,25 @@ let contextually byhead occs f env sigma t =
  * n is the number of the next occurence of name.
  * ol is the occurence list to find. *)
 
-let match_constr_evaluable_ref c evref = 
+let match_constr_evaluable_ref sigma c evref = 
   match kind_of_term c, evref with
   | Const (c,u), EvalConstRef c' when eq_constant c c' -> Some u
+  | Proj (p,c), EvalConstRef p' when eq_constant p p' -> Some Univ.Instance.empty
   | Var id, EvalVarRef id' when id_eq id id' -> Some Univ.Instance.empty
   | _, _ -> None
 
-let substlin env evalref n (nowhere_except_in,locs) c =
+let substlin env sigma evalref n (nowhere_except_in,locs) c =
   let maxocc = List.fold_right max locs 0 in
   let pos = ref n in
   assert (List.for_all (fun x -> x >= 0) locs);
-  let value u = value_of_evaluable_ref env evalref u in
+  let value u = 
+    value_of_evaluable_ref env evalref u 
+          (* Some (whd_betaiotazeta sigma c) *)
+  in
   let rec substrec () c =
     if nowhere_except_in & !pos > maxocc then c
     else 
-      match match_constr_evaluable_ref c evalref with
+      match match_constr_evaluable_ref sigma c evalref with
       | Some u ->
         let ok =
 	  if nowhere_except_in then List.mem !pos locs
@@ -1011,7 +1048,7 @@ let unfold env sigma name =
  * Performs a betaiota reduction after unfolding. *)
 let unfoldoccs env sigma (occs,name) c =
   let unfo nowhere_except_in locs =
-    let (nbocc,uc) = substlin env name 1 (nowhere_except_in,locs) c in
+    let (nbocc,uc) = substlin env sigma name 1 (nowhere_except_in,locs) c in
     if Int.equal nbocc 1 then
       error ((string_of_evaluable_ref env name)^" does not occur.");
     let rest = List.filter (fun o -> o >= nbocc) locs in

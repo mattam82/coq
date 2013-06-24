@@ -623,8 +623,36 @@ let used_section_variables env inds =
     (fun l c -> Id.Set.union (Environ.global_vars_set env c) l)
       Id.Set.empty inds in
   keep_hyps env ids
+let lift_decl n d = 
+  map_rel_declaration (lift n) d
 
-let build_inductive env p ctx env_ar params isrecord isfinite inds nmr recargs =
+let rel_vect n m = Array.init m (fun i -> mkRel(n+m-i))
+let rel_list n m = Array.to_list (rel_vect n m)
+let rel_appvect n m = rel_vect n (List.length m)
+
+exception UndefinableExpansion
+
+(** From a rel context describing the constructor arguments,
+    build an expansion function.
+    The term built is expecting to be substituted first by 
+    a substitution of the form [params, x : ind params] *)
+let compute_expansion (kn, _ as ind) params ctx =
+  let mp, dp, l = repr_mind kn in
+  let make_proj id = Constant.make1 (KerName.make mp dp (Label.of_id id)) in
+  let rec projections acc (na, b, t) =
+    match b with
+    | Some c -> acc
+    | None -> 
+      match na with
+      | Name id -> make_proj id :: acc
+      | Anonymous -> raise UndefinableExpansion
+  in
+  let projs = List.fold_left projections [] ctx in
+    mkApp (mkConstruct (ind, 1),
+	   Array.append (rel_appvect 1 params)
+	     (Array.of_list (List.map (fun p -> mkProj (p, mkRel 1)) projs)))
+
+let build_inductive env p ctx env_ar params kn isrecord isfinite inds nmr recargs =
   let ntypes = Array.length inds in
   (* Compute the set of used section variables *)
   let hyps =  used_section_variables env inds in
@@ -677,6 +705,18 @@ let build_inductive env p ctx env_ar params isrecord isfinite inds nmr recargs =
 	mind_reloc_tbl = rtbl;
       } in
   let packets = Array.map2 build_one_packet inds recargs in
+  let isrecord = 
+    let pkt = packets.(0) in
+      if isrecord (* || (Array.length pkt.mind_consnames = 1 &&  *)
+        (* inductive_sort_family pkt <> InProp) *) then
+	let ctx, _ = decompose_prod_assum pkt.mind_nf_lc.(0) in
+	try 
+	  let exp = compute_expansion (kn, 0) params 
+	    (List.firstn pkt.mind_consnrealdecls.(0) ctx) 
+	  in Some exp
+	with UndefinableExpansion -> None
+      else None
+  in
     (* Build the mutual inductive *)
     { mind_record = isrecord;
       mind_ntypes = ntypes;
@@ -705,5 +745,5 @@ let check_inductive env kn mie =
   (* Build the inductive packets *)
     build_inductive env mie.mind_entry_polymorphic 
       mie.mind_entry_universes
-      env_ar params mie.mind_entry_record mie.mind_entry_finite
+      env_ar params kn mie.mind_entry_record mie.mind_entry_finite
       inds nmr recargs

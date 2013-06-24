@@ -446,8 +446,8 @@ Qed.
 Instance SubsetSetoid : PreOrder Subset. (* reflexive + transitive *)
 Proof. firstorder. Qed.
 
-Definition Subset_refl := @PreOrder_Reflexive _ _ SubsetSetoid.
-Definition Subset_trans := @PreOrder_Transitive _ _ SubsetSetoid.
+Definition Subset_refl := @PreOrder_Reflexive SubsetSetoid.
+Definition Subset_trans := @PreOrder_Transitive SubsetSetoid.
 
 Instance In_s_m : Morphisms.Proper (E.eq ==> Subset ++> impl) In | 1.
 Proof.

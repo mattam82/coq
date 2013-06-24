@@ -101,9 +101,9 @@ Proof. split; induction 1; auto. Qed.
 (** Results concerning lists modulo [eqA] *)
 
 Hypothesis eqA_equiv : Equivalence eqA.
-Definition eqarefl := (@Equivalence_Reflexive _ _ eqA_equiv).
-Definition eqatrans := (@Equivalence_Transitive _ _ eqA_equiv).
-Definition eqasym := (@Equivalence_Symmetric _ _ eqA_equiv).
+Definition eqarefl := (@Equivalence_Reflexive eqA_equiv).
+Definition eqatrans := (@Equivalence_Transitive eqA_equiv).
+Definition eqasym := (@Equivalence_Symmetric eqA_equiv).
 
 Hint Resolve eqarefl eqatrans.
 Hint Immediate eqasym.
@@ -635,7 +635,7 @@ Variable ltA : A -> A -> Prop.
 Hypothesis ltA_strorder : StrictOrder ltA.
 Hypothesis ltA_compat : Proper (eqA==>eqA==>iff) ltA.
 
-Let sotrans := (@StrictOrder_Transitive _ _ ltA_strorder).
+Let sotrans := (@StrictOrder_Transitive ltA_strorder).
 
 Hint Resolve sotrans.
 

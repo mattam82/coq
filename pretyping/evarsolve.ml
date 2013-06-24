@@ -1007,7 +1007,6 @@ let project_evar_on_evar g env evd aliases k2 (evk1,argsv1 as ev1) (evk2,argsv2 
   else
     raise (CannotProject filter1)
 
-
 exception IllTypedInstance of env * types * types
 
 let check_evar_instance evd evk1 body conv_algo =
