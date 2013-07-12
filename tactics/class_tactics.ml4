@@ -266,7 +266,7 @@ let make_resolve_hyp env sigma st flags only_classes pri (id, _, cty) =
         (hints @ List.map_filter
 	 (fun f -> try Some (f (mkVar id, cty, Univ.ContextSet.empty))
 	           with Failure _ | UserError _ -> None) 
-	 [make_exact_entry ~name sigma pri false; 
+	 [make_exact_entry ~name env sigma pri false; 
 	  make_apply_entry ~name env sigma flags pri false])
     else []
 
