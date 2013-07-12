@@ -412,8 +412,16 @@ let rec detype (isgoal:bool) avoid env t =
     | Lambda (na,ty,c) -> detype_binder isgoal BLambda avoid env na ty c
     | LetIn (na,b,_,c) -> detype_binder isgoal BLetIn avoid env na b c
     | App (f,args) ->
-	GApp (dl,detype isgoal avoid env f,
-              Array.map_to_list (detype isgoal avoid env) args)
+      let mkapp f' args' = 
+ 	match f' with
+ 	| GApp (dl',f',args'') -> 
+ 	  GApp (dl,f',args''@args')
+ 	| _ -> GApp (dl,f',args')
+      in
+ 	mkapp (detype isgoal avoid env f)
+ 	  (Array.map_to_list (detype isgoal avoid env) args)
+        (* GApp (dl,detype isgoal avoid env f, *)
+        (*       Array.map_to_list (detype isgoal avoid env) args) *)
     | Const (sp,u) -> GRef (dl, ConstRef sp, option_of_instance u)
     | Proj (p,c) ->
         GApp (dl,GRef(dl,ConstRef p,None),[detype isgoal avoid env c])

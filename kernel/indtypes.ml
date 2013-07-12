@@ -636,7 +636,7 @@ exception UndefinableExpansion
     build an expansion function.
     The term built is expecting to be substituted first by 
     a substitution of the form [params, x : ind params] *)
-let compute_expansion (kn, _ as ind) params ctx =
+let compute_expansion ((kn, _ as ind), u) params ctx =
   let mp, dp, l = repr_mind kn in
   let make_proj id = Constant.make1 (KerName.make mp dp (Label.of_id id)) in
   let rec projections acc (na, b, t) =
@@ -648,7 +648,7 @@ let compute_expansion (kn, _ as ind) params ctx =
       | Anonymous -> raise UndefinableExpansion
   in
   let projs = List.fold_left projections [] ctx in
-    mkApp (mkConstruct (ind, 1),
+    mkApp (mkConstructU ((ind, 1),u),
 	   Array.append (rel_appvect 1 params)
 	     (Array.of_list (List.map (fun p -> mkProj (p, mkRel 1)) projs)))
 
@@ -709,10 +709,11 @@ let build_inductive env p ctx env_ar params kn isrecord isfinite inds nmr recarg
     let pkt = packets.(0) in
       if isrecord (* || (Array.length pkt.mind_consnames = 1 &&  *)
         (* inductive_sort_family pkt <> InProp) *) then
-	let ctx, _ = decompose_prod_assum pkt.mind_nf_lc.(0) in
+	let rctx, _ = decompose_prod_assum pkt.mind_nf_lc.(0) in
+	let u = if p then Univ.UContext.instance ctx else Univ.Instance.empty in
 	try 
-	  let exp = compute_expansion (kn, 0) params 
-	    (List.firstn pkt.mind_consnrealdecls.(0) ctx) 
+	  let exp = compute_expansion ((kn, 0), u) params 
+	    (List.firstn pkt.mind_consnrealdecls.(0) rctx) 
 	  in Some exp
 	with UndefinableExpansion -> None
       else None

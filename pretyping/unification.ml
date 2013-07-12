@@ -386,7 +386,7 @@ let constr_cmp pb sigma t u =
   in 
     if b then 
       try Evd.add_universe_constraints sigma cstrs, b
-      with Evd.UniversesDiffer -> sigma, false
+      with Evd.UniversesDiffer | Univ.UniverseInconsistency _ -> sigma, false
     else sigma, b
     
 let do_reduce ts (env, nb) sigma c =

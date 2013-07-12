@@ -3706,16 +3706,17 @@ let admit_as_an_axiom gl =
   let na = next_global_ident_away name (pf_ids_of_hyps gl) in
   let concl = it_mkNamedProd_or_LetIn (pf_concl gl) sign in
   if occur_existential concl then error"\"admit\" cannot handle existentials.";
+  let evd, nf = nf_evars_and_universes (project gl) in
+  let ctx = Evd.universe_context evd in
   let entry = 
-    let evd, nf = nf_evars_and_universes (project gl) in
-    let ctx = Evd.universe_context evd in
       (Pfedit.get_used_variables(),poly,(nf concl,ctx),None) 
   in
   let cd = Entries.ParameterEntry entry in
   let decl = (cd, IsAssumption Logical) in
   (** ppedrot: seems legit to have admitted subproofs as local*)
   let con = Declare.declare_constant ~internal:Declare.KernelSilent ~local:true na decl in
-  let evd, axiom = Evd.fresh_global (pf_env gl) (project gl) (ConstRef con) in
+  let evd, axiom = evd, (mkConstU (con, Univ.UContext.instance ctx)) in
+  (* let evd, axiom = Evd.fresh_global (pf_env gl) (project gl) (ConstRef con) in *)
   let gl = tclTHEN (tclEVARS evd)
     (exact_check
        (applist (axiom,

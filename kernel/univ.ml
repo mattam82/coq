@@ -549,8 +549,10 @@ struct
 
     let addn k (u,n as x) = 
       if k = 0 then x 
+      else if Level.is_prop u then
+	hcons (Level.set,n+k)
       else hcons (u,n+k)
-
+	
     let super (u,n as x) (v,n' as y) =
       let cmp = Level.compare u v in
 	if Int.equal cmp 0 then 
@@ -575,6 +577,8 @@ struct
     let map f (v, n as x) = 
       let v' = f v in 
 	if v' == v then x
+	else if Level.is_prop v' && n <> 0 then
+	  hcons (Level.set, n)
 	else hcons (v', n)
 
   end

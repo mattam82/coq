@@ -481,10 +481,12 @@ let explicitize loc inctx impl (cf,f) args =
     | args, [] -> List.map (fun a -> (a,None)) args (*In case of polymorphism*)
     | [], _ -> [] in
   match is_projection (List.length args) cf with
-    | Some i as ip ->
+    | Some i ->
 	if not (List.is_empty impl) && is_status_implicit (List.nth impl (i-1)) then
-	  let f',us = match f with CRef (f,us) -> f,us | _ -> assert false in
-	  CAppExpl (loc,(ip,f',us),args)
+ 	  let args = exprec 1 (args,impl) in
+ 	    CApp (loc, (None, f), args)
+	  (* let f',us = match f with CRef (f,us) -> f,us | _ -> assert false in *)
+	  (* CAppExpl (loc,(ip,f',us),args) *)
 	else
 	  let (args1,args2) = List.chop i args in
 	  let (impl1,impl2) = if List.is_empty impl then [],[] else List.chop i impl in
