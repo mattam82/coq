@@ -844,7 +844,7 @@ let eta_expand_ind_stack env lft (ind,u) m s (lft, h) =
   let mib = lookup_mind (fst ind) env in
     match mib.Declarations.mind_record with
     | None -> raise Not_found
-    | Some exp -> 
+    | Some (exp,_) -> 
       let pars = mib.Declarations.mind_nparams in
       let h' = fapp_stack h in
       let (depth, args, _) = strip_update_shift_app m s in
@@ -852,6 +852,22 @@ let eta_expand_ind_stack env lft (ind,u) m s (lft, h) =
       let subs = subs_cons (Array.append paramargs [|h'|], subs_id 0) in
       let fexp = mk_clos subs exp in
 	(lft, (fexp, []))
+
+let eta_expand_ind_stacks env ind m s h =
+  let mib = lookup_mind (fst ind) env in
+    match mib.Declarations.mind_record with
+    | None -> raise Not_found
+    | Some (exp,projs) -> 
+      let pars = mib.Declarations.mind_nparams in
+      let h' = fapp_stack h in
+      let (depth, args, _) = strip_update_shift_app m s in
+      let s' = drop_parameters depth pars args in
+      (* Construct, arg1...argn :: s ~= (t, []) ->
+	 arg1..argn :: s ~= (proj1 t...projn t) s
+	*)
+      let hstack = Array.map (fun p -> { norm = Red;
+					 term = FProj (p, h') }) projs in
+	s', [Zapp hstack]
 
 let rec project_nth_arg n argstk =
   match argstk with

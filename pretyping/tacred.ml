@@ -779,11 +779,15 @@ and whd_simpl_stack env sigma =
 	  with Redelimination -> s')
 
       | Proj (p, c) ->
-         (try match reduce_projection env sigma p (whd_construct_stack env sigma c) stack with
-	 | Reduced s' -> redrec (applist s')
-	 | NotReducible -> s'
+        (try 
+ 	   (match recargs (EvalConst p) with
+ 	   | Some (_, n) when n > 1 -> (* simpl never *) s'
+ 	   | _ ->
+	     match reduce_projection env sigma p (whd_construct_stack env sigma c) stack with
+	     | Reduced s' -> redrec (applist s')
+	     | NotReducible -> s')
 	 with Redelimination -> s')
-
+	  
       | _ -> 
         match match_eval_ref env x with
 	| Some (ref, u) ->

@@ -390,9 +390,10 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 
     | Proj (p,c) ->
       let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
-      let j = Typeops.judge_of_projection env p {uj_val=c';uj_type=cty} in
-	(acc',j.uj_type,sigma,Term.mkProj (p, c'))
-	
+      let c = mkProj (p, c') in
+      let ty = get_type_of env sigma c in
+	(acc',ty,sigma,c)
+
     | Case (ci,p,c,lf) ->
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
 	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
@@ -454,8 +455,9 @@ and mk_hdgoals sigma goal goalacc trm =
 
     | Proj (p,c) ->
          let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
-         let j = Typeops.judge_of_projection env p {uj_val=c';uj_type=cty} in
-	   (acc',j.uj_type,sigma,Term.mkProj (p, c'))
+	 let c = mkProj (p, c') in
+         let ty = get_type_of env sigma c in
+	   (acc',ty,sigma,c)
 
     | _ ->
 	if !check && occur_meta trm then

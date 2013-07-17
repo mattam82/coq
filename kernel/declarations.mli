@@ -127,9 +127,9 @@ type mutual_inductive_body = {
 
     mind_packets : one_inductive_body array;  (** The component of the mutual inductive block *)
 
-    mind_record : constr option;  
+    mind_record : (constr * constant array) option;  
     (** Whether the inductive type has been declared as a record, 
-	In that case we get its canonical eta-expansion. *)
+	In that case we get its canonical eta-expansion and list of projections. *)
 
     mind_finite : bool;  (** Whether the type is inductive or coinductive *)
 

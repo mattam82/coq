@@ -188,8 +188,10 @@ val whd_stack :
   clos_infos -> fconstr -> stack -> fconstr * stack
 
 val eta_expand_ind_stack : env -> lift -> pinductive -> fconstr -> stack -> 
-  (lift * (fconstr * stack)) -> 
-  lift * (fconstr * stack)
+  (lift * (fconstr * stack)) -> lift * (fconstr * stack)
+ 
+val eta_expand_ind_stacks : env -> inductive -> fconstr -> stack -> 
+   (fconstr * stack) -> stack * stack
 
 (** Conversion auxiliary functions to do step by step normalisation *)
 

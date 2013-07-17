@@ -648,9 +648,12 @@ let compute_expansion ((kn, _ as ind), u) params ctx =
       | Anonymous -> raise UndefinableExpansion
   in
   let projs = List.fold_left projections [] ctx in
+  let projarr = Array.of_list projs in
+  let exp = 
     mkApp (mkConstructU ((ind, 1),u),
 	   Array.append (rel_appvect 1 params)
-	     (Array.of_list (List.map (fun p -> mkProj (p, mkRel 1)) projs)))
+ 	     (Array.map (fun p -> mkProj (p, mkRel 1)) projarr))
+   in exp, projarr
 
 let build_inductive env p ctx env_ar params kn isrecord isfinite inds nmr recargs =
   let ntypes = Array.length inds in

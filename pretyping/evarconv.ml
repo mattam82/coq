@@ -672,13 +672,15 @@ and eta_constructor ts env evd ((ind, i), u) l1 csts1 (c, csts2) =
   let mib = lookup_mind (fst ind) env in
     match mib.Declarations.mind_record with
     | None -> UnifFailure (evd,NotSameHead)
-    | Some exp -> 
+    | Some (exp,projs) -> 
       let pars = mib.Declarations.mind_nparams in
 	try 
-	  let params = nfirsts_app_of_stack pars l1 in
-	  let expansion = substl (zip c :: List.rev params) exp in
-	    (* Todo : optimize by not rechecking the parameters for conversion ! *)
-	    evar_conv_x ts env evd CONV (zip (mkConstruct (ind,i),l1)) expansion
+	  let l1' = stack_tail pars l1 in
+	  let sk2 = 
+	    let term = zip c in 
+	      List.map (fun p -> mkProj (p, term)) (Array.to_list projs)
+	  in
+	    exact_ise_stack2 env evd (evar_conv_x ts) l1' [Zapp sk2]
 	with Failure _ -> UnifFailure(evd,NotSameHead)
 
 (* We assume here |l1| <= |l2| *)

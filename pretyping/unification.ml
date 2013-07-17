@@ -498,6 +498,8 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 	    unirec_rec (push (na,t2) curenvnb) CONV true wt substn
 	      (mkApp (lift 1 cM,[|mkRel 1|])) c2
 
+	(* TODO: eta for records *)
+
 	| Case (_,p1,c1,cl1), Case (_,p2,c2,cl2) ->
             (try 
 	       Array.fold_left2 (unirec_rec curenvnb CONV true wt)
