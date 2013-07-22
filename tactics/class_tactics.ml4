@@ -495,7 +495,8 @@ let run_on_evars ?(only_classes=true) ?(st=full_transparent_state) p evm hints t
       let res = run_list_tac tac p goals (make_autogoals ~only_classes ~st hints goals evm') in
 	match get_result res with
 	| None -> raise Not_found
-	| Some (evm', fk) -> Some (evars_reset_evd ~with_conv_pbs:true evm' evm, fk)
+	| Some (evm', fk) -> 
+	  Some (evars_reset_evd ~with_conv_pbs:true ~with_univs:false evm' evm, fk)
 	    
 let eauto_tac hints = 
   then_tac normevars_tac (or_tac (hints_tac hints) intro_tac)
@@ -582,9 +583,10 @@ let split_evars evm =
 
 let evars_in_comp comp evm =
   try
-    evars_reset_evd 
-      (Int.Set.fold (fun ev acc -> Evd.add acc ev (Evd.find_undefined evm ev))
-	 comp Evd.empty) evm
+    Evd.fold_undefined (fun ev evi acc ->
+      if Int.Set.mem ev comp then acc
+      else Evd.remove ev acc)
+      evm evm
   with Not_found -> assert false
 
 let is_inference_forced p evd ev =

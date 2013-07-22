@@ -181,7 +181,7 @@ val instantiate_evar : named_context -> constr -> constr list -> constr
 val subst_evar_defs_light : substitution -> evar_map -> evar_map
 
 (** spiwack: this function seems to somewhat break the abstraction. *)
-val evars_reset_evd  : ?with_conv_pbs:bool -> evar_map ->  evar_map -> evar_map
+val evars_reset_evd  : ?with_conv_pbs:bool -> ?with_univs:bool -> evar_map ->  evar_map -> evar_map
 
 
 val undefined_evars : evar_map -> evar_map

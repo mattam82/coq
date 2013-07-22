@@ -252,8 +252,9 @@ let union_evar_universe_context ctx ctx' =
      Univ.LMap.subst_union ctx.uctx_univ_variables ctx'.uctx_univ_variables;
     uctx_univ_algebraic = 
      Univ.LSet.union ctx.uctx_univ_algebraic ctx'.uctx_univ_algebraic;
-    uctx_universes = Univ.merge_constraints (Univ.ContextSet.constraints ctx'.uctx_local)
-      ctx.uctx_universes }
+    uctx_universes = 
+      let cstrsr = Univ.ContextSet.constraints ctx'.uctx_local in
+	Univ.merge_constraints cstrsr ctx.uctx_universes}
 
 type 'a in_evar_universe_context = 'a * evar_universe_context
 
@@ -602,7 +603,8 @@ let cmap f evd =
 let create_evar_defs sigma = { sigma with
   conv_pbs=[]; last_mods=ExistentialSet.empty; metas=Metamap.empty }
 (* spiwack: tentatively deprecated *)
-let create_goal_evar_defs sigma = { sigma with
+let create_goal_evar_defs sigma = 
+  { sigma with
    (* conv_pbs=[]; last_mods=ExistentialSet.empty; metas=Metamap.empty } *)
   metas=Metamap.empty } 
 let empty =  {
@@ -621,9 +623,12 @@ let has_undefined evd =
 let merge_universe_context ({evars = (evd, uctx)} as d) uctx' =
   {d with evars = (evd, union_evar_universe_context uctx uctx')}
 
-let evars_reset_evd ?(with_conv_pbs=false) evd d = 
-  {d with evars = (fst evd.evars, union_evar_universe_context (snd evd.evars) (snd d.evars));
-  conv_pbs = if with_conv_pbs then evd.conv_pbs else d.conv_pbs }
+let evars_reset_evd ?(with_conv_pbs=false) ?(with_univs=true) evd d = 
+  {d with evars = 
+      (if not with_univs then evd.evars 
+       else (fst evd.evars, 
+	     union_evar_universe_context (snd evd.evars) (snd d.evars)));
+    conv_pbs = if with_conv_pbs then evd.conv_pbs else d.conv_pbs }
 let add_conv_pb pb d = {d with conv_pbs = pb::d.conv_pbs}
 let evar_source evk d = (EvarMap.find d.evars evk).evar_source
 
