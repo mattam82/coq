@@ -198,8 +198,12 @@ let explain_unification_error env sigma p1 p2 = function
           str "cannot unify" ++
           pr_lconstr_env env t ++ spc () ++ str "and" ++ spc () ++
           pr_lconstr_env env u ++ str ")"
-    | UnifUnivInconsistency ->
-        spc () ++ str "(Universe inconsistency)"
+    | UnifUnivInconsistency p ->
+        if !Constrextern.print_universes then
+	  spc () ++ str "(Universe inconsistency: " ++ 
+	    Univ.explain_universe_inconsistency p ++ str")"
+	else
+          spc () ++ str "(Universe inconsistency)"
 
 let explain_actual_type env sigma j t reason =
   let env = make_all_name_different env in

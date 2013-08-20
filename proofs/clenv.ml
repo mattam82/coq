@@ -279,14 +279,14 @@ let clenv_dependent ce = clenv_dependent_gen false ce
 
 (******************************************************************)
 
-let clenv_unify ?(flags=default_unify_flags) cv_pb t1 t2 clenv =
+let clenv_unify ?(flags=default_unify_flags ()) cv_pb t1 t2 clenv =
   { clenv with
       evd = w_unify ~flags clenv.env clenv.evd cv_pb t1 t2 }
 
-let clenv_unify_meta_types ?(flags=default_unify_flags) clenv =
+let clenv_unify_meta_types ?(flags=default_unify_flags ()) clenv =
   { clenv with evd = w_unify_meta_types ~flags:flags clenv.env clenv.evd }
 
-let clenv_unique_resolver ?(flags=default_unify_flags) clenv gl =
+let clenv_unique_resolver ?(flags=default_unify_flags ()) clenv gl =
   let concl = Goal.V82.concl clenv.evd (sig_it gl) in
   if isMeta (fst (whd_nored_stack clenv.evd clenv.templtyp.rebus)) then
     clenv_unify CUMUL ~flags (clenv_type clenv) concl
@@ -371,11 +371,11 @@ let connect_clenv gls clenv =
    In particular, it assumes that [env'] and [sigma'] extend [env] and [sigma].
 *)
 
-let fchain_flags =
-  { default_unify_flags with
+let fchain_flags () =
+  { (default_unify_flags ()) with
     allow_K_in_toplevel_higher_order_unification = true }
 
-let clenv_fchain ?(flags=fchain_flags) mv clenv nextclenv =
+let clenv_fchain ?(flags=fchain_flags ()) mv clenv nextclenv =
   (* Add the metavars of [nextclenv] to [clenv], with their name-environment *)
   let clenv' =
     { templval = clenv.templval;

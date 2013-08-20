@@ -27,11 +27,11 @@ type unify_flags = {
   allow_K_in_toplevel_higher_order_unification : bool
 }
 
-val default_unify_flags : unify_flags
-val default_no_delta_unify_flags : unify_flags
+val default_unify_flags : unit -> unify_flags
+val default_no_delta_unify_flags : unit -> unify_flags
 
-val elim_flags : unify_flags
-val elim_no_delta_flags : unify_flags
+val elim_flags : unit -> unify_flags
+val elim_no_delta_flags : unit -> unify_flags
 
 (** The "unique" unification fonction *)
 val w_unify :

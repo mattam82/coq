@@ -809,7 +809,7 @@ let index_of_ind_arg t =
       | None -> error "Could not find inductive argument of elimination scheme."
   in aux None 0 t
 
-let elimination_clause_scheme with_evars ?(flags=elim_flags) i elimclause indclause gl =
+let elimination_clause_scheme with_evars ?(flags=elim_flags ()) i elimclause indclause gl =
   let indmv =
     (match kind_of_term (nth_arg i elimclause.templval.rebus) with
        | Meta mv -> mv
@@ -927,13 +927,13 @@ let simplest_elim c = default_elim false (c,NoBindings)
    (e.g. it could replace id:A->B->C by id:C, knowing A/\B)
 *)
 
-let clenv_fchain_in id ?(flags=elim_flags) mv elimclause hypclause =
+let clenv_fchain_in id ?(flags=elim_flags ()) mv elimclause hypclause =
   try clenv_fchain ~flags mv elimclause hypclause
   with PretypeError (env,evd,NoOccurrenceFound (op,_)) ->
     (* Set the hypothesis name in the message *)
     raise (PretypeError (env,evd,NoOccurrenceFound (op,Some id)))
 
-let elimination_in_clause_scheme with_evars ?(flags=elim_flags) id i elimclause indclause gl =
+let elimination_in_clause_scheme with_evars ?(flags=elim_flags ()) id i elimclause indclause gl =
   let indmv = destMeta (nth_arg i elimclause.templval.rebus) in
   let hypmv =
     try match List.remove indmv (clenv_independent elimclause) with
@@ -1029,7 +1029,7 @@ let descend_in_conjunctions tac exit c gl =
 
 let general_apply with_delta with_destruct with_evars (loc,(c,lbind)) gl0 =
   let flags =
-    if with_delta then default_unify_flags else default_no_delta_unify_flags in
+    if with_delta then default_unify_flags () else default_no_delta_unify_flags () in
   (* The actual type of the theorem. It will be matched against the
   goal. If this fails, then the head constant will be unfolded step by
   step. *)
@@ -1123,7 +1123,7 @@ let apply_in_once_main flags innerclause (d,lbind) gl =
 
 let apply_in_once sidecond_first with_delta with_destruct with_evars id
   (loc,(d,lbind)) gl0 =
-  let flags = if with_delta then elim_flags else elim_no_delta_flags in
+  let flags = if with_delta then elim_flags () else elim_no_delta_flags () in
   let t' = pf_get_hyp_typ gl0 id in
   let innerclause = mk_clenv_from_n gl0 (Some 0) (mkVar id,t') in
   let rec aux with_destruct c gl =
@@ -1244,7 +1244,7 @@ let specialize mopt (c,lbind) g =
 	tclEVARS evd, nf_evar evd c
     else
       let clause = make_clenv_binding g (c,pf_type_of g c) lbind in
-      let flags = { default_unify_flags with resolve_evars = true } in
+      let flags = { (default_unify_flags ()) with resolve_evars = true } in
       let clause = clenv_unify_meta_types ~flags clause in
       let (thd,tstack) = whd_nored_stack clause.evd (clenv_value clause) in
       let nargs = List.length tstack in
@@ -3070,7 +3070,7 @@ let induction_tac_felim with_evars indvars nparams elim gl =
   (* elimclause' is built from elimclause by instanciating all args and params. *)
   let elimclause' = recolle_clenv nparams indvars elimclause gl in
   (* one last resolution (useless?) *)
-  let resolved = clenv_unique_resolver ~flags:elim_flags elimclause' gl in
+  let resolved = clenv_unique_resolver ~flags:(elim_flags ()) elimclause' gl in
   clenv_refine with_evars resolved gl
 
 (* Apply induction "in place" replacing the hypothesis on which
@@ -3404,9 +3404,9 @@ let elim_scheme_type elim t gl =
     | Meta mv ->
         let clause' =
 	  (* t is inductive, then CUMUL or CONV is irrelevant *)
-	  clenv_unify ~flags:elim_flags Reduction.CUMUL t
+	  clenv_unify ~flags:(elim_flags ()) Reduction.CUMUL t
             (clenv_meta_type clause mv) clause in
-	res_pf clause' ~flags:elim_flags gl
+	res_pf clause' ~flags:(elim_flags ()) gl
     | _ -> anomaly (Pp.str "elim_scheme_type")
 
 let elim_type t gl =
@@ -3729,7 +3729,7 @@ let admit_as_an_axiom gl =
 let unify ?(state=full_transparent_state) x y gl =
   try
     let flags =
-      {default_unify_flags with
+      {(default_unify_flags ()) with
        modulo_delta = state;
        modulo_delta_types = state;
        modulo_delta_in_merge = Some state;

@@ -350,15 +350,20 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
   let mk_goal hyps concl =
     Goal.V82.mk_goal sigma hyps concl (Goal.V82.extra sigma goal)
   in
-  match kind_of_term trm with
-    | Meta _ ->
+    if (not !check) && not (occur_meta trm) then
+      let t'ty = Retyping.get_type_of env sigma trm in
+      let sigma = check_conv_leq_goal env sigma trm t'ty conclty in
+        (goalacc,t'ty,sigma,trm)
+    else
+      match kind_of_term trm with
+      | Meta _ ->
 	let conclty = nf_betaiota sigma conclty in
 	  if !check && occur_meta conclty then
 	    raise (RefinerError (MetaInType conclty));
 	  let (gl,ev,sigma) = mk_goal hyps conclty in
 	  gl::goalacc, conclty, sigma, ev
 
-    | Cast (t,k, ty) ->
+      | Cast (t,k, ty) ->
 	check_typability env sigma ty;
         let sigma = check_conv_leq_goal env sigma trm ty conclty in
 	let res = mk_refgoals sigma goal goalacc ty t in
@@ -371,7 +376,7 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	  let (gls,cty,sigma,trm) = res in
 	  (gls,cty,sigma,mkCast(trm,k,ty))
 
-    | App (f,l) ->
+      | App (f,l) ->
 	let (acc',hdty,sigma,applicand) =
 	  match kind_of_term f with
 	    | Ind _ | Const _
@@ -388,13 +393,13 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
         (acc'',conclty',sigma, Term.mkApp (applicand, Array.of_list args))
 
-    | Proj (p,c) ->
-      let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
-      let c = mkProj (p, c') in
-      let ty = get_type_of env sigma c in
-	(acc',ty,sigma,c)
+      | Proj (p,c) ->
+	let (acc',cty,sigma,c') = mk_hdgoals sigma goal goalacc c in
+	let c = mkProj (p, c') in
+	let ty = get_type_of env sigma c in
+	  (acc',ty,sigma,c)
 
-    | Case (ci,p,c,lf) ->
+      | Case (ci,p,c,lf) ->
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
 	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
 	let (acc'',sigma, rbranches) =
@@ -403,15 +408,14 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	       let (r,_,s,b') = mk_refgoals sigma goal lacc ty fi in r,s,(b'::bacc))
             (acc',sigma,[]) lbrty lf
 	in
-	(acc'',conclty',sigma, Term.mkCase (ci,p',c',Array.of_list (List.rev rbranches)))
-
-    | _ ->
+	  (acc'',conclty',sigma, Term.mkCase (ci,p',c',Array.of_list (List.rev rbranches)))
+	    
+      | _ ->
 	if occur_meta trm then
 	  anomaly (Pp.str "refiner called with a meta in non app/case subterm");
-
-      	let t'ty = goal_type_of env sigma trm in
+	let t'ty = goal_type_of env sigma trm in
 	let sigma = check_conv_leq_goal env sigma trm t'ty conclty in
-        (goalacc,t'ty,sigma, trm)
+          (goalacc,t'ty,sigma, trm)
 
 (* Same as mkREFGOALS but without knowing the type of the term. Therefore,
  * Metas should be casted. *)

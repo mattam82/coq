@@ -841,9 +841,6 @@ let is_type0_univ = Universe.is_type0
 
 let is_univ_variable l = Universe.level l <> None
 
-let initial_universes = LMap.empty
-let is_initial_universes = LMap.is_empty
-
 (* Every Level.t has a unique canonical arc representative *)
 
 (* repr : universes -> Level.t -> canonical_arc *)
@@ -1195,8 +1192,9 @@ let merge_disc g arc1 arc2 =
 (* Universe inconsistency: error raised when trying to enforce a relation
    that would create a cycle in the graph of universes. *)
 
-exception UniverseInconsistency of
-  constraint_type * universe * universe * explanation
+type univ_inconsistency = constraint_type * universe * universe * explanation
+
+exception UniverseInconsistency of univ_inconsistency
 
 let error_inconsistency o u v (p:explanation) =
   raise (UniverseInconsistency (o,make u,make v,p))
@@ -1242,6 +1240,10 @@ let enforce_univ_lt u v g =
 	  NLE -> fst (setlt g arcu arcv)
 	| EQ -> anomaly (Pp.str "Univ.compare")
 	| (LE p|LT p) -> error_inconsistency Lt u v (List.rev p))
+
+let empty_universes = LMap.empty
+let initial_universes = enforce_univ_lt Level.prop Level.set LMap.empty
+let is_initial_universes g = LMap.equal (==) g initial_universes
 
 (* Constraints and sets of constraints. *)    
 
@@ -2119,3 +2121,19 @@ let hcons_universe_context_set (v, c) =
 let hcons_univlevel = Level.hcons
 let hcons_univ x = x (* Universe.hcons (Huniv.node x) *)
 let equal_universes = Universe.equal_universes
+
+let explain_universe_inconsistency (o,u,v,p) =
+    let pr_rel = function
+      | Eq -> str"=" | Lt -> str"<" | Le -> str"<=" 
+    in
+    let reason = match p with
+	[] -> mt()
+      | _::_ ->
+	str " because" ++ spc() ++ pr_uni v ++
+	  prlist (fun (r,v) -> spc() ++ pr_rel r ++ str" " ++ pr_uni v)
+	  p ++
+	  (if Universe.eq (snd (List.last p)) u then mt() else
+	      (spc() ++ str "= " ++ pr_uni u)) 
+    in
+      str "Cannot enforce" ++ spc() ++ pr_uni u ++ spc() ++
+        pr_rel o ++ spc() ++ pr_uni v ++ reason ++ str")"

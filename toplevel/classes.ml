@@ -349,7 +349,7 @@ let context l =
       error "Anonymous variables not allowed in contexts."
   in
   let uctx = Evd.get_universe_context_set !evars in
-  let fn status (id, _, t) =
+  let fn status (id, b, t) =
     let uctx = Universes.shrink_universe_context uctx (Universes.universes_of_constr t) in
     if Lib.is_modtype () && not (Lib.sections_are_opened ()) then
       let uctx = Univ.ContextSet.to_context uctx in	

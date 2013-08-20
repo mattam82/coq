@@ -258,7 +258,7 @@ let eq_puniverses evd pbty f (x,u) (y,v) =
   if f x y then 
     try 
       Success (Evd.set_eq_instances evd u v)
-    with _ -> UnifFailure (evd, UnifUnivInconsistency)
+    with Univ.UniverseInconsistency e -> UnifFailure (evd, UnifUnivInconsistency e)
   else UnifFailure (evd, NotSameHead)
     
 let rec evar_conv_x ts env evd pbty term1 term2 =
@@ -429,7 +429,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	      ise_and i [(fun i -> 
 		try Success (Evd.add_universe_constraints i univs)
 		with UniversesDiffer -> UnifFailure (i,NotSameHead)
-		| Univ.UniverseInconsistency _ -> UnifFailure (i, UnifUnivInconsistency));
+		| Univ.UniverseInconsistency p -> UnifFailure (i, UnifUnivInconsistency p));
 			 (fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk1 sk2)]
 	    else UnifFailure (i,NotSameHead)
 	and f2 i =
@@ -586,8 +586,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 		 then Evd.set_eq_sort evd s1 s2
 		 else Evd.set_leq_sort evd s1 s2
 	       in Success evd'
-	     with Univ.UniverseInconsistency _ ->
-               UnifFailure (evd,UnifUnivInconsistency)
+	     with Univ.UniverseInconsistency p ->
+               UnifFailure (evd,UnifUnivInconsistency p)
 	     | e when Errors.noncritical e -> UnifFailure (evd,NotSameHead))
 
 	| Prod (n,c1,c'1), Prod (_,c2,c'2) when app_empty ->
@@ -1002,22 +1002,22 @@ let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
 
 exception UnableToUnify of evar_map * unification_error
 
-let the_conv_x ?(ts=full_transparent_state) env t1 t2 evd =
+let the_conv_x ?(ts=Conv_oracle.get_transp_state ()) env t1 t2 evd =
   match evar_conv_x ts env evd CONV  t1 t2 with
   | Success evd' -> evd'
   | UnifFailure (evd',e) -> raise (UnableToUnify (evd',e))
 
-let the_conv_x_leq ?(ts=full_transparent_state) env t1 t2 evd =
+let the_conv_x_leq ?(ts=Conv_oracle.get_transp_state ()) env t1 t2 evd =
   match evar_conv_x ts env evd CUMUL t1 t2 with
   | Success evd' -> evd'
   | UnifFailure (evd',e) -> raise (UnableToUnify (evd',e))
 
-let e_conv ?(ts=full_transparent_state) env evdref t1 t2 =
+let e_conv ?(ts=Conv_oracle.get_transp_state ()) env evdref t1 t2 =
   match evar_conv_x ts env !evdref CONV t1 t2 with
   | Success evd' -> evdref := evd'; true
   | _ -> false
 
-let e_cumul ?(ts=full_transparent_state) env evdref t1 t2 =
+let e_cumul ?(ts=Conv_oracle.get_transp_state ()) env evdref t1 t2 =
   match evar_conv_x ts env !evdref CUMUL t1 t2 with
   | Success evd' -> evdref := evd'; true
   | _ -> false

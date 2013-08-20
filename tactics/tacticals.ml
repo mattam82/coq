@@ -285,7 +285,7 @@ let general_elim_then_using mk_elim
     match predicate with
        | None   -> elimclause'
        | Some p ->
-           clenv_unify ~flags:Unification.elim_flags
+           clenv_unify ~flags:(Unification.elim_flags ())
              Reduction.CONV (mkMeta pmv) p elimclause'
   in
   elim_res_pf_THEN_i elimclause' branchtacs gl

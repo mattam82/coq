@@ -166,3 +166,5 @@ val shrink_universe_context : universe_context_set -> universe_set -> universe_c
 val restrict_universe_context : universe_context_set -> universe_set -> universe_context_set
 
 val refresh_constraints : universes -> universe_context_set -> universe_context_set * universes
+
+val remove_trivial_constraints : universe_context_set -> universe_context_set

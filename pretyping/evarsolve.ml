@@ -1058,8 +1058,8 @@ let refresh_universes dir evd t =
   let evdref = ref evd in
   let modified = ref false in
   let rec refresh t = match kind_of_term t with
-    | Sort (Type u as s) when Univ.universe_level u = None ||
-			   Evd.is_sort_variable evd s = None ->
+    | Sort (Type u as s) (* when Univ.universe_level u = None || *)
+			 (*   Evd.is_sort_variable evd s = None *) ->
       (modified := true;
        (* s' will appear in the term, it can't be algebraic *)
        let s' = evd_comb0 (new_sort_variable Evd.univ_flexible) evdref in
@@ -1150,6 +1150,9 @@ exception NotInvertibleUsingOurAlgorithm of constr
 exception NotEnoughInformationToProgress of (Id.t * evar_projection) list
 exception OccurCheckIn of evar_map * constr
 exception MetaOccurInBodyInternal
+
+let fast_stats = ref 0
+let not_fast_stats = ref 0
 
 let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
   let aliases = make_alias_map env in
@@ -1284,9 +1287,32 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
             map_constr_with_full_binders (fun d (env,k) -> push_rel d env, k+1)
               imitate envk t in
 
+  let fast rhs = 
+    let filter_ctxt = evar_filtered_context evi in
+    let names = ref Idset.empty in
+    let rec is_id_subst ctxt s =
+       match ctxt, s with
+         | ((id, _, _) :: ctxt'), (c :: s') ->
+           names := Idset.add id !names;
+           isVarId id c && is_id_subst ctxt' s'
+         | [], [] -> true
+         | _ -> false in
+    is_id_subst filter_ctxt (Array.to_list argsv) &&
+    closed0 rhs &&
+    Idset.subset (collect_vars rhs) !names in
   let rhs = whd_beta evd rhs (* heuristic *) in
-  let body = imitate (env,0) rhs in
-  (!evdref,body)
+  let body = 
+    if fast rhs then 
+      begin
+        fast_stats := !fast_stats +1;
+        rhs
+      end
+    else
+      begin
+        not_fast_stats := !not_fast_stats +1;
+        imitate (env,0) rhs
+      end
+  in (!evdref,body)
 
 (* [define] tries to solve the problem "?ev[args] = rhs" when "?ev" is
  * an (uninstantiated) evar such that "hyps |- ?ev : typ". Otherwise said,

@@ -78,14 +78,14 @@ open Unification
 
 let dft = default_unify_flags
 
-let res_pf clenv ?(with_evars=false) ?(flags=dft) gls =
+let res_pf clenv ?(with_evars=false) ?(flags=dft ()) gls =
   clenv_refine with_evars (clenv_unique_resolver ~flags clenv gls) gls
 
 let elim_res_pf_THEN_i clenv tac gls =
-  let clenv' = (clenv_unique_resolver ~flags:elim_flags clenv gls) in
+  let clenv' = (clenv_unique_resolver ~flags:(elim_flags ()) clenv gls) in
   tclTHENLASTn (clenv_refine false clenv') (tac clenv') gls
 
-let e_res_pf clenv = res_pf clenv ~with_evars:true ~flags:dft
+let e_res_pf clenv = res_pf clenv ~with_evars:true ~flags:(dft ())
 
 
 (* [unifyTerms] et [unify] ne semble pas gérer les Meta, en

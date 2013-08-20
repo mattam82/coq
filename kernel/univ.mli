@@ -168,6 +168,9 @@ val check_eq : universe check_function
 val lax_check_eq : universe check_function (* same, without anomaly *)
 
 (** The empty graph of universes *)
+val empty_universes : universes
+
+(** The initial graph of universes: Prop < Set *)
 val initial_universes : universes
 val is_initial_universes : universes -> bool
 
@@ -369,9 +372,9 @@ val enforce_eq_instances_univs : bool -> universe_instance universe_constraint_f
   constraints...
 *)
 type explanation = (constraint_type * universe) list
+type univ_inconsistency = constraint_type * universe * universe * explanation
 
-exception UniverseInconsistency of
-    constraint_type * universe * universe * explanation
+exception UniverseInconsistency of univ_inconsistency
 
 val enforce_constraint : univ_constraint -> universes -> universes
 val merge_constraints : constraints -> universes -> universes
@@ -412,6 +415,7 @@ val pr_universe_context : universe_context -> Pp.std_ppcmds
 val pr_universe_context_set : universe_context_set -> Pp.std_ppcmds
 val pr_universe_level_subst : universe_level_subst -> Pp.std_ppcmds
 val pr_universe_subst : universe_subst -> Pp.std_ppcmds
+val explain_universe_inconsistency : univ_inconsistency -> Pp.std_ppcmds
 
 (** {6 Dumping to a file } *)
 

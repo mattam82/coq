@@ -585,7 +585,7 @@ let evars_in_comp comp evm =
   try
     Evd.fold_undefined (fun ev evi acc ->
       if Int.Set.mem ev comp then acc
-      else Evd.remove ev acc)
+      else Evd.remove acc ev)
       evm evm
   with Not_found -> assert false
 

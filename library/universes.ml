@@ -481,10 +481,15 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	     we instantiate it with its lower bound if it is a 
 	     different level, otherwise we keep it. *)
 	  if not (Level.eq l u) && not (LSet.mem l algs) then
-	    instantiate_with_lbound u lbound false false acc
-	  else acc, (true, false, lbound)
+	    (* if right = None then *)
+	      instantiate_with_lbound u lbound false false acc
+	    (* else instantiate_with_lbound u lbound false true acc *)
+	  else
+	    (* assert false: l can't be alg *)
+	    acc, (true, false, lbound)
 	| None -> 
 	  try 
+	    if right <> None then raise Not_found;
 	    (* Another universe represents the same lower bound, 
 	       we can share them with no harm. *)
 	    let can = find_inst insts lbound in
@@ -535,7 +540,7 @@ let normalize_context_set ctx us algs =
   let csts = 
     (* We first put constraints in a normal-form: all self-loops are collapsed
        to equalities. *)
-    let g = Univ.merge_constraints csts Univ.initial_universes in
+    let g = Univ.merge_constraints csts Univ.empty_universes in
       Univ.constraints_of_universes (Univ.normalize_universes g)
   in
   let noneqs =
@@ -648,3 +653,10 @@ let refresh_constraints univs (ctx, cstrs) =
       else (Univ.Constraint.add c cstrs', Univ.enforce_constraint c univs))
       cstrs (Univ.Constraint.empty, univs)
   in ((ctx, cstrs'), univs')
+
+let remove_trivial_constraints (ctx, cstrs) =
+  let cstrs' = 
+    Univ.Constraint.fold (fun c acc ->
+      if is_prop_leq c then Univ.Constraint.remove c acc
+      else acc) cstrs cstrs
+  in (ctx, cstrs')
