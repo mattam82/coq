@@ -101,7 +101,7 @@ module Level = struct
       else if i1 > i2 then 1
       else Names.DirPath.compare dp1 dp2)
 
-  let eq u v = compare u v = 0
+  let eq u v = u == v
   let leq u v = compare u v <= 0
 
   let to_string = function
@@ -185,7 +185,6 @@ module LList = struct
 
   let hcons = 
     Hashcons.simple_hcons Huniverse_level_list.generate Level.hcons
-  (* let hcons x = x *)
 
   let empty = hcons []
   let eq l l' = l == l' ||
@@ -484,9 +483,9 @@ struct
   struct
     type t = Level.t * int
     type _t = t
-
-    module Hunivlevelexpr =
-    Hashcons.Make(
+	
+    (* Hashing of expressions *)
+    module ExprHash = 
     struct
       type t = _t
       type u = Level.t -> Level.t
@@ -498,10 +497,28 @@ struct
         match l1,l2 with
 	| (b,n), (b',n') -> b == b' && n == n'
       let hash = Hashtbl.hash
-    end)
 
-    let hcons = Hashcons.simple_hcons Hunivlevelexpr.generate Level.hcons
-    (* let hcons x = x *)
+    end
+
+    module HExpr = 
+    struct 
+
+      include Hashcons.Make(ExprHash)
+
+      type data = t
+      type node = t
+
+      let make =
+	Hashcons.simple_hcons generate Level.hcons
+      external node : node -> data = "%identity"
+      let hash = ExprHash.hash
+      let uid = hash
+      let equal x y = x == y
+      let stats _ = ()
+      let init _ = ()
+    end
+
+    let hcons = HExpr.make
 
     let make l = hcons (l, 0)
 
@@ -509,7 +526,7 @@ struct
       if u == v then 0
       else 
 	let (x, n) = u and (x', n') = v in
-	  if Int.equal n n' then compare u v
+	  if Int.equal n n' then Level.compare x x'
 	  else n - n'
 
     let prop = make Level.prop
@@ -532,15 +549,15 @@ struct
       | (l, 0) -> Level.is_small l
       | _ -> false
 
-    let eq (u,n) (v,n') =
-      Int.equal n n' && Level.eq u v
+    (* let eq (u,n) (v,n') = *)
+    (*   Int.equal n n' && Level.eq u v *)
+    let eq x y = x == y
 
     let leq (u,n) (v,n') =
       let cmp = Level.compare u v in
 	if Int.equal cmp 0 then n <= n'
 	else if n <= n' then 
-	  (Level.is_prop u && Level.is_small v) ||
-	  (Level.is_set u && Level.is_set v)
+	  (Level.is_prop u && Level.is_small v)
 	else false
 
     let successor (u,n) =
@@ -583,20 +600,25 @@ struct
 
   end
 
-  module Hunivelt = Hashconsing.Hcons.Make(
-  struct
-    type t = Expr.t
-    let equal l1 l2 =
-      l1 == l2 || 
-      match l1,l2 with
-      | (b,n), (b',n') -> b == b' && n == n'
-    let hash = Hashtbl.hash
-  end)
+  module Hunivelt = struct
+    let node x = x
+    let make x = x
+  end
+
+  (* module Hunivelt = Hashconsing.Hcons.Make( *)
+  (* struct *)
+  (*   type t = Expr.t *)
+  (*   let equal l1 l2 = *)
+  (*     l1 == l2 ||  *)
+  (*     match l1,l2 with *)
+  (*     | (b,n), (b',n') -> b == b' && n == n' *)
+  (*   let hash = Hashtbl.hash *)
+  (* end) *)
     
   let compare_expr n m = Expr.compare (Hunivelt.node n) (Hunivelt.node m)
   let pr_expr n = Expr.pr (Hunivelt.node n)
 
-  module Huniv = Hashconsing.HList.Make(Hunivelt)
+  module Huniv = Hashconsing.HList.Make(Expr.HExpr)
   type t = Huniv.t
   open Huniv
     
@@ -714,28 +736,7 @@ struct
     List.fold_right
       (fun x acc -> cons (Hunivelt.make x) acc)
       l nil
-
-  let of_levels l = of_list (List.map (fun x -> Expr.make x) l)
-  let to_levels l = 
-    try Some (Huniv.fold (fun x acc -> 
-    match Hunivelt.node x with x,0 -> x :: acc | _ -> raise Not_found) l [])
-    with Not_found -> None
     
-  (* let unifies x y = *)
-  (*   match node x, node y with *)
-  (*   | [(x,n)], [(y,m)] ->  *)
-  (*     if Int.equal n m then Some ([(x,0)], [(y,0)]) else  *)
-  (*     if n < m then Some ([(x,0)], [(y,m-n)]) *)
-  (*     else Some ([(x,n-m)],[(y,0)]) *)
-  (*   | _, _ -> None *)
-
-  (* let diff x y =  *)
-  (*   let x',y' = List.fold_left (fun (ls,rs) l ->  *)
-  (*     let rs' = List.smartfilter (fun r -> not (Expr.eq l r)) rs in *)
-  (* 	if rs' == rs then (l::ls, rs') *)
-  (* 	else (ls,rs')) ([],y) x *)
-  (*   in x', y' *)
-
   let empty = nil
   let is_empty n =
     node n = Nil
@@ -757,45 +758,10 @@ end
 
 type universe = Universe.t
 
-module UList = struct
-  type t = Universe.t list
-  type _t = t
-  module Huniverse_list = 
-  Hashcons.Make(
-    struct
-      type t = _t
-      type u = universe -> universe
-      let hashcons huc s =
-	List.fold_right (fun x a -> huc x :: a) s []
-      let equal s s' = List.for_all2eq (==) s s'
-      let hash = Hashtbl.hash
-    end)
-
-  let hcons = 
-    Hashcons.simple_hcons Huniverse_list.generate (fun x -> x)
-  (* let hcons x = x *)
-
-  let empty = hcons []
-
-  let eq l l' = 
-    try List.for_all2 Universe.eq l l'
-    with Invalid_argument _ -> false
-
-  let pr =
-    prlist_with_sep spc Universe.pr
-
-  let of_llist l =
-    hcons (List.map (fun x -> Universe.make x) l)
-
-  let levels = 
-    List.fold_left (fun s x ->
-      LSet.union (Universe.levels x) s) LSet.empty
-end
-
 open Universe
 
-type universe_list = UList.t
-let pr_universe_list = UList.pr
+(* type universe_list = UList.t *)
+(* let pr_universe_list = UList.pr *)
 
 let pr_uni = Universe.pr
 let is_small_univ = Universe.is_small
@@ -1384,7 +1350,7 @@ module Instance = struct
   let empty = [||]
   let is_empty x = Int.equal (Array.length x) 0
 
-  let eq = CArray.for_all2 Level.eq
+  let eq t u = t == u || CArray.for_all2 Level.eq t u
 
   let of_array a = a
   let to_array a = a

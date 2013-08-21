@@ -34,24 +34,11 @@ end
 type universe_level = Level.t
 (** Alias name. *)
 
-module LList :
-sig
-  type t = Level.t list
-
-  val hcons : t -> t
-  val empty : t
-  val eq : t -> t -> bool
-end
-
-type universe_level_list = LList.t
-
 module LSet : 
 sig 
   include Set.S with type elt = universe_level
 	      
   val pr : t -> Pp.std_ppcmds
-
-  val of_list : universe_level_list -> t
 end
 
 type universe_set = LSet.t
@@ -109,30 +96,10 @@ sig
   val type0m : t  (** image of Prop in the universes hierarchy *)
   val type0 : t  (** image of Set in the universes hierarchy *)
   val type1 : t  (** the universe of the type of Prop/Set *)
-
-  val of_levels : Level.t list -> t
-  val to_levels : t -> Level.t list option
-
-  (* val diff : t -> t -> t * t *)
-  (* val unifies : t -> t -> (t * t) option *)
-end
-
-module UList :
-sig
-  type t = Universe.t list
-
-  val empty : t
-  val hcons : t -> t
-
-  val eq : t -> t -> bool
-  val pr : t -> Pp.std_ppcmds
-
-  val of_llist : LList.t -> t
-  val levels : t -> LSet.t
 end
 
 type universe = Universe.t
-type universe_list = UList.t
+
 (** Alias name. *)
 
 val pr_uni : universe -> Pp.std_ppcmds
@@ -410,7 +377,7 @@ val univ_depends : universe -> universe -> bool
 val pr_universes : universes -> Pp.std_ppcmds
 val pr_constraint_type : constraint_type -> Pp.std_ppcmds
 val pr_constraints : constraints -> Pp.std_ppcmds
-val pr_universe_list : universe_list -> Pp.std_ppcmds
+(* val pr_universe_list : universe_list -> Pp.std_ppcmds *)
 val pr_universe_context : universe_context -> Pp.std_ppcmds
 val pr_universe_context_set : universe_context_set -> Pp.std_ppcmds
 val pr_universe_level_subst : universe_level_subst -> Pp.std_ppcmds

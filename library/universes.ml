@@ -206,36 +206,6 @@ let choose_canonical ctx flexible algs s =
 
 open Universe
 
-let smartmap_pair f g x =
-  let (a, b) = x in
-  let a' = f a and b' = g b in
-    if a' == a && b' == b then x
-    else (a', b')
-
-let has_constraint csts x d y =
-  Constraint.exists (fun (l,d',r) ->
-    eq_levels x l && d = d' && eq_levels y r)
-    csts
-
-let id x = x
-
-(* TODO: handle u+n levels *)
-let simplify_max_expressions csts subst = 
-  let remove_higher l =
-    match Universe.to_levels l with
-    | None -> l
-    | Some levs ->
-      let rec aux found acc = function
-	| [] -> if found then Universe.of_levels acc else l
-	| ge :: ges -> 
-	if List.exists (fun ge' -> has_constraint csts ge Le ge') acc 
-	  || List.exists (fun ge' -> has_constraint csts ge Le ge') ges then
-	  aux true acc ges
-	else aux found (ge :: acc) ges
-      in aux false [] levs
-  in
-    CList.smartmap (smartmap_pair id remove_higher) subst
-
 let subst_puniverses subst (c, u as cu) =
   let u' = Instance.subst subst u in
     if u' == u then cu else (c, u')
@@ -481,7 +451,8 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	     we instantiate it with its lower bound if it is a 
 	     different level, otherwise we keep it. *)
 	  if not (Level.eq l u) && not (LSet.mem l algs) then
-	    (* if right = None then *)
+	    (* if right = None then. Should check that u does not 
+	       have upper constraints that are not already in right *)
 	      instantiate_with_lbound u lbound false false acc
 	    (* else instantiate_with_lbound u lbound false true acc *)
 	  else
@@ -489,7 +460,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	    acc, (true, false, lbound)
 	| None -> 
 	  try 
-	    if right <> None then raise Not_found;
+	    (* if right <> None then raise Not_found; *)
 	    (* Another universe represents the same lower bound, 
 	       we can share them with no harm. *)
 	    let can = find_inst insts lbound in
