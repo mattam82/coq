@@ -71,7 +71,7 @@ let clenv_refine with_evars ?(with_classes=true) clenv gls =
   let clenv = { clenv with evd = evd' } in
   tclTHEN
     (tclEVARS evd')
-    (refine (clenv_cast_meta clenv (clenv_value clenv)))
+    (refine_no_check (clenv_cast_meta clenv (clenv_value clenv)))
     gls
 
 open Unification

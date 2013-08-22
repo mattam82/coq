@@ -472,7 +472,7 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
 	| Sort s1, Sort s2 ->
 	    (try 
 	       let sigma' = 
-		 if cv_pb == CUMUL 
+		 if pb == CUMUL
 		 then Evd.set_leq_sort sigma s1 s2 
 		 else Evd.set_eq_sort sigma s1 s2 
 	       in (sigma', metasubst, evarsubst)

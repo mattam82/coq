@@ -299,6 +299,7 @@ val set_eq_level : evar_map -> Univ.universe_level -> Univ.universe_level -> eva
 val set_leq_level : evar_map -> Univ.universe_level -> Univ.universe_level -> evar_map
 val set_eq_instances : evar_map -> Univ.universe_instance -> Univ.universe_instance -> evar_map
 
+val check_eq : evar_map -> Univ.universe -> Univ.universe -> bool
 val check_leq : evar_map -> Univ.universe -> Univ.universe -> bool
 
 val evar_universe_context : evar_map -> evar_universe_context

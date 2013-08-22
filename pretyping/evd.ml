@@ -932,6 +932,9 @@ let set_leq_sort ({evars = (sigma, uctx)} as d) s1 s2 =
       | _, _ ->
         add_universe_constraints d (Univ.UniverseConstraints.singleton (u1,Univ.ULe,u2))
 	
+let check_eq {evars = (sigma,uctx)} s s' =
+  Univ.check_eq uctx.uctx_universes s s'
+
 let check_leq {evars = (sigma,uctx)} s s' =
   Univ.check_leq uctx.uctx_universes s s'
 

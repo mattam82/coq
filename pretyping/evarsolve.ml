@@ -1048,6 +1048,33 @@ let solve_evar_evar ?(force=false) f g env evd (evk1,args1 as ev1) (evk2,args2 a
     with CannotProject filter2 ->
     postpone_evar_evar f env evd filter1 ev1 filter2 ev2
 
+let solve_evar_evar ?(force=false) f g env evd (evk1,args1 as ev1) (evk2,args2 as ev2) =
+  let evi = Evd.find evd evk1 in
+    try 
+      (* ?X : Π Δ. Type i = ?Y : Π Δ'. Type j.
+	 The body of ?X and ?Y just has to be of type Π Δ. Type k for some k <= i, j. *)
+      let evienv = Evd.evar_env evi in
+      let ctx, i = Reduction.dest_arity evienv evi.evar_concl in
+      let evi2 = Evd.find evd evk2 in
+      let evi2env = Evd.evar_env evi2 in
+      let ctx', j = Reduction.dest_arity evi2env evi2.evar_concl in
+	if i == j || Evd.check_eq evd (univ_of_sort i) (univ_of_sort j) 
+	then (* Shortcut, i = j *) 
+	  solve_evar_evar ~force f g env evd ev1 ev2
+	else 
+	  let evd, k = Evd.new_sort_variable univ_flexible_alg evd in
+	  let evd, ev3 = 
+	    Evarutil.new_pure_evar evd (Evd.evar_hyps evi) 
+	      ~src:evi.evar_source ~filter:evi.evar_filter 
+	      ?candidates:evi.evar_candidates (it_mkProd_or_LetIn (mkSort k) ctx) 
+	  in
+	  let evd = Evd.set_leq_sort (Evd.set_leq_sort evd k i) k j in
+	    solve_evar_evar ~force f g env 
+	      (solve_evar_evar ~force f g env evd (ev3,args1) ev1)
+	      (ev3,args1) ev2
+    with Reduction.NotArity -> 
+      solve_evar_evar ~force f g env evd ev1 ev2
+
 type conv_fun =
   env ->  evar_map -> conv_pb -> constr -> constr -> unification_result
 
