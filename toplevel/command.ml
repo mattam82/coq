@@ -372,14 +372,22 @@ let inductive_levels env evdref arities inds =
     if a = Prop Null then None
     else Some (univ_of_sort a)) destarities
   in
-  let cstrs_levels, sizes = 
-    List.split
-      (List.map (fun (_,tys,_) -> (extract_level env !evdref tys, List.length tys)) inds)
+  let cstrs_levels, min_levels, sizes = 
+    CList.split3
+      (List.map2 (fun (_,tys,_) (ctx,du) -> 
+	let len = List.length tys in
+	let clev = extract_level env !evdref tys in
+	let minlev =
+	  if len > 1 && not (is_impredicative env du) then
+	    Univ.type0_univ
+	  else Univ.type0m_univ
+	in
+	  (clev, minlev, len)) inds destarities)
   in
   (* Take the transitive closure of the system of constructors *)
   (* level constraints and remove the recursive dependencies *)
   let levels' = Univ.solve_constraints_system (Array.of_list levels)
-    (Array.of_list cstrs_levels) 
+    (Array.of_list cstrs_levels) (Array.of_list min_levels)
   in
   let evd =
     CList.fold_left3 (fun evd cu (ctx,du) len ->

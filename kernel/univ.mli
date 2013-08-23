@@ -358,7 +358,7 @@ val check_constraints : constraints -> universes -> bool
 
 (** {6 Support for sort-polymorphism } *)
 
-val solve_constraints_system : universe option array -> universe array ->
+val solve_constraints_system : universe option array -> universe array -> universe array ->
   universe array
 
 val subst_large_constraint : universe -> universe -> universe -> universe

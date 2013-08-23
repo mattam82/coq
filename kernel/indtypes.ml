@@ -615,8 +615,8 @@ let allowed_sorts is_smashed s =
 (* - logical_sorts in case of large, unitary Prop (smashed) *)
 
 let fold_inductive_blocks f =
-  Array.fold_left (fun acc (_,_,lc,(arsign,_)) ->
-    f (Array.fold_left f acc lc) (it_mkProd_or_LetIn (* dummy *) mkSet arsign))
+  Array.fold_left (fun acc (_,_,lc,(arsign,ar)) ->
+    f (Array.fold_left f acc lc) (it_mkProd_or_LetIn (pi2 ar) arsign))
 
 let used_section_variables env inds =
   let ids = fold_inductive_blocks

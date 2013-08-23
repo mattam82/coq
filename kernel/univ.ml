@@ -1945,11 +1945,12 @@ let sort_universes orig =
 (* Miscellaneous functions to remove or test local univ assumed to
    occur only in the le constraints *)
 
-let remove_large_constraint u v = 
+let remove_large_constraint u v min = 
   match Universe.level v with
-  | Some u' -> if Level.eq u u' then Universe.type0m else v
+  | Some u' -> if Level.eq u u' then min else v
   | None -> Huniv.remove (Hunivelt.make (Universe.Expr.make u)) v
 
+(* [is_direct_constraint u v] if level [u] is a member of universe [v] *)
 let is_direct_constraint u v =
   match Universe.level v with
   | Some u' -> Level.eq u u'
@@ -1973,7 +1974,7 @@ let is_direct_sort_constraint s v = match s with
   | Some u -> is_direct_constraint u v
   | None -> false
 
-let solve_constraints_system levels level_bounds =
+let solve_constraints_system levels level_bounds level_min =
   let levels =
     Array.map (Option.map (fun u -> match level u with Some u -> u | _ -> anomaly (Pp.str"expects Atom")))
       levels in
@@ -1982,11 +1983,12 @@ let solve_constraints_system levels level_bounds =
   for i=0 to nind-1 do
     for j=0 to nind-1 do
       if not (Int.equal i j) && is_direct_sort_constraint levels.(j) v.(i) then
-	v.(i) <- Universe.sup v.(i) level_bounds.(j)
+	(v.(i) <- Universe.sup v.(i) level_bounds.(j);
+	 level_min.(i) <- Universe.sup level_min.(i) level_min.(j))
     done;
     for j=0 to nind-1 do
       match levels.(j) with
-      | Some u -> v.(i) <- remove_large_constraint u v.(i)
+      | Some u -> v.(i) <- remove_large_constraint u v.(i) level_min.(i)
       | None -> ()
     done
   done;
@@ -1995,7 +1997,8 @@ let solve_constraints_system levels level_bounds =
 let subst_large_constraint u u' v =
   match level u with
   | Some u ->
-      if is_direct_constraint u v then Universe.sup u' (remove_large_constraint u v)
+      if is_direct_constraint u v then 
+	Universe.sup u' (remove_large_constraint u v type0m_univ)
       else v
   | _ ->
       anomaly (Pp.str "expect a universe level")

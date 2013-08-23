@@ -1,3 +1,69 @@
+Set Universe Polymorphism.
+
+Inductive empty :=. 
+Inductive emptyt : Type :=. 
+Inductive singleton : Type :=
+  single.
+Inductive singletoninfo : Type :=
+  singleinfo : unit -> singletoninfo.
+Inductive singletonset : Set :=
+  singleset.
+
+Inductive singletonnoninfo : Type :=
+  singlenoninfo : empty -> singletonnoninfo.
+
+Inductive singletoninfononinfo : Prop :=
+  singleinfononinfo : unit -> singletoninfononinfo.
+
+Inductive bool : Type := 
+  | true | false.
+
+Inductive smashedbool : Prop := 
+  | trueP | falseP.
+
+Section foo.
+  Let T := Type.
+  Inductive polybool : T := 
+  | trueT | falseT.
+End foo.
+
+Inductive list (A: Type) : Type := 
+| nil : list A
+| cons : A -> list A -> list A.
+
+Module ftypSetSet.
+Inductive ftyp : Type :=
+  | Funit : ftyp 
+  | Ffun : list ftyp -> ftyp 
+  | Fref : area -> ftyp
+with area : Type := 
+  | Stored : ftyp -> area        
+.
+End ftypSetSet.
+
+
+Module ftypSetProp.
+Inductive ftyp : Type :=
+  | Funit : ftyp 
+  | Ffun : list ftyp -> ftyp 
+  | Fref : area -> ftyp
+with area : Type := 
+  | Stored : (* ftyp ->  *)area        
+.
+End ftypSetProp.
+
+Module ftypSetSetForced.
+Inductive ftyp : Type :=
+  | Funit : ftyp 
+  | Ffun : list ftyp -> ftyp 
+  | Fref : area -> ftyp
+with area : Set (* Type *) := 
+  | Stored : (* ftyp ->  *)area        
+.
+End ftypSetSetForced.
+
+Unset Universe Polymorphism.
+
 Set Printing Universes.  
 Module Easy.
 
@@ -149,7 +215,7 @@ Definition typeid := (@id Type).
 
 (* Some tests of sort-polymorphisme *)
 Section S.
-Variable A:Type.
+Polymorphic Variable A:Type.
 (*
 Definition f (B:Type) := (A * B)%type.
 *)
@@ -168,8 +234,8 @@ Print Universes. Print foo. Set Printing Universes. Print foo.
 Polymorphic Axiom funext : forall (A B : Type) (f g : A -> B), 
                  (forall x, f x = g x) -> f = g.
 
-Check funext.
-Check funext.
+(* Check @funext. *)
+(* Check funext. *)
 
 Polymorphic Definition fun_ext (A B : Type) := 
   forall (f g : A -> B), 
