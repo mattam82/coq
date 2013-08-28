@@ -197,7 +197,16 @@ let evar_type_fixpoint loc env evdref lna lar vdefj =
 (* coerce to tycon if any *)
 let inh_conv_coerce_to_tycon loc env evdref j = function
   | None -> j
-  | Some t -> evd_comb2 (Coercion.inh_conv_coerce_to loc env) evdref j t
+  | Some t -> 
+    let nfj = Evarutil.j_nf_evar !evdref j in
+      (* try *) evd_comb2 (Coercion.inh_conv_coerce_to loc env) evdref nfj t
+      (* with e ->  *)
+      (* 	let r = evd_comb2 (Coercion.inh_conv_coerce_to loc env)  *)
+      (* 	  evdref nfj t *)
+      (* 	in  *)
+      (* 	  msg_debug (str"Unifying " ++ snd (Printer.pr_ljudge_env env j) ++ str" and " ++ *)
+      (* 		       Printer.pr_constr_env env t ++ str " failed while unifying succeeds on " ++ *)
+      (* 		       snd (Printer.pr_ljudge_env env nfj)); *)
 
 (* used to enforce a name in Lambda when the type constraints itself
    is named, hence possibly dependent *)

@@ -27,6 +27,24 @@ let normalize_evar evd ev =
   | Evar (evk,args) -> (evk,args)
   | _ -> assert false
 
+let refresh_universes dir evd t =
+  let evdref = ref evd in
+  let modified = ref false in
+  let rec refresh t = match kind_of_term t with
+    | Sort (Type u as s) when Univ.universe_level u = None ||
+			   Evd.is_sort_variable evd s = None ->
+      (modified := true;
+       (* s' will appear in the term, it can't be algebraic *)
+       let s' = evd_comb0 (new_sort_variable Evd.univ_flexible) evdref in
+	 evdref :=
+	   (if dir then set_leq_sort !evdref s' s else
+	     set_leq_sort !evdref s s');
+         mkSort s')
+    | Prod (na,u,v) -> mkProd (na,u,refresh v)
+    | _ -> t in
+  let t' = refresh t in
+  if !modified then !evdref, t' else evd, t
+
 (************************)
 (* Unification results  *)
 (************************)
@@ -452,6 +470,7 @@ let make_projectable_subst aliases sigma evi args =
 
 let define_evar_from_virtual_equation define_fun env evd t_in_env sign filter inst_in_env =
   let ty_t_in_env = Retyping.get_type_of env evd t_in_env in
+  let evd,ty_t_in_env = refresh_universes false evd ty_t_in_env in
   let evd,evar_in_env = new_evar_instance sign evd ty_t_in_env ~filter inst_in_env in
   let t_in_env = whd_evar evd t_in_env in
   let evd = define_fun env evd (destEvar evar_in_env) t_in_env in
@@ -1080,24 +1099,6 @@ type conv_fun =
 
 type conv_fun_bool =
   env ->  evar_map -> conv_pb -> constr -> constr -> bool
-
-let refresh_universes dir evd t =
-  let evdref = ref evd in
-  let modified = ref false in
-  let rec refresh t = match kind_of_term t with
-    | Sort (Type u as s) when Univ.universe_level u = None ||
-			   Evd.is_sort_variable evd s = None ->
-      (modified := true;
-       (* s' will appear in the term, it can't be algebraic *)
-       let s' = evd_comb0 (new_sort_variable Evd.univ_flexible) evdref in
-	 evdref :=
-	   (if dir then set_leq_sort !evdref s' s else
-	     set_leq_sort !evdref s s');
-         mkSort s')
-    | Prod (na,u,v) -> mkProd (na,u,refresh v)
-    | _ -> t in
-  let t' = refresh t in
-  if !modified then !evdref, t' else evd, t
 
 (* Solve pbs ?e[t1..tn] = ?e[u1..un] which arise often in fixpoint
  * definitions. We try to unify the ti with the ui pairwise. The pairs

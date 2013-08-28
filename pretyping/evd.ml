@@ -324,9 +324,9 @@ let process_universe_constraints univs postponed vars alg local cstrs =
 			       THIS IS WRONG: it should be postponed and the equality
 			       turned into a common lub constraint. *) -> 
 	   if Univ.check_eq univs l r then local, postponed
-	   else 
+	   else raise UniversesDiffer
 	      (* anomaly (Pp.str"Trying to equate algebraic universes") *)
-	     local, Univ.UniverseConstraints.add (l,d,r) postponed
+	     (* local, Univ.UniverseConstraints.add (l,d,r) postponed *)
   in
   let rec fixpoint local postponed cstrs =
     let local, postponed' =

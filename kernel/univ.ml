@@ -1184,7 +1184,7 @@ let enforce_univ_eq u v g =
   let g,arcv = safe_repr g v in
   match compare g arcu arcv with
     | EQ -> g
-    | LT p -> error_inconsistency Eq u v (List.rev p)
+    | LT p -> error_inconsistency Eq v u (List.rev p)
     | LE _ -> merge g arcu arcv
     | NLE ->
 	(match compare g arcv arcu with

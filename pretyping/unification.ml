@@ -377,14 +377,32 @@ let oracle_order env cf1 cf2 =
       | None -> Some true
       | Some k2 -> Some (Conv_oracle.oracle_order false (translate_key k1) (translate_key k2))
 
-let constr_cmp pb sigma t u =
+let is_rigid_head flags t =
+  match kind_of_term t with
+  | Const (cst,u) -> not (Cpred.mem cst (snd flags.modulo_delta))
+  | Ind (i,u) -> true
+  | _ -> false
+
+let force_eqs c = 
+  Univ.UniverseConstraints.fold
+    (fun ((l,d,r) as c) acc -> 
+      let c' = if d = Univ.ULub then (l,Univ.UEq,r) else c in
+	Univ.UniverseConstraints.add c' acc) 
+    c Univ.UniverseConstraints.empty
+
+let constr_cmp pb sigma flags t u =
   let b, cstrs = 
     if pb = Reduction.CONV then eq_constr_universes t u
     else leq_constr_universes t u
   in 
     if b then 
       try Evd.add_universe_constraints sigma cstrs, b
-      with Evd.UniversesDiffer | Univ.UniverseInconsistency _ -> sigma, false
+      with Univ.UniverseInconsistency _ -> sigma, false
+      | Evd.UniversesDiffer -> 
+	if is_rigid_head flags t then 
+	  try Evd.add_universe_constraints sigma (force_eqs cstrs), b
+	  with Univ.UniverseInconsistency _ -> sigma, false
+	else sigma, false
     else sigma, b
     
 let do_reduce ts (env, nb) sigma c =
@@ -570,7 +588,7 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
   and unify_not_same_head curenvnb pb b wt (sigma, metas, evars as substn) cM cN =
     try canonical_projections curenvnb pb b cM cN substn
     with ex when precatchable_exception ex ->
-    let sigma', b = constr_cmp cv_pb sigma cM cN in
+    let sigma', b = constr_cmp cv_pb sigma flags cM cN in
       if b then (sigma', metas, evars)
       else
 	try reduce curenvnb pb b wt substn cM cN
@@ -718,7 +736,7 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
     else 
       let sigma, b = match flags.modulo_conv_on_closed_terms with
       | Some convflags -> infer_conv ~pb:cv_pb ~ts:convflags env sigma m n
-      | _ -> constr_cmp cv_pb sigma m n in
+      | _ -> constr_cmp cv_pb sigma flags m n in
 	if b then Some sigma
 	else if (match flags.modulo_conv_on_closed_terms, flags.modulo_delta with
             | Some (cv_id, cv_k), (dl_id, dl_k) ->

@@ -311,9 +311,15 @@ let message_ambig l =
 (* add_coercion_in_graph : coe_index * cl_index * cl_index -> unit
                          coercion,source,target *)
 
-let different_class_params i j =
-  (snd (class_info_from_index i)).cl_param > 0
-
+let different_class_params i =
+  let ci = class_info_from_index i in
+    if (snd ci).cl_param > 0 then true
+    else 
+      match fst ci with
+      | CL_IND i -> Global.is_polymorphic (IndRef i)
+      | CL_CONST c -> Global.is_polymorphic (ConstRef c)
+      | _ -> false
+	
 let add_coercion_in_graph (ic,source,target) =
   let old_inheritance_graph = !inheritance_graph in
   let ambig_paths =
@@ -321,12 +327,12 @@ let add_coercion_in_graph (ic,source,target) =
   let try_add_new_path (i,j as ij) p =
     try
       if Int.equal i j then begin
-	if different_class_params i j then begin
+	if different_class_params i then begin
 	  let _ = lookup_path_between_class ij in
           ambig_paths := (ij,p)::!ambig_paths
 	end
       end else begin
-        let _ = lookup_path_between_class (i,j) in
+        let _ = lookup_path_between_class ij in
         ambig_paths := (ij,p)::!ambig_paths
       end;
       false
