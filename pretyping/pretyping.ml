@@ -198,8 +198,8 @@ let evar_type_fixpoint loc env evdref lna lar vdefj =
 let inh_conv_coerce_to_tycon loc env evdref j = function
   | None -> j
   | Some t -> 
-    let nfj = Evarutil.j_nf_evar !evdref j in
-      (* try *) evd_comb2 (Coercion.inh_conv_coerce_to loc env) evdref nfj t
+    (* let nfj = Evarutil.j_nf_evar !evdref j in *)
+      (* try *) evd_comb2 (Coercion.inh_conv_coerce_to loc env) evdref j t
       (* with e ->  *)
       (* 	let r = evd_comb2 (Coercion.inh_conv_coerce_to loc env)  *)
       (* 	  evdref nfj t *)

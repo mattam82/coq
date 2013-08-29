@@ -3704,12 +3704,14 @@ let admit_as_an_axiom gl =
       global_sign (empty_named_context,empty_named_context) in
   let name = add_suffix (get_current_proof_name ()) "_admitted" in
   let na = next_global_ident_away name (pf_ids_of_hyps gl) in
-  let concl = it_mkNamedProd_or_LetIn (pf_concl gl) sign in
-  if occur_existential concl then error"\"admit\" cannot handle existentials.";
   let evd, nf = nf_evars_and_universes (project gl) in
   let ctx = Evd.universe_context evd in
+  let newconcl = nf (pf_concl gl) in
+  let newsign = Context.map_named_context nf sign in
+  let concl = it_mkNamedProd_or_LetIn newconcl newsign in
+  if occur_existential concl then error"\"admit\" cannot handle existentials.";
   let entry = 
-      (Pfedit.get_used_variables(),poly,(nf concl,ctx),None) 
+      (Pfedit.get_used_variables(),poly,(concl,ctx),None) 
   in
   let cd = Entries.ParameterEntry entry in
   let decl = (cd, IsAssumption Logical) in
@@ -3718,9 +3720,10 @@ let admit_as_an_axiom gl =
   let evd, axiom = evd, (mkConstU (con, Univ.UContext.instance ctx)) in
   (* let evd, axiom = Evd.fresh_global (pf_env gl) (project gl) (ConstRef con) in *)
   let gl = tclTHEN (tclEVARS evd)
-    (exact_check
-       (applist (axiom,
-		 List.rev (Array.to_list (instance_from_named_context sign)))))
+    (tclTHEN (convert_concl_no_check newconcl DEFAULTcast)
+       (exact_check
+	  (applist (axiom,
+		    List.rev (Array.to_list (instance_from_named_context sign))))))
     gl
   in
     Pp.feedback Interface.AddedAxiom;

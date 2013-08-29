@@ -398,6 +398,7 @@ let compare_head_gen_leq eq_universes eq_sorts leq_sorts eq leq t1 t2 =
   | App (c1,l1), App (c2,l2) ->
     Int.equal (Array.length l1) (Array.length l2) &&
       eq c1 c2 && Array.equal eq l1 l2
+  | Proj (p1,c1), Proj (p2,c2) -> eq_constant p1 p2 && eq c1 c2
   | Evar (e1,l1), Evar (e2,l2) -> Int.equal e1 e2 && Array.equal eq l1 l2
   | Const (c1,u1), Const (c2,u2) -> eq_constant c1 c2 && eq_universes true u1 u2
   | Ind (c1,u1), Ind (c2,u2) -> eq_ind c1 c2 && eq_universes false u1 u2
