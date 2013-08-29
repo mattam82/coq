@@ -1040,7 +1040,7 @@ let general_apply with_delta with_destruct with_evars (loc,(c,lbind)) gl0 =
       let n = nb_prod thm_ty - nprod in
 	if n<0 then error "Applied theorem has not enough premisses.";
 	let clause = make_clenv_binding_apply gl (Some n) (c,thm_ty) lbind in
-	Clenvtac.res_pf clause ~with_evars:with_evars ~flags:flags gl
+	  Clenvtac.res_pf clause ~with_evars:with_evars ~flags:flags gl
     in
       try try_apply thm_ty0 concl_nprod
       with PretypeError _|RefinerError _|UserError _|Failure _ as exn ->

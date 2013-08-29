@@ -201,7 +201,7 @@ let rec execute env evdref cstr =
 
     | Proj (p, c) -> 
         let cj = execute env evdref c in
-	  judge_of_projection env p cj
+	  judge_of_projection env p (Evarutil.j_nf_evar !evdref cj)
 
     | App (f,args) ->
         let jl = execute_array env evdref args in
