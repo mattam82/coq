@@ -67,7 +67,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
        T.Meta n ->
         Errors.error
          "DoubleTypeInference.double_type_of: found a non-instanciated goal"
-
+    | T.Proj _ -> assert false
      | T.Evar ((n,l) as ev) ->
         let ty = Unshare.unshare (Evd.existential_type sigma ev) in
         let jty = execute env sigma ty None in

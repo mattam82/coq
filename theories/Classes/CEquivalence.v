@@ -24,11 +24,11 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 
 Generalizable Variables A R eqA B S eqB.
-Local Obligation Tactic := try solve [simpl_relation].
+Local Obligation Tactic := try solve [simpl_crelation].
 
 Local Open Scope signature_scope.
 
-Definition equiv `{Equivalence A R} : relation A := R.
+Definition equiv `{Equivalence A R} : crelation A := R.
 
 (** Overloaded notations for setoid equivalence and inequivalence.
     Not to be confused with [eq] and [=]. *)
@@ -41,7 +41,7 @@ Local Open Scope equiv_scope.
 
 (** Overloading for [PER]. *)
 
-Definition pequiv `{PER A R} : relation A := R.
+Definition pequiv `{PER A R} : crelation A := R.
 
 (** Overloaded notation for partial equivalence. *)
 
@@ -105,15 +105,15 @@ Section Respecting.
   (** Here we build an equivalence instance for functions which relates respectful ones only,
      we do not export it. *)
 
-  Definition respecting `(eqa : Equivalence A (R : relation A), 
-                          eqb : Equivalence B (R' : relation B)) : Type :=
+  Definition respecting `(eqa : Equivalence A (R : crelation A), 
+                          eqb : Equivalence B (R' : crelation B)) : Type :=
     { morph : A -> B | respectful R R' morph morph }.
 
   Program Instance respecting_equiv `(eqa : Equivalence A R, eqb : Equivalence B R') :
     Equivalence (fun (f g : respecting eqa eqb) => 
                    forall (x y : A), R x y -> R' (proj1_sig f x) (proj1_sig g y)).
 
-  Solve Obligations with unfold respecting in * ; simpl_relation ; program_simpl.
+  Solve Obligations with unfold respecting in * ; simpl_crelation ; program_simpl.
 
   Next Obligation.
   Proof. 

@@ -176,6 +176,7 @@ let find_hyps t =
     | T.Meta _
     | T.Evar _
     | T.Sort _ -> l
+    | T.Proj _ -> ignore(Errors.todo "Proj in find_hyps"); assert false
     | T.Cast (te,_, ty) -> aux (aux l te) ty
     | T.Prod (_,s,t) -> aux (aux l s) t
     | T.Lambda (_,s,t) -> aux (aux l s) t

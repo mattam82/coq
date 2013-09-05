@@ -1002,6 +1002,10 @@ let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
 
 exception UnableToUnify of evar_map * unification_error
 
+(* Profiling *)
+(* let evar_conv_xkey = Profile.declare_profile "evar_conv_x";; *)
+(* let evar_conv_x = Profile.profile6 evar_conv_xkey evar_conv_x *)
+
 let the_conv_x ?(ts=Conv_oracle.get_transp_state ()) env t1 t2 evd =
   match evar_conv_x ts env evd CONV  t1 t2 with
   | Success evd' -> evd'

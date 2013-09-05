@@ -155,6 +155,10 @@ val merge : evar_map -> evar_map -> evar_map
 val define : evar -> constr -> evar_map -> evar_map
 val cmap : (constr -> constr) -> evar_map -> evar_map
 
+(** [diff ext orig] assuming [ext] is an extension of [orig], 
+    return an evar map containing just the extension *)
+val diff : evar_map -> evar_map -> evar_map
+
 val is_evar : evar_map -> evar -> bool
 
 val is_defined : evar_map -> evar -> bool
@@ -232,6 +236,8 @@ val meta_declare   :
   metavariable -> types -> ?name:Name.t -> evar_map -> evar_map
 val meta_assign    : metavariable -> constr * instance_status -> evar_map -> evar_map
 val meta_reassign  : metavariable -> constr * instance_status -> evar_map -> evar_map
+
+val clear_metas : evar_map -> evar_map
 
 (** [meta_merge evd1 evd2] returns [evd2] extended with the metas of [evd1] *)
 val meta_merge : evar_map -> evar_map -> evar_map

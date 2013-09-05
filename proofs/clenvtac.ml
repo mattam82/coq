@@ -70,7 +70,7 @@ let clenv_refine with_evars ?(with_classes=true) clenv gls =
   in
   let clenv = { clenv with evd = evd' } in
   tclTHEN
-    (tclEVARS evd')
+    (tclEVARS (Evd.clear_metas evd'))
     (refine_no_check (clenv_cast_meta clenv (clenv_value clenv)))
     gls
 

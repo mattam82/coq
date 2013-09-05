@@ -1926,7 +1926,7 @@ let make_eq_test evd c =
     let tac = tclPUSHEVARUNIVCONTEXT (Evd.evar_universe_context cstr.testing_state) in
       tac, c
   in
-    (Tacred.make_eq_univs_test evd c, out)
+    (Tacred.make_eq_univs_test Evd.empty c, out)
 
 let letin_tac with_eq name c ty occs gl =
   letin_tac_gen with_eq name (project gl,c) (make_eq_test (project gl) c) ty (occs,true) gl

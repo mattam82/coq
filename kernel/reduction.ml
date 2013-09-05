@@ -585,6 +585,10 @@ let trans_fconv_universes reds cv_pb l2r evars env univs t1 t2 =
       let _ = clos_fconv reds cv_pb l2r evars env (univs, None) t1 t2 in
 	()
 
+(* Profiling *)
+(* let trans_fconv_universes_key = Profile.declare_profile "trans_fconv_universes" *)
+(* let trans_fconv_universes = Profile.profile8 trans_fconv_universes_key trans_fconv_universes *)
+
 let trans_fconv reds cv_pb l2r evars env = 
   trans_fconv_universes reds cv_pb l2r evars env (universes env)
 
@@ -622,6 +626,10 @@ let infer_conv_universes cv_pb l2r evars reds env univs t1 t2 =
       let (u, cstrs) = 
 	clos_fconv reds cv_pb l2r evars env (univs, Some Constraint.empty) t1 t2 
       in Option.get cstrs
+
+(* Profiling *)
+(* let infer_conv_universes_key = Profile.declare_profile "infer_conv_universes" *)
+(* let infer_conv_universes = Profile.profile8 infer_conv_universes_key infer_conv_universes *)
 
 let infer_conv ?(l2r=false) ?(evars=fun _ -> None) ?(ts=full_transparent_state)
     env univs t1 t2 = 

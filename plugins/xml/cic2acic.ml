@@ -194,6 +194,7 @@ module CPropRetyping =
 let typeur sigma metamap =
   let rec type_of env cstr=
     match Term.kind_of_term cstr with
+    | T.Proj _ -> assert false
     | T.Meta n ->
           (try T.strip_outer_cast (List.assoc n metamap)
            with Not_found -> Errors.anomaly ~label:"type_of" (Pp.str "this is not a well-typed term"))
@@ -491,7 +492,8 @@ print_endline "PASSATO" ; flush stdout ;
           (* Now that we have all the auxiliary functions we  *)
           (* can finally proceed with the main case analysis. *)
           match T.kind_of_term tt with
-             T.Rel n ->
+	  | T.Proj _ -> assert false
+          | T.Rel n ->
               let id =
                match List.nth (E.rel_context env) (n - 1) with
                   (N.Name id,_,_)   -> id

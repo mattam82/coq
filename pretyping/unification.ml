@@ -1357,3 +1357,14 @@ let w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 =
 
       (* General case: try first order *)
       | _ -> w_typed_unify env evd cv_pb flags ty1 ty2
+
+(* Profiling *)
+(* let wunifkey = Profile.declare_profile "w_unify";; *)
+
+(* let w_unify env evd cv_pb flags ty1 ty2 = *)
+(*   w_unify env evd cv_pb ~flags:flags ty1 ty2 *)
+
+(* let w_unify = Profile.profile6 wunifkey w_unify *)
+
+(* let w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 = *)
+(*   w_unify env evd cv_pb flags ty1 ty2 *)

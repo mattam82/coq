@@ -147,6 +147,12 @@ module LMap = struct
       | Some None, None -> l
       | _, _ -> r) l r
 
+  let diff ext orig =
+    fold (fun u v acc -> 
+      if mem u orig then acc 
+      else add u v acc)
+      ext empty
+
   let elements = bindings
   let of_set s d = 
     LSet.fold (fun u -> add u d) s
@@ -1447,6 +1453,9 @@ struct
   let union (univs, cst) (univs', cst') =
     LSet.union univs univs', Constraint.union cst cst'
 
+  let diff (univs, cst) (univs', cst') =
+    LSet.diff univs univs', Constraint.diff cst cst'
+
   let add_constraints (univs, cst) cst' =
     univs, Constraint.union cst cst'
 
@@ -1577,6 +1586,10 @@ let subst_univs_level_constraints subst csts =
     (fun c -> Option.fold_right Constraint.add (subst_univs_level_constraint subst c))
     csts Constraint.empty 
 
+(* let subst_univs_level_constraint_key = Profile.declare_profile "subst_univs_level_constraint";; *)
+(* let subst_univs_level_constraint = *)
+(*   Profile.profile2 subst_univs_level_constraint_key subst_univs_level_constraint *)
+
 (** With level to universe substitutions. *)
 type universe_subst_fn = universe_level -> universe
 
@@ -1688,6 +1701,9 @@ let enforce_eq_instances_univs strict t1 t2 c =
 let merge_constraints c g =
   Constraint.fold enforce_constraint c g
 
+(* let merge_constraints_key = Profile.declare_profile "merge_constraints";; *)
+(* let merge_constraints = Profile.profile2 merge_constraints_key merge_constraints *)
+
 let check_constraint g (l,d,r) =
   match d with
   | Eq -> check_equal g l r
@@ -1708,10 +1724,18 @@ let subst_univs_constraints subst csts =
     (fun c -> Option.fold_right enforce_univ_constraint (subst_univs_constraint subst c))
     csts Constraint.empty 
 
+(* let subst_univs_constraints_key = Profile.declare_profile "subst_univs_constraints";; *)
+(* let subst_univs_constraints = *)
+(*   Profile.profile2 subst_univs_constraints_key subst_univs_constraints *)
+
 let subst_univs_universe_constraints subst csts =
   UniverseConstraints.fold 
     (fun c -> Option.fold_right UniverseConstraints.add (subst_univs_universe_constraint subst c))
     csts UniverseConstraints.empty 
+
+(* let subst_univs_universe_constraints_key = Profile.declare_profile "subst_univs_universe_constraints";; *)
+(* let subst_univs_universe_constraints = *)
+(*   Profile.profile2 subst_univs_universe_constraints_key subst_univs_universe_constraints *)
 
 (** Substitute instance inst for ctx in csts *)
 let instantiate_univ_context subst (_, csts) = 

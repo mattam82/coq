@@ -876,7 +876,7 @@ let h = Id.of_string "H"
 
 exception Found of constr * types
 
-let prepare_hint check env (sigma,c) =
+let prepare_hint check env init (sigma,c) =
   let sigma = Typeclasses.resolve_typeclasses ~fail:false env sigma in
   (* We re-abstract over uninstantiated evars.
      It is actually a bit stupid to generalize over evars since the first
@@ -905,13 +905,14 @@ let prepare_hint check env (sigma,c) =
       mkNamedLambda id t (iter (replace_term evar (mkVar id) c)) in
   let c' = iter c in
     if check then Evarutil.check_evars (Global.env()) Evd.empty sigma c';
-    IsConstr (c', Evd.get_universe_context_set sigma)
+    let diff = Evd.diff sigma init in
+      IsConstr (c', Evd.get_universe_context_set diff)
 
 let interp_hints poly =
   fun h ->
   let f c =
     let evd,c = Constrintern.interp_open_constr Evd.empty (Global.env()) c in
-      prepare_hint true (Global.env()) (evd,c) in
+      prepare_hint true (Global.env()) Evd.empty (evd,c) in
   let fr r =
     let gr = global_with_alias r in
     let r' = evaluable_of_global_reference (Global.env()) gr in
@@ -1150,21 +1151,21 @@ let exact poly (c,clenv) =
     
 (* Util *)
 
-let expand_constructor_hints env lems =
-  List.map_append (fun (sigma,lem) ->
+let expand_constructor_hints env sigma lems =
+  List.map_append (fun (evd,lem) ->
     match kind_of_term lem with
     | Ind (ind,u) ->
 	List.init (nconstructors ind) 
 	  (fun i -> IsConstr (mkConstructU ((ind,i+1),u), 
 			      Univ.ContextSet.empty))
     | _ ->
-	[prepare_hint false env (sigma,lem)]) lems
+	[prepare_hint false env sigma (evd,lem)]) lems
 
 (* builds a hint database from a constr signature *)
 (* typically used with (lid, ltyp) = pf_hyps_types <some goal> *)
 
 let add_hint_lemmas eapply lems hint_db gl =
-  let lems = expand_constructor_hints (pf_env gl) lems in
+  let lems = expand_constructor_hints (pf_env gl) (project gl) lems in
   let hintlist' =
     List.map_append (pf_apply make_resolves gl (eapply,true,false) None true) lems in
   Hint_db.add_list hintlist' hint_db

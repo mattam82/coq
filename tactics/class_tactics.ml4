@@ -839,5 +839,6 @@ TACTIC EXTEND autoapply
     let flags = flags_of_state (Auto.Hint_db.transparent_state (Auto.searchtable_map i)) in
     let cty = pf_type_of gl c in
     let ce = mk_clenv_from gl (c,cty) in
-      unify_e_resolve false flags (c,ce) gl ]
+    let clenv' = clenv_unique_resolver ~flags ce gl in
+      Clenvtac.clenv_refine true ~with_classes:false clenv' gl ]
 END

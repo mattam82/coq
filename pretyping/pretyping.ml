@@ -819,6 +819,9 @@ and pretype_type valcon env evdref lvar = function
 	      error_unexpected_type_loc
                 (loc_of_glob_constr c) env !evdref tj.utj_val v
 
+(* let pretype_key = Profile.declare_profile "pretype" *)
+(* let pretype = Profile.profile5 pretype_key pretype *)
+
 let ise_pretype_gen flags sigma env lvar kind c =
   let evdref = ref sigma in
   let c' = match kind with

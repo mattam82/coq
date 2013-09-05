@@ -15,6 +15,8 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
+Set Universe Polymorphism.
+
 (** The polymorphic identity function is defined in [Datatypes]. *)
 
 Arguments id {A} x.

@@ -15,11 +15,12 @@
 
 Require Import Coq.Program.Basics.
 Require Import Coq.Program.Tactics.
-Require Import Coq.Relations.Relation_Definitions.
 Require Export Coq.Classes.RelationClasses.
 
 Generalizable Variables A eqA B C D R RA RB RC m f x y.
-Local Obligation Tactic := simpl_relation.
+Local Obligation Tactic := simpl_crelation.
+
+Set Universe Polymorphism.
 
 (** * Morphisms.
 
@@ -33,7 +34,7 @@ Section Proper.
   Let U := Type.
   Context {A B : U}.
 
-  Class Proper (R : relation A) (m : A) : Prop :=
+  Class Proper (R : crelation A) (m : A) :=
     proper_prf : R m m.
 
   (** Every element in the carrier of a reflexive relation is a morphism
@@ -45,7 +46,7 @@ Section Proper.
    priorities in different hint bases and select a particular hint
    database for resolution of a type class constraint. *)
 
-  Class ProperProxy (R : relation A) (m : A) : Prop :=
+  Class ProperProxy (R : crelation A) (m : A) :=
     proper_proxy : R m m.
 
   Lemma eq_proper_proxy (x : A) : ProperProxy (@eq A) x.
@@ -64,20 +65,20 @@ Section Proper.
   Definition respectful_hetero
   (A B : Type)
   (C : A -> Type) (D : B -> Type)
-  (R : A -> B -> Prop)
-  (R' : forall (x : A) (y : B), C x -> D y -> Prop) :
-    (forall x : A, C x) -> (forall x : B, D x) -> Prop :=
+  (R : A -> B -> Type)
+  (R' : forall (x : A) (y : B), C x -> D y -> Type) :
+    (forall x : A, C x) -> (forall x : B, D x) -> Type :=
     fun f g => forall x y, R x y -> R' x y (f x) (g y).
 
   (** The non-dependent version is an instance where we forget dependencies. *)
   
-  Definition respectful (R : relation A) (R' : relation B) : relation (A -> B) :=
+  Definition respectful (R : crelation A) (R' : crelation B) : crelation (A -> B) :=
     Eval compute in @respectful_hetero A A (fun _ => B) (fun _ => B) R (fun _ _ => R').
 
 End Proper.
 
-(** We favor the use of Leibniz equality or a declared reflexive relation 
-  when resolving [ProperProxy], otherwise, if the relation is given (not an evar),
+(** We favor the use of Leibniz equality or a declared reflexive crelation 
+  when resolving [ProperProxy], otherwise, if the crelation is given (not an evar),
   we fall back to [Proper]. *)
 Hint Extern 1 (ProperProxy _ _) => 
   class_apply @eq_proper_proxy || class_apply @reflexive_proper_proxy : typeclass_instances.
@@ -134,7 +135,7 @@ Ltac f_equiv :=
   | |- ?R (?f ?x) (?f' _) =>
     let T := type of x in
     let Rx := fresh "R" in
-    evar (Rx : relation T);
+    evar (Rx : crelation T);
     let H := fresh in
     assert (H : (Rx==>R)%signature f f');
     unfold Rx in *; clear Rx; [ f_equiv | apply H; clear H; try reflexivity ]
@@ -145,27 +146,27 @@ Ltac f_equiv :=
 
 Section Relations.
   Let U := Type.
-  Context {A B : U} (P : A -> U).
+  Context {A B : U}. 
 
   (** [forall_def] reifies the dependent product as a definition. *)
   
-  Definition forall_def : Type := forall x : A, P x.
+  Definition forall_def (P : A -> U) : Type := forall x : A, P x.
   
-  (** Dependent pointwise lifting of a relation on the range. *)
+  (** Dependent pointwise lifting of a crelation on the range. *)
   
-  Definition forall_relation 
-             (sig : forall a, relation (P a)) : relation (forall x, P x) :=
+  Definition forall_relation (P : A -> U)
+             (sig : forall a, crelation (P a)) : crelation (forall x, P x) :=
     fun f g => forall a, sig a (f a) (g a).
 
   (** Non-dependent pointwise lifting *)
-  Definition pointwise_relation (R : relation B) : relation (A -> B) :=
+  Definition pointwise_relation (R : crelation B) : crelation (A -> B) :=
     fun f g => forall a, R (f a) (g a).
 
-  Lemma pointwise_pointwise (R : relation B) :
+  Lemma pointwise_pointwise (R : crelation B) :
     relation_equivalence (pointwise_relation R) (@eq A ==> R).
-  Proof. intros. split; reduce; subst; firstorder. Qed.
+  Proof. intros. split. simpl_crelation. firstorder. Qed.
   
-  (** Subrelations induce a morphism on the identity. *)
+  (** Subcrelations induce a morphism on the identity. *)
   
   Global Instance subrelation_id_proper `(subrelation A RA RA') : Proper (RA ==> RA') id.
   Proof. firstorder. Qed.
@@ -174,19 +175,19 @@ Section Relations.
   
   Lemma subrelation_respectful `(subl : subrelation A RA' RA, subr : subrelation B RB RB') :
     subrelation (RA ==> RB) (RA' ==> RB').
-  Proof. unfold subrelation in *; firstorder. Qed.
+  Proof. simpl_crelation. Qed.
 
   (** And of course it is reflexive. *)
   
   Lemma subrelation_refl R : @subrelation A R R.
-  Proof. unfold subrelation; firstorder. Qed.
+  Proof. simpl_crelation. Qed.
 
   (** [Proper] is itself a covariant morphism for [subrelation].
    We use an unconvertible premise to avoid looping.
    *)
   
   Lemma subrelation_proper `(mor : Proper A R' m) 
-        `(unc : Unconvertible (relation A) R R')
+        `(unc : Unconvertible (crelation A) R R')
         `(sub : subrelation A R' R) : Proper R m.
   Proof.
     intros. apply sub. apply mor.
@@ -196,14 +197,19 @@ Section Relations.
     Proper (subrelation ++> eq ==> impl) (@Proper A).
   Proof. reduce. subst. firstorder. Qed.
 
+  Global Instance proper_subrelation_proper_arrow :
+    Proper (subrelation ++> eq ==> arrow) (@Proper A).
+  Proof. reduce. subst. firstorder. Qed.
+
   Global Instance pointwise_subrelation `(sub : subrelation B R R') :
     subrelation (pointwise_relation R) (pointwise_relation R') | 4.
-  Proof. reduce. unfold pointwise_relation in *. apply sub. apply H. Qed.
+  Proof. reduce. unfold pointwise_relation in *. apply sub. auto. Qed.
   
   (** For dependent function types. *)
-  Lemma forall_subrelation (R S : forall x : A, relation (P x)) :
-    (forall a, subrelation (R a) (S a)) -> subrelation (forall_relation R) (forall_relation S).
-  Proof. reduce. apply H. apply H0. Qed.
+  Lemma forall_subrelation (P : A -> U) (R S : forall x : A, crelation (P x)) :
+    (forall a, subrelation (R a) (S a)) -> 
+    subrelation (forall_relation P R) (forall_relation P S).
+  Proof. reduce. firstorder. Qed.
 End Relations.
 
 Typeclasses Opaque respectful pointwise_relation forall_relation.
@@ -239,6 +245,14 @@ Proof. firstorder. Qed.
 Instance iff_flip_impl_subrelation : subrelation iff (flip impl) | 2.
 Proof. firstorder. Qed.
 
+(** Essential subrelation instances for [iffT] and [arrow]. *)
+
+Instance iffT_arrow_subrelation : subrelation iffT arrow | 2.
+Proof. firstorder. Qed.
+
+Instance iffT_flip_arrow_subrelation : subrelation iffT (flip arrow) | 2.
+Proof. firstorder. Qed.
+
 (** We use an extern hint to help unification. *)
 
 Hint Extern 4 (subrelation (@forall_relation ?A ?B ?R) (@forall_relation _ _ ?S)) =>
@@ -258,10 +272,10 @@ Section GenericInstances.
   Proof with auto.
     assert(R x0 x0).
     transitivity y0... symmetry...
-    transitivity (y x0)... 
+    transitivity (y x0)...
   Qed.
 
-  (** The complement of a relation conserves its proper elements. *)
+  (** The complement of a crelation conserves its proper elements. *)
   
   Program Definition complement_proper
           `(mR : Proper (A -> A -> Prop) (RA ==> RA ==> iff) R) :
@@ -270,7 +284,7 @@ Section GenericInstances.
   Next Obligation.
   Proof.
     unfold complement.
-    pose (mR x y H x0 y0 H0).
+    pose (mR x y X x0 y0 X0).
     intuition.
   Qed.
  
@@ -286,12 +300,22 @@ Section GenericInstances.
   Qed.
 
 
-  (** Every Transitive relation gives rise to a binary morphism on [impl],
+  (** Every Transitive crelation gives rise to a binary morphism on [impl],
    contravariant in the first argument, covariant in the second. *)
   
   Global Program 
   Instance trans_contra_co_morphism
     `(Transitive A R) : Proper (R --> R ++> impl) R.
+  
+  Next Obligation.
+  Proof with auto.
+    transitivity x...
+    transitivity x0...
+  Qed.
+
+  Global Program 
+  Instance trans_contra_co_type_morphism
+    `(Transitive A R) : Proper (R --> R ++> arrow) R.
   
   Next Obligation.
   Proof with auto.
@@ -311,8 +335,26 @@ Section GenericInstances.
   Qed.
 
   Global Program 
+  Instance trans_contra_inv_impl_type_morphism
+  `(Transitive A R) : Proper (R --> flip arrow) (R x) | 3.
+
+  Next Obligation.
+  Proof with auto.
+    transitivity y...
+  Qed.
+
+  Global Program 
   Instance trans_co_impl_morphism
     `(Transitive A R) : Proper (R ++> impl) (R x) | 3.
+
+  Next Obligation.
+  Proof with auto.
+    transitivity x0...
+  Qed.
+
+  Global Program 
+  Instance trans_co_impl_type_morphism
+    `(Transitive A R) : Proper (R ++> arrow) (R x) | 3.
 
   Next Obligation.
   Proof with auto.
@@ -328,8 +370,25 @@ Section GenericInstances.
     transitivity y... symmetry...
   Qed.
 
+  Global Program 
+  Instance trans_sym_co_inv_impl_type_morphism
+    `(PER A R) : Proper (R ++> flip arrow) (R x) | 3.
+
+  Next Obligation.
+  Proof with auto.
+    transitivity y... symmetry...
+  Qed.
+
   Global Program Instance trans_sym_contra_impl_morphism
     `(PER A R) : Proper (R --> impl) (R x) | 3.
+
+  Next Obligation.
+  Proof with auto.
+    transitivity x0... symmetry...
+  Qed.
+
+  Global Program Instance trans_sym_contra_arrow_morphism
+    `(PER A R) : Proper (R --> arrow) (R x) | 3.
 
   Next Obligation.
   Proof with auto.
@@ -347,7 +406,18 @@ Section GenericInstances.
     symmetry...
   Qed.
 
-  (** Every Transitive relation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
+  Global Program Instance per_partial_app_type_morphism
+  `(PER A R) : Proper (R ==> iffT) (R x) | 2.
+
+  Next Obligation.
+  Proof with auto.
+    split. intros ; transitivity x0...
+    intros.
+    transitivity y...
+    symmetry...
+  Qed.
+
+  (** Every Transitive crelation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
 
   Global Program 
   Instance trans_co_eq_inv_impl_morphism
@@ -358,10 +428,32 @@ Section GenericInstances.
     transitivity y...
   Qed.
 
-  (** Every Symmetric and Transitive relation gives rise to an equivariant morphism. *)
+  Global Program 
+  Instance trans_co_eq_inv_arrow_morphism
+  `(Transitive A R) : Proper (R ==> (@eq A) ==> flip arrow) R | 2.
+
+  Next Obligation.
+  Proof with auto.
+    transitivity y...
+  Qed.
+
+  (** Every Symmetric and Transitive crelation gives rise to an equivariant morphism. *)
 
   Global Program 
   Instance PER_morphism `(PER A R) : Proper (R ==> R ==> iff) R | 1.
+
+  Next Obligation.
+  Proof with auto.
+    split ; intros.
+    transitivity x0... transitivity x... symmetry...
+
+    transitivity y... transitivity y0... symmetry...
+  Qed.
+
+  (** Every Symmetric and Transitive crelation gives rise to an equivariant morphism. *)
+
+  Global Program 
+  Instance PER_type_morphism `(PER A R) : Proper (R ==> R ==> iffT) R | 1.
 
   Next Obligation.
   Proof with auto.
@@ -379,8 +471,8 @@ Section GenericInstances.
 
   Next Obligation.
   Proof.
-    simpl_relation.
-    unfold compose. apply H. apply H0. apply H1.
+    simpl_crelation.
+    unfold compose. firstorder. 
   Qed.
 
   (** Coq functions are morphisms for Leibniz equality,
@@ -388,38 +480,30 @@ Section GenericInstances.
 
   Global Instance reflexive_eq_dom_reflexive `(Reflexive B R') :
     Reflexive (@Logic.eq A ==> R').
-  Proof. simpl_relation. Qed.
+  Proof. simpl_crelation. Qed.
 
-  (** [respectful] is a morphism for relation equivalence. *)
+  (** [respectful] is a morphism for crelation equivalence. *)
   
   Global Instance respectful_morphism :
     Proper (relation_equivalence ++> relation_equivalence ++> relation_equivalence) 
            (@respectful A B).
-  Proof.
-    reduce.
-    unfold respectful, relation_equivalence, predicate_equivalence in * ; simpl in *.
-    split ; intros.
-    
-    rewrite <- H0.
-    apply H1.
-    rewrite H.
-    assumption.
-    
-    rewrite H0.
-    apply H1.
-    rewrite <- H.
-    assumption.
+  Proof. 
+    intros R R' HRR' S S' HSS' f g.
+    unfold respectful, relation_equivalence in * ; simpl in *.
+    split ; intros H x y Hxy.
+    setoid_rewrite <- HSS'. apply H. now rewrite HRR'.
+    rewrite HSS'. apply H. now rewrite <- HRR'.
   Qed.
 
   (** [R] is Reflexive, hence we can build the needed proof. *)
 
   Lemma Reflexive_partial_app_morphism `(Proper (A -> B) (R ==> R') m, ProperProxy A R x) :
     Proper R' (m x).
-  Proof. simpl_relation. Qed.
+  Proof. simpl_crelation. Qed.
   
   Class Params (of : A) (arity : nat).
     
-  Lemma flip_respectful (R : relation A) (R' : relation B) :
+  Lemma flip_respectful (R : crelation A) (R' : crelation B) :
     relation_equivalence (flip (R ==> R')) (flip R ==> flip R').
   Proof.
     intros.
@@ -440,13 +524,13 @@ Section GenericInstances.
   (** That's if and only if *)
   
   Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq A) R.
-  Proof. simpl_relation. Qed.
+  Proof. simpl_crelation. Qed.
 
   (** Once we have normalized, we will apply this instance to simplify the problem. *)
   
   Definition proper_flip_proper `(mor : Proper A R m) : Proper (flip R) m := mor.
   
-  (** Every reflexive relation gives rise to a morphism, 
+  (** Every reflexive crelation gives rise to a morphism, 
   only for immediately solving goals without variables. *)
   
   Lemma reflexive_proper `{Reflexive A R} (x : A) : Proper R x.
@@ -506,15 +590,12 @@ Ltac partial_application_tactic :=
 
 (** Bootstrap !!! *)
 
-Instance proper_proper : Proper (relation_equivalence ==> eq ==> iff) (@Proper A).
+Instance proper_proper : Proper (relation_equivalence ==> eq ==> iffT) (@Proper A).
 Proof.
-  simpl_relation.
-  reduce in H.
-  split ; red ; intros.
-  setoid_rewrite <- H.
-  apply H0.
-  setoid_rewrite H.
-  apply H0.
+  intros A R R' HRR' x y <-. red in HRR'.
+  split ; red ; intros. 
+  now setoid_rewrite <- HRR'.
+  now setoid_rewrite HRR'.
 Qed.
 
 Ltac proper_reflexive :=
@@ -543,7 +624,7 @@ Hint Extern 7 (@Proper _ _ _) => proper_reflexive
 Section Normalize.
   Context (A : Type).
 
-  Class Normalizes (m : relation A) (m' : relation A) : Prop :=
+  Class Normalizes (m : crelation A) (m' : crelation A) : Prop :=
     normalizes : relation_equivalence m m'.
   
   (** Current strategy: add [flip] everywhere and reduce using [subrelation]
@@ -551,8 +632,8 @@ Section Normalize.
 
   Lemma proper_normalizes_proper `(Normalizes R0 R1, Proper A R1 m) : Proper R0 m.
   Proof.
-    red in H, H0.
-    rewrite H.
+    red in H, H0. red in H.
+    setoid_rewrite H.
     assumption.
   Qed.
 
@@ -588,8 +669,8 @@ Hint Extern 1 (Normalizes _ _ _) => normalizes : typeclass_instances.
 Hint Extern 6 (@Proper _ _ _) => proper_normalization 
   : typeclass_instances.
 
-(** When the relation on the domain is symmetric, we can
-    flip the relation on the codomain. Same for binary functions. *)
+(** When the crelation on the domain is symmetric, we can
+    flip the crelation on the codomain. Same for binary functions. *)
 
 Lemma proper_sym_flip :
  forall `(Symmetric A R1)`(Proper (A->B) (R1==>R2) f),
@@ -607,12 +688,18 @@ intros A R1 Sym1 B R2 Sym2 C R3 f Hf.
 intros x x' Hxx' y y' Hyy'. apply Hf; auto.
 Qed.
 
-(** When the relation on the domain is symmetric, a predicate is
+(** When the crelation on the domain is symmetric, a predicate is
   compatible with [iff] as soon as it is compatible with [impl].
-  Same with a binary relation. *)
+  Same with a binary crelation. *)
 
 Lemma proper_sym_impl_iff : forall `(Symmetric A R)`(Proper _ (R==>impl) f),
  Proper (R==>iff) f.
+Proof.
+intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
+Qed.
+
+Lemma proper_sym_arrow_iffT : forall `(Symmetric A R)`(Proper _ (R==>arrow) f),
+ Proper (R==>iffT) f.
 Proof.
 intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
@@ -625,13 +712,33 @@ intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
 repeat red in Hf. split; eauto.
 Qed.
 
-(** A [PartialOrder] is compatible with its underlying equivalence. *)
+Lemma proper_sym_arrow_iffT_2 :
+ forall `(Symmetric A R)`(Symmetric B R')`(Proper _ (R==>R'==>arrow) f),
+ Proper (R==>R'==>iffT) f.
+Proof.
+intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
+repeat red in Hf. split; eauto.
+Qed.
 
-Instance PartialOrder_proper `(PartialOrder A eqA R) :
+(** A [PartialOrder] is compatible with its underlying equivalence. *)
+Require Import Relation_Definitions.
+Instance PartialOrder_proper `(PartialOrder A eqA (R : relation A)) :
   Proper (eqA==>eqA==>iff) R.
 Proof.
 intros.
 apply proper_sym_impl_iff_2; auto with *.
+intros x x' Hx y y' Hy Hr.
+transitivity x.
+generalize (partial_order_equivalence x x'); compute; intuition.
+transitivity y; auto.
+generalize (partial_order_equivalence y y'); compute; intuition.
+Qed.
+
+Instance PartialOrder_proper_type `(PartialOrder A eqA R) :
+  Proper (eqA==>eqA==>iffT) R.
+Proof.
+intros.
+apply proper_sym_arrow_iffT_2; auto with *.
 intros x x' Hx y y' Hy Hr.
 transitivity x.
 generalize (partial_order_equivalence x x'); compute; intuition.
@@ -653,16 +760,15 @@ apply PreOrder_Transitive with y; assumption.
 intro Hxz.
 apply Hxy'.
 apply partial_order_antisym; auto.
-rewrite Hxz; auto.
+rewrite Hxz. auto.
 Qed.
-
 
 (** From a [StrictOrder] to the corresponding [PartialOrder]:
      [le = lt \/ eq].
     If the order is total, we could also say [ge = ~lt]. *)
 
 Lemma StrictOrder_PreOrder
- `(Equivalence A eqA, StrictOrder A R, Proper _ (eqA==>eqA==>iff) R) :
+ `(Equivalence A eqA, StrictOrder A R, Proper _ (eqA==>eqA==>iffT) R) :
  PreOrder (relation_disjunction R eqA).
 Proof.
 split.
@@ -678,7 +784,7 @@ Hint Extern 4 (PreOrder (relation_disjunction _ _)) =>
   class_apply StrictOrder_PreOrder : typeclass_instances.
 
 Lemma StrictOrder_PartialOrder
-  `(Equivalence A eqA, StrictOrder A R, Proper _ (eqA==>eqA==>iff) R) :
+  `(Equivalence A eqA, StrictOrder A R, Proper _ (eqA==>eqA==>iffT) R) :
   PartialOrder eqA (relation_disjunction R eqA).
 Proof.
 intros. intros x y. compute. intuition.

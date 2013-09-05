@@ -49,6 +49,8 @@ sig
 
   (** Favorizes the bindings in the first map. *)
   val union : 'a t -> 'a t -> 'a t
+  val diff : 'a t -> 'a t -> 'a t
+
   val subst_union : 'a option t -> 'a option t -> 'a option t
 
   val elements : 'a t -> (universe_level * 'a) list
@@ -248,6 +250,7 @@ sig
   val of_set : universe_set -> t
 
   val union : t -> t -> t
+  val diff : t -> t -> t
   val add_constraints : t -> constraints -> t
   val add_universes : Instance.t -> t -> t
 

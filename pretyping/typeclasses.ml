@@ -538,6 +538,13 @@ let has_typeclasses filter evd =
 
 let solve_instanciations_problem = ref (fun _ _ _ _ _ -> assert false)
 
+let solve_problem env evd filter split fail =
+  !solve_instanciations_problem env evd filter split fail
+
+(** Profiling resolution of typeclasses *)
+(* let solve_classeskey = Profile.declare_profile "solve_typeclasses" *)
+(* let solve_problem = Profile.profile5 solve_classeskey solve_problem *)
+
 let resolve_typeclasses ?(filter=no_goals) ?(split=true) ?(fail=true) env evd =
   if not (has_typeclasses filter evd) then evd
-  else !solve_instanciations_problem env evd filter split fail
+  else solve_problem env evd filter split fail

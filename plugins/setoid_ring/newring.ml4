@@ -453,10 +453,11 @@ let theory_to_obj : ring_info -> obj =
 
 let setoid_of_relation env evd a r =
   try
-    let evm, refl = Rewrite.get_reflexive_proof env !evd a r in
-    let evm, sym = Rewrite.get_symmetric_proof env evm a r in
-    let evm, trans = Rewrite.get_transitive_proof env evm a r in
-      evd := evm;
+    let evm = !evd, Int.Set.empty in
+    let evm, refl = Rewrite.PropGlobal.get_reflexive_proof env evm a r in
+    let evm, sym = Rewrite.PropGlobal.get_symmetric_proof env evm a r in
+    let evm, trans = Rewrite.PropGlobal.get_transitive_proof env evm a r in
+      evd := fst evm;
       lapp coq_mk_Setoid [|a ; r ; refl; sym; trans |]
   with Not_found ->
     error "cannot find setoid relation"

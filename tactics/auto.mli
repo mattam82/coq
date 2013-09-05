@@ -131,7 +131,8 @@ val interp_hints : polymorphic -> hints_expr -> hints_entry
 
 val add_hints : locality_flag -> hint_db_name list -> hints_entry -> unit
 
-val prepare_hint : bool (* Check no remaining evars *) -> env -> open_constr -> hint_term
+val prepare_hint : bool (* Check no remaining evars *) -> env -> evar_map -> 
+  open_constr -> hint_term
 
 val pr_searchtable : unit -> std_ppcmds
 val pr_applicable_hint : unit -> std_ppcmds

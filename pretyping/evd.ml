@@ -218,6 +218,42 @@ module EvarInfoMap = struct
     try Some (existential_value sigma ev)
     with NotInstantiatedEvar -> None
 
+  (** Invariant: sigma' is a partial extension of sigma: 
+      It may define variables that are undefined in sigma, 
+      or add new defined or undefined variables. It should not
+      undefine a defined variable in sigma.
+  *)
+  let merge (def,undef) (def',undef') =
+    let def, undef = 
+      ExistentialMap.fold (fun n v (def,undef) -> 
+	ExistentialMap.add n v def, ExistentialMap.remove n undef)
+	def' (def,undef)
+    in
+    let undef = ExistentialMap.fold ExistentialMap.add undef' undef in
+      (def, undef)
+      
+  (** ext is supposed to be an extension of odef: 
+      it might have more defined evars, and more 
+      or less undefined ones *)
+  let diff (edef,eundef) (odef,oundef) =
+    let def = 
+      if odef == edef then ExistentialMap.empty
+      else
+	ExistentialMap.fold (fun e v acc ->
+	  if ExistentialMap.mem e odef then acc
+	  else ExistentialMap.add e v acc)
+	  edef ExistentialMap.empty
+    in
+    let undef = 
+      if oundef == eundef then ExistentialMap.empty
+      else
+	ExistentialMap.fold (fun e v acc ->
+	  if ExistentialMap.mem e oundef then acc
+	  else ExistentialMap.add e v acc)
+	  eundef ExistentialMap.empty
+    in
+      (def, undef)
+
 end
 
 (* 2nd part used to check consistency on the fly. *)
@@ -246,15 +282,33 @@ let is_empty_evar_universe_context ctx =
 let union_evar_universe_context ctx ctx' =
   if ctx == ctx' then ctx
   else
-  { uctx_local = Univ.ContextSet.union ctx.uctx_local ctx'.uctx_local;
-    uctx_postponed = Univ.UniverseConstraints.union ctx.uctx_postponed ctx'.uctx_postponed;
-    uctx_univ_variables = 
-     Univ.LMap.subst_union ctx.uctx_univ_variables ctx'.uctx_univ_variables;
-    uctx_univ_algebraic = 
-     Univ.LSet.union ctx.uctx_univ_algebraic ctx'.uctx_univ_algebraic;
-    uctx_universes = 
-      let cstrsr = Univ.ContextSet.constraints ctx'.uctx_local in
-	Univ.merge_constraints cstrsr ctx.uctx_universes}
+    let local = 
+      if ctx.uctx_local == ctx'.uctx_local then ctx.uctx_local 
+      else Univ.ContextSet.union ctx.uctx_local ctx'.uctx_local
+    in
+      { uctx_local = local;
+	uctx_postponed = Univ.UniverseConstraints.union ctx.uctx_postponed ctx'.uctx_postponed;
+	uctx_univ_variables = 
+	  Univ.LMap.subst_union ctx.uctx_univ_variables ctx'.uctx_univ_variables;
+	uctx_univ_algebraic = 
+	  Univ.LSet.union ctx.uctx_univ_algebraic ctx'.uctx_univ_algebraic;
+	uctx_universes = 
+	  if local == ctx.uctx_local then ctx.uctx_universes
+	  else
+	    let cstrsr = Univ.ContextSet.constraints ctx'.uctx_local in
+	      Univ.merge_constraints cstrsr ctx.uctx_universes}
+
+let diff_evar_universe_context ctx' ctx  =
+  if ctx == ctx' then empty_evar_universe_context
+  else
+    let local = Univ.ContextSet.diff ctx'.uctx_local ctx.uctx_local in
+      { uctx_local = local;
+	uctx_postponed = Univ.UniverseConstraints.diff ctx'.uctx_postponed ctx.uctx_postponed;
+	uctx_univ_variables = 
+	  Univ.LMap.diff ctx'.uctx_univ_variables ctx.uctx_univ_variables;
+	uctx_univ_algebraic = 
+	  Univ.LSet.diff ctx'.uctx_univ_algebraic ctx.uctx_univ_algebraic;
+	uctx_universes = Univ.empty_universes }
 
 type 'a in_evar_universe_context = 'a * evar_universe_context
 
@@ -361,6 +415,9 @@ let add_constraints_context ctx cstrs =
       uctx_univ_variables = vars;
       uctx_universes = Univ.merge_constraints cstrs ctx.uctx_universes }
 
+(* let addconstrkey = Profile.declare_profile "add_constraints_context";; *)
+(* let add_constraints_context = Profile.profile2 addconstrkey add_constraints_context;; *)
+
 let add_universe_constraints_context ctx cstrs =
   let univs, local = ctx.uctx_local in
   let vars, local', pbs = 
@@ -371,6 +428,10 @@ let add_universe_constraints_context ctx cstrs =
       uctx_postponed = pbs;
       uctx_univ_variables = vars;
       uctx_universes = Univ.merge_constraints local' ctx.uctx_universes }
+
+(* let addunivconstrkey = Profile.declare_profile "add_universe_constraints_context";; *)
+(* let add_universe_constraints_context =  *)
+(*   Profile.profile2 addunivconstrkey add_universe_constraints_context;; *)
 
 module EvarMap = struct
 
@@ -420,9 +481,17 @@ module EvarMap = struct
       (sigma, ctx')
 
   let merge (sigma,ctx) (sigma',ctx') = 
-     let evars = EvarInfoMap.fold sigma' (fun n v sigma -> EvarInfoMap.add sigma n v) sigma in
-     let ctx = union_evar_universe_context ctx' ctx in
+     let evars = EvarInfoMap.merge sigma sigma' in
+     let ctx = union_evar_universe_context ctx ctx' in
        (evars, ctx)
+
+  (* let merge =  *)
+  (*   let merge_key = Profile.declare_profile "Evd.merge" *)
+  (*     Profile.profile2 merge_key merge *)
+
+  let diff (esigma,ectx) (osigma,octx) =
+    EvarInfoMap.diff esigma osigma, diff_evar_universe_context ectx octx
+
 end
 
 (*******************************************************************)
@@ -708,6 +777,19 @@ let collect_evars c =
   in
   collrec ExistentialSet.empty c
 
+let meta_diff ext orig = 
+  Metamap.fold (fun m v acc ->
+    if Metamap.mem m orig then acc
+    else Metamap.add m v acc)
+    ext Metamap.empty
+      
+let diff ext orig = 
+  { ext with
+      evars = EvarMap.diff ext.evars orig.evars;
+      metas = meta_diff ext.metas orig.metas;
+  }
+
+
 (**********************************************************)
 (* Sort variables *)
 
@@ -967,6 +1049,10 @@ let normalize_evar_universe_context_variables uctx =
     subst, { uctx with uctx_local = ctx_local';
       uctx_univ_variables = normalized_variables;
       uctx_universes = univs }
+
+(* let normvarsconstrkey = Profile.declare_profile "normalize_evar_universe_context_variables";; *)
+(* let normalize_evar_universe_context_variables = *)
+(*   Profile.profile1 normvarsconstrkey normalize_evar_universe_context_variables;; *)
     
 let mark_undefs_as_rigid uctx =
   let vars' = 
@@ -1058,6 +1144,9 @@ let nf_constraints ({evars = (sigma, uctx)} as d) =
   let uctx' = normalize_evar_universe_context uctx' in
   let evd' = {d with evars = (sigma, uctx')} in
     evd'
+
+(* let nfconstrkey = Profile.declare_profile "nf_constraints";; *)
+(* let nf_constraints = Profile.profile1 nfconstrkey nf_constraints;; *)
 
 let universes {evars = (sigma, uctx)} = uctx.uctx_universes
 
@@ -1166,6 +1255,7 @@ let meta_with_name evd id =
           (str "Binder name \"" ++ pr_id id ++
            strbrk "\" occurs more than once in clause.")
 
+let clear_metas evd = {evd with metas = Metamap.empty}
 
 let meta_merge evd1 evd2 =
   {evd2 with

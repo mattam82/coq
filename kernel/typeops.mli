@@ -68,6 +68,8 @@ val judge_of_abstraction :
   env -> Name.t -> unsafe_type_judgment -> unsafe_judgment
     -> unsafe_judgment
 
+val sort_of_product : env -> sorts -> sorts -> sorts
+
 (** {6 Type of a product. } *)
 val judge_of_product :
   env -> Name.t -> unsafe_type_judgment -> unsafe_type_judgment

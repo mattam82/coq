@@ -347,6 +347,9 @@ let connect_clenv gls clenv =
     evd = evd ;
     env = Goal.V82.env evd (sig_it gls) }
 
+(* let connect_clenv_key = Profile.declare_profile "connect_clenv";; *)
+(* let connect_clenv = Profile.profile2 connect_clenv_key connect_clenv *)
+
 (* [clenv_fchain mv clenv clenv']
  *
  * Resolves the value of "mv" (which must be undefined) in clenv to be
