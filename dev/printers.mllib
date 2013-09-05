@@ -65,6 +65,7 @@ Type_errors
 Modops
 Inductive
 Typeops
+Fast_typeops
 Indtypes
 Cooking
 Term_typing
