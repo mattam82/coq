@@ -775,7 +775,8 @@ module Hsorts =
           Prop c -> Prop c
         | Type u -> Type (huniv u)
       let equal s1 s2 =
-        match (s1,s2) with
+        s1 == s2 ||
+	  match (s1,s2) with
             (Prop c1, Prop c2) -> c1 == c2
           | (Type u1, Type u2) -> u1 == u2
           |_ -> false

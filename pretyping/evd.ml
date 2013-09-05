@@ -298,6 +298,10 @@ let union_evar_universe_context ctx ctx' =
 	    let cstrsr = Univ.ContextSet.constraints ctx'.uctx_local in
 	      Univ.merge_constraints cstrsr ctx.uctx_universes}
 
+(* let union_evar_universe_context_key = Profile.declare_profile "union_evar_universe_context";; *)
+(* let union_evar_universe_context =  *)
+(*   Profile.profile2 union_evar_universe_context_key union_evar_universe_context;; *)
+
 let diff_evar_universe_context ctx' ctx  =
   if ctx == ctx' then empty_evar_universe_context
   else
@@ -309,6 +313,10 @@ let diff_evar_universe_context ctx' ctx  =
 	uctx_univ_algebraic = 
 	  Univ.LSet.diff ctx'.uctx_univ_algebraic ctx.uctx_univ_algebraic;
 	uctx_universes = Univ.empty_universes }
+
+(* let diff_evar_universe_context_key = Profile.declare_profile "diff_evar_universe_context";; *)
+(* let diff_evar_universe_context =  *)
+(*   Profile.profile2 diff_evar_universe_context_key diff_evar_universe_context;; *)
 
 type 'a in_evar_universe_context = 'a * evar_universe_context
 

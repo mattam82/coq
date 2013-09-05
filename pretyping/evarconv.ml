@@ -683,6 +683,10 @@ and eta_constructor ts env evd ((ind, i), u) l1 csts1 (c, csts2) =
 	    exact_ise_stack2 env evd (evar_conv_x ts) l1' [Zapp sk2]
 	with Failure _ -> UnifFailure(evd,NotSameHead)
 
+(* Profiling *)
+(* let evar_conv_xkey = Profile.declare_profile "evar_conv_x";; *)
+(* let evar_conv_x = Profile.profile6 evar_conv_xkey evar_conv_x *)
+
 (* We assume here |l1| <= |l2| *)
 
 let first_order_unification ts env evd (ev1,l1) (term2,l2) =
@@ -1001,10 +1005,6 @@ let consider_remaining_unif_problems ?(ts=full_transparent_state) env evd =
 (* Main entry points *)
 
 exception UnableToUnify of evar_map * unification_error
-
-(* Profiling *)
-(* let evar_conv_xkey = Profile.declare_profile "evar_conv_x";; *)
-(* let evar_conv_x = Profile.profile6 evar_conv_xkey evar_conv_x *)
 
 let the_conv_x ?(ts=Conv_oracle.get_transp_state ()) env t1 t2 evd =
   match evar_conv_x ts env evd CONV  t1 t2 with

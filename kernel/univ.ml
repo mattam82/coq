@@ -912,10 +912,10 @@ let constraint_type_ord c1 c2 = match c1, c2 with
    correspond to the universes in (direct) relation [rel] with it,
    make a list of canonical universe, updating the relation with
    the starting point (path stored in reverse order). *)
-let canp g (p:explanation) rel l : (canonical_arc * explanation) list =
-  List.map (fun u -> (repr g u, (rel,Universe.make u)::p)) l
+let canp g (p:explanation Lazy.t) rel l : (canonical_arc * explanation Lazy.t) list =
+  List.map (fun u -> (repr g u, lazy ((rel,Universe.make u):: Lazy.force p))) l
 
-type order = EQ | LT of explanation | LE of explanation | NLE
+type order = EQ | LT of explanation Lazy.t | LE of explanation Lazy.t | NLE
 
 (** [compare_neq] : is [arcv] in the transitive upward closure of [arcu] ?
 
@@ -971,7 +971,7 @@ let compare_neq strict g arcu arcv =
 	   let le_new = canp g p Le arc.le in
 	   cmp c lt_done (arc::le_done) (lt_new, le_new@le_todo))
   in
-  cmp NLE [] [] ([],[arcu,[]])
+  cmp NLE [] [] ([],[arcu,Lazy.from_val []])
 
 let compare g arcu arcv =
   if arcu == arcv then EQ else compare_neq true g arcu arcv
@@ -1178,7 +1178,7 @@ let enforce_univ_leq u v g =
   let g,arcv = safe_repr g v in
   if is_leq g arcu arcv then g
   else match compare g arcv arcu with
-    | LT p -> error_inconsistency Le u v (List.rev p)
+    | LT p -> error_inconsistency Le u v (List.rev (Lazy.force p))
     | LE _ -> merge g arcv arcu
     | NLE -> fst (setleq g arcu arcv)
     | EQ -> anomaly (Pp.str "Univ.compare")
@@ -1190,11 +1190,11 @@ let enforce_univ_eq u v g =
   let g,arcv = safe_repr g v in
   match compare g arcu arcv with
     | EQ -> g
-    | LT p -> error_inconsistency Eq v u (List.rev p)
+    | LT p -> error_inconsistency Eq v u (List.rev (Lazy.force p))
     | LE _ -> merge g arcu arcv
     | NLE ->
 	(match compare g arcv arcu with
-           | LT p -> error_inconsistency Eq u v (List.rev p)
+           | LT p -> error_inconsistency Eq u v (List.rev (Lazy.force p))
            | LE _ -> merge g arcv arcu
            | NLE -> merge_disc g arcu arcv
            | EQ -> anomaly (Pp.str "Univ.compare"))
@@ -1211,7 +1211,7 @@ let enforce_univ_lt u v g =
       (match compare_neq false g arcv arcu with
 	  NLE -> fst (setlt g arcu arcv)
 	| EQ -> anomaly (Pp.str "Univ.compare")
-	| (LE p|LT p) -> error_inconsistency Lt u v (List.rev p))
+	| (LE p|LT p) -> error_inconsistency Lt u v (List.rev (Lazy.force p)))
 
 let empty_universes = LMap.empty
 let initial_universes = enforce_univ_lt Level.prop Level.set LMap.empty
@@ -1352,7 +1352,28 @@ let level_subst_of f =
 module Instance = struct
   type t = Level.t array
 
-  let hcons x = x
+  module HInstance =
+    Hashcons.Make(
+      struct
+	type _t = t
+	type t = _t
+	type u = Level.t -> Level.t
+	let hashcons huniv a = 
+	  CArray.smartmap huniv a
+
+	let equal t1 t2 =
+	  t1 == t2 ||
+	    (Int.equal (Array.length t1) (Array.length t2) &&
+	       let rec aux i =
+		 (Int.equal i (Array.length t1)) || (t1.(i) == t2.(i) && aux (i + 1))
+	       in aux 0)
+
+	let hash = Hashtbl.hash
+    end)
+
+  let hcons_instance = Hashcons.simple_hcons HInstance.generate Level.hcons
+
+  let hcons = hcons_instance
   let empty = [||]
   let is_empty x = Int.equal (Array.length x) 0
 
@@ -1712,6 +1733,10 @@ let check_constraint g (l,d,r) =
 
 let check_constraints c g =
   Constraint.for_all (check_constraint g) c
+
+(* let check_constraints_key = Profile.declare_profile "check_constraints";; *)
+(* let check_constraints = *)
+(*   Profile.profile2 check_constraints_key check_constraints *)
 
 let enforce_univ_constraint (u,d,v) =
   match d with

@@ -22,6 +22,7 @@ open Declarations
 open Environ
 open Entries
 open Typeops
+open Fast_typeops
 
 let constrain_type env j poly = function
   | None -> j.uj_type
