@@ -27,6 +27,9 @@ let refiner pr goal_sigma =
   let (sgl,sigma') = prim_refiner pr goal_sigma.sigma goal_sigma.it in
   {it=sgl; sigma = sigma'}
 
+(* let refiner_key = Profile.declare_profile "refiner" *)
+(* let refiner = Profile.profile2 refiner_key refiner *)
+
 let norm_evar_tac gl = refiner (Change_evars) gl
 
 (*********************)

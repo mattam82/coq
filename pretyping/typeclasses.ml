@@ -533,7 +533,7 @@ let mark_resolvables sigma = mark_resolvability all_evars true sigma
 
 let has_typeclasses filter evd =
   Evd.fold_undefined (fun ev evi has -> has ||
-    (filter ev (snd evi.evar_source) && is_class_evar evd evi && is_resolvable evi))
+    (filter ev (snd evi.evar_source) && is_resolvable evi && is_class_evar evd evi))
     evd false
 
 let solve_instanciations_problem = ref (fun _ _ _ _ _ -> assert false)

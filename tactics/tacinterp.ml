@@ -627,9 +627,7 @@ let interp_may_eval f ist gl = function
   | ConstrEval (r,c) ->
       let (sigma,redexp) = pf_interp_red_expr ist gl r in
       let (sigma,c_interp) = f ist { gl with sigma=sigma } c in
-      (* let sigma, subst = Evd.nf_univ_variables sigma in *)
       sigma , pf_reduction_of_red_expr {gl with sigma=sigma} redexp c_interp
-	(* (subst_univs_constr subst c_interp) *)
   | ConstrContext ((loc,s),c) ->
       (try
 	let (sigma,ic) = f ist gl c

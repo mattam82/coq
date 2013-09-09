@@ -242,17 +242,23 @@ let subst_univs_level_constr subst c =
     let rec aux t = 
       match kind t with
       | Const (c, u) -> 
-        let u' = f u in 
-	  if u' == u then t
-	  else (changed := true; mkConstU (c, u'))
+	if Univ.Instance.is_empty u then t
+	else 
+          let u' = f u in 
+	    if u' == u then t
+	    else (changed := true; mkConstU (c, u'))
       | Ind (i, u) ->
-        let u' = f u in 
-	  if u' == u then t
-	  else (changed := true; mkIndU (i, u'))
+	if Univ.Instance.is_empty u then t
+	else 
+	  let u' = f u in 
+	    if u' == u then t
+	    else (changed := true; mkIndU (i, u'))
       | Construct (c, u) ->
-         let u' = f u in 
-	   if u' == u then t
-	   else (changed := true; mkConstructU (c, u'))
+	if Univ.Instance.is_empty u then t
+	else 
+          let u' = f u in 
+	    if u' == u then t
+	    else (changed := true; mkConstructU (c, u'))
       | Sort (Sorts.Type u) -> 
          let u' = Univ.subst_univs_level_universe subst u in
 	   if u' == u then t else 

@@ -2173,6 +2173,13 @@ let apply_lemma gl (c,l) cl l2r occs =
     Strategies.choice app (subterm true general_rewrite_flags (fun env -> aux () env))
   in !hypinfo, aux ()
 
+
+let cl_rewrite_clause_tac abs strat meta cl gl =
+  cl_rewrite_clause_tac ~abs strat meta cl gl
+
+(* let rewriteclaustac_key = Profile.declare_profile "cl_rewrite_clause_tac";; *)
+(* let cl_rewrite_clause_tac = Profile.profile5 rewriteclaustac_key cl_rewrite_clause_tac *)
+
 let general_s_rewrite cl l2r occs (c,l) ~new_goals gl =
   let meta = Evarutil.new_meta() in
   let hypinfo, strat = apply_lemma gl (c,l) cl l2r occs in
@@ -2180,7 +2187,7 @@ let general_s_rewrite cl l2r occs (c,l) ~new_goals gl =
       tclWEAK_PROGRESS 
 	(tclTHEN
            (Refiner.tclEVARS (Evd.merge (project gl) hypinfo.cl.evd))
-	   (cl_rewrite_clause_tac ~abs:hypinfo.abs strat (mkMeta meta) cl)) gl
+	   (cl_rewrite_clause_tac hypinfo.abs strat (mkMeta meta) cl)) gl
     with RewriteFailure e ->
       let {l2r=l2r; c1=x; c2=y} = hypinfo in
 	raise (Pretype_errors.PretypeError

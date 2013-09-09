@@ -671,13 +671,13 @@ let rec whd_evar sigma c =
     | Sort (Type u) -> 
       let u' = Evd.normalize_universe sigma u in
 	if u' == u then c else mkSort (Type u')
-    | Const (c', u) -> 
+    | Const (c', u) when not (Univ.Instance.is_empty u) -> 
       let u' = Evd.normalize_universe_instance sigma u in
 	if u' == u then c else mkConstU (c', u')
-    | Ind (i, u) -> 
+    | Ind (i, u) when not (Univ.Instance.is_empty u) -> 
       let u' = Evd.normalize_universe_instance sigma u in
 	if u' == u then c else mkIndU (i, u')
-    | Construct (co, u) -> 
+    | Construct (co, u) when not (Univ.Instance.is_empty u) ->
       let u' = Evd.normalize_universe_instance sigma u in
 	if u' == u then c else mkConstructU (co, u')
     | _ -> c

@@ -59,6 +59,8 @@ let rec flush_and_check_evars sigma c =
        | Some c -> flush_and_check_evars sigma c)
   | _ -> map_constr (flush_and_check_evars sigma) c
 
+(* let nf_evar_key = Profile.declare_profile "nf_evar"  *)
+(* let nf_evar = Profile.profile2 nf_evar_key Reductionops.nf_evar *)
 let nf_evar = Reductionops.nf_evar
 let j_nf_evar sigma j =
   { uj_val = nf_evar sigma j.uj_val;
@@ -103,17 +105,17 @@ let nf_evar_map_universes evm =
 	Evd.map (map_evar_info f) evm, f
 
 let nf_named_context_evar sigma ctx =
-  Context.map_named_context (Reductionops.nf_evar sigma) ctx
+  Context.map_named_context (nf_evar sigma) ctx
 
 let nf_rel_context_evar sigma ctx =
-  Context.map_rel_context (Reductionops.nf_evar sigma) ctx
+  Context.map_rel_context (nf_evar sigma) ctx
 
 let nf_env_evar sigma env =
   let nc' = nf_named_context_evar sigma (Environ.named_context env) in
   let rel' = nf_rel_context_evar sigma (Environ.rel_context env) in
     push_rel_context rel' (reset_with_named_context (val_of_named_context nc') env)
 
-let nf_evar_info evc info = map_evar_info (Reductionops.nf_evar evc) info
+let nf_evar_info evc info = map_evar_info (nf_evar evc) info
 let nf_evar_map evm = Evd.map (nf_evar_info evm) evm
 let nf_evar_map_undefined evm = Evd.map_undefined (nf_evar_info evm) evm
 
