@@ -162,8 +162,8 @@ module LevelUnionFind = Unionfind.Make (Univ.LSet) (Univ.LMap)
 
 let remove_trivial_constraints cst =
   Constraint.fold (fun (l,d,r as cstr) nontriv ->
-    if d <> Lt && eq_levels l r then nontriv
-    else if d = Le && is_type0m_univ (Univ.Universe.make l) then nontriv
+    if d != Lt && eq_levels l r then nontriv
+    else if d == Le && is_type0m_univ (Univ.Universe.make l) then nontriv
     else Constraint.add cstr nontriv)
     cst Constraint.empty
 
@@ -374,12 +374,12 @@ exception Stays
 let compute_lbound left =
  (** The universe variable was not fixed yet.
      Compute its level using its lower bound. *)
-  if left = [] then None
+  if CList.is_empty left then None
   else
     let lbound = List.fold_left (fun lbound (d, l) -> 
-      if d = Le (* l <= ?u *) then (Universe.sup l lbound)
+      if d == Le (* l <= ?u *) then (Universe.sup l lbound)
       else (* l < ?u *) 
-	(assert (d = Lt); 
+	(assert (d == Lt); 
 	 (Universe.sup (Universe.super l) lbound)))	    
       Universe.type0m left
     in 
@@ -478,7 +478,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	  else
 	    let ((ctx', us, algs, insts, cstrs), (enf,_,inst as b)) = acc in
 	    let cstrs' = List.fold_left (fun cstrs (d, r) -> 
-	      if d = Univ.Le then
+	      if d == Univ.Le then
 		enforce_leq inst (Universe.make r) cstrs
 	      else 
 		try let lev = Option.get (Universe.level inst) in
@@ -501,7 +501,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
     with Not_found -> instance acc u
   in
     LMap.fold (fun u v (ctx', us, algs, seen, cstrs as acc) -> 
-      if v = None then fst (aux acc u)
+      if v == None then fst (aux acc u)
       else LSet.remove u ctx', us, LSet.remove u algs, seen, cstrs)
       us (ctx, us, algs, lbounds, cstrs)
       
@@ -516,7 +516,7 @@ let normalize_context_set ctx us algs =
   in
   let noneqs =
     Constraint.fold (fun (l,d,r) noneqs ->
-      if d = Eq then (UF.union l r uf; noneqs) 
+      if d == Eq then (UF.union l r uf; noneqs) 
       else Constraint.add (l,d,r) noneqs)
     csts Constraint.empty
   in
@@ -608,11 +608,11 @@ let restrict_universe_context (univs,csts) s =
   in (univs', csts')
 
 let is_prop_leq (l,d,r) =
-  Level.eq Level.prop l && d = Univ.Le
+  Level.eq Level.prop l && d == Univ.Le
 
 (* Prop < i <-> Set+1 <= i <-> Set < i *)
 let translate_cstr (l,d,r as cstr) =
-  if Level.eq Level.prop l && d = Univ.Lt then
+  if Level.eq Level.prop l && d == Univ.Lt then
     (Level.set, d, r)
   else cstr
 

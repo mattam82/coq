@@ -279,6 +279,8 @@ let ensure_products n =
     (* Now we know how many red are needed *)
     (fun gl -> tclDO !p red_in_concl gl)
 
+let refine = refine_no_check
+
 let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
   let c = substl subst c in
   match (kind_of_term c,sgp) with
@@ -400,3 +402,6 @@ let refine (evd,c) gl =
      complicated to update meta types when passing through a binder *)
   let th = compute_metamap (pf_env gl) evd c in
   tclTHEN (Refiner.tclEVARS evd) (tcc_aux [] th) gl
+
+(* let refine_key = Profile.declare_profile "refine_tactic" *)
+(* let refine = Profile.profile2 refine_key refine *)

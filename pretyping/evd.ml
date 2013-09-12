@@ -345,7 +345,7 @@ let process_universe_constraints univs postponed vars alg local cstrs =
 	  | None -> Inl x
 	  | Some l -> Inr (l, Univ.LMap.mem l !vars, Univ.LSet.mem l alg)
 	in
-	  if d = Univ.ULe then
+	  if d == Univ.ULe then
 	    if Univ.check_leq univs l r then
 	      (** Keep Prop <= var around if var might be instantiated by prop later. *)
 	      if Univ.is_type0m_univ l && not (Univ.is_small_univ r) then
@@ -357,7 +357,7 @@ let process_universe_constraints univs postponed vars alg local cstrs =
 	      match Univ.Universe.level r with
 	      | None -> (local, Univ.UniverseConstraints.add (l,d,r) postponed)
 	      | Some _ -> (Univ.enforce_leq l r local, postponed)
-	  else if d = Univ.ULub then
+	  else if d == Univ.ULub then
 	    match varinfo l, varinfo r with
 	    | (Inr (l, true, _), Inr (r, _, _)) 
 	    | (Inr (r, _, _), Inr (l, true, _)) -> 
@@ -408,8 +408,8 @@ let add_constraints_context ctx cstrs =
   let cstrs' = Univ.Constraint.fold (fun (l,d,r) acc -> 
     let l = Univ.Universe.make l and r = Univ.Universe.make r in
     let cstr' = 
-      if d = Univ.Lt then (Univ.Universe.super l, Univ.ULe, r)
-      else (l, (if d = Univ.Le then Univ.ULe else Univ.UEq), r)
+      if d == Univ.Lt then (Univ.Universe.super l, Univ.ULe, r)
+      else (l, (if d == Univ.Le then Univ.ULe else Univ.UEq), r)
     in Univ.UniverseConstraints.add cstr' acc)
     cstrs Univ.UniverseConstraints.empty
   in
@@ -1017,7 +1017,7 @@ let set_leq_sort ({evars = (sigma, uctx)} as d) s1 s2 =
   | Some (u1, u2) ->
       match s1, s2 with
       | Prop c, Prop c' -> 
-	  if c = Null && c' = Pos then d
+	  if c == Null && c' == Pos then d
 	  else (raise (Univ.UniverseInconsistency (Univ.Le, u1, u2, [])))
       | _, _ ->
         add_universe_constraints d (Univ.UniverseConstraints.singleton (u1,Univ.ULe,u2))
@@ -1065,7 +1065,7 @@ let normalize_evar_universe_context_variables uctx =
 let mark_undefs_as_rigid uctx =
   let vars' = 
     Univ.LMap.fold (fun u v acc ->
-      if v = None && not (Univ.LSet.mem u uctx.uctx_univ_algebraic) 
+      if v == None && not (Univ.LSet.mem u uctx.uctx_univ_algebraic) 
       then acc else Univ.LMap.add u v acc)
     uctx.uctx_univ_variables Univ.LMap.empty
   in { uctx with uctx_univ_variables = vars' }
@@ -1073,7 +1073,7 @@ let mark_undefs_as_rigid uctx =
 let mark_undefs_as_nonalg uctx =
   let vars' = 
     Univ.LMap.fold (fun u v acc ->
-      if v = None then Univ.LSet.remove u acc
+      if v == None then Univ.LSet.remove u acc
       else acc)
     uctx.uctx_univ_variables uctx.uctx_univ_algebraic
   in { uctx with uctx_univ_algebraic = vars' }

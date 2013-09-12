@@ -720,7 +720,7 @@ let apply_on_subterm evdref f c t =
       match kind_of_term t with
       | Evar (evk,args) when Evd.is_undefined !evdref evk ->
           let ctx = evar_filtered_context (Evd.find_undefined !evdref evk) in
-          let g (_,b,_) a = if b = None then applyrec kc a else a in
+          let g (_,b,_) a = if b == None then applyrec kc a else a in
           mkEvar (evk, Array.of_list (List.map2 g ctx (Array.to_list args)))
       | _ ->
         map_constr_with_binders_left_to_right (fun d (k,c) -> (k+1,lift 1 c))

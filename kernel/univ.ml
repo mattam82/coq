@@ -324,6 +324,7 @@ module Hashconsing = struct
       val make : data -> t
       val equal : t -> t -> bool
       val nil : t
+      val is_nil : t -> bool
       val tip : elt -> t
       val node : t -> t node
       val cons : (* ?sorted:bool -> *) elt -> t -> t
@@ -373,9 +374,12 @@ module Hashconsing = struct
     let nil = Node.make Nil
     let stats = Node.stats
     let init = Node.init
+
+    let is_nil =
+      function { Node.node = Nil } -> true | _ -> false
 				  
-				(* doing sorted insertion allows to make
-				   better use of hash consing *)
+    (* doing sorted insertion allows to make
+       better use of hash consing *)
     let rec sorted_cons e l =
       match l.Node.node with
       |	Nil -> Node.make (Cons(e, l))
@@ -600,7 +604,7 @@ struct
     let map f (v, n as x) = 
       let v' = f v in 
 	if v' == v then x
-	else if Level.is_prop v' && n <> 0 then
+	else if Level.is_prop v' && n != 0 then
 	  hcons (Level.set, n)
 	else hcons (v', n)
 
@@ -628,7 +632,7 @@ struct
   type t = Huniv.t
   open Huniv
     
-  let eq = Huniv.equal
+  let eq x y = x == y (* Huniv.equal *)
 
   let compare u1 u2 =
     if eq u1 u2 then 0 else 
@@ -651,18 +655,18 @@ struct
 (*         CList.eq_set x' y' *)
 
   let pr l = match node l with
-    | Cons (u, n) when node n = Nil -> Expr.pr (Hunivelt.node u)
+    | Cons (u, n) when is_nil n -> Expr.pr (Hunivelt.node u)
     | _ -> 
       str "max(" ++ hov 0
 	(prlist_with_sep pr_comma Expr.pr (List.map Hunivelt.node (to_list l))) ++
         str ")"
       
   let atom l = match node l with
-    | Cons (l, n) when node n = Nil -> Some l
+    | Cons (l, n) when is_nil n -> Some l
     | _ -> None
 
   let level l = match node l with
-    | Cons (l, n) when node n = Nil -> Expr.level (Hunivelt.node l)
+    | Cons (l, n) when is_nil n -> Expr.level (Hunivelt.node l)
     | _ -> None
 
   let levels l = 
@@ -696,7 +700,7 @@ struct
 
   let is_type1 u =
     match node u with
-    | Cons (l, n) when node n = Nil -> Expr.is_type1 (Hunivelt.node l)
+    | Cons (l, n) when is_nil n -> Expr.is_type1 (Hunivelt.node l)
     | _ -> false
 
   (* Returns the formal universe that lies juste above the universe variable u.
@@ -744,8 +748,7 @@ struct
       l nil
     
   let empty = nil
-  let is_empty n =
-    node n = Nil
+  let is_empty n = is_nil n
 
   let exists f l = 
     Huniv.exists (fun x -> f (Hunivelt.node x)) l
@@ -811,7 +814,7 @@ let super = Universe.super
 
 let is_type0_univ = Universe.is_type0
 
-let is_univ_variable l = Universe.level l <> None
+let is_univ_variable l = Universe.level l != None
 
 (* Every Level.t has a unique canonical arc representative *)
 
@@ -1039,7 +1042,7 @@ let compare_list cmp l1 l2 =
 
 let check_equal_expr g x y =
   x == y || (let (u, n) = Hunivelt.node x and (v, m) = Hunivelt.node y in 
-	       n = m && (u = v || check_equal g u v))
+	       n = m && check_equal g u v)
 
 (** [check_eq] is also used in [Evd.set_eq_sort],
     hence [Evarconv] and [Unification]. In this case,
@@ -1062,7 +1065,7 @@ let check_equal_expr g x y =
 (* let lax_check_eq = gen_check_eq false *)
 let check_eq g u v =
   compare_list (check_equal_expr g) u v
-let check_eq_level g u v = check_equal g u v
+let check_eq_level g u v = u == v || check_equal g u v
 let lax_check_eq = check_eq
 
 let check_smaller_expr g (u,n) (v,m) =
@@ -1310,7 +1313,7 @@ module UniverseConstraints = struct
 	  let i' = Universe.compare u u' in
 	    if Int.equal i' 0 then Universe.compare v v'
 	    else 
-	      if c <> ULe && Universe.compare u v' = 0 && Universe.compare v u' = 0 then 0
+	      if c != ULe && Universe.compare u v' = 0 && Universe.compare v u' = 0 then 0
 	      else i'
 	else i
   end)
@@ -1540,7 +1543,7 @@ let remove_dangling_constraints dangling cst =
     if List.mem l dangling || List.mem r dangling then cst'
     else
       (** Unnecessary constraints Prop <= u *)
-      if Level.eq l Level.prop && d = Le then cst'
+      if Level.eq l Level.prop && d == Le then cst'
       else Constraint.add cstr cst') cst Constraint.empty
   
 let check_context_subset (univs, cst) (univs', cst') =
@@ -1599,7 +1602,7 @@ let rec subst_univs_level_universe subst u =
 let subst_univs_level_constraint subst (u,d,v) =
   let u' = subst_univs_level_level subst u 
   and v' = subst_univs_level_level subst v in
-    if d <> Lt && Level.eq u' v' then None
+    if d != Lt && Level.eq u' v' then None
     else Some (u',d,v')
 
 let subst_univs_level_constraints subst csts =
@@ -1632,7 +1635,7 @@ let subst_univs_universe fn ul =
       | None -> (subst, u :: nosubst))
     ul ([], [])
   in 
-    if subst = [] then ul
+    if CList.is_empty subst then ul
     else 
       let substs = 
 	List.fold_left Universe.merge_univs Universe.empty subst
@@ -1642,7 +1645,7 @@ let subst_univs_universe fn ul =
 
 let subst_univs_constraint fn (u,d,v) =
   let u' = subst_univs_level fn u and v' = subst_univs_level fn v in
-    if d <> Lt && Universe.eq u' v' then None
+    if d != Lt && Universe.eq u' v' then None
     else Some (u',d,v')
 
 let subst_univs_universe_constraint fn (u,d,v) =
@@ -1777,7 +1780,7 @@ let to_constraints g s =
       | None, ULe, Some l' -> enforce_leq x y acc
       | _, ULub, _ -> acc
       | _, d, _ -> 
-	let f = if d = ULe then check_leq else check_eq in
+	let f = if d == ULe then check_leq else check_eq in
 	  if f g x y then acc else 
 	    raise (Invalid_argument 
 		   "to_constraints: non-trivial algebraic constraint between universes")

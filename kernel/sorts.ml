@@ -68,9 +68,12 @@ module Hsorts =
       type _t = t
       type t = _t
       type u = universe -> universe
-      let hashcons huniv = function
-          Prop c -> Prop c
-        | Type u -> Type (huniv u)
+      let hashcons huniv c = 
+	match c with
+          Prop _ -> c
+        | Type u -> let u' = huniv u in 
+		      if u' == u then c else Type u'
+
       let equal s1 s2 =
         match (s1,s2) with
             (Prop c1, Prop c2) -> c1 == c2

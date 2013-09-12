@@ -1315,7 +1315,7 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
             map_constr_with_full_binders (fun d (env,k) -> push_rel d env, k+1)
               imitate envk t in
 
-  let fast rhs = 
+  let _fast rhs = 
     let filter_ctxt = evar_filtered_context evi in
     let names = ref Idset.empty in
     let rec is_id_subst ctxt s =
@@ -1330,16 +1330,16 @@ let rec invert_definition conv_algo choose env evd (evk,argsv as ev) rhs =
     Idset.subset (collect_vars rhs) !names in
   let rhs = whd_beta evd rhs (* heuristic *) in
   let body = 
-    if fast rhs then 
-      begin
-        fast_stats := !fast_stats +1;
-        rhs
-      end
-    else
-      begin
-        not_fast_stats := !not_fast_stats +1;
+    (* if fast rhs then  *)
+    (*   begin *)
+    (*     fast_stats := !fast_stats +1; *)
+    (*     rhs *)
+    (*   end *)
+    (* else *)
+    (*   begin *)
+    (*     not_fast_stats := !not_fast_stats +1; *)
         imitate (env,0) rhs
-      end
+      (* end *)
   in (!evdref,body)
 
 (* [define] tries to solve the problem "?ev[args] = rhs" when "?ev" is
