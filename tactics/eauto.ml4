@@ -33,7 +33,7 @@ let eauto_unif_flags = { auto_unif_flags with Unification.modulo_delta = full_tr
 
 let e_give_exact ?(flags=eauto_unif_flags) c gl = let t1 = (pf_type_of gl c) and t2 = pf_concl gl in
   if occur_existential t1 or occur_existential t2 then
-     tclTHEN (Clenvtac.unify ~flags t1) (exact_check c) gl
+     tclTHEN (Clenvtac.unify ~flags t1) (exact_no_check c) gl
   else exact_check c gl
 
 let assumption id = e_give_exact (mkVar id)
@@ -95,6 +95,9 @@ open Unification
 (***************************************************************************)
 
 let priority l = List.map snd (List.filter (fun (pr,_) -> Int.equal pr 0) l)
+
+(* let h_simplest_eapply_key = Profile.declare_profile "h_simplest_eapply" *)
+(* let h_simplest_eapply = Profile.profile2 h_simplest_eapply_key h_simplest_eapply *)
 
 let unify_e_resolve poly flags (c,clenv) gls =
   let clenv', subst = if poly then Clenv.refresh_undefined_univs clenv 

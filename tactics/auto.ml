@@ -1180,16 +1180,6 @@ let make_local_hint_db ?ts eapply lems gl =
   add_hint_lemmas eapply lems
     (Hint_db.add_list hintlist (Hint_db.empty ts false)) gl
 
-(* let make_local_hint_db ts eapply lems gl = *)
-(*   make_local_hint_db ?ts eapply lems gl *)
-
-(* let make_key = Profile.declare_profile "make_local_hint_db" *)
-(* let make_local_hint_db = *)
-(*   Profile.profile4 make_key make_local_hint_db *)
-
-(* let make_local_hint_db ?ts eapply lems gl = *)
-(*   make_local_hint_db ts eapply lems gl *)
-
 (* Serait-ce possible de compiler d'abord la tactique puis de faire la
    substitution sans passer par bdize dont l'objectif est de préparer un
    terme pour l'affichage ? (HH) *)

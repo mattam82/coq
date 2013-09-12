@@ -1161,10 +1161,17 @@ let universes {evars = (sigma, uctx)} = uctx.uctx_universes
 (* Conversion w.r.t. an evar map and its local universes. *)
 
 let conversion_gen env ({evars = (sigma, uctx)} as d) pb t u =
-  let conv = match pb with 
-    | Reduction.CONV -> Reduction.trans_conv_universes
-    | Reduction.CUMUL -> Reduction.trans_conv_leq_universes
-  in conv full_transparent_state ~evars:(existential_opt_value d) env uctx.uctx_universes t u
+  match pb with 
+  | Reduction.CONV -> 
+    Reduction.trans_conv_universes 
+      full_transparent_state ~evars:(existential_opt_value d) env 
+      uctx.uctx_universes t u
+  | Reduction.CUMUL -> Reduction.trans_conv_leq_universes
+     full_transparent_state ~evars:(existential_opt_value d) env 
+     uctx.uctx_universes t u
+
+(* let conversion_gen_key = Profile.declare_profile "conversion_gen" *)
+(* let conversion_gen = Profile.profile5 conversion_gen_key conversion_gen *)
 
 let conversion env d pb t u =
   conversion_gen env d pb t u; d

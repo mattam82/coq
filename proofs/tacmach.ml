@@ -126,10 +126,6 @@ let tclIDTAC_list      = tclIDTAC_list
 
 let refiner = refiner
 
-(* Profiling refiner *)
-(* let refinerkey = Profile.declare_profile "refiner";; *)
-(* let refiner = Profile.profile2 refinerkey refiner *)
-
 (* This does not check that the variable name is not here *)
 let introduction_no_check id =
   refiner (Intro id)

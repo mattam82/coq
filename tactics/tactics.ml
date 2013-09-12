@@ -145,8 +145,12 @@ let convert_gen pb x y gl =
   try tclEVARS (pf_apply Evd.conversion gl pb x y) gl
   with Reduction.NotConvertible ->
     let env = pf_env gl in
-      tclFAIL 0 (str"Not convertible: " ++ Printer.pr_constr_env env x ++ 
-		 str" and " ++ Printer.pr_constr_env env y) gl
+      tclFAIL_lazy 0 (lazy (str"Not convertible"))
+ (* Adding more information in this message, even under the lazy, can result in huge *)
+ (* blowups, time and spacewise... (see autos used in DoubleCyclic.) 2.3s against 15s. *)
+ (* 			    ++ Printer.pr_constr_env env x ++  *)
+ (* 			    str" and " ++ Printer.pr_constr_env env y)) *)
+        gl
 
 let convert = convert_gen Reduction.CONV
 let convert_leq = convert_gen Reduction.CUMUL
@@ -1164,6 +1168,12 @@ let cut_and_apply c gl =
 (********************************************************************)
 (*               Exact tactics                                      *)
 (********************************************************************)
+
+(* let convert_leqkey = Profile.declare_profile "convert_leq";; *)
+(* let convert_leq = Profile.profile3 convert_leqkey convert_leq *)
+
+(* let refine_no_checkkey = Profile.declare_profile "refine_no_check";; *)
+(* let refine_no_check = Profile.profile2 refine_no_checkkey refine_no_check *)
 
 let exact_check c gl =
   let concl = (pf_concl gl) in
