@@ -809,7 +809,7 @@ refine
  refine (@spec_ww_sqrt t w_is_even w_0 w_1 w_Bm1
            w_sub w_add_mul_div w_digits w_zdigits _ww_zdigits
                w_sqrt2 pred add_mul_div head0 compare
-            _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _); wwauto.
+            _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _); wwauto.
  exact ZnZ.spec_zdigits.
  exact ZnZ.spec_more_than_1_digit.
  exact ZnZ.spec_is_even.

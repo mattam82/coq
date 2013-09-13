@@ -1400,7 +1400,10 @@ module Instance = struct
   let pr =
     prvect_with_sep spc Level.pr
 
-  let append = Array.append
+  let append x y =
+    if Array.length x = 0 then y
+    else if Array.length y = 0 then x 
+    else Array.append x y
 
   let max_level i = 
     if Array.is_empty i then 0
