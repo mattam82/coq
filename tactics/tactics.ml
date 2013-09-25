@@ -144,7 +144,7 @@ let thin_body       = Tacmach.thin_body
 let convert_gen pb x y gl =
   try tclEVARS (pf_apply Evd.conversion gl pb x y) gl
   with Reduction.NotConvertible ->
-      tclFAIL_lazy 0 (lazy (str"Not convertible"))
+    tclFAIL_lazy 0 (lazy (str"Not convertible"))
  (* Adding more information in this message, even under the lazy, can result in huge *)
  (* blowups, time and spacewise... (see autos used in DoubleCyclic.) 2.3s against 15s. *)
  (* 			    ++ Printer.pr_constr_env env x ++  *)
@@ -3647,7 +3647,7 @@ let intros_transitivity  n  = tclTHEN intros (transitivity_gen n)
    the current goal, abstracted with respect to the local signature,
    is solved by tac *)
 
-let interpretable_as_section_decl d1 d2 = match d1,d2 with
+let interpretable_as_section_decl d1 d2 = match d2,d1 with
   | (_,Some _,_), (_,None,_) -> false
   | (_,Some b1,t1), (_,Some b2,t2) -> eq_constr b1 b2 & eq_constr t1 t2
   | (_,None,t1), (_,_,t2) -> eq_constr t1 t2
