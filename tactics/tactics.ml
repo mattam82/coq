@@ -144,7 +144,6 @@ let thin_body       = Tacmach.thin_body
 let convert_gen pb x y gl =
   try tclEVARS (pf_apply Evd.conversion gl pb x y) gl
   with Reduction.NotConvertible ->
-    let env = pf_env gl in
       tclFAIL_lazy 0 (lazy (str"Not convertible"))
  (* Adding more information in this message, even under the lazy, can result in huge *)
  (* blowups, time and spacewise... (see autos used in DoubleCyclic.) 2.3s against 15s. *)

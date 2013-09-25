@@ -199,3 +199,6 @@ let cook_constant env r =
     (body, typ, Option.map projection cb.const_proj, 
      cb.const_polymorphic, univs, cb.const_inline_code, 
      Some const_hyps)
+
+(* let cook_constant_key = Profile.declare_profile "cook_constant" *)
+(* let cook_constant = Profile.profile2 cook_constant_key cook_constant *)

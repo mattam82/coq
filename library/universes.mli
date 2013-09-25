@@ -146,9 +146,6 @@ val type_of_global : Globnames.global_reference -> types in_universe_context_set
 val nf_evars_and_universes_local : (existential -> constr option) -> universe_level_subst -> 
   constr -> constr
 
-val nf_evars_and_universes_subst : (existential -> constr option) -> 
-  universe_subst -> constr -> constr
-
 val nf_evars_and_universes_opt_subst : (existential -> constr option) -> 
   universe_opt_subst -> constr -> constr
 

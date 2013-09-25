@@ -286,21 +286,19 @@ let make_hints g st only_classes sign =
     (PathEmpty, []) sign
   in Hint_db.add_list hintlist (Hint_db.empty st true)
 
-let autogoal_hints_cache
-    : (bool * Environ.named_context_val * hint_db) option ref
-    = Summary.ref None ~name:"autogoal-hints-cache"
-let freeze () = !autogoal_hints_cache
-let unfreeze v = autogoal_hints_cache := v
-
 let make_autogoal_hints =
-  fun only_classes ?(st=full_transparent_state) g ->
-    let sign = pf_filtered_hyps g in
-      match freeze () with
-      | Some (onlyc, sign', hints) 
-	  when onlyc = only_classes && 
-	    Environ.eq_named_context_val sign sign' -> hints
-      | _ -> let hints = make_hints g st only_classes (Environ.named_context_of_val sign) in
-	  unfreeze (Some (only_classes, sign, hints)); hints
+  let cache = ref (true, Environ.empty_named_context_val, 
+		   Hint_db.empty full_transparent_state true) 
+  in
+    fun only_classes ?(st=full_transparent_state) g ->
+      let sign = pf_filtered_hyps g in
+      let (onlyc, sign', cached_hints) = !cache in
+	if onlyc == only_classes && 
+	  (sign == sign' || Environ.eq_named_context_val sign sign') then
+	  cached_hints
+	else
+	  let hints = make_hints g st only_classes (Environ.named_context_of_val sign) in
+	    cache := (only_classes, sign, hints); hints
 	  
 let lift_tactic tac (f : goal list sigma -> autoinfo -> autogoal list sigma) : 'a tac =
   { skft = fun sk fk {it = gl,hints; sigma=s} ->

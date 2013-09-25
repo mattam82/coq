@@ -846,7 +846,7 @@ refine
   intros (Hn,Hn').
   assert (E : ZnZ.to_Z y = [|WW x y|] mod wB).
   { simpl; symmetry.
-    rewrite Z.add_comm, Z.mod_add; auto with zarith.
+    rewrite Z.add_comm, Z.mod_add; auto with zarith nocore.
     apply Z.mod_small; eauto with ZnZ zarith. }
   rewrite E.
   unfold wB, base. symmetry. apply Z.mod_pow2_bits_low; auto.
@@ -922,6 +922,7 @@ refine
  Qed.
 
 End Z_2nZ.
+
 
 Section MulAdd.
 

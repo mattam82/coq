@@ -240,7 +240,7 @@ let check_instance env sigma c =
   try 
     let (evd, c) = resolve_one_typeclass env sigma
       (Retyping.get_type_of env sigma c) in
-      Evd.has_undefined evd
+      not (Evd.has_undefined evd)
   with e when Errors.noncritical e -> false
 
 let build_subclasses ~check env sigma glob pri =
