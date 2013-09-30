@@ -106,7 +106,7 @@ let position_problem l2r = function
 
 let check_conv_record (t1,sk1) (t2,sk2) =
   try
-    let proji, u = Universes.global_of_constr t1 in
+    let (proji, u), arg = Universes.global_app_of_constr t1 in
     let canon_s,sk2_effective =
       try
 	match kind_of_term t2 with
@@ -125,7 +125,11 @@ let check_conv_record (t1,sk1) (t2,sk2) =
     let { o_DEF = c; o_CTX = ctx; o_INJ=n; o_TABS = bs;
           o_TPARAMS = params; o_NPARAMS = nparams; o_TCOMPS = us } = canon_s in
     let params1, c1, extra_args1 =
-      match strip_n_app nparams sk1 with
+      match arg with
+      | Some c -> (* A primitive projection applied to c *)
+	[], c, sk1
+      | None ->
+	match strip_n_app nparams sk1 with
 	| Some (params1, c1,extra_args1) -> params1, c1, extra_args1
 	| _ -> raise Not_found in
     let us2,extra_args2 =

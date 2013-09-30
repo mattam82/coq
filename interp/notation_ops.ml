@@ -55,6 +55,7 @@ let ldots_var = Id.of_string ".."
 let glob_constr_of_notation_constr_with_binders loc g f e = function
   | NVar id -> GVar (loc,id)
   | NApp (a,args) -> GApp (loc,f e a, List.map (f e) args)
+  | NProj (p,c) -> GProj (loc,p,f e c)
   | NList (x,y,iter,tail,swap) ->
       let t = f e tail in let it = f e iter in
       let innerl = (ldots_var,t)::(if swap then [] else [x,GVar(loc,y)]) in
@@ -149,6 +150,7 @@ let compare_glob_constr f add t1 t2 = match t1,t2 with
   | GRef (_,r1,_), GRef (_,r2,_) -> eq_gr r1 r2
   | GVar (_,v1), GVar (_,v2) -> on_true_do (Id.equal v1 v2) add (Name v1)
   | GApp (_,f1,l1), GApp (_,f2,l2) -> f f1 f2 && List.for_all2eq f l1 l2
+  | GProj (_,p1,c1), GProj (_, p2, c2) -> eq_constant p1 p2 && f c1 c2
   | GLambda (_,na1,bk1,ty1,c1), GLambda (_,na2,bk2,ty2,c2)
     when Name.equal na1 na2 && Constrexpr_ops.binding_kind_eq bk1 bk2 ->
     on_true_do (f ty1 ty2 & f c1 c2) add na1
@@ -164,7 +166,7 @@ let compare_glob_constr f add t1 t2 = match t1,t2 with
   | _,(GCases _ | GRec _
       | GPatVar _ | GEvar _ | GLetTuple _ | GIf _ | GCast _)
       -> error "Unsupported construction in recursive notations."
-  | (GRef _ | GVar _ | GApp _ | GLambda _ | GProd _
+  | (GRef _ | GVar _ | GApp _ | GProj _ | GLambda _ | GProd _
     | GHole _ | GSort _ | GLetIn _), _
       -> false
 
@@ -259,6 +261,7 @@ let notation_constr_and_vars_of_glob_constr a =
   and aux' = function
   | GVar (_,id) -> add_id found id; NVar id
   | GApp (_,g,args) -> NApp (aux g, List.map aux args)
+  | GProj (_,p,c) -> NProj (p, aux c)
   | GLambda (_,na,bk,ty,c) -> add_name found na; NLambda (na,aux ty,aux c)
   | GProd (_,na,bk,ty,c) -> add_name found na; NProd (na,aux ty,aux c)
   | GLetIn (_,na,b,c) -> add_name found na; NLetIn (na,aux b,aux c)
@@ -372,6 +375,12 @@ let rec subst_notation_constr subst bound raw =
       and rl' = List.smartmap (subst_notation_constr subst bound) rl in
 	if r' == r && rl' == rl then raw else
 	  NApp(r',rl')
+
+  | NProj (p,c) ->
+      let p' = subst_constant subst p in
+      let c' = subst_notation_constr subst bound c in
+	if p == p' && c == c' then raw else
+	  NProj (p',c')
 
   | NList (id1,id2,r1,r2,b) ->
       let r1' = subst_notation_constr subst bound r1

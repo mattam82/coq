@@ -31,5 +31,5 @@ val translate_recipe : env -> kernel_name -> Cooking.recipe -> constant_body
 
 (** Internal functions, mentioned here for debug purpose only *)
 
-val infer_declaration : env -> constant_entry -> Cooking.result
+val infer_declaration : env -> kernel_name -> constant_entry -> Cooking.result
 val build_constant_declaration : env -> kernel_name -> Cooking.result -> constant_body

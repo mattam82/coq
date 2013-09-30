@@ -61,21 +61,10 @@ let check_declared_variables declared inferred =
               (String.concat ", "
                  (List.map Id.to_string (Id.Set.elements undeclared_set))))
 
-let infer_declaration env = function
+let infer_declaration env kn = function
   | DefinitionEntry c ->
     let env' = push_context c.const_entry_universes env in
-    let j = infer env' c.const_entry_body in
-    let j =
-      {uj_val = hcons_constr j.uj_val;
-       uj_type = hcons_constr j.uj_type} in
-    let typ = constrain_type env' j
-      c.const_entry_polymorphic c.const_entry_type in
-    let def =
-      if c.const_entry_opaque
-      then OpaqueDef (Lazyconstr.opaque_from_val j.uj_val)
-      else Def (Lazyconstr.from_val j.uj_val)
-    in
-    let proj = 
+    let def, typ, proj = 
       match c.const_entry_proj with
       | Some (ind, n, m, ty) ->
         (* FIXME: check projection *)
@@ -83,11 +72,29 @@ let infer_declaration env = function
 		   proj_npars = n;
 		   proj_arg = m;
 		   proj_type = ty }
-	in Some pb
-      | None -> None
+	in 
+	let body = mkProj (constant_of_kn kn, mkRel 1) in
+	let context, typ = decompose_prod_n_assum (n + 1) (Option.get c.const_entry_type) in 
+	let body = it_mkLambda_or_LetIn body context in
+	(* let tj = infer_type env' (Option.get c.const_entry_type) in *)
+	  Def (Lazyconstr.from_val (hcons_constr body)),
+	  hcons_constr (Option.get c.const_entry_type), Some pb
+      | None -> 
+	let j = infer env' c.const_entry_body in
+	let j =
+	  {uj_val = hcons_constr j.uj_val;
+	   uj_type = hcons_constr j.uj_type} in
+	let typ = constrain_type env' j
+	  c.const_entry_polymorphic c.const_entry_type in
+	let def =
+	  if c.const_entry_opaque
+	  then OpaqueDef (Lazyconstr.opaque_from_val j.uj_val)
+	  else Def (Lazyconstr.from_val j.uj_val)
+	in
+	  def, typ, None
     in
       def, typ, proj, c.const_entry_polymorphic, c.const_entry_universes,
-        c.const_entry_inline_code, c.const_entry_secctx
+      c.const_entry_inline_code, c.const_entry_secctx
   | ParameterEntry (ctx,poly,(t,uctx),nl) ->
     let env' = push_context uctx env in
     let j = infer env' t in
@@ -112,7 +119,12 @@ let build_constant_declaration env kn (def,typ,proj,poly,univs,inline_code,ctx) 
         check_declared_variables declared inferred;
         declared
   in
-  let tps = Cemitcodes.from_val (compile_constant_body env def) in
+  let tps = 
+    (*FIXME*) 
+    if proj = None then
+      Cemitcodes.from_val (compile_constant_body env def) 
+    else Cemitcodes.from_val Cemitcodes.BCconstant
+  in
   { const_hyps = hyps;
     const_body = def;
     const_type = typ;
@@ -126,7 +138,7 @@ let build_constant_declaration env kn (def,typ,proj,poly,univs,inline_code,ctx) 
 (*s Global and local constant declaration. *)
 
 let translate_constant env kn ce =
-  build_constant_declaration env kn (infer_declaration env ce)
+  build_constant_declaration env kn (infer_declaration env kn ce)
 
 let translate_recipe env kn r =
   build_constant_declaration env kn (Cooking.cook_constant env r)

@@ -396,10 +396,11 @@ let compute_constant_implicits flags manual cst =
   let cb = Environ.lookup_constant cst env in
   let ty = cb.const_type in
   let impls = compute_semi_auto_implicits env flags manual ty in
-    match cb.const_proj with
-    | None -> impls
-    | Some {proj_npars = n} -> 
-    List.map (fun (x,args) -> x, CList.skipn_at_least n args) impls
+    impls
+    (* match cb.const_proj with *)
+    (* | None -> impls *)
+    (* | Some {proj_npars = n} ->  *)
+    (* List.map (fun (x,args) -> x, CList.skipn_at_least n args) impls *)
 
 (*s Inductives and constructors. Their implicit arguments are stored
    in an array, indexed by the inductive number, of pairs $(i,v)$ where
@@ -532,16 +533,16 @@ let discharge_implicits (_,(req,l)) =
   | ImplInteractive (ref,flags,exp) ->
     (try
       let vars,_ = section_segment_of_reference ref in
-      let isproj = 
-	 match ref with
-	 | ConstRef cst -> is_projection cst (Global.env ())
-	 | _ -> false
-      in
+      (* let isproj =  *)
+      (* 	 match ref with *)
+      (* 	 | ConstRef cst -> is_projection cst (Global.env ()) *)
+      (* 	 | _ -> false *)
+      (* in *)
       let ref' = if isVarRef ref then ref else pop_global_reference ref in
       let extra_impls = impls_of_context vars in
       let l' = 
-	if isproj then [ref',snd (List.hd l)]
-	else
+	(* if isproj then [ref',snd (List.hd l)] *)
+	(* else *)
 	  [ref', List.map (add_section_impls vars extra_impls) (snd (List.hd l))] in
       Some (ImplInteractive (ref',flags,exp),l')
     with Not_found -> (* ref not defined in this section *) Some (req,l))
@@ -551,8 +552,8 @@ let discharge_implicits (_,(req,l)) =
       let vars,_ = section_segment_of_constant con in
       let extra_impls = impls_of_context vars in
       let newimpls = 
-	if is_projection con (Global.env()) then (snd (List.hd l))
-	else List.map (add_section_impls vars extra_impls) (snd (List.hd l))
+	(* if is_projection con (Global.env()) then (snd (List.hd l)) *)
+	(* else *) List.map (add_section_impls vars extra_impls) (snd (List.hd l))
       in
       let l' = [ConstRef con',newimpls] in
 	Some (ImplConstant (con',flags),l')
@@ -670,19 +671,16 @@ let check_rigidity isrigid =
   if not isrigid then
     errorlabstrm "" (strbrk "Multiple sequences of implicit arguments available only for references that cannot be applied to an arbitrarily large number of arguments.")
 
+let projection_implicits env p (x, impls) = 
+  let pb = Environ.lookup_projection p env in
+    x, CList.skipn_at_least pb.Declarations.proj_npars impls
+
 let declare_manual_implicits local ref ?enriching l =
   let flags = !implicit_args in
   let env = Global.env () in
   let t = Global.type_of_global_unsafe ref in
   let enriching = Option.default flags.auto enriching in
   let isrigid,autoimpls = compute_auto_implicits env flags enriching t in
-  let autoimpls = 
-    match ref with
-    | ConstRef cst when is_projection cst env ->
-      let pb = Environ.lookup_projection cst env in
-	CList.skipn_at_least pb.Declarations.proj_npars autoimpls
-    | _ -> autoimpls
-  in
   let l' = match l with
     | [] -> assert false
     | [l] ->

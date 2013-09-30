@@ -71,6 +71,7 @@ Record retract_cond : Prop :=
   {i2 : A -> B; j2 : B -> A; inv2 : retract -> forall a:A, j2 (i2 a) = a}.
 
 (** The dependent elimination above implies the axiom of choice: *)
+
 Lemma AC : forall r:retract_cond, retract -> forall a:A, r.(j2) (r.(i2) a) = a.
 Proof. intros r. exact r.(inv2). Qed.
 
@@ -108,7 +109,7 @@ Proof.
 exists g f.
 intro a.
 unfold f, g; simpl.
-apply AC.
+apply AC. 
 exists (fun x:pow U => x) (fun x:pow U => x).
 trivial.
 Qed.
@@ -126,9 +127,11 @@ Lemma not_has_fixpoint : R R = Not_b (R R).
 Proof.
 unfold R at 1.
 unfold g.
-rewrite AC with (r := L1 U U) (a := fun u:U => Not_b (u U u)).
+unfold j2, i2. 
+rewrite AC.
 trivial.
-exists (fun x:pow U => x) (fun x:pow U => x); trivial.
+exists (fun x:pow U => x) (fun x:pow U => x).
+trivial.
 Qed.
 
 

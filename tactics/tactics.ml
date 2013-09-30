@@ -991,7 +991,7 @@ let make_projection env sigma params cstr sign elim i n c =
 	  let proj = mkProj (proj, mkApp (c, args)) in
 	  let app = it_mkLambda_or_LetIn proj sign in
 	  let t = Retyping.get_type_of env sigma app in
-	    Some (proj, t)
+	    Some (app, t)
       | None -> None
   in elim
 

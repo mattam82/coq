@@ -664,9 +664,22 @@ let rec extern inctx scopes vars r =
 		       (select_stronger_impargs (implicits_of_global ref))
 		       (Some ref,extern_reference rloc vars ref) (extern_universes us) args
 	     end
+
+	 | GProj (loc,p,c) ->
+	   let ref = ConstRef p in
+	   let subscopes = find_arguments_scope ref in
+	   let args =
+	     extern_args (extern true) (snd scopes) vars (c :: args) subscopes 
+	   in
+	     extern_app loc inctx [] (Some ref, extern_reference loc vars ref)
+	       None args
+	       
 	 | _       ->
-	     explicitize loc inctx [] (None,sub_extern false scopes vars f)
-               (List.map (sub_extern true scopes vars) args))
+	   explicitize loc inctx [] (None,sub_extern false scopes vars f)
+             (List.map (sub_extern true scopes vars) args))
+
+  | GProj (loc,p,c) ->
+    extern inctx scopes vars (GApp (loc,r',[]))
 
   | GLetIn (loc,na,t,c) ->
       CLetIn (loc,(loc,na),sub_extern false scopes vars t,

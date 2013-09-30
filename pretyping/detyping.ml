@@ -424,7 +424,7 @@ let rec detype (isgoal:bool) avoid env t =
         (*       Array.map_to_list (detype isgoal avoid env) args) *)
     | Const (sp,u) -> GRef (dl, ConstRef sp, option_of_instance u)
     | Proj (p,c) ->
-        GApp (dl,GRef(dl,ConstRef p,None),[detype isgoal avoid env c])
+        GProj (dl, p, detype isgoal avoid env c)
     | Evar (ev,cl) ->
         GEvar (dl, ev,
                Some (List.map (detype isgoal avoid env) (Array.to_list cl)))
@@ -617,6 +617,12 @@ let rec subst_glob_constr subst raw =
       and rl' = List.smartmap (subst_glob_constr subst) rl in
 	if r' == r && rl' == rl then raw else
 	  GApp(loc,r',rl')
+
+  | GProj (loc,p,c) -> 
+    let p' = subst_constant subst p in
+    let c' = subst_glob_constr subst c in
+      if p' == p && c' == c then raw
+      else GProj (loc,p',c')
 
   | GLambda (loc,n,bk,r1,r2) ->
       let r1' = subst_glob_constr subst r1 and r2' = subst_glob_constr subst r2 in

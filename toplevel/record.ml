@@ -242,11 +242,13 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
               | None ->
 	        (* [ccl] is defined in context [params;x:rp] *)
 		(* [ccl'] is defined in context [params;x:rp;x:rp] *)
-		let ccl' = liftn 1 2 ccl in
-		let p = mkLambda (x, lift 1 rp, ccl') in
-		let branch = it_mkLambda_or_LetIn (mkRel nfi) lifted_fields in
-		let ci = Inductiveops.make_case_info env indsp LetStyle in
-		mkCase (ci, p, mkRel 1, [|branch|]) in
+		(* let ccl' = liftn 1 2 ccl in *)
+		(* let p = mkLambda (x, lift 1 rp, ccl') in *)
+		(* let branch = it_mkLambda_or_LetIn (mkRel nfi) lifted_fields in *)
+		(* let ci = Inductiveops.make_case_info env indsp LetStyle in *)
+		(* mkCase (ci, p, mkRel 1, [|branch|]) in *)
+		mkRel 1
+	      in
 	      let proj =
 	        it_mkLambda_or_LetIn (mkLambda (x,rp,body)) paramdecls in
               let projtyp =
@@ -457,7 +459,7 @@ let definition_structure (kind,poly,finite,infer,(is_coe,(loc,idstruc)),ps,cfs,i
 	gr
     | _ ->
 	let implfs = List.map
-	  (fun impls -> (* implpars @  *)Impargs.lift_implicits
+	  (fun impls -> implpars @ Impargs.lift_implicits
 	    (succ (List.length params)) impls) implfs in
 	let ind = declare_structure finite infer poly ctx idstruc 
 	  idbuild implpars params arity implfs 
