@@ -36,6 +36,7 @@ type projection_body = {
   proj_npars : int;
   proj_arg : int;
   proj_type : types; (* Type under params *)
+  proj_body : constr; (* For compatibility, the match version *)
 }
 
 type constant_def =

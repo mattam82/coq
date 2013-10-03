@@ -119,6 +119,10 @@ let expmod_constr modlist c =
 	     let p' = share_univs (ConstRef p) Univ.Instance.empty modlist in
 	     match kind_of_term p' with
 	     | Const (p',_) -> mkProj (p', substrec c')
+	     | App (f, args) -> 
+	       (match kind_of_term f with 
+	       | Const (p', _) -> mkProj (p', substrec c')
+	       | _ -> assert false)
 	     | _ -> assert false
 	   with Not_found -> map_constr substrec c)
 
@@ -182,6 +186,7 @@ let cook_constant env r =
     abstract_constant_type (expmod_constr r.d_modlist cb.const_type) hyps 
   in
   let projection pb =
+    let c' = abstract_constant_body (expmod_constr r.d_modlist pb.proj_body) hyps in
     let ((mind, _), _), n' =
       try 
 	let c' = share_univs (IndRef (pb.proj_ind,0)) Univ.Instance.empty r.d_modlist in
@@ -193,7 +198,7 @@ let cook_constant env r =
     in 
     let ctx, ty' = decompose_prod_n (n' + pb.proj_npars + 1) typ in
       { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
-	 proj_type = ty' }
+	proj_type = ty'; proj_body = c' }
   in
   let univs = UContext.union abs_ctx cb.const_universes in
     (body, typ, Option.map projection cb.const_proj, 

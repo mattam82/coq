@@ -59,9 +59,9 @@ Qed.
 
 
 Add Relation R req
-  reflexivity proved by sor.(SORsetoid).(@Equivalence_Reflexive)
-  symmetry proved by sor.(SORsetoid).(@Equivalence_Symmetric)
-  transitivity proved by sor.(SORsetoid).(@Equivalence_Transitive)
+  reflexivity proved by sor.(SORsetoid).(@Equivalence_Reflexive _ _)
+  symmetry proved by sor.(SORsetoid).(@Equivalence_Symmetric _ _)
+  transitivity proved by sor.(SORsetoid).(@Equivalence_Transitive _ _)
 as sor_setoid.
 
 Add Morphism rplus with signature req ==> req ==> req as rplus_morph.

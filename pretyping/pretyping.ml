@@ -449,7 +449,7 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
       (* j.uj_val :: args) ctx pars [] *)
       in (ind, List.rev args)
     in
-    let tycon =
+    let argtycon =
       match arg with
       | GHole (loc, k) -> (* Typeclass projection application: 
 			     create the necessary type constraint *)
@@ -457,17 +457,17 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
 	  mk_tycon (applist (mkIndU ind, args))
       | _ -> empty_tycon
     in
-    let recty = pretype tycon env evdref lvar arg in
+    let recty = pretype argtycon env evdref lvar arg in
     let recty, ((ind,u), pars) = 
       try
 	let IndType (indf, _ (*[]*)) = 
 	  find_rectype env !evdref recty.uj_type
 	in recty, dest_ind_family indf
       with Not_found -> 
-	(match tycon with
-	| Some ty -> 
-	  let IndType (indf, _) = find_rectype env !evdref ty in
-	    recty, dest_ind_family indf
+	(match argtycon with
+	| Some ty -> assert false
+	  (* let IndType (indf, _) = find_rectype env !evdref ty in *)
+	  (*   recty, dest_ind_family indf *)
 	| None -> 
 	  let ind, args = mk_ty Evar_kinds.InternalHole in
 	  let j' = 
@@ -478,8 +478,9 @@ let rec pretype (tycon : type_constraint) env evdref lvar = function
     let usubst = make_inductive_subst (fst (lookup_mind_specif env ind)) u in
     let ty = Vars.subst_univs_constr usubst ty in
     let ty = substl (recty.uj_val :: List.rev pars) ty in
-      {uj_val = mkProj (cst,recty.uj_val); uj_type = ty}
-	
+    let j = {uj_val = mkProj (cst,recty.uj_val); uj_type = ty} in
+      inh_conv_coerce_to_tycon loc env evdref j tycon
+
   | GApp (loc,f,args) ->
     let fj = pretype empty_tycon env evdref lvar f in
     let floc = loc_of_glob_constr f in

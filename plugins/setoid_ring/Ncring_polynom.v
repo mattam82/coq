@@ -520,28 +520,28 @@ Definition pow_N_gen (R:Type)(x1:R)(m:R->R->R)(x:R) (p:N) :=
   Proof.
    intros.
    induction pe.
-Esimpl3. Esimpl3. simpl.
- rewrite IHpe1;rewrite IHpe2.
- destruct pe2; Esimpl3. 
-unfold Psub.
-destruct pe1; destruct pe2; rewrite Padd_ok; rewrite Popp_ok; reflexivity.
-simpl. unfold Psub. rewrite IHpe1;rewrite IHpe2.
-destruct pe1. destruct pe2; rewrite Padd_ok; rewrite Popp_ok; try reflexivity.
-Esimpl3. Esimpl3. Esimpl3. Esimpl3. Esimpl3. Esimpl3.
- Esimpl3. Esimpl3. Esimpl3. Esimpl3. Esimpl3. Esimpl3. Esimpl3.
-simpl. rewrite IHpe1;rewrite IHpe2. rewrite Pmul_ok. reflexivity.
-simpl. rewrite IHpe; Esimpl3. 
-simpl.
-   rewrite Ppow_N_ok; (intros;try reflexivity). 
-   rewrite rpow_pow_N.  Esimpl3.
-   induction n;simpl. Esimpl3. induction p; simpl.
-  try rewrite IHp;try rewrite IHpe;
- repeat rewrite Pms_ok;
-      repeat rewrite Pmul_ok;reflexivity.
-rewrite Pmul_ok. try rewrite IHp;try rewrite IHpe;
- repeat rewrite Pms_ok;
-      repeat rewrite Pmul_ok;reflexivity. trivial.
-exact pow_th.
+   - Esimpl3. 
+   - Esimpl3. 
+   - simpl.
+     rewrite IHpe1;rewrite IHpe2.
+     destruct pe2; Esimpl3. 
+     unfold Psub.
+     destruct pe1; destruct pe2; rewrite Padd_ok; rewrite Popp_ok; reflexivity.
+   - simpl. unfold Psub. rewrite IHpe1;rewrite IHpe2.
+     now destruct pe1; 
+       [destruct pe2; rewrite Padd_ok; rewrite Popp_ok; Esimpl3 | Esimpl3..]. 
+   - simpl. rewrite IHpe1;rewrite IHpe2. rewrite Pmul_ok. reflexivity.
+   - now simpl; rewrite IHpe; Esimpl3. 
+   - simpl.
+     rewrite Ppow_N_ok; (intros;try reflexivity). 
+     rewrite @rpow_pow_N; [| now apply pow_th]. 
+     induction n;simpl; [now Esimpl3|]. 
+     induction p; simpl; trivial.
+     + try rewrite IHp;try rewrite IHpe;
+         repeat rewrite Pms_ok; repeat rewrite Pmul_ok;reflexivity.
+     + rewrite Pmul_ok. 
+       try rewrite IHp;try rewrite IHpe; repeat rewrite Pms_ok;
+         repeat rewrite Pmul_ok;reflexivity. 
   Qed.
 
  Lemma norm_subst_spec :

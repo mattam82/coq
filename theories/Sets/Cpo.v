@@ -103,6 +103,6 @@ Section Specific_orders.
 
   Record Chain : Type := Definition_of_chain
     {PO_of_chain : PO U;
-    Chain_cond : Totally_ordered U PO_of_chain (Carrier_of PO_of_chain)}.
+    Chain_cond : Totally_ordered U PO_of_chain PO_of_chain.(Carrier_of)}.
 
 End Specific_orders.

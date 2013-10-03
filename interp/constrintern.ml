@@ -654,18 +654,33 @@ let intern_var genv (ltacvars,ntnvars) namedctx loc id =
 	(* [id] a goal variable *)
 	GVar (loc,id), [], [], []
 
-let find_appl_head_data = function
-  | GRef (_,ref,_) as x -> x,implicits_of_global ref,find_arguments_scope ref,[]
+let is_projection_ref = function
+  | ConstRef r -> if Environ.is_projection r (Global.env ()) then Some r else None
+  | _ -> None
+
+let find_appl_head_data c =
+  match c with
+  | GRef (loc,ref,_) as x -> 
+    let impls = implicits_of_global ref in
+    let isproj, impls = 
+      match is_projection_ref ref with
+      | Some r -> true, List.map (projection_implicits (Global.env ()) r) impls
+      | None -> false, impls
+    in
+    let scopes = find_arguments_scope ref in
+      x, isproj, impls, scopes, []
   | GApp (_,GRef (_,ref,_),l) as x
       when l != [] & Flags.version_strictly_greater Flags.V8_2 ->
       let n = List.length l in
-      x,List.map (drop_first_implicits n) (implicits_of_global ref),
-      List.skipn_at_least n (find_arguments_scope ref),[]
-  | GProj (_,p,c) as x -> 
-    let impls = implicits_of_global (ConstRef p) in
-    let scopes = find_arguments_scope (ConstRef p) in
-      x, List.map (projection_implicits (Global.env ()) p) impls, scopes, []
-  | x -> x,[],[],[]
+      let impls = implicits_of_global ref in 
+      let isproj, impls = 
+	match is_projection_ref ref with
+	| Some r -> true, List.map (projection_implicits (Global.env ()) r) impls
+	| None -> false, impls
+      in
+	x, isproj, List.map (drop_first_implicits n) impls,
+	List.skipn_at_least n (find_arguments_scope ref),[]
+  | x -> x,false,[],[],[]
 
 let error_not_enough_arguments loc =
   user_err_loc (loc,"",str "Abbreviation is not applied enough.")
@@ -714,20 +729,9 @@ let intern_reference ref =
   Smartlocate.global_of_extended_global r
 
 (* Is it a global reference or a syntactic definition? *)
-let intern_qualid loc qid intern env lvar isproj args =
+let intern_qualid loc qid intern env lvar args =
   match intern_extended_global_of_qualid (loc,qid) with
-  | TrueGlobal ref ->
-      (match ref, isproj with 
-      | ConstRef c, Some _ -> 
-	let arg, args = match args with
-	  | hd :: tl -> fst hd, tl
-	  | [] -> user_err_loc (loc,"",str "Projection is not applied enough.")
-	in
-	  GProj (loc, c, intern env arg), args
-      (* | _, Some _ -> *)
-      (* 	user_err_loc (loc,"",str "Not a projection") *)
-      | _, _ ->
-	GRef (loc, ref, None), args)
+  | TrueGlobal ref -> GRef (loc, ref, None), args
   | SynDef sp ->
       let (ids,c) = Syntax_def.search_syntactic_definition sp in
       let nids = List.length ids in
@@ -738,37 +742,39 @@ let intern_qualid loc qid intern env lvar isproj args =
       subst_aconstr_in_glob_constr loc intern lvar (subst,[],[]) ([],env) c, args2
 
 (* Rule out section vars since these should have been found by intern_var *)
-let intern_non_secvar_qualid loc qid intern env lvar isproj args =
-  match intern_qualid loc qid intern env lvar isproj args with
+let intern_non_secvar_qualid loc qid intern env lvar args =
+  match intern_qualid loc qid intern env lvar args with
     | GRef (_, VarRef _, _),_ -> raise Not_found
     | r -> r
 
-let intern_applied_reference intern env namedctx lvar isproj args = function
+let intern_applied_reference intern env namedctx lvar args = function
   | Qualid (loc, qid) ->
       let r,args2 =
-	try intern_qualid loc qid intern env lvar isproj args
+	try intern_qualid loc qid intern env lvar args
 	with Not_found -> error_global_not_found_loc loc qid
       in
-      find_appl_head_data r, args2
+      let x, isproj, imp, scopes, l = find_appl_head_data r in
+	(x,imp,scopes,l), isproj, args2
   | Ident (loc, id) ->
-      try intern_var env lvar namedctx loc id, args
+      try intern_var env lvar namedctx loc id, false, args
       with Not_found ->
       let qid = qualid_of_ident id in
       try
-	let r,args2 = intern_non_secvar_qualid loc qid intern env lvar isproj args in
-	find_appl_head_data r, args2
+	let r,args2 = intern_non_secvar_qualid loc qid intern env lvar args in
+	let x, isproj, imp, scopes, l = find_appl_head_data r in
+	  (x,imp,scopes,l), isproj, args2
       with Not_found ->
 	(* Extra allowance for non globalizing functions *)
 	if !interning_grammar || env.unb then
-	  (GVar (loc,id), [], [], []),args
+	  (GVar (loc,id), [], [], []), false, args
 	else error_global_not_found_loc loc qid
 
 let interp_reference vars r =
-  let (r,_,_,_),_ =
+  let (r,_,_,_),_,_ =
     intern_applied_reference (fun _ -> error_not_enough_arguments Loc.ghost)
       {ids = Id.Set.empty; unb = false ;
        tmp_scope = None; scopes = []; impls = empty_internalization_env} []
-      (vars,[]) None [] r
+      (vars,[]) [] r
   in r
 
 (**********************************************************************)
@@ -1266,6 +1272,7 @@ let get_implicit_name n imps =
 
 let set_hole_implicit i b = function
   | GRef (loc,r,_) | GApp (_,GRef (loc,r,_),_) -> (loc,Evar_kinds.ImplicitArg (r,i,b))
+  | GProj (loc,p,_) -> (loc,Evar_kinds.ImplicitArg (ConstRef p,i,b))
   | GVar (loc,id) -> (loc,Evar_kinds.ImplicitArg (VarRef id,i,b))
   | _ -> anomaly (Pp.str "Only refs have implicits")
 
@@ -1309,14 +1316,17 @@ let extract_explicit_arg imps args =
 (**********************************************************************)
 (* Main loop                                                          *)
 
+let is_projection_ref env = function
+  | ConstRef c -> Environ.is_projection c env
+  | _ -> false
+
 let internalize sigma globalenv env allow_patvar lvar c =
   let rec intern env = function
     | CRef (ref,us) as x ->
-	let (c,imp,subscopes,l),_ =
-	  intern_applied_reference intern env (Environ.named_context globalenv) lvar None [] ref in
-	(match intern_impargs c env imp subscopes l with
-           | [] -> c
-           | l -> GApp (constr_loc x, c, l))
+	let (c,imp,subscopes,l),isproj,_ =
+	  intern_applied_reference intern env (Environ.named_context globalenv) lvar [] ref in
+	  apply_impargs (None, isproj) c env imp subscopes l (constr_loc x)
+
     | CFix (loc, (locid,iddef), dl) ->
         let lf = List.map (fun ((_, id),_,_,_,_) -> id) dl in
         let dl = Array.of_list dl in
@@ -1410,13 +1420,14 @@ let internalize sigma globalenv env allow_patvar lvar c =
 	intern {env with tmp_scope = None;
 		  scopes = find_delimiters_scope loc key :: env.scopes} e
     | CAppExpl (loc, (isproj,ref,us), args) ->
-        let (f,_,args_scopes,_),args =
+        let (f,_,args_scopes,_),_,args =
 	  let args = List.map (fun a -> (a,None)) args in
 	  intern_applied_reference intern env (Environ.named_context globalenv) 
-	    lvar isproj args ref in
+	    lvar args ref in
 	(* check_projection isproj (List.length args) f; *)
 	(* Rem: GApp(_,f,[]) stands for @f *)
 	  GApp (loc, f, intern_args env args_scopes (List.map fst args))
+
     | CApp (loc, (isproj,f), args) ->
         let isproj,f,args = match f with
           (* Compact notations like "t.(f args') args" *)
@@ -1424,22 +1435,19 @@ let internalize sigma globalenv env allow_patvar lvar c =
 	    isproj',f,args'@args
           (* Don't compact "(f args') args" to resolve implicits separately *)
           | _ -> isproj,f,args in
-	let (c,impargs,args_scopes,l),args =
+	let (c,impargs,args_scopes,l),isprojf,args =
           match f with
             | CRef (ref,us) -> 
 	       intern_applied_reference intern env
-		 (Environ.named_context globalenv) lvar isproj args ref
+		 (Environ.named_context globalenv) lvar args ref
             | CNotation (loc,ntn,([],[],[])) ->
                 let c = intern_notation intern env lvar loc ntn ([],[],[]) in
-                find_appl_head_data c, args
-            | x -> (intern env f,[],[],[]), args in
-	let args =
-          intern_impargs c env impargs args_scopes (merge_impargs l args) in
-	(* check_projection isproj (List.length args) c; *)
-	(match c with
-          (* Now compact "(f args') args" *)
-	  | GApp (loc', f', args') -> GApp (Loc.merge loc' loc, f',args'@args)
-	  | _ -> GApp (loc, c, args))
+                let x, isproj, impl, scopes, l = find_appl_head_data c in
+		  (x,impl,scopes,l), false, args
+            | x -> (intern env f,[],[],[]), false, args in
+          apply_impargs (isproj,isprojf) c env impargs args_scopes 
+	    (merge_impargs l args) loc
+
     | CRecord (loc, _, fs) ->
 	let cargs =
 	  sort_fields true loc fs
@@ -1651,6 +1659,41 @@ let internalize sigma globalenv env allow_patvar lvar c =
 	  intern_args env subscopes rargs
     in aux 1 l subscopes eargs rargs
 
+  and make_first_explicit (l, r) =
+    match r with
+    | hd :: tl -> l, None :: tl
+    | [] -> l, []
+
+  and apply_impargs (isproj,isprojf) c env imp subscopes l loc = 
+    let l = 
+      let imp = 
+	if isprojf && isproj <> None then 
+	  (* Drop first implicit which corresponds to record given in c.(p) notation *)
+	  List.map make_first_explicit imp
+	else imp
+      in intern_impargs c env imp subscopes l
+    in
+      if isprojf then
+	match c, l with
+	| GApp (loc', GRef (loc'', ConstRef f, _), hd :: tl), rest ->
+	  let proj = GProj (Loc.merge loc'' (loc_of_glob_constr hd), f, hd) in
+	    if List.is_empty tl then smart_gapp proj loc rest
+	    else GApp (loc, proj, tl @ rest)
+	| GRef (loc', ConstRef f, _), hd :: tl -> 
+	  let proj = GProj (Loc.merge loc' (loc_of_glob_constr hd), f, hd) in
+	    smart_gapp proj loc tl
+	| _ -> user_err_loc (loc, "apply_impargs", 
+			     str"Projection is not applied to enough arguments")
+      else 
+	(* check_projection isproj *)
+	smart_gapp c loc l
+
+  and smart_gapp f loc = function
+    | [] -> f
+    | l -> match f with 
+      | GApp (loc', g, args) -> GApp (Loc.merge loc' loc, g, args@l)
+      | _ -> GApp (Loc.merge (loc_of_glob_constr f) loc, f, l)
+      
   and intern_args env subscopes = function
     | [] -> []
     | a::args ->

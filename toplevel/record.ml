@@ -242,12 +242,11 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
               | None ->
 	        (* [ccl] is defined in context [params;x:rp] *)
 		(* [ccl'] is defined in context [params;x:rp;x:rp] *)
-		(* let ccl' = liftn 1 2 ccl in *)
-		(* let p = mkLambda (x, lift 1 rp, ccl') in *)
-		(* let branch = it_mkLambda_or_LetIn (mkRel nfi) lifted_fields in *)
-		(* let ci = Inductiveops.make_case_info env indsp LetStyle in *)
-		(* mkCase (ci, p, mkRel 1, [|branch|]) in *)
-		mkRel 1
+		let ccl' = liftn 1 2 ccl in
+		let p = mkLambda (x, lift 1 rp, ccl') in
+		let branch = it_mkLambda_or_LetIn (mkRel nfi) lifted_fields in
+		let ci = Inductiveops.make_case_info env indsp LetStyle in
+		  mkCase (ci, p, mkRel 1, [|branch|]) 
 	      in
 	      let proj =
 	        it_mkLambda_or_LetIn (mkLambda (x,rp,body)) paramdecls in
@@ -357,12 +356,12 @@ let declare_class finite def infer poly ctx id idbuild paramimpls params arity f
     ?(kind=StructureComponent) ?name is_coe coers priorities sign =
   let fieldimpls =
     (* Make the class implicit in the projections, and the params if applicable. *)
-    if def then
+    (* if def then *)
       let len = List.length params in
       let impls = implicits_of_context params in
 	 List.map (fun x -> impls @ Impargs.lift_implicits (succ len) x) fieldimpls
-    else List.map (fun x -> (ExplByPos (1, None), (true, true, true)) ::
-		     Impargs.lift_implicits 1 x) fieldimpls
+    (* else List.map (fun x -> (ExplByPos (1, None), (true, true, true)) :: *)
+    (* 		     Impargs.lift_implicits 1 x) fieldimpls *)
   in
   let impl, projs =
     match fields with

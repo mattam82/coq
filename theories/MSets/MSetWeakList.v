@@ -118,9 +118,9 @@ Module MakeRaw (X:DecidableType) <: WRawSets X.
   Notation In := (InA X.eq).
 
   (* TODO: modify proofs in order to avoid these hints *)
-  Let eqr:= (@Equivalence_Reflexive X.eq_equiv).
-  Let eqsym:= (@Equivalence_Symmetric X.eq_equiv).
-  Let eqtrans:= (@Equivalence_Transitive X.eq_equiv).
+  Let eqr:= (@Equivalence_Reflexive _ _ X.eq_equiv).
+  Let eqsym:= (@Equivalence_Symmetric _ _ X.eq_equiv).
+  Let eqtrans:= (@Equivalence_Transitive _ _ X.eq_equiv).
   Hint Resolve eqr eqtrans.
   Hint Immediate eqsym.
 

@@ -404,7 +404,7 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
 	  else (* Two projections in WHNF: unfold *)
 	    raise NotConvertible)
 
-    | (FProj (p1,c1), _) ->
+    | (FProj (p1,c1), t2) ->
       (match unfold_projection infos p1 c1 with
       | Some (def1,s1) ->
          eqappr cv_pb l2r infos (lft1, whd def1 (s1 :: v1)) appr2 cuniv

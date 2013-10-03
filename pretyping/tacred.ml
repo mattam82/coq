@@ -151,6 +151,7 @@ type constant_evaluation =
       ((int*evaluable_reference) option array *
        (int * (int * constr) list * int))
   | EliminationCases of int
+  | EliminationProj of int
   | NotAnElimination
 
 (* We use a cache registered as a global table *)
@@ -267,6 +268,7 @@ let compute_consteval_direct sigma env ref =
 	  (try check_fix_reversibility labs l fix
 	  with Elimconst -> NotAnElimination)
       | Case (_,_,d,_) when isRel d -> EliminationCases n
+      | Proj (p, d) when isRel d -> EliminationProj n
       | _ -> NotAnElimination
   in
   match unsafe_reference_opt_value sigma env ref with
@@ -580,6 +582,24 @@ let reduce_projection env sigma proj (recarg'hd,stack') stack =
     in Reduced (List.nth stack' proj_narg, stack)
   | _ -> NotReducible)
 
+let reduce_proj env sigma whfun c =
+  (* Pp.msgnl (str" reduce_proj: " ++ print_constr c); *)
+  let rec redrec s =
+    match kind_of_term s with
+    | Proj (proj, c) -> 
+      let c' = try redrec c with Redelimination -> c in
+      let constr, cargs = whfun c' in
+	(* Pp.msgnl (str" reduce_proj: constructor: " ++ print_constr constr); *)
+	(match kind_of_term constr with
+	| Construct _ -> 
+	  let proj_narg = 
+	    let pb = Option.get ((lookup_constant proj env).Declarations.const_proj) in
+	      pb.Declarations.proj_npars + pb.Declarations.proj_arg
+	  in List.nth cargs proj_narg
+	| _ -> raise Redelimination)
+    | _ -> raise Redelimination
+  in redrec c
+
 (* data structure to hold the map kn -> rec_args for simpl *)
 
 type behaviour = {
@@ -722,6 +742,11 @@ let rec red_elim_const env sigma ref u largs =
 	let c', lrest = whd_nothing_for_iota env sigma (applist(c,largs)) in
 	let whfun = whd_simpl_stack env sigma in
         (special_red_case env sigma whfun (destCase c'), lrest)
+    | EliminationProj n when nargs >= n ->
+	let c = reference_value sigma env ref u in
+	let c', lrest = whd_nothing_for_iota env sigma (applist(c,largs)) in
+	let whfun = whd_construct_stack env sigma in
+	  (reduce_proj env sigma whfun c', lrest)
     | EliminationFix (min,minfxargs,infos) when nargs >= min ->
 	let c = reference_value sigma env ref u in
 	let d, lrest = whd_nothing_for_iota env sigma (applist(c,largs)) in

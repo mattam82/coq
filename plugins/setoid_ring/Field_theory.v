@@ -1026,13 +1026,13 @@ Qed.
 
 Theorem Pcond_Fnorm:
  forall l e,
- PCond l (condition (Fnorm e)) ->  ~ NPEeval l (denum (Fnorm e)) == 0.
+ PCond l (condition (Fnorm e)) ->  ~ NPEeval l ((Fnorm e).(denum)) == 0.
 intros l e; elim e.
  simpl; intros _ _; rewrite (morph1 CRmorph); exact rI_neq_rO.
  simpl; intros _ _; rewrite (morph1 CRmorph); exact rI_neq_rO.
  intros e1 Hrec1 e2 Hrec2 Hcond.
-   simpl condition in Hcond.
-   simpl denum.
+   simpl in Hcond.
+   simpl @denum.
    rewrite NPEmul_correct.
    simpl.
    apply field_is_integral_domain.
@@ -1044,8 +1044,8 @@ intros l e; elim e.
      apply PCond_app_inv_r with (1 := Hcond).
    rewrite (split_correct_r l (denum (Fnorm e1)) (denum (Fnorm e2))); auto.
  intros e1 Hrec1 e2 Hrec2 Hcond.
-   simpl condition in Hcond.
-   simpl denum.
+   simpl @condition in Hcond.
+   simpl @denum.
    rewrite NPEmul_correct.
    simpl.
    apply field_is_integral_domain.
@@ -1057,8 +1057,8 @@ intros l e; elim e.
      apply PCond_app_inv_r with (1 := Hcond).
    rewrite (split_correct_r l (denum (Fnorm e1)) (denum (Fnorm e2))); auto.
  intros e1 Hrec1 e2 Hrec2 Hcond.
-   simpl condition in Hcond.
-   simpl denum.
+   simpl in Hcond.
+   simpl @denum.
    rewrite NPEmul_correct.
    simpl.
    apply field_is_integral_domain.
@@ -1071,16 +1071,16 @@ intros l e; elim e.
     rewrite (split_correct_r l (num (Fnorm e1)) (denum (Fnorm e2))).
     rewrite NPEmul_correct; simpl; rewrite HH; ring.
  intros e1 Hrec1 Hcond.
-   simpl condition in Hcond.
-   simpl denum.
+   simpl in Hcond.
+   simpl @denum.
    auto.
  intros e1 Hrec1 Hcond.
-   simpl condition in Hcond.
-   simpl denum.
+   simpl in Hcond.
+   simpl @denum.
    apply PCond_cons_inv_l with (1:=Hcond).
  intros e1 Hrec1 e2 Hrec2 Hcond.
-   simpl condition in Hcond.
-   simpl denum.
+   simpl in Hcond.
+   simpl @denum.
    rewrite NPEmul_correct.
    simpl.
    apply field_is_integral_domain.

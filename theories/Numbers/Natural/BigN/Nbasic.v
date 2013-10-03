@@ -20,8 +20,8 @@ Arguments mk_zn2z_ops [t] ops.
 Arguments mk_zn2z_ops_karatsuba [t] ops.
 Arguments mk_zn2z_specs [t ops] specs.
 Arguments mk_zn2z_specs_karatsuba [t ops] specs.
-Arguments ZnZ.digits : clear implicits. 
-Arguments ZnZ.zdigits : clear implicits.
+Arguments ZnZ.digits [t] Ops.
+Arguments ZnZ.zdigits [t] Ops.
 
 Lemma Pshiftl_nat_Zpower : forall n p,
   Zpos (Pos.shiftl_nat p n) = Zpos p * 2 ^ Z.of_nat n.
@@ -458,7 +458,7 @@ End AddS.
  Variable w: Type.
 
  Theorem digits_zop: forall t (ops : ZnZ.Ops t),
-  (mk_zn2z_ops ops).(ZnZ.digits) = xO (ZnZ.digits ops).
+  ZnZ.digits (mk_zn2z_ops ops) = xO (ZnZ.digits ops).
  Proof.
  intros ww x; auto.
  Qed.
@@ -470,7 +470,7 @@ End AddS.
  Qed.
 
  Theorem make_zop: forall t (ops : ZnZ.Ops t),
-  @ZnZ.to_Z (mk_zn2z_ops ops) =
+  @ZnZ.to_Z _ (mk_zn2z_ops ops) =
     fun z => match z with
              | W0 => 0
              | WW xh xl => ZnZ.to_Z xh * base (ZnZ.digits ops)
@@ -481,7 +481,7 @@ End AddS.
  Qed.
 
  Theorem make_kzop: forall t (ops: ZnZ.Ops t),
-  @ZnZ.to_Z (mk_zn2z_ops_karatsuba ops) =
+  @ZnZ.to_Z _ (mk_zn2z_ops_karatsuba ops) =
     fun z => match z with
              | W0 => 0
              | WW xh xl => ZnZ.to_Z xh * base (ZnZ.digits ops)

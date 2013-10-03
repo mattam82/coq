@@ -170,7 +170,7 @@ Proof.
   eapply limit_comp.
   apply H.
   apply H0.
-  unfold limit1_in; unfold limit_in; simpl dist;
+  unfold limit1_in; unfold limit_in; unfold dist;
     simpl; unfold R_dist; intros.
   assert (H3 := H1 eps H2).
   elim H3; intros.
@@ -353,7 +353,7 @@ Lemma uniqueness_step3 :
     derivable_pt_lim f x l.
 Proof.
   unfold limit1_in, derivable_pt_lim; unfold limit_in;
-    simpl dist; simpl; intros.
+    unfold dist; simpl; intros.
   elim (H eps H0).
   intros; elim H1; intros.
   exists (mkposreal x0 H2).
@@ -432,7 +432,7 @@ Proof.
   intro.
   assert (H0 := derive_pt_eq_1 f x (df x) pr H).
   unfold D_in; unfold limit1_in; unfold limit_in;
-    simpl dist; simpl; unfold R_dist;
+    unfold dist; simpl; unfold R_dist;
       intros.
   elim (H0 eps H1); intros alpha H2; exists (pos alpha); split.
   apply (cond_pos alpha).
@@ -465,7 +465,7 @@ Proof.
   intro.
   unfold derivable_pt_lim in H.
   unfold D_in; unfold limit1_in; unfold limit_in;
-    simpl dist; simpl; unfold R_dist;
+    unfold dist; simpl; unfold R_dist;
       intros.
   elim (H eps H0); intros alpha H2; exists (pos alpha); split.
   apply (cond_pos alpha).
@@ -533,7 +533,7 @@ Lemma derivable_pt_lim_plus :
   generalize
     (limit_plus (fun h':R => (f1 (x + h') - f1 x) / h')
       (fun h':R => (f2 (x + h') - f2 x) / h') (fun h:R => h <> 0) l1 l2 0 H1 H2).
-  unfold limit1_in; unfold limit_in; simpl dist;
+  unfold limit1_in; unfold limit_in; unfold dist;
     simpl; unfold R_dist; intros.
   elim (H4 eps H5); intros.
   exists x0.
@@ -555,7 +555,7 @@ Proof.
   intro.
   generalize
     (limit_Ropp (fun h:R => (f (x + h) - f x) / h) (fun h:R => h <> 0) l 0 H1).
-  unfold limit1_in; unfold limit_in; simpl dist;
+  unfold limit1_in; unfold limit_in; unfold dist;
     simpl; unfold R_dist; intros.
   elim (H2 eps H3); intros.
   exists x0.
@@ -584,7 +584,7 @@ Proof.
   generalize
     (limit_minus (fun h':R => (f1 (x + h') - f1 x) / h')
       (fun h':R => (f2 (x + h') - f2 x) / h') (fun h:R => h <> 0) l1 l2 0 H1 H2).
-  unfold limit1_in; unfold limit_in; simpl dist;
+  unfold limit1_in; unfold limit_in; unfold dist;
     simpl; unfold R_dist; intros.
   elim (H4 eps H5); intros.
   exists x0.
@@ -694,7 +694,7 @@ Proof.
     apply (Dcomp no_cond no_cond (fun y:R => l1) (fun y:R => l2) f1 f2 x);
       assumption.
   unfold Dgf, D_in, no_cond; unfold limit1_in;
-    unfold limit_in; simpl dist; simpl;
+    unfold limit_in; unfold dist; simpl;
       unfold R_dist; intros.
   elim (H1 eps H3); intros.
   exists x0; intros; split.

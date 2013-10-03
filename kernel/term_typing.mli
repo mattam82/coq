@@ -18,9 +18,6 @@ val translate_local_def : env -> definition_entry ->
 
 val translate_local_assum : env -> types -> types
 
-val infer_declaration : env -> constant_entry ->
-  constant_def * constant_type * bool * universe_context * bool * Context.section_context option
-
 val translate_constant : env -> kernel_name -> constant_entry -> constant_body
 
 val translate_mind :
