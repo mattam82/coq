@@ -51,7 +51,7 @@ Section Partial_orders.
 
 End Partial_orders.
 
-Hint Unfold Strict_Rel_of: sets v62.
+Hint Unfold Carrier_of Rel_of Strict_Rel_of: sets v62.
 Hint Resolve Definition_of_covers: sets v62.
 
 
@@ -61,7 +61,7 @@ Section Partial_order_facts.
 
   Lemma Strict_Rel_Transitive_with_Rel :
     forall x y z:U,
-      Strict_Rel_of U D x y -> Rel_of D y z -> Strict_Rel_of U D x z.
+      Strict_Rel_of U D x y -> @Rel_of U D y z -> Strict_Rel_of U D x z.
   Proof.
     unfold Strict_Rel_of at 1.
     red.
@@ -77,7 +77,7 @@ Section Partial_order_facts.
 
   Lemma Strict_Rel_Transitive_with_Rel_left :
     forall x y z:U,
-      Rel_of D x y -> Strict_Rel_of U D y z -> Strict_Rel_of U D x z.
+      @Rel_of U D x y -> Strict_Rel_of U D y z -> Strict_Rel_of U D x z.
   Proof.
     unfold Strict_Rel_of at 1.
     red.

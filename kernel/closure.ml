@@ -856,18 +856,21 @@ let eta_expand_ind_stack env lft (ind,u) m s (lft, h) =
 let eta_expand_ind_stacks env ind m s h =
   let mib = lookup_mind (fst ind) env in
     match mib.Declarations.mind_record with
-    | None -> raise Not_found
-    | Some (exp,projs) -> 
+    | Some (exp,projs) when Array.length projs > 0 -> 
       let pars = mib.Declarations.mind_nparams in
       let h' = fapp_stack h in
       let (depth, args, _) = strip_update_shift_app m s in
-      let s' = drop_parameters depth pars args in
-      (* Construct, arg1...argn :: s ~= (t, []) ->
+      let primitive = Environ.is_projection projs.(0) env in
+	if primitive then
+	  let s' = drop_parameters depth pars args in
+      (* Construct, pars1 .. parsm :: arg1...argn :: s ~= (t, []) ->
 	 arg1..argn :: s ~= (proj1 t...projn t) s
-	*)
-      let hstack = Array.map (fun p -> { norm = Red;
-					 term = FProj (p, h') }) projs in
-	s', [Zapp hstack]
+      *)
+	  let hstack = Array.map (fun p -> { norm = Red;
+					     term = FProj (p, h') }) projs in
+	    s', [Zapp hstack]
+	else raise Not_found (* disallow eta-exp for non-primitive records *)
+    | _ -> raise Not_found
 
 let rec project_nth_arg n argstk =
   match argstk with

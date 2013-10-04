@@ -127,7 +127,6 @@ Lemma not_has_fixpoint : R R = Not_b (R R).
 Proof.
 unfold R at 1.
 unfold g.
-unfold j2, i2. 
 rewrite AC.
 trivial.
 exists (fun x:pow U => x) (fun x:pow U => x).

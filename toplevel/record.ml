@@ -24,25 +24,20 @@ open Decl_kinds
 open Type_errors
 open Constrexpr
 open Constrexpr_ops
+open Goptions
 
 (********** definition d'un record (structure) **************)
-(* ======= *)
-(* let interp_evars evdref env impls k typ = *)
-(*   let typ' = intern_gen k ~impls !evdref env typ in *)
-(*   let imps = Implicit_quantifiers.implicits_of_glob_constr typ' in *)
-(*     imps, Pretyping.understand_tcc_evars evdref env k typ' *)
 
-(* let interp_type_evars evdref env impls typ = *)
-(*   let typ' = intern_gen Pretyping.IsType ~impls !evdref env typ in *)
-(*   let imps = Implicit_quantifiers.implicits_of_glob_constr typ' in *)
-(*     imps, Pretyping.understand_type_judgment_tcc evdref env typ' *)
-
-(* let interp_fields_evars evars env impls_env nots l = *)
-(*   List.fold_left2 *)
-(*     (fun (env, uimpls, params, univ, impls) no ((loc, i), b, t) -> *)
-(*       let impl, {utj_val = t'; utj_type = s} = interp_type_evars evars env impls t in *)
-(*       let b' = Option.map (fun x -> snd (interp_evars evars env impls (Pretyping.OfType (Some t')) x)) b in *)
-(* >>>>>>> This commit adds full universe polymorphism to Coq. *)
+(** Flag governing use of primitive projections. Disabled by default. *)
+let primitive_flag = ref false
+let _ =
+  declare_bool_option
+    { optsync  = true;
+      optdepr  = false;
+      optname  = "use of primitive projections";
+      optkey   = ["Primitive";"Projections"];
+      optread  = (fun () -> !primitive_flag) ;
+      optwrite = (fun b -> primitive_flag := b) }
 
 let interp_fields_evars evars env impls_env nots l =
   List.fold_left2
@@ -222,7 +217,7 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
   let indu = indsp, u in
   let r = mkIndU (indsp,u) in
   let rp = applist (r, Termops.extended_rel_list 0 paramdecls) in
-  let _paramargs = Termops.extended_rel_list 1 paramdecls in (*def in [[params;x:rp]]*)
+  let paramargs = Termops.extended_rel_list 1 paramdecls in (*def in [[params;x:rp]]*)
   let x = match name with Some n -> Name n | None -> Namegen.named_hd (Global.env()) r Anonymous in
   let fields = instantiate_possibly_recursive_type indu paramdecls fields in
   let lifted_fields = Termops.lift_rel_context 1 fields in
@@ -257,13 +252,17 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
 		  let projinfo = 
 		    (fst indsp, mib.mind_nparams, nfields - nfi, ccl)
 		  in
+		  let projinfo =
+		    if !primitive_flag && optci = None then Some projinfo 
+		    else None
+		  in
 		  let cie = {
 		    const_entry_body = proj;
                     const_entry_secctx = None;
                     const_entry_type = Some projtyp;
 		    const_entry_polymorphic = poly;
 		    const_entry_universes = ctx;
-		    const_entry_proj = if optci = None then Some projinfo else None;
+		    const_entry_proj = projinfo;
                     const_entry_opaque = false;
 		    const_entry_inline_code = false } in
 		  let k = (DefinitionEntry cie,IsDefinition kind) in
@@ -278,8 +277,13 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
 	        let cl = Class.class_of_global (IndRef indsp) in
 	        Class.try_add_new_coercion_with_source refi ~local:false poly ~source:cl
 	      end;
-	      let constr_fip = mkProj (kn,mkRel 1) in
-	      (Some kn::sp_projs, Projection constr_fip::subst)
+	      let constr_fip =
+		if !primitive_flag then mkProj (kn,mkRel 1)
+		else
+		  let proj_args = (*Rel 1 refers to "x"*) paramargs@[mkRel 1] in
+		    applist (mkConstU (kn,u),proj_args) 
+	      in
+		(Some kn::sp_projs, Projection constr_fip::subst)
             with NotDefinable why ->
 	      warning_or_error coe indsp why;
 	      (None::sp_projs,NoProjection fi::subst) in

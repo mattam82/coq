@@ -988,7 +988,13 @@ let make_projection env sigma params cstr sign elim i n c =
       match List.nth l i with
       | Some proj ->
 	  let args = extended_rel_vect 0 sign in
-	  let proj = mkProj (proj, mkApp (c, args)) in
+	  let proj = 
+	    if Environ.is_projection proj env then
+	      mkProj (proj, mkApp (c, args)) 
+	    else 
+	      mkApp (mkConst proj, Array.append (Array.of_list params)
+		[|mkApp (c, args)|])
+	  in
 	  let app = it_mkLambda_or_LetIn proj sign in
 	  let t = Retyping.get_type_of env sigma app in
 	    Some (app, t)

@@ -675,17 +675,19 @@ and conv_record trs env evd (ctx,c,bs,(params,params1),(us,us2),(ts,ts1),c1,(n,t
 and eta_constructor ts env evd ((ind, i), u) l1 csts1 (c, csts2) =
   let mib = lookup_mind (fst ind) env in
     match mib.Declarations.mind_record with
-    | None -> UnifFailure (evd,NotSameHead)
-    | Some (exp,projs) -> 
+    | Some (exp,projs) when Array.length projs > 0 -> 
       let pars = mib.Declarations.mind_nparams in
-	try 
-	  let l1' = stack_tail pars l1 in
-	  let sk2 = 
-	    let term = zip c in 
-	      List.map (fun p -> mkProj (p, term)) (Array.to_list projs)
-	  in
-	    exact_ise_stack2 env evd (evar_conv_x ts) l1' [Zapp sk2]
-	with Failure _ -> UnifFailure(evd,NotSameHead)
+	(try 
+	   let l1' = stack_tail pars l1 in
+	     if Environ.is_projection projs.(0) env then
+	       let sk2 = 
+		 let term = zip c in 
+		   List.map (fun p -> mkProj (p, term)) (Array.to_list projs)
+	       in
+		 exact_ise_stack2 env evd (evar_conv_x ts) l1' [Zapp sk2]
+	     else raise (Failure "")
+	 with Failure _ -> UnifFailure(evd,NotSameHead))
+    | _ -> UnifFailure (evd,NotSameHead)
 
 (* Profiling *)
 (* let evar_conv_xkey = Profile.declare_profile "evar_conv_x";; *)
