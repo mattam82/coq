@@ -412,7 +412,7 @@ let print_constant with_values sep sp =
   let cb = Global.lookup_constant sp in
   let val_0 = Declareops.body_of_constant cb in
   let typ = ungeneralized_type_of_constant_type cb.const_type in
-  hov 0 (
+  hov 0 (pr_polymorphic cb.const_polymorphic ++
     match val_0 with
     | None ->
 	str"*** [ " ++
@@ -420,7 +420,6 @@ let print_constant with_values sep sp =
 	str" ]" ++
 	Printer.pr_universe_ctx cb.const_universes
     | _ ->
-        pr_polymorphic cb.const_polymorphic ++
 	print_basename sp ++ str sep ++ cut () ++
 	(if with_values then print_typed_body (val_0,typ) else pr_ltype typ)++
         Printer.pr_universe_ctx cb.const_universes)

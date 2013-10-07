@@ -964,7 +964,7 @@ type conjunction_status =
   | DefinedRecord of constant option list
   | NotADefinedRecordUseScheme of constr
 
-let make_projection env sigma params cstr sign elim i n c =
+let make_projection env sigma params cstr sign elim i n c u =
   let elim = match elim with
   | NotADefinedRecordUseScheme elim ->
       (* bugs: goes from right to left when i increases! *)
@@ -992,7 +992,7 @@ let make_projection env sigma params cstr sign elim i n c =
 	    if Environ.is_projection proj env then
 	      mkProj (proj, mkApp (c, args)) 
 	    else 
-	      mkApp (mkConst proj, Array.append (Array.of_list params)
+	      mkApp (mkConstU (proj,u), Array.append (Array.of_list params)
 		[|mkApp (c, args)|])
 	  in
 	  let app = it_mkLambda_or_LetIn proj sign in
@@ -1020,7 +1020,7 @@ let descend_in_conjunctions tac exit c gl =
 	    NotADefinedRecordUseScheme (snd elim) in
 	tclFIRST
 	  (List.init n (fun i gl ->
-	    match pf_apply make_projection gl params cstr sign elim i n c with
+	    match pf_apply make_projection gl params cstr sign elim i n c u with
 	    | None -> tclFAIL 0 (mt()) gl
 	    | Some (p,pt) -> 
 	    tclTHENS

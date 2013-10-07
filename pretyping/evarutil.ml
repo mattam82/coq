@@ -688,17 +688,25 @@ let define_pure_evar_as_product evd evk =
   let evi = Evd.find_undefined evd evk in
   let evenv = evar_env evi in
   let id = next_ident_away idx (ids_of_named_context (evar_context evi)) in
+  let s = destSort evi.evar_concl in
   let evd1,(dom,u1) = new_type_evar univ_flexible_alg evd evenv ~filter:(evar_filter evi) in
-  let evd2,(rng,u2) =
+  let evd2,rng =
     let newenv = push_named (id, None, dom) evenv in
     let src = evar_source evk evd1 in
     let filter = true::evar_filter evi in
-    new_type_evar univ_flexible_alg evd1 newenv ~src ~filter in
+      if is_prop_sort s then
+       (* Impredicative product, conclusion must fall in [Prop]. *)
+        new_evar evd1 newenv evi.evar_concl ~src ~filter
+      else
+	let evd3, (rng, srng) =
+	  new_type_evar univ_flexible_alg evd1 newenv ~src ~filter in
+	let prods = Univ.sup (univ_of_sort u1) (univ_of_sort srng) in
+	let evd3 = Evd.set_leq_sort evd3 (Type prods) s in
+	  evd3, rng
+  in
   let prod = mkProd (Name id, dom, subst_var id rng) in
   let evd3 = Evd.define evk prod evd2 in
-  let u = destSort evi.evar_concl in
-  let evd3 = set_leq_sort evd3 (Type (Univ.sup (univ_of_sort u1) (univ_of_sort u2))) u in
-  evd3,prod
+    evd3,prod
 
 (* Refine an applied evar to a product and returns its instantiation *)
 

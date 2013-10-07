@@ -80,6 +80,11 @@ let type_of_var env id =
   try let (_,_,ty) = lookup_named id env in ty
   with Not_found -> retype_error (BadVariable id)
 
+let decomp_sort env sigma t =
+  match kind_of_term (whd_betadeltaiota env sigma t) with
+  | Sort s -> s
+  | _ -> retype_error NotASort
+
 let retype ?(polyprop=true) sigma =
   let rec type_of env cstr=
     match kind_of_term cstr with

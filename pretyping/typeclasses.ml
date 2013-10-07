@@ -132,16 +132,19 @@ let class_of_constr c =
   try Some (dest_class_arity (Global.env ()) c)
   with e when Errors.noncritical e -> None
 
-let rec is_class_type evd c =
-  match kind_of_term c with
-  | Prod (_, _, t) -> is_class_type evd t
-  | Evar (e, _) when is_defined evd e -> is_class_type evd (Evarutil.nf_evar evd c)
-  | _ ->
-    begin match class_of_constr c with
-    | Some _ -> true
-    | None -> false
-    end
+let is_class_constr c = 
+  try let gr, u = Universes.global_of_constr c in
+	Refmap.mem gr !classes
+  with Not_found -> false
 
+let rec is_class_type evd c =
+  let c, args = decompose_app c in
+    match kind_of_term c with
+    | Prod (_, _, t) -> is_class_type evd t
+    | Evar (e, _) when Evd.is_defined evd e ->
+      is_class_type evd (Evarutil.whd_head_evar evd c)
+    | _ -> is_class_constr c
+      
 let is_class_evar evd evi =
   is_class_type evd evi.Evd.evar_concl
 

@@ -376,9 +376,14 @@ let process_universe_constraints univs postponed vars alg local cstrs =
 		  instantiate_variable l' (Univ.Universe.make r') vars
 		else if rloc then 
 		  instantiate_variable r' (Univ.Universe.make l') vars
-		else if fo then 
-		  if not (Univ.check_eq univs l r) then 
-		    raise UniversesDiffer
+		else 
+		  (* Two rigid/global levels, one of them being Prop/Set, disallow *)
+		  (* if Univ.is_small_univ l' || Univ.is_small_univ r' then *)
+		  (*   raise UniversesDiffer *)
+		  (* else *)
+		  if fo then 
+		    if not (Univ.check_eq univs l r) then 
+		      raise UniversesDiffer
 	      in
 	        Univ.enforce_eq_level l' r' local, postponed
            | _, _ (* Algebraic or globals: 

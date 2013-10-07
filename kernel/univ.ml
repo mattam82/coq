@@ -111,6 +111,11 @@ module Level = struct
 
   let pr u = str (to_string u)
 
+  let apart u v =
+    match u, v with
+    | Prop, Set | Set, Prop -> true
+    | _ -> false
+
 end
 
 let pr_universe_level_list l = 
@@ -1700,7 +1705,7 @@ let enforce_leq u v c =
 let enforce_eq_level u v c =
   (* We discard trivial constraints like u=u *)
   if Level.eq u v then c 
-  else if (Level.is_prop u && Level.is_set v) || (Level.is_prop v && Level.is_set u) then
+  else if Level.apart u v then
     error_inconsistency Eq u v []
   else Constraint.add (u,Eq,v) c
 
@@ -1780,7 +1785,7 @@ let to_constraints g s =
     let add l d l' acc = Constraint.add (l,UniverseConstraints.tr_dir d,l') acc in
       match Universe.level x, d, Universe.level y with
       | Some l, (ULe | UEq | ULub), Some l' -> add l d l' acc
-      | None, ULe, Some l' -> enforce_leq x y acc
+      | _, ULe, Some l' -> enforce_leq x y acc
       | _, ULub, _ -> acc
       | _, d, _ -> 
 	let f = if d == ULe then check_leq else check_eq in
