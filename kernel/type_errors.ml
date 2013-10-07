@@ -56,6 +56,7 @@ type type_error =
   | IllFormedRecBody of guard_error * Name.t array * int * env * unsafe_judgment array
   | IllTypedRecBody of
       int * Name.t array * unsafe_judgment array * types array
+  | UnsatisfiedConstraints of Univ.constraints
 
 exception TypeError of env * type_error
 
@@ -114,3 +115,5 @@ let error_elim_explain kp ki =
   | InType, InSet -> StrongEliminationOnNonSmallType (* if Set impredicative *)
   | _ -> WrongArity
 
+let error_unsatisfied_constraints env c =
+  raise (TypeError (env, UnsatisfiedConstraints c))

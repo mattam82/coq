@@ -534,6 +534,10 @@ let explain_non_linear_unification env m t =
   strbrk " which would require to abstract twice on " ++
   pr_lconstr_env env t ++ str "."
 
+let explain_unsatisfied_constraints env cst =
+  strbrk "Unsatisfied constraints: " ++ Univ.pr_constraints cst ++ 
+    spc () ++ str "(maybe a bugged tactic)."
+
 let explain_type_error env sigma err =
   let env = make_all_name_different env in
   match err with
@@ -569,6 +573,8 @@ let explain_type_error env sigma err =
      explain_ill_typed_rec_body env sigma i lna vdefj vargs
   | WrongCaseInfo (ind,ci) ->
       explain_wrong_case_info env ind ci
+  | UnsatisfiedConstraints cst ->
+      explain_unsatisfied_constraints env cst
 
 let explain_pretype_error env sigma err =
   let env = Evarutil.env_nf_betaiotaevar sigma env in

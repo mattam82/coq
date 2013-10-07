@@ -476,7 +476,7 @@ let rec decompose_app_rel env evd t =
 	in (f'', args)
   | _ -> error "The term provided is not an applied relation."
 
-let decompose_applied_relation env sigma flags orig (c,l) left2right =
+let decompose_applied_relation env origsigma sigma flags orig (c,l) left2right =
   let c' = c in
   let ctype = Typing.type_of env sigma c' in
   let find_rel ty =
@@ -490,7 +490,7 @@ let decompose_applied_relation env sigma flags orig (c,l) left2right =
       else
 	let sort = sort_of_rel env eqclause.evd equiv in
 	let value = Clenv.clenv_value eqclause in
-	let eqclause = { eqclause with evd = Evd.diff eqclause.evd sigma } in
+	let eqclause = { eqclause with evd = Evd.diff eqclause.evd origsigma } in
 	  Some { cl=eqclause; prf=value;
 		 car=ty1; rel = equiv; sort = Sorts.is_prop sort;
 		 l2r=left2right; c1=c1; c2=c2; c=orig; abs=None;
@@ -505,8 +505,8 @@ let decompose_applied_relation env sigma flags orig (c,l) left2right =
 	| None -> error "The term does not end with an applied homogeneous relation."
 
 let decompose_applied_relation_expr env sigma flags (is, (c,l)) left2right =
-  let sigma, cbl = Tacinterp.interp_open_constr_with_bindings is env sigma (c,l) in
-    decompose_applied_relation env sigma flags (Some (is, (c,l))) cbl left2right
+  let sigma', cbl = Tacinterp.interp_open_constr_with_bindings is env sigma (c,l) in
+    decompose_applied_relation env sigma sigma' flags (Some (is, (c,l))) cbl left2right
 
 let rewrite_db = "rewrite"
 
@@ -803,7 +803,9 @@ let apply_rule hypinfo by loccs : strategy =
 let apply_lemma flags (evm,c) left2right by loccs : strategy =
   fun env avoid t ty cstr evars ->
     let hypinfo = 
-      ref (decompose_applied_relation env (Evd.merge (goalevars evars) evm) flags None c left2right)
+      let evars' = Evd.merge (goalevars evars) evm in
+	ref (decompose_applied_relation env (goalevars evars) evars'
+	       flags None c left2right)
     in
       apply_rule hypinfo by loccs env avoid t ty cstr evars
 
@@ -2155,7 +2157,7 @@ let unification_rewrite flags l2r c1 c2 cl car rel but gl =
 
 let get_hyp gl evars (c,l) clause l2r =
   let flags = rewrite2_unif_flags in
-  let hi = decompose_applied_relation (pf_env gl) evars flags None (c,l) l2r in
+  let hi = decompose_applied_relation (pf_env gl) evars evars flags None (c,l) l2r in
   let but = match clause with
     | Some id -> pf_get_hyp_typ gl id 
     | None -> Evarutil.nf_evar evars (pf_concl gl)

@@ -174,13 +174,13 @@ val lookup_modtype : module_path -> env -> module_type_body
 
 (** {5 Universe constraints } *)
 
+(** Add universe constraints to the environment.
+    @raises UniverseInconsistency
+*)
 val add_constraints : Univ.constraints -> env -> env
 
-exception UnsatifiedConstraints of env * Univ.constraints
-(** Check constraints are satifiable in the environment. 
-    Raises [UnsatisfiedConstraint] on error.
-*)
-val check_constraints : Univ.constraints -> env -> unit
+(** Check constraints are satifiable in the environment. *)
+val check_constraints : Univ.constraints -> env -> bool
 val push_context : Univ.universe_context -> env -> env
 val push_context_set : Univ.universe_context_set -> env -> env
 val push_constraints_to_env : 'a Univ.constrained -> env -> env

@@ -57,6 +57,7 @@ type type_error =
   | IllFormedRecBody of guard_error * Name.t array * int * env * unsafe_judgment array
   | IllTypedRecBody of
       int * Name.t array * unsafe_judgment array * types array
+  | UnsatisfiedConstraints of Univ.constraints
 
 exception TypeError of env * type_error
 
@@ -98,3 +99,5 @@ val error_ill_typed_rec_body  :
   env -> int -> Name.t array -> unsafe_judgment array -> types array -> 'a
 
 val error_elim_explain : sorts_family -> sorts_family -> arity_error
+
+val error_unsatisfied_constraints : env -> Univ.constraints -> 'a

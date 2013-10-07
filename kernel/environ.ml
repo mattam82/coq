@@ -167,11 +167,8 @@ let add_constraints c env =
     { env with env_stratification =
       { s with env_universes = Univ.merge_constraints c s.env_universes } }
 
-exception UnsatifiedConstraints of env * Univ.constraints
-
 let check_constraints c env =
-  if Univ.check_constraints c env.env_stratification.env_universes then ()
-  else raise (UnsatifiedConstraints (env, c))
+  Univ.check_constraints c env.env_stratification.env_universes
 
 let set_engagement c env = (* Unsafe *)
   { env with env_stratification =

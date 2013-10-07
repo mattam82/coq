@@ -31,6 +31,10 @@ let conv_leq_vecti env v1 v2 =
     v1
     v2
 
+let check_constraints cst env = 
+  if Environ.check_constraints cst env then ()
+  else error_unsatisfied_constraints env cst
+
 (* This should be a type (a priori without intension to be an assumption) *)
 let type_judgment env c t =
   match kind_of_term(whd_betadeltaiota env t) with
@@ -111,9 +115,9 @@ let type_of_constant_knowing_parameters env t _ = t
 
 let judge_of_constant env (kn,u as cst) =
   let cb = lookup_constant kn env in
-  let _ = check_hyps_inclusion env mkConstU cst cb.const_hyps in
+  let () = check_hyps_inclusion env mkConstU cst cb.const_hyps in
   let ty, cu = type_of_constant env cst in
-  let _ = Environ.check_constraints cu env in
+  let () = check_constraints cu env in
     ty
 
 let type_of_projection env (cst,u) =
@@ -262,7 +266,7 @@ let judge_of_inductive env (ind,u as indu) =
   let (mib,mip) = lookup_mind_specif env ind in
   check_hyps_inclusion env mkIndU indu mib.mind_hyps;
   let t,cst = Inductive.constrained_type_of_inductive env ((mib,mip),u) in
-    Environ.check_constraints cst env;
+    check_constraints cst env;
     t
 
 (* Constructors. *)
@@ -274,7 +278,7 @@ let judge_of_constructor env (c,u as cu) =
     check_hyps_inclusion env mkConstructU cu mib.mind_hyps in
   let specif = lookup_mind_specif env (inductive_of_constructor c) in
   let t,cst = constrained_type_of_constructor cu specif in
-  let () = Environ.check_constraints cst env in
+  let () = check_constraints cst env in
     t
 
 (* Case. *)
