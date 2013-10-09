@@ -277,10 +277,13 @@ let empty_evar_universe_context =
     uctx_universes = Univ.initial_universes }
 
 let is_empty_evar_universe_context ctx =
-  Univ.ContextSet.is_empty ctx.uctx_local
+  Univ.ContextSet.is_empty ctx.uctx_local && 
+    Univ.LMap.is_empty ctx.uctx_univ_variables
 
 let union_evar_universe_context ctx ctx' =
   if ctx == ctx' then ctx
+  else if is_empty_evar_universe_context ctx then ctx'
+  else if is_empty_evar_universe_context ctx' then ctx
   else
     let local = 
       if ctx.uctx_local == ctx'.uctx_local then ctx.uctx_local 

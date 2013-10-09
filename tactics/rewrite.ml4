@@ -1736,6 +1736,12 @@ END
 let db_strat db = Strategies.td (Strategies.hints db)
 let cl_rewrite_clause_db db cl = cl_rewrite_clause_strat (db_strat db) cl
 
+let cl_rewrite_clause_db = 
+  if Flags.profile then
+    let key = Profile.declare_profile "cl_rewrite_clause_db" in
+      Profile.profile3 key cl_rewrite_clause_db
+  else cl_rewrite_clause_db
+
 TACTIC EXTEND rewrite_strat
 | [ "rewrite_strat" rewstrategy(s) "in" hyp(id) ] -> [ cl_rewrite_clause_strat s (Some id) ]
 | [ "rewrite_strat" rewstrategy(s) ] -> [ cl_rewrite_clause_strat s None ]

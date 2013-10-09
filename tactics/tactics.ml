@@ -3676,6 +3676,7 @@ let abstract_subproof id tac gl =
     with Uninstantiated_evar _ ->
       error "\"abstract\" cannot handle existentials." in
   let evd, ctx, concl = 
+    (* FIXME: should be done only if the tactic succeeds *)
     let evd, nf = nf_evars_and_universes (project gl) in
     let ctx = Evd.get_universe_context_set evd in
       evd, ctx, nf concl

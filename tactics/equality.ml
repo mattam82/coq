@@ -1272,7 +1272,8 @@ let swapEquandsInConcl gls =
 
 let bareRevSubstInConcl (lbeq,u) body (t,e1,e2) gls =
   (* find substitution scheme *)
-  let eq_elim = find_elim (Universes.constr_of_global lbeq.eq(*FIXME*)) (Some false) false None None gls in
+  let eq_elim = find_elim (Universes.constr_of_global_univ (lbeq.eq,u))
+    (Some false) false None None gls in
   (* build substitution predicate *)
   let p = lambda_create (pf_env gls) (t,body) in
   (* apply substitution scheme *)
@@ -1459,8 +1460,8 @@ let unfold_body x gl =
 
 
 let restrict_to_eq_and_identity eq = (* compatibility *)
-  if not (eq_constr eq (Universes.constr_of_global glob_eq)) && (*FIXME*)
-    not (eq_constr eq (Universes.constr_of_global glob_identity)) then
+  if not (is_global glob_eq eq) &&
+    not (is_global glob_identity eq) then
     raise PatternMatchingFailure
 
 exception FoundHyp of (Id.t * constr * bool)

@@ -282,15 +282,17 @@ let subst_univs_full_constr subst c =
   nf_evars_and_universes_subst (fun _ -> None) subst c
 
 let fresh_universe_context_set_instance ctx =
-  let (univs, cst) = ContextSet.levels ctx, ContextSet.constraints ctx in
-  let univs',subst = LSet.fold
-    (fun u (univs',subst) ->
-      let u' = fresh_level () in
-	(LSet.add u' univs', LMap.add u u' subst))
-    univs (LSet.empty, LMap.empty)
-  in
-  let cst' = subst_univs_level_constraints subst cst in
-    subst, (univs', cst')
+  if ContextSet.is_empty ctx then LMap.empty, ctx
+  else
+    let (univs, cst) = ContextSet.levels ctx, ContextSet.constraints ctx in
+    let univs',subst = LSet.fold
+      (fun u (univs',subst) ->
+	let u' = fresh_level () in
+	  (LSet.add u' univs', LMap.add u u' subst))
+      univs (LSet.empty, LMap.empty)
+    in
+    let cst' = subst_univs_level_constraints subst cst in
+      subst, (univs', cst')
 
 let normalize_univ_variable ~find ~update =
   let rec aux cur =

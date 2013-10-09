@@ -33,8 +33,8 @@ let occur_meta_or_undefined_evar evd c =
         | Evar_defined c ->
             occrec c; Array.iter occrec args
         | Evar_empty -> raise Occur)
-    | Sort (Type _) (* FIXME could be finer *) -> raise Occur
-    | Const (_, i) | Ind (_, i) | Construct (_, i) 
+    (* | Sort (Type _) (\* FIXME could be finer *\) -> raise Occur *)
+    | Const (_, i) (* | Ind (_, i) | Construct (_, i)  *)
 	when not (Univ.Instance.is_empty i) -> raise Occur
     | _ -> iter_constr occrec c
   in try occrec c; false with Occur | Not_found -> true
@@ -1275,13 +1275,19 @@ let secondOrderAbstraction env evd flags typ (p, oplist) =
   let (evd',cllist) = w_unify_to_subterm_list env evd flags p oplist typ in
   let typp = Typing.meta_type evd' p in
   let evd',(pred,predtyp) = abstract_list_all env evd' typp typ cllist in
-  let evd',metas,evars = 
-    try unify_0 env evd' CUMUL flags predtyp typp 
-    with NotConvertible ->
-      error_wrong_abstraction_type env evd
-        (Evd.meta_name evd p) pred typp predtyp
-  in
-    w_merge env false flags (evd',(p,pred,(Conv,TypeProcessed))::metas,evars)
+  let evd', b = infer_conv ~pb:CUMUL env evd' predtyp typp in
+    if not b then
+      error_wrong_abstraction_type env evd'
+  	(Evd.meta_name evd p) pred typp predtyp;
+    w_merge env false flags (evd',[p,pred,(Conv,TypeProcessed)],[])
+
+  (* let evd',metas,evars =  *)
+  (*   try unify_0 env evd' CUMUL flags predtyp typp  *)
+  (*   with NotConvertible -> *)
+  (*     error_wrong_abstraction_type env evd *)
+  (*       (Evd.meta_name evd p) pred typp predtyp *)
+  (* in *)
+  (*   w_merge env false flags (evd',(p,pred,(Conv,TypeProcessed))::metas,evars) *)
 
 let secondOrderDependentAbstraction env evd flags typ (p, oplist) =
   let typp = Typing.meta_type evd p in

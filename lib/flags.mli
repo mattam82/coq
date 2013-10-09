@@ -14,6 +14,8 @@ val batch_mode : bool ref
 
 val debug : bool ref
 
+val profile : bool
+
 val print_emacs : bool ref
 
 val term_quality : bool ref

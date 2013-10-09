@@ -1341,6 +1341,9 @@ module UniverseConstraints = struct
 	pp_std ++ Universe.pr u1 ++ str (op_str op) ++
 	Universe.pr u2 ++ fnl ()) c (str "")
 
+  let equal x y = 
+    x == y || equal x y
+
 end
 
 type universe_constraints = UniverseConstraints.t

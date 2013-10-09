@@ -13,7 +13,7 @@ Require Import BinList BinPos BinNat BinInt.
 Require Export Ring_theory.
 Local Open Scope positive_scope.
 Import RingSyntax.
-Set Universe Polymorphism.
+(* Set Universe Polymorphism. *)
 
 Section MakeRingPol.
 

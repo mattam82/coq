@@ -28,7 +28,7 @@ Reserved Notation "x == y" (at level 70, no associativity).
 End RingSyntax.
 Import RingSyntax.
 
-Set Universe Polymorphism.
+(* Set Universe Polymorphism. *)
 
 Section Power.
  Variable R:Type.

@@ -11,7 +11,7 @@ Import Ring_polynom Ring_tac Ring_theory InitialRing Setoid List Morphisms.
 Require Import ZArith_base.
 (*Require Import Omega.*)
 Set Implicit Arguments.
-Set Universe Polymorphism.
+(* Set Universe Polymorphism. *)
 
 Section MakeFieldPol.
 

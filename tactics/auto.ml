@@ -1170,7 +1170,7 @@ let add_hint_lemmas eapply lems hint_db gl =
     List.map_append (pf_apply make_resolves gl (eapply,true,false) None true) lems in
   Hint_db.add_list hintlist' hint_db
 
-let make_local_hint_db ?ts eapply lems gl =
+let make_local_hint_db ts eapply lems gl =
   let sign = pf_hyps gl in
   let ts = match ts with
     | None -> Hint_db.transparent_state (searchtable_map "core") 
@@ -1179,6 +1179,15 @@ let make_local_hint_db ?ts eapply lems gl =
   let hintlist = List.map_append (pf_apply make_resolve_hyp gl) sign in
   add_hint_lemmas eapply lems
     (Hint_db.add_list hintlist (Hint_db.empty ts false)) gl
+
+let make_local_hint_db = 
+  if Flags.profile then
+    let key = Profile.declare_profile "make_local_hint_db" in
+      Profile.profile4 key make_local_hint_db
+  else make_local_hint_db
+
+let make_local_hint_db ?ts eapply lems gl =
+  make_local_hint_db ts eapply lems gl
 
 (* Serait-ce possible de compiler d'abord la tactique puis de faire la
    substitution sans passer par bdize dont l'objectif est de préparer un
@@ -1517,15 +1526,21 @@ let search d n mod_delta db_list local_db =
 
 let default_search_depth = ref 5
 
-let delta_auto ?(debug=Off) mod_delta n lems dbnames gl =
+let delta_auto debug mod_delta n lems dbnames gl =
   let db_list = make_db_list dbnames in
   let d = mk_auto_dbg debug in
   tclTRY_dbg d
     (search d n mod_delta db_list (make_local_hint_db false lems gl)) gl
 
-let auto ?(debug=Off) n = delta_auto ~debug false n
+let delta_auto = 
+  if Flags.profile then
+    let key = Profile.declare_profile "delta_auto" in
+      Profile.profile6 key delta_auto
+  else delta_auto
 
-let new_auto ?(debug=Off) n = delta_auto ~debug true n
+let auto ?(debug=Off) n = delta_auto debug false n
+
+let new_auto ?(debug=Off) n = delta_auto debug true n
 
 let default_auto = auto !default_search_depth [] []
 

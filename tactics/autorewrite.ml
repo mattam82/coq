@@ -188,6 +188,9 @@ let gen_auto_multi_rewrite conds tac_main lbas cl =
 		 let ids =  Tacmach.pf_ids_of_hyps gl
 		 in try_do_hyps (fun id -> id)  ids gl)
 
+(* let gen_auto_multi_rewrite_key = Profile.declare_profile "gen_auto_multi_rewrite" *)
+(* let gen_auto_multi_rewrite = Profile.profile5 gen_auto_multi_rewrite_key gen_auto_multi_rewrite *)
+
 let auto_multi_rewrite ?(conds=Naive) = gen_auto_multi_rewrite conds Refiner.tclIDTAC
 
 let auto_multi_rewrite_with ?(conds=Naive) tac_main lbas cl gl =
