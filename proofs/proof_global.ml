@@ -270,29 +270,48 @@ type closed_proof =
 
 let close_proof ~now fpl =
   let { pid;section_vars;compute_guard;strength;hook;proof } = cur_pstate () in
+  let poly = pi2 strength (* Polymorphic *) in
   let initial_goals = Proof.initial_goals proof in
-  let evdref = ref (Proof.return proof) in
-  let nf,subst = Evarutil.e_nf_evars_and_universes evdref in
-  let initial_goals = List.map (fun (c,t) -> (nf c, nf t)) initial_goals in
-  let ctx = Evd.universe_context !evdref in
+  let fpl, univs = Future.split2 fpl in
+  let () = if poly || now then ignore (Future.compute univs) in
   let entries = Future.map2 (fun p (c, t) ->
-    let univs = 
-      Univ.LSet.union (Universes.universes_of_constr c)
-	(Universes.universes_of_constr t)
-    in 
-    let ctx = Universes.restrict_universe_context (Univ.ContextSet.of_context ctx) univs in
-    { Entries.
-    const_entry_body = p;
-    const_entry_secctx = section_vars;
-    const_entry_type  = Some t;
-    const_entry_inline_code = false;
-    const_entry_opaque = true;
-    const_entry_universes = Univ.ContextSet.to_context ctx;
-    const_entry_polymorphic = pi2 strength;
-    const_entry_proj = None}) fpl initial_goals in
-  if now then
-    List.iter (fun x -> ignore(Future.compute x.Entries.const_entry_body)) entries;
-  (pid, (entries, compute_guard, strength, Option.map (fun f -> f (subst,ctx)) hook))
+    let compute_univs (usubst, uctx) = 
+      let nf = Universes.nf_evars_and_universes_opt_subst (fun _ -> None) usubst in
+      let compute_c_t (c, eff) =
+	let univs =
+	  Univ.LSet.union (Universes.universes_of_constr c)
+	    (Universes.universes_of_constr t)
+	in 
+	let ctx = Universes.restrict_universe_context (Univ.ContextSet.of_context uctx) univs in
+	  (nf c, eff), nf t, Univ.ContextSet.to_context ctx
+      in
+	Future.chain p compute_c_t
+    in
+    let p_t_univs = Future.chain univs compute_univs in
+    let p, t, univs = Future.split3 (Future.join p_t_univs) in
+    let t = Future.force t in
+      { Entries.
+	const_entry_body = p;
+	const_entry_secctx = section_vars;
+	const_entry_type  = Some t;
+	const_entry_inline_code = false;
+	const_entry_opaque = true;
+	const_entry_universes = univs;
+	const_entry_polymorphic = pi2 strength;
+	const_entry_proj = None}) fpl initial_goals in
+  let _ = 
+    if now then
+      List.iter (fun x -> ignore(Future.compute x.Entries.const_entry_body)) entries
+  in
+  let hook = Option.map (fun f -> 
+    if poly || now then f (Future.join univs) 
+    else f (Univ.LMap.empty,Univ.UContext.empty))
+    hook
+  in
+    (pid, (entries, compute_guard, strength, hook))
+
+type closed_proof_output = Entries.proof_output list * 
+    Universes.universe_opt_subst Univ.in_universe_context
 
 let return_proof ~fix_exn =
   let { proof } = cur_pstate () in
@@ -308,10 +327,14 @@ let return_proof ~fix_exn =
          str"variables still non-instantiated")))
   in
   let eff = Evd.eval_side_effects evd in
+  let evd = Evd.nf_constraints evd in
+  let subst = Evd.universe_subst evd in
+  let ctx = Evd.universe_context evd in
   (** ppedrot: FIXME, this is surely wrong. There is no reason to duplicate
       side-effects... This may explain why one need to uniquize side-effects
       thereafter... *)
-  List.map (fun (c, _) -> (Evarutil.nf_evar evd c, eff)) initial_goals
+  let goals = List.map (fun (c, _) -> (Evarutil.nf_evar evd c, eff)) initial_goals in
+    goals, (subst, ctx)
 
 let close_future_proof proof = close_proof ~now:false proof
 let close_proof () =

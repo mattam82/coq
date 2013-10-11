@@ -83,13 +83,13 @@ let handle_side_effects env body side_eff =
 let infer_declaration ?(what="UNKNOWN") env kn dcl =
   match dcl with
   | DefinitionEntry c ->
-    let env = push_context c.const_entry_universes env in
     let ctx, entry_body = c.const_entry_secctx, c.const_entry_body in
       if c.const_entry_opaque && not (Option.is_empty c.const_entry_type) then
         let id = "infer_declaration " ^ what in
         let body =
           Future.chain ~id entry_body (fun (body, side_eff) ->
             let body = handle_side_effects env body side_eff in
+	    let env = push_context (Future.force c.const_entry_universes) env in
             let j = infer env body in
             let j =
               {uj_val = hcons_constr j.uj_val;
@@ -102,8 +102,9 @@ let infer_declaration ?(what="UNKNOWN") env kn dcl =
         | None -> assert false
         | Some typ -> typ in
         def, typ, None, c.const_entry_polymorphic, 
-	  Future.from_val c.const_entry_universes, c.const_entry_inline_code, ctx
+	  c.const_entry_universes, c.const_entry_inline_code, ctx
       else
+	let env = push_context (Future.force c.const_entry_universes) env in
         let body, side_eff = Future.force entry_body in
         let body = handle_side_effects env body side_eff in
 	let def, typ, proj = 
@@ -136,7 +137,7 @@ let infer_declaration ?(what="UNKNOWN") env kn dcl =
             let def = Def (Lazyconstr.from_val j.uj_val) in
               def, typ, None
 	in def, typ, proj, c.const_entry_polymorphic,
-	  Future.from_val c.const_entry_universes, c.const_entry_inline_code, ctx
+	  c.const_entry_universes, c.const_entry_inline_code, ctx
   | ParameterEntry (ctx,poly,(t,uctx),nl) ->
       let env = push_context uctx env in
       let j = infer env t in

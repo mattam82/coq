@@ -54,7 +54,7 @@ type ast = bool * Loc.t * vernac_expr
 let pr_ast (_, _, v) = pr_vernac v
 
 module Vcs_ = Vcs.Make(Stateid)
-type future_proof = Entries.proof_output list Future.computation
+type future_proof = Proof_global.closed_proof_output Future.computation
 type proof_mode = string
 type depth = int
 type branch_type =
@@ -690,7 +690,7 @@ end = struct (* {{{ *)
   type request = ReqBuildProof of (Stateid.t * Stateid.t) * Stateid.t * VCS.vcs
 
   type response =
-    | RespBuiltProof of Entries.proof_output list 
+    | RespBuiltProof of Proof_global.closed_proof_output
     | RespError of Stateid.t * Stateid.t * std_ppcmds (* err, safe, msg *)
     | RespFeedback of Interface.feedback
     | RespGetCounterFreshLocalUniv
@@ -710,7 +710,7 @@ end = struct (* {{{ *)
  
   type task =
     | TaskBuildProof of (Stateid.t * Stateid.t) * Stateid.t * Stateid.t *
-        (Entries.proof_output list Future.assignement -> unit)
+        (Proof_global.closed_proof_output Future.assignement -> unit)
   let pr_task = function
     | TaskBuildProof(_,bop,eop,_) ->
         "TaskBuilProof("^Stateid.to_string bop^","^Stateid.to_string eop^")"
@@ -740,7 +740,7 @@ end = struct (* {{{ *)
                  const_universes = cst} ) -> 
                   ignore(Future.force f); ignore(Future.force cst)
             | _ -> ())
-          se) l;
+          se) (fst l);
           l) in
         VCS.print ();
         r

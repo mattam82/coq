@@ -61,11 +61,11 @@ val add_morphism_infer : bool -> constr_expr -> Id.t -> unit
 val add_morphism :
   bool -> local_binder list -> constr_expr -> constr_expr -> Id.t -> unit
 
-(* val get_reflexive_proof : env -> evar_map -> constr -> constr -> constr *)
-
-(* val get_symmetric_proof : env -> evar_map -> constr -> constr -> constr *)
-
-(* val get_transitive_proof : env -> evar_map -> constr -> constr -> constr *)
+val get_reflexive_proof : env -> evar_map -> constr -> constr -> evar_map * constr
+  
+val get_symmetric_proof : env -> evar_map -> constr -> constr -> evar_map * constr
+  
+val get_transitive_proof : env -> evar_map -> constr -> constr -> evar_map * constr
 
 val default_morphism :
   (types * constr option) option list * (types * types option) option ->

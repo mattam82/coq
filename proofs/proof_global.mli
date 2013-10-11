@@ -72,9 +72,11 @@ val close_proof : unit -> closed_proof
 (* Intermediate step necessary to delegate the future.
  * Both access the current proof state. The formes is supposed to be
  * chained with a computation that completed the proof *)
-val return_proof : fix_exn:(exn -> exn) -> Entries.proof_output list
-val close_future_proof :
-  Entries.proof_output list Future.computation -> closed_proof
+type closed_proof_output = Entries.proof_output list * 
+    Universes.universe_opt_subst Univ.in_universe_context
+
+val return_proof : fix_exn:(exn -> exn) -> closed_proof_output
+val close_future_proof : closed_proof_output Future.computation -> closed_proof
 
 exception NoSuchProof
 

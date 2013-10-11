@@ -65,15 +65,9 @@ let interp_positive dloc n =
 (**********************************************************************)
 
 let rec bignat_of_pos = function
-<<<<<<< .merge_file_Q83gsI
-  | GApp (_, GRef (_,b),[a]) when Globnames.eq_gr b glob_xO -> mult_2(bignat_of_pos a)
-  | GApp (_, GRef (_,b),[a]) when Globnames.eq_gr b glob_xI -> add_1(mult_2(bignat_of_pos a))
-  | GRef (_, a) when Globnames.eq_gr a glob_xH -> Bigint.one
-=======
-  | GApp (_, GRef (_,b,_),[a]) when b = glob_xO -> mult_2(bignat_of_pos a)
-  | GApp (_, GRef (_,b,_),[a]) when b = glob_xI -> add_1(mult_2(bignat_of_pos a))
-  | GRef (_, a, _) when a = glob_xH -> Bigint.one
->>>>>>> .merge_file_NGf3Zp
+  | GApp (_, GRef (_,b,_),[a]) when Globnames.eq_gr b glob_xO -> mult_2(bignat_of_pos a)
+  | GApp (_, GRef (_,b,_),[a]) when Globnames.eq_gr b glob_xI -> add_1(mult_2(bignat_of_pos a))
+  | GRef (_, a, _) when Globnames.eq_gr a glob_xH -> Bigint.one
   | _ -> raise Non_closed_number
 
 let uninterp_positive p =
@@ -109,13 +103,8 @@ let glob_Npos = ConstructRef path_of_Npos
 let n_path = make_path binnums "N"
 
 let n_of_binnat dloc pos_or_neg n =
-<<<<<<< .merge_file_Q83gsI
   if not (Bigint.equal n zero) then
-    GApp(dloc, GRef (dloc,glob_Npos), [pos_of_bignat dloc n])
-=======
-  if n <> zero then
     GApp(dloc, GRef (dloc,glob_Npos,None), [pos_of_bignat dloc n])
->>>>>>> .merge_file_NGf3Zp
   else
     GRef (dloc, glob_N0, None)
 
@@ -131,13 +120,8 @@ let n_of_int dloc n =
 (**********************************************************************)
 
 let bignat_of_n = function
-<<<<<<< .merge_file_Q83gsI
-  | GApp (_, GRef (_,b),[a]) when Globnames.eq_gr b glob_Npos -> bignat_of_pos a
-  | GRef (_, a) when Globnames.eq_gr a glob_N0 -> Bigint.zero
-=======
-  | GApp (_, GRef (_,b,_),[a]) when b = glob_Npos -> bignat_of_pos a
-  | GRef (_, a, _) when a = glob_N0 -> Bigint.zero
->>>>>>> .merge_file_NGf3Zp
+  | GApp (_, GRef (_,b,_),[a]) when Globnames.eq_gr b glob_Npos -> bignat_of_pos a
+  | GRef (_, a, _) when Globnames.eq_gr a glob_N0 -> Bigint.zero
   | _ -> raise Non_closed_number
 
 let uninterp_n p =
@@ -182,15 +166,9 @@ let z_of_int dloc n =
 (**********************************************************************)
 
 let bigint_of_z = function
-<<<<<<< .merge_file_Q83gsI
-  | GApp (_, GRef (_,b),[a]) when Globnames.eq_gr b glob_POS -> bignat_of_pos a
-  | GApp (_, GRef (_,b),[a]) when Globnames.eq_gr b glob_NEG -> Bigint.neg (bignat_of_pos a)
-  | GRef (_, a) when Globnames.eq_gr a glob_ZERO -> Bigint.zero
-=======
-  | GApp (_, GRef (_,b,_),[a]) when b = glob_POS -> bignat_of_pos a
-  | GApp (_, GRef (_,b,_),[a]) when b = glob_NEG -> Bigint.neg (bignat_of_pos a)
-  | GRef (_, a, _) when a = glob_ZERO -> Bigint.zero
->>>>>>> .merge_file_NGf3Zp
+  | GApp (_, GRef (_,b,_),[a]) when Globnames.eq_gr b glob_POS -> bignat_of_pos a
+  | GApp (_, GRef (_,b,_),[a]) when Globnames.eq_gr b glob_NEG -> Bigint.neg (bignat_of_pos a)
+  | GRef (_, a, _) when Globnames.eq_gr a glob_ZERO -> Bigint.zero
   | _ -> raise Non_closed_number
 
 let uninterp_z p =

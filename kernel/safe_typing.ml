@@ -313,7 +313,7 @@ let push_named_def (id,de) senv =
     | Def c -> Lazyconstr.force c
     | OpaqueDef c -> Lazyconstr.force_opaque (Future.join c)
     | _ -> assert false in
-  let senv' = push_context de.Entries.const_entry_universes senv in
+  let senv' = push_context (Future.join de.Entries.const_entry_universes) senv in
   let env'' = safe_push_named (id,Some c,typ) senv'.env in
     {senv' with env=env''}
 
