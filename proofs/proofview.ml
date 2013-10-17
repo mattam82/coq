@@ -24,7 +24,7 @@ open Util
 
 (* Type of proofviews. *)
 type proofview = {
-     initial : (Term.constr * Term.types) list;
+     initial : (Term.constr * Term.types Univ.in_universe_context_set) list;
      solution : Evd.evar_map;
      comb : Goal.goal list;
      }
@@ -36,26 +36,27 @@ let proofview p =
    conclusion types, and optional names, creating that many initial goals. *)
 let init = 
   let rec aux env = function
-  | [] ->  { initial = [] ; 
-	     solution = Evd.from_env env ;
-	     comb = []
-	   }
-  | (env,(typ,ctx))::l -> let { initial = ret ; solution = sol ; comb = comb } =
-                           aux env l
-                         in
-                         let ( new_defs , econstr ) = 
-			   Evarutil.new_evar sol env typ
-			 in
-			 let (e,_) = Term.destEvar econstr in
-			 let new_defs = Evd.merge_context_set Evd.univ_rigid new_defs ctx in
-			 let gl = Goal.build e in
-			 { initial = (econstr,typ)::ret;
-			   solution = new_defs ;
-                           comb = gl::comb; }
+    | [] ->  { initial = [] ; 
+	       solution = Evd.from_env env ;
+	       comb = []
+	     }
+    | (env,(typ,ctx))::l -> 
+      let { initial = ret ; solution = sol ; comb = comb } =
+        aux env l
+      in
+      let ( new_defs , econstr ) = 
+	Evarutil.new_evar sol env typ
+      in
+      let (e,_) = Term.destEvar econstr in
+      let new_defs = Evd.merge_context_set Evd.univ_rigid new_defs ctx in
+      let gl = Goal.build e in
+	{ initial = (econstr,(typ,ctx))::ret;
+	  solution = new_defs ;
+          comb = gl::comb; }
   in
-  fun l -> let v = aux (Global.env()) l in
+    fun l -> let v = aux (Global.env()) l in
     (* Marks all the goal unresolvable for typeclasses. *)
-    { v with solution = Typeclasses.mark_unresolvables v.solution }
+	       { v with solution = Typeclasses.mark_unresolvables v.solution }
 
 let initial_goals { initial } = initial
 

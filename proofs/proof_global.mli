@@ -64,7 +64,7 @@ val start_proof : Names.Id.t ->
 
 type closed_proof =
   Names.Id.t *
-  (Entries.definition_entry list * lemma_possible_guards *
+  (Entries.definition_entry list * Univ.constraints * lemma_possible_guards *
     Decl_kinds.goal_kind * unit Tacexpr.declaration_hook)
 
 val close_proof : unit -> closed_proof
@@ -74,7 +74,7 @@ val close_proof : unit -> closed_proof
  * chained with a computation that completed the proof *)
 type closed_proof_output = Entries.proof_output list * 
     Universes.universe_opt_subst Univ.in_universe_context
-
+    
 val return_proof : fix_exn:(exn -> exn) -> closed_proof_output
 val close_future_proof : closed_proof_output Future.computation -> closed_proof
 

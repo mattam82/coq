@@ -73,17 +73,19 @@ val start_proof :
 val cook_this_proof : (Proof.proof -> unit) ->
     Id.t *
     (Entries.definition_entry list *
+       Univ.constraints *
     lemma_possible_guards *
     Decl_kinds.goal_kind *
     unit Tacexpr.declaration_hook) ->
   Id.t *
-    (Entries.definition_entry * lemma_possible_guards * goal_kind *
+    (Entries.definition_entry * Univ.constraints * lemma_possible_guards * goal_kind *
      unit declaration_hook)
 
 val cook_proof : (Proof.proof -> unit) ->
   Id.t *
-    (Entries.definition_entry * lemma_possible_guards * goal_kind *
-     unit declaration_hook)
+    (Entries.definition_entry * Univ.constraints * 
+       lemma_possible_guards * goal_kind *
+       unit declaration_hook)
 
 (** {6 ... } *)
 (** [get_pftreestate ()] returns the current focused pending proof.

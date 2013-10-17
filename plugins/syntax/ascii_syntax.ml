@@ -37,12 +37,9 @@ let interp_ascii dloc p =
   let rec aux n p =
      if Int.equal n 0 then [] else
      let mp = p mod 2 in
-<<<<<<< .merge_file_xUTsqH
-     GRef (dloc,if Int.equal mp 0 then glob_false else glob_true)
-=======
-     GRef (dloc,(if mp = 0 then glob_false else glob_true),None)
->>>>>>> .merge_file_4ble6z
-     :: (aux (n-1) (p/2)) in
+     let glob = if Int.equal mp 0 then glob_false else glob_true in
+       GRef (dloc,glob,None)
+       :: (aux (n-1) (p/2)) in
   GApp (dloc,GRef(dloc,force glob_Ascii,None), aux 8 p)
 
 let interp_ascii_string dloc s =
@@ -58,23 +55,13 @@ let interp_ascii_string dloc s =
 
 let uninterp_ascii r =
   let rec uninterp_bool_list n = function
-<<<<<<< .merge_file_xUTsqH
     | [] when Int.equal n 0 -> 0
-    | GRef (_,k)::l when Globnames.eq_gr k glob_true  -> 1+2*(uninterp_bool_list (n-1)  l)
-    | GRef (_,k)::l when Globnames.eq_gr k glob_false -> 2*(uninterp_bool_list (n-1) l)
+    | GRef (_,k,_)::l when Globnames.eq_gr k glob_true  -> 1+2*(uninterp_bool_list (n-1)  l)
+    | GRef (_,k,_)::l when Globnames.eq_gr k glob_false -> 2*(uninterp_bool_list (n-1) l)
     | _ -> raise Non_closed_ascii in
   try
     let aux = function
-    | GApp (_,GRef (_,k),l) when Globnames.eq_gr k (force glob_Ascii) -> uninterp_bool_list 8 l
-=======
-    | [] when n = 0 -> 0
-    | GRef (_,k,_)::l when k = glob_true  -> 1+2*(uninterp_bool_list (n-1)  l)
-    | GRef (_,k,_)::l when k = glob_false -> 2*(uninterp_bool_list (n-1) l)
-    | _ -> raise Non_closed_ascii in
-  try
-    let aux = function
-    | GApp (_,GRef (_,k,_),l) when k = force glob_Ascii -> uninterp_bool_list 8 l
->>>>>>> .merge_file_4ble6z
+    | GApp (_,GRef (_,k,_),l) when Globnames.eq_gr k (force glob_Ascii) -> uninterp_bool_list 8 l
     | _ -> raise Non_closed_ascii in
     Some (aux r)
   with

@@ -45,6 +45,11 @@ let elide_part_of_script_and_now (a, _) =
   | VtStm (x, _) -> VtStm (x, false), VtNow
   | x -> x, VtNow
 
+let make_polymorphic (a, b as x) =
+  match a with
+  | VtStartProof (x, y, _) -> (VtStartProof (x, y, true), b)
+  | _ -> x
+
 let undo_classifier = ref (fun _ -> assert false)
 let set_undo_classifier f = undo_classifier := f
 
@@ -65,13 +70,13 @@ let rec classify_vernac e =
     | VernacLocal (_,e) -> classify_vernac e
     | VernacPolymorphic (b, e) -> 
       if b || Flags.is_universe_polymorphism () (* Ok or not? *) then
-	fst (classify_vernac e), VtNow
+	make_polymorphic (classify_vernac e)
       else classify_vernac e
     | VernacTimeout (_,e) -> classify_vernac e
     | VernacTime e -> classify_vernac e
     | VernacFail e -> (* Fail Qed or Fail Lemma must not join/fork the DAG *)
         (match classify_vernac e with
-        | ( VtQuery _ | VtProofStep _ | VtSideff _
+        | ( VtQuery _ | VtProofStep | VtSideff _
           | VtStm _ | VtProofMode _ ), _ as x -> x
         | VtQed _, _ -> VtProofStep, VtNow
         | (VtStartProof _ | VtUnknown), _ -> VtUnknown, VtNow)
@@ -84,31 +89,31 @@ let rec classify_vernac e =
     (* ProofStep *)
     | VernacProof _ 
     | VernacBullet _ 
-    | VernacFocus _ | VernacUnfocus _
-    | VernacSubproof _ | VernacEndSubproof _ 
+    | VernacFocus _ | VernacUnfocus
+    | VernacSubproof _ | VernacEndSubproof
     | VernacSolve _ 
-    | VernacCheckGuard _
-    | VernacUnfocused _
+    | VernacCheckGuard
+    | VernacUnfocused
     | VernacSolveExistential _ -> VtProofStep, VtLater
     (* StartProof *)
     | VernacDefinition (_,(_,i),ProveBody _) ->
-        VtStartProof("Classic",[i]), VtLater
+        VtStartProof("Classic",[i],false), VtLater
     | VernacStartTheoremProof (_,l,_) ->
         let ids = 
           CList.map_filter (function (Some(_,i), _) -> Some i | _ -> None) l in
-        VtStartProof ("Classic", ids), VtLater
-    | VernacGoal _ -> VtStartProof ("Classic",[]), VtLater
+        VtStartProof ("Classic", ids,false), VtLater
+    | VernacGoal _ -> VtStartProof ("Classic",[],false), VtLater
     | VernacFixpoint (_,l) ->
         let ids, open_proof =
           List.fold_left (fun (l,b) (((_,id),_,_,_,p),_) ->
             id::l, b || p = None) ([],false) l in
-        if open_proof then VtStartProof ("Classic",ids), VtLater
+        if open_proof then VtStartProof ("Classic",ids,false), VtLater
         else VtSideff ids, VtLater
     | VernacCoFixpoint (_,l) ->
         let ids, open_proof =
           List.fold_left (fun (l,b) (((_,id),_,_,p),_) ->
             id::l, b || p = None) ([],false) l in
-        if open_proof then VtStartProof ("Classic",ids), VtLater
+        if open_proof then VtStartProof ("Classic",ids,false), VtLater
         else VtSideff ids, VtLater
     (* Sideff: apply to all open branches. usually run on master only *)
     | VernacAssumption (_,_,l) ->
@@ -167,7 +172,7 @@ let rec classify_vernac e =
     (* Stm will install a new classifier to handle these *)
     | VernacBack _ | VernacAbortAll
     | VernacUndoTo _ | VernacUndo _
-    | VernacResetName _ | VernacResetInitial _
+    | VernacResetName _ | VernacResetInitial
     | VernacBacktrack _ | VernacBackTo _ | VernacRestart -> !undo_classifier e
     (* What are these? *)
     | VernacNop

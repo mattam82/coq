@@ -55,8 +55,8 @@ type const_entry_body = proof_output Future.computation
 type projection = mutual_inductive * int * int * types
 
 type definition_entry = {
-  const_entry_body   : const_entry_body;
-  const_entry_secctx : Context.section_context option;
+  const_entry_body        : const_entry_body;
+  const_entry_secctx      : Context.section_context option;
   const_entry_type        : types option;
   const_entry_polymorphic : bool;
   const_entry_universes   : Univ.universe_context Future.computation;

@@ -191,19 +191,11 @@ let constr_display csr =
       "LetIn("^(name_display na)^","^(term_display b)^","
       ^(term_display t)^","^(term_display c)^")"
   | App (c,l) -> "App("^(term_display c)^","^(array_display l)^")\n"
-<<<<<<< .merge_file_nW7ixv
   | Evar (e,l) -> "Evar("^(string_of_existential e)^","^(array_display l)^")"
-  | Const c -> "Const("^(string_of_con c)^")"
-  | Ind (sp,i) ->
-      "MutInd("^(string_of_mind sp)^","^(string_of_int i)^")"
-  | Construct ((sp,i),j) ->
-=======
-  | Evar (e,l) -> "Evar("^(string_of_int e)^","^(array_display l)^")"
   | Const (c,u) -> "Const("^(string_of_con c)^","^(universes_display u)^")"
   | Ind ((sp,i),u) ->
       "MutInd("^(string_of_mind sp)^","^(string_of_int i)^","^(universes_display u)^")"
   | Construct (((sp,i),j),u) ->
->>>>>>> .merge_file_JLEkLg
       "MutConstruct(("^(string_of_mind sp)^","^(string_of_int i)^"),"
       ^","^(universes_display u)^(string_of_int j)^")"
   | Proj (p, c) -> "Proj("^(string_of_con p)^","^term_display c ^")"

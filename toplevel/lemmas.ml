@@ -164,9 +164,11 @@ let look_for_possibly_mutual_statements = function
 
 (* Saving a goal *)
 
-let save ?proof id const do_guard (locality,poly,kind) hook =
+let save ?proof id const cstrs do_guard (locality,poly,kind) hook =
   let const = adjust_guardness_conditions const do_guard in
   let k = Kindops.logical_kind_of_goal_kind kind in
+  (* Add global constraints necessary to check the type of the proof *)
+  let () = Global.add_constraints cstrs in
   let l,r = match locality with
     | Discharge when Lib.sections_are_opened () ->
 	let c = SectionLocalDef const in
@@ -249,15 +251,15 @@ let save_hook = ref ignore
 let set_save_hook f = save_hook := f
 
 let get_proof ?proof opacity =
-  let id,(const,do_guard,persistence,hook) = 
+  let id,(const,cstrs,do_guard,persistence,hook) = 
     match proof with
     | None -> Pfedit.cook_proof !save_hook 
     | Some p -> Pfedit.cook_this_proof !save_hook p in
-  id,{const with const_entry_opaque = opacity},do_guard,persistence,hook
+  id,{const with const_entry_opaque = opacity},cstrs,do_guard,persistence,hook
 
 let save_named ?proof opacity =
-  let id,const,do_guard,persistence,hook = get_proof ?proof opacity in
-  save ?proof id const do_guard persistence hook
+  let id,const,cstrs,do_guard,persistence,hook = get_proof ?proof opacity in
+  save ?proof id const cstrs do_guard persistence hook
 
 let check_anonymity id save_ident =
   if not (String.equal (atompart_of_id id) (Id.to_string (default_thm_id))) then
@@ -265,15 +267,15 @@ let check_anonymity id save_ident =
 
 
 let save_anonymous ?proof opacity save_ident =
-  let id,const,do_guard,persistence,hook = get_proof ?proof opacity in
+  let id,const,cstrs,do_guard,persistence,hook = get_proof ?proof opacity in
   check_anonymity id save_ident;
-  save ?proof save_ident const do_guard persistence hook
+  save ?proof save_ident const cstrs do_guard persistence hook
 
 let save_anonymous_with_strength ?proof kind opacity save_ident =
-  let id,const,do_guard,_,hook = get_proof ?proof opacity in
+  let id,const,cstrs,do_guard,_,hook = get_proof ?proof opacity in
   check_anonymity id save_ident;
   (* we consider that non opaque behaves as local for discharge *)
-  save ?proof save_ident const do_guard 
+  save ?proof save_ident const cstrs do_guard 
     (Global, const.const_entry_polymorphic, Proof kind) hook
 
 (* Starting a goal *)

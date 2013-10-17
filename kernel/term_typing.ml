@@ -24,7 +24,7 @@ open Entries
 open Typeops
 open Fast_typeops
 
-let debug = false
+let debug = true
 let prerr_endline =
   if debug then prerr_endline else fun _ -> ()
 
@@ -101,12 +101,12 @@ let infer_declaration ?(what="UNKNOWN") env kn dcl =
         let typ = match c.const_entry_type with
         | None -> assert false
         | Some typ -> typ in
-        def, typ, None, c.const_entry_polymorphic, 
+          def, typ, None, c.const_entry_polymorphic, 
 	  c.const_entry_universes, c.const_entry_inline_code, ctx
       else
-	let env = push_context (Future.force c.const_entry_universes) env in
         let body, side_eff = Future.force entry_body in
         let body = handle_side_effects env body side_eff in
+	let env = push_context (Future.force c.const_entry_universes) env in
 	let def, typ, proj = 
 	  match c.const_entry_proj with
 	  | Some (ind, n, m, ty) ->

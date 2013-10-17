@@ -53,19 +53,19 @@ let clear_global=function
     VarRef id->clear [id]
   | _->tclIDTAC
 
-let constr_of_global = Universes.constr_of_global
 (* connection rules *)
 
 let axiom_tac t seq=
-  try exact_no_check (constr_of_global (find_left t seq))
+  try pf_constr_of_global (find_left t seq) exact_no_check
   with Not_found->tclFAIL 0 (Pp.str "No axiom link")
 
 let ll_atom_tac a backtrack id continue seq=
   tclIFTHENELSE
     (try
       tclTHENLIST
-	[generalize [mkApp(constr_of_global id,
-			   [|constr_of_global (find_left a seq)|])];
+	[pf_constr_of_global (find_left a seq) (fun left ->
+	  pf_constr_of_global id (fun id -> 
+	    generalize [mkApp(id, [|left|])]));
 	 clear_global id;
 	 intro]
     with Not_found->tclFAIL 0 (Pp.str "No link"))
@@ -92,7 +92,7 @@ let left_and_tac ind backtrack id continue seq gls=
  let n=(construct_nhyps ind gls).(0) in
    tclIFTHENELSE
      (tclTHENLIST
-      [simplest_elim (constr_of_global id);
+      [pf_constr_of_global id simplest_elim;
        clear_global id;
        tclDO n intro])
      (wrap n false continue seq)
@@ -106,53 +106,52 @@ let left_or_tac ind backtrack id continue seq gls=
        tclDO n intro;
        wrap n false continue seq] in
     tclIFTHENSVELSE
-      (simplest_elim (constr_of_global id))
+      (pf_constr_of_global id simplest_elim)
       (Array.map f v)
       backtrack gls
 
 let left_false_tac id=
-  simplest_elim (constr_of_global id)
+  pf_constr_of_global id simplest_elim
 
 (* left arrow connective rules *)
 
 (* We use this function for false, and, or, exists *)
 
 let ll_ind_tac (ind,u as indu) largs backtrack id continue seq gl=
-     let rcs=ind_hyps 0 indu largs gl in
-     let vargs=Array.of_list largs in
-	     (* construire le terme  H->B, le generaliser etc *)
-     let myterm i=
-       let rc=rcs.(i) in
-       let p=List.length rc in
-       let cstr=mkApp ((mkConstructU ((ind,(i+1)),u)),vargs) in
-       let vars=Array.init p (fun j->mkRel (p-j)) in
-       let capply=mkApp ((lift p cstr),vars) in
-       let head=mkApp ((lift p (constr_of_global id)),[|capply|]) in
-	 it_mkLambda_or_LetIn head rc in
-       let lp=Array.length rcs in
-       let newhyps=List.init lp myterm in
-	 tclIFTHENELSE
-	   (tclTHENLIST
-	      [generalize newhyps;
-	       clear_global id;
-	       tclDO lp intro])
-	   (wrap lp false continue seq) backtrack gl
+  let rcs=ind_hyps 0 indu largs gl in
+  let vargs=Array.of_list largs in
+     (* construire le terme  H->B, le generaliser etc *)
+  let myterm idc i=
+    let rc=rcs.(i) in
+    let p=List.length rc in
+    let cstr=mkApp ((mkConstructU ((ind,(i+1)),u)),vargs) in
+    let vars=Array.init p (fun j->mkRel (p-j)) in
+    let capply=mkApp ((lift p cstr),vars) in
+    let head=mkApp ((lift p idc),[|capply|]) in
+      it_mkLambda_or_LetIn head rc in
+  let lp=Array.length rcs in
+  let newhyps idc =List.init lp (myterm idc) in
+    tclIFTHENELSE
+      (tclTHENLIST
+	 [pf_constr_of_global id (fun idc -> generalize (newhyps idc));
+	  clear_global id;
+	  tclDO lp intro])
+      (wrap lp false continue seq) backtrack gl
 
 let ll_arrow_tac a b c backtrack id continue seq=
   let cc=mkProd(Anonymous,a,(lift 1 b)) in
-  let d=mkLambda (Anonymous,b,
-		  mkApp ((constr_of_global id),
-			 [|mkLambda (Anonymous,(lift 1 a),(mkRel 2))|])) in
+  let d idc =mkLambda (Anonymous,b,
+		  mkApp (idc, [|mkLambda (Anonymous,(lift 1 a),(mkRel 2))|])) in
     tclORELSE
       (tclTHENS (cut c)
 	 [tclTHENLIST
-	    [introf;
-	     clear_global id;
-	     wrap 1 false continue seq];
+	     [introf;
+	      clear_global id;
+	      wrap 1 false continue seq];
 	  tclTHENS (cut cc)
-            [exact_no_check (constr_of_global id);
+            [pf_constr_of_global id exact_no_check;
 	     tclTHENLIST
-	       [generalize [d];
+	       [pf_constr_of_global id (fun idc -> generalize [d idc]);
 		clear_global id;
 		introf;
 		introf;
@@ -175,7 +174,7 @@ let forall_tac backtrack continue seq=
 let left_exists_tac ind backtrack id continue seq gls=
   let n=(construct_nhyps ind gls).(0) in
     tclIFTHENELSE
-      (simplest_elim (constr_of_global id))
+      (pf_constr_of_global id simplest_elim)
       (tclTHENLIST [clear_global id;
                     tclDO n intro;
                     (wrap (n-1) false continue seq)])
@@ -187,10 +186,11 @@ let ll_forall_tac prod backtrack id continue seq=
     (tclTHENS (cut prod)
        [tclTHENLIST
 	  [intro;
-	   (fun gls->
-	      let id0=pf_nth_hyp_id gls 1 in
-	      let term=mkApp((constr_of_global id),[|mkVar(id0)|]) in
-		tclTHEN (generalize [term]) (clear [id0]) gls);
+	   pf_constr_of_global id (fun idc ->
+	     (fun gls->
+	       let id0=pf_nth_hyp_id gls 1 in
+	       let term=mkApp(idc,[|mkVar(id0)|]) in
+		 tclTHEN (generalize [term]) (clear [id0]) gls));
 	   clear_global id;
 	   intro;
 	   tclCOMPLETE (wrap 1 false continue (deepen seq))];

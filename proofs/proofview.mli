@@ -49,7 +49,7 @@ val return : proofview -> Evd.evar_map
 (* val return : proofview -> ((constr*types) list * Universes.universe_opt_subst) Univ.in_universe_context *)
 
 val partial_proof : proofview -> constr list
-val initial_goals : proofview -> (constr * types) list
+val initial_goals : proofview -> (constr * types Univ.in_universe_context_set) list
 val emit_side_effects : Declareops.side_effects -> proofview -> proofview
 
 (*** Focusing operations ***)

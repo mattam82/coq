@@ -40,7 +40,7 @@ let start_proof (id : Id.t) str hyps c ?init_tac ?compute_guard hook =
 
 let cook_this_proof hook p =
   match p with
-  | (i,([e],cg,str,h)) -> (i,(e,cg,str,h))
+  | (i,([e],cstrs,cg,str,h)) -> (i,(e,cstrs,cg,str,h))
   | _ -> Errors.anomaly ~label:"Pfedit.cook_proof" (Pp.str "more than one proof term.")
 
 let cook_proof hook = cook_this_proof hook (Proof_global.close_proof ())
@@ -120,7 +120,7 @@ let build_constant_by_tactic id sign ?(goal_kind = Global, false, Proof Theorem)
     start_proof id goal_kind sign typ (Some (fun subst -> substref := fst subst; fun _ _ -> ()));
     try
       by tac;
-      let _,(const,_,_,h) = cook_proof (fun _ -> ()) in
+      let _,(const,_,_,_,h) = cook_proof (fun _ -> ()) in
 	delete_current_proof ();
 	const, !substref
     with reraise ->

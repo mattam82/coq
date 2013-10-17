@@ -265,7 +265,7 @@ let get_open_goals () =
 
 type closed_proof =
   Names.Id.t *
-  (Entries.definition_entry list * lemma_possible_guards *
+  (Entries.definition_entry list * Univ.constraints * lemma_possible_guards *
     Decl_kinds.goal_kind * unit Tacexpr.declaration_hook)
 
 let close_proof ~now fpl =
@@ -274,7 +274,7 @@ let close_proof ~now fpl =
   let initial_goals = Proof.initial_goals proof in
   let fpl, univs = Future.split2 fpl in
   let () = if poly || now then ignore (Future.compute univs) in
-  let entries = Future.map2 (fun p (c, t) ->
+  let entries = Future.map2 (fun p (c, (t, octx)) ->
     let compute_univs (usubst, uctx) = 
       let nf = Universes.nf_evars_and_universes_opt_subst (fun _ -> None) usubst in
       let compute_c_t (c, eff) =
@@ -288,7 +288,7 @@ let close_proof ~now fpl =
 	Future.chain p compute_c_t
     in
     let p_t_univs = Future.chain univs compute_univs in
-    let p, t, univs = Future.split3 (Future.join p_t_univs) in
+    let p, t, univs = Future.split3 (Future.force p_t_univs) in
     let t = Future.force t in
       { Entries.
 	const_entry_body = p;
@@ -299,16 +299,23 @@ let close_proof ~now fpl =
 	const_entry_universes = univs;
 	const_entry_polymorphic = pi2 strength;
 	const_entry_proj = None}) fpl initial_goals in
+  let globaluctx = 
+    if not poly then
+      List.fold_left (fun acc (c, (t, octx)) -> 
+	Univ.ContextSet.union octx acc)
+	Univ.ContextSet.empty initial_goals
+    else Univ.ContextSet.empty
+  in
   let _ = 
     if now then
       List.iter (fun x -> ignore(Future.compute x.Entries.const_entry_body)) entries
   in
   let hook = Option.map (fun f -> 
-    if poly || now then f (Future.join univs) 
+    if poly || now then f (Future.force univs) 
     else f (Univ.LMap.empty,Univ.UContext.empty))
     hook
   in
-    (pid, (entries, compute_guard, strength, hook))
+    (pid, (entries, Univ.ContextSet.constraints globaluctx, compute_guard, strength, hook))
 
 type closed_proof_output = Entries.proof_output list * 
     Universes.universe_opt_subst Univ.in_universe_context
@@ -333,8 +340,8 @@ let return_proof ~fix_exn =
   (** ppedrot: FIXME, this is surely wrong. There is no reason to duplicate
       side-effects... This may explain why one need to uniquize side-effects
       thereafter... *)
-  let goals = List.map (fun (c, _) -> (Evarutil.nf_evar evd c, eff)) initial_goals in
-    goals, (subst, ctx)
+  let proofs = List.map (fun (c, _) -> (Evarutil.nf_evar evd c, eff)) initial_goals in
+    proofs, (subst, ctx)
 
 let close_future_proof proof = close_proof ~now:false proof
 let close_proof () =
@@ -448,7 +455,9 @@ end
 module V82 = struct
   let get_current_initial_conclusions () =
     let { pid; strength; hook; proof } = cur_pstate () in
-    pid, (List.map snd (Proof.initial_goals proof), strength, hook)
+    let initial = Proof.initial_goals proof in
+    let goals = List.map (fun (o, (c, ctx)) -> c) initial in
+      pid, (goals, strength, hook)
 end
 
 type state = pstate list

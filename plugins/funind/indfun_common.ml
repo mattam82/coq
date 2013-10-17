@@ -167,7 +167,7 @@ let save with_clean id const (locality,_,kind) hook =
 
 
 let cook_proof _ =
-  let (id,(entry,_,strength,hook)) = Pfedit.cook_proof (fun _ -> ()) in
+  let (id,(entry,_,_,strength,hook)) = Pfedit.cook_proof (fun _ -> ()) in
   (id,(entry,strength,hook))
 
 let new_save_named opacity =

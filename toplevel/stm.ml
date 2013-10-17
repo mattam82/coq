@@ -62,7 +62,7 @@ type branch_type =
   | `Proof of proof_mode * depth
   | `Edit of proof_mode * Stateid.t * Stateid.t ]
 type cmd_t = ast * Id.t list
-type fork_t = ast * Vcs_.Branch.t * Id.t list
+type fork_t = ast * Vcs_.Branch.t * Id.t list * Decl_kinds.polymorphic
 type qed_t = {
   qast : ast;
   keep : vernac_qed_type;
@@ -228,7 +228,7 @@ end = struct (* {{{ *)
   let print_dag vcs () = (* {{{ *)
     let fname = "stm" ^ string_of_int (max 0 !Flags.coq_slave_mode) in
     let string_of_transaction = function
-      | Cmd (t, _) | Fork (t, _,_) ->
+      | Cmd (t, _) | Fork (t, _, _, _) ->
           (try string_of_ppcmds (pr_ast t) with _ -> "ERR")
       | Sideff (Some t) ->
           sprintf "Sideff(%s)"
@@ -960,13 +960,15 @@ let collect_proof cur hd id =
     match last, view.step with
     | _, `Cmd (x, _) -> collect (Some (id,x)) (id::accn) view.next
     | _, `Alias _ -> collect None (id::accn) view.next
-    | _, `Fork(_,_,_::_::_)->
-        `NotOptimizable `MutualProofs (* TODO: enderstand where we need that *)
-    | Some (parent, (_,_,VernacProof(_,Some _) as v)), `Fork (_, hd', _) ->
+    | _, `Fork(_,_,_::_::_,_)->
+        `NotOptimizable `MutualProofs (* TODO: understand where we need that *)
+    | _, `Fork(_,_,_,true)->
+        `NotOptimizable `Polymorphic
+    | Some (parent, (_,_,VernacProof(_,Some _) as v)), `Fork (_, hd', _, false) ->
         assert (VCS.Branch.equal hd hd' || VCS.Branch.equal hd VCS.edit_branch);
         if delegate_policy_check accn then `Optimizable (parent, Some v, accn)
         else `NotOptimizable `TooShort
-    | Some (parent, _), `Fork (_, hd', _) ->
+    | Some (parent, _), `Fork (_, hd', _, false) ->
         assert (VCS.Branch.equal hd hd' || VCS.Branch.equal hd VCS.edit_branch);
         if delegate_policy_check accn then `MaybeOptimizable (parent, accn)
         else `NotOptimizable `TooShort
@@ -1011,7 +1013,7 @@ let known_state ?(redefine_qed=false) ~cache id =
       | `Cmd (x,_) -> (fun () ->
             reach view.next; vernac_interp id x
           ), cache
-      | `Fork (x,_,_) -> (fun () ->
+      | `Fork (x,_,_,_) -> (fun () ->
             reach view.next; vernac_interp id x
           ), `Yes
       | `Qed ({ qast = x; keep; brinfo; brname } as qed, eop) ->
@@ -1143,7 +1145,7 @@ end = struct (* {{{ *)
         let ids =
           if id = Stateid.initial || id = Stateid.dummy then [] else
           match VCS.visit id with
-          | { step = `Fork (_,_,l) } -> l
+          | { step = `Fork (_,_,l,_) } -> l
           | { step = `Cmd (_,l) } -> l
           | _ -> [] in
         match f acc (id, vcs, ids) with
@@ -1355,11 +1357,11 @@ let process_transaction ~tty verbose c (loc, expr) =
           anomaly(str"classifier: VtQuery + VtLater must imply part_of_script")
 
       (* Proof *)
-      | VtStartProof (mode, names), w ->
+      | VtStartProof (mode, names, poly), w ->
           let id = VCS.new_node () in
           let bname = VCS.mk_branch_name x in
           VCS.checkout VCS.Branch.master;
-          VCS.commit id (Fork (x, bname, names));
+          VCS.commit id (Fork (x, bname, names, poly));
           VCS.branch bname (`Proof (mode, VCS.proof_nesting () + 1));
           Proof_global.activate_proof_mode mode;
           Backtrack.record (); if w == VtNow then finish (); `Ok
@@ -1416,7 +1418,7 @@ let process_transaction ~tty verbose c (loc, expr) =
                Proof_global.there_are_pending_proofs ()
             then begin
               let bname = VCS.mk_branch_name x in
-              VCS.commit id (Fork (x,bname,[]));
+              VCS.commit id (Fork (x,bname,[],false));
               VCS.branch bname (`Proof ("Classic", VCS.proof_nesting () + 1));
               Proof_global.activate_proof_mode "Classic";
             end else begin
@@ -1453,7 +1455,8 @@ let process_transaction ~tty verbose c (loc, expr) =
         prerr_endline ("Failed at state " ^ Stateid.to_string id);
         VCS.restore vcs;
         if tty then begin (* We stay on a valid state *)
-          Backtrack.backto safe_id;
+          prerr_endline ("Safe state " ^ Stateid.to_string safe_id);
+	  Backtrack.backto safe_id;
           VCS.checkout_shallowest_proof_branch ();
           Reach.known_state ~cache:(interactive ()) safe_id;
         end else begin
@@ -1630,7 +1633,7 @@ let get_script prf =
     if Stateid.equal id Stateid.initial || Stateid.equal id Stateid.dummy then acc else
     let view = VCS.visit id in
     match view.step with
-    | `Fork (_,_,ns) when List.mem prf ns -> acc
+    | `Fork (_,_,ns,_) when List.mem prf ns -> acc
     | `Qed (qed, proof) -> find [pi3 qed.qast, (VCS.get_info id).n_goals] proof
     | `Sideff (`Ast (x,_)) ->
          find ((pi3 x, (VCS.get_info id).n_goals)::acc) view.next

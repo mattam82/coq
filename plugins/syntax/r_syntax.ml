@@ -53,15 +53,9 @@ let r_of_posint dloc n =
     if less_than n four then small_r dloc n
     else
       let (q,r) = div2_with_rest n in
-<<<<<<< .merge_file_GkifYk
-      let b = GApp(dloc,GRef(dloc,glob_Rmult),[r2;r_of_pos q]) in
-      if r then GApp(dloc,GRef(dloc,glob_Rplus),[r1;b]) else b in
-  if not (Bigint.equal n zero) then r_of_pos n else GRef(dloc,glob_R0)
-=======
       let b = GApp(dloc,GRef(dloc,glob_Rmult,None),[r2;r_of_pos q]) in
       if r then GApp(dloc,GRef(dloc,glob_Rplus,None),[r1;b]) else b in
-  if n <> zero then r_of_pos n else GRef(dloc,glob_R0,None)
->>>>>>> .merge_file_C4JwbA
+  if not (Bigint.equal n zero) then r_of_pos n else GRef(dloc,glob_R0,None)
 
 let r_of_int dloc z =
   if is_strictly_neg z then
@@ -77,60 +71,33 @@ let bignat_of_r =
 (* for numbers > 1 *)
 let rec bignat_of_pos = function
   (* 1+1 *)
-<<<<<<< .merge_file_GkifYk
-  | GApp (_,GRef (_,p), [GRef (_,o1); GRef (_,o2)])
-      when Globnames.eq_gr p glob_Rplus && Globnames.eq_gr o1 glob_R1 && Globnames.eq_gr o2 glob_R1 -> two
-  (* 1+(1+1) *)
-  | GApp (_,GRef (_,p1), [GRef (_,o1);
-      GApp(_,GRef (_,p2),[GRef(_,o2);GRef(_,o3)])])
-      when Globnames.eq_gr p1 glob_Rplus && Globnames.eq_gr p2 glob_Rplus &&
-           Globnames.eq_gr o1 glob_R1 && Globnames.eq_gr o2 glob_R1 && Globnames.eq_gr o3 glob_R1 -> three
-  (* (1+1)*b *)
-  | GApp (_,GRef (_,p), [a; b]) when Globnames.eq_gr p glob_Rmult ->
-      if not (Bigint.equal (bignat_of_pos a) two) then raise Non_closed_number;
-      mult_2 (bignat_of_pos b)
-  (* 1+(1+1)*b *)
-  | GApp (_,GRef (_,p1), [GRef (_,o); GApp (_,GRef (_,p2),[a;b])])
-      when Globnames.eq_gr p1 glob_Rplus && Globnames.eq_gr p2 glob_Rmult && Globnames.eq_gr o glob_R1  ->
-      if not (Bigint.equal (bignat_of_pos a) two) then raise Non_closed_number;
-=======
   | GApp (_,GRef (_,p,_), [GRef (_,o1,_); GRef (_,o2,_)])
-      when p = glob_Rplus & o1 = glob_R1 & o2 = glob_R1 -> two
+      when Globnames.eq_gr p glob_Rplus && Globnames.eq_gr o1 glob_R1 && Globnames.eq_gr o2 glob_R1 -> two
   (* 1+(1+1) *)
   | GApp (_,GRef (_,p1,_), [GRef (_,o1,_);
       GApp(_,GRef (_,p2,_),[GRef(_,o2,_);GRef(_,o3,_)])])
-      when p1 = glob_Rplus & p2 = glob_Rplus &
-           o1 = glob_R1 & o2 = glob_R1 & o3 = glob_R1 -> three
+      when Globnames.eq_gr p1 glob_Rplus && Globnames.eq_gr p2 glob_Rplus &&
+           Globnames.eq_gr o1 glob_R1 && Globnames.eq_gr o2 glob_R1 && Globnames.eq_gr o3 glob_R1 -> three
   (* (1+1)*b *)
-  | GApp (_,GRef (_,p,_), [a; b]) when p = glob_Rmult ->
-      if bignat_of_pos a <> two then raise Non_closed_number;
+  | GApp (_,GRef (_,p,_), [a; b]) when Globnames.eq_gr p glob_Rmult ->
+      if not (Bigint.equal (bignat_of_pos a) two) then raise Non_closed_number;
       mult_2 (bignat_of_pos b)
   (* 1+(1+1)*b *)
   | GApp (_,GRef (_,p1,_), [GRef (_,o,_); GApp (_,GRef (_,p2,_),[a;b])])
-      when p1 = glob_Rplus & p2 = glob_Rmult & o = glob_R1  ->
-      if bignat_of_pos a <> two then raise Non_closed_number;
->>>>>>> .merge_file_C4JwbA
+      when Globnames.eq_gr p1 glob_Rplus && Globnames.eq_gr p2 glob_Rmult && Globnames.eq_gr o glob_R1  ->
+      if not (Bigint.equal (bignat_of_pos a) two) then raise Non_closed_number;
         add_1 (mult_2 (bignat_of_pos b))
   | _ -> raise Non_closed_number
 in
 let bignat_of_r = function
-<<<<<<< .merge_file_GkifYk
-  | GRef (_,a) when Globnames.eq_gr a glob_R0 -> zero
-  | GRef (_,a) when Globnames.eq_gr a glob_R1 -> one
-=======
-  | GRef (_,a,_) when a = glob_R0 -> zero
-  | GRef (_,a,_) when a = glob_R1 -> one
->>>>>>> .merge_file_C4JwbA
+  | GRef (_,a,_) when Globnames.eq_gr a glob_R0 -> zero
+  | GRef (_,a,_) when Globnames.eq_gr a glob_R1 -> one
   | r -> bignat_of_pos r
 in
 bignat_of_r
 
 let bigint_of_r = function
-<<<<<<< .merge_file_GkifYk
-  | GApp (_,GRef (_,o), [a]) when Globnames.eq_gr o glob_Ropp ->
-=======
-  | GApp (_,GRef (_,o,_), [a]) when o = glob_Ropp ->
->>>>>>> .merge_file_C4JwbA
+  | GApp (_,GRef (_,o,_), [a]) when Globnames.eq_gr o glob_Ropp ->
       let n = bignat_of_r a in
       if Bigint.equal n zero then raise Non_closed_number;
       neg n

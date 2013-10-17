@@ -29,7 +29,7 @@ let check_constant_declaration env kn cb =
 (*  let env = add_constraints cb.const_constraints env in*)
   (match cb.const_type with
       ty ->
-        let env' = add_constraints cb.const_constraints env in
+        let env' = add_constraints (Future.force cb.const_constraints) env in
 	let _ = infer_type env' ty in
           (match body_of_constant cb with
           | Some bd ->
@@ -70,13 +70,13 @@ let rec check_module env mp mb =
       {typ_mp=mp;
        typ_expr=sign;
        typ_expr_alg=None;
-       typ_constraints=Univ.empty_constraint;
+       typ_constraints=Univ.Constraint.empty;
        typ_delta = mb.mod_delta;}
     and mtb2 =
       {typ_mp=mp;
        typ_expr=mb.mod_type;
        typ_expr_alg=None;
-       typ_constraints=Univ.empty_constraint;
+       typ_constraints=Univ.Constraint.empty;
        typ_delta = mb.mod_delta;}
     in
     let env = add_module_type mp mtb1 env in
@@ -87,38 +87,6 @@ and check_module_type env mty =
     check_signature env mty.typ_expr mty.typ_mp mty.typ_delta in
   ()
 
-<<<<<<< .merge_file_hiXZ5p
-=======
-							 
-and check_module env mp mb =
-  match mb.mod_expr, mb.mod_type with
-    | None,mtb -> 
-	let (_:struct_expr_body) =
-	  check_modtype env mtb mb.mod_mp mb.mod_delta in ()
-    | Some mexpr, mtb when mtb==mexpr ->
-	let (_:struct_expr_body) =
-	  check_modtype env mtb mb.mod_mp mb.mod_delta in ()
-    | Some mexpr, _ ->
-	let sign = check_modexpr env mexpr mb.mod_mp mb.mod_delta in
-	let (_:struct_expr_body) =
-	  check_modtype env mb.mod_type mb.mod_mp mb.mod_delta in
-	let mtb1 =
-	  {typ_mp=mp;
-	   typ_expr=sign;
-	   typ_expr_alg=None;
-	   typ_constraints=Univ.Constraint.empty;
-	   typ_delta = mb.mod_delta;}
-	and mtb2 =
-	  {typ_mp=mp;
-	   typ_expr=mb.mod_type;
-	   typ_expr_alg=None;
-	   typ_constraints=Univ.Constraint.empty;
-	   typ_delta = mb.mod_delta;}
-	in
-	let env = add_module (module_body_of_type mp mtb1) env in
-	check_subtypes env mtb1 mtb2
-
->>>>>>> .merge_file_M3S73l
 and check_structure_field env mp lab res = function
   | SFBconst cb ->
       let c = Constant.make2 mp lab in
