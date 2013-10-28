@@ -29,12 +29,15 @@ let prerr_endline =
   if debug then prerr_endline else fun _ -> ()
 
 let constrain_type env j poly = function
-  | None -> j.uj_type
+  | None ->
+    if not poly then (* Old-style polymorphism *)
+      make_polymorphic_if_constant_for_ind env j
+    else RegularArity j.uj_type
   | Some t ->
       let tj = infer_type env t in
       let _ = judge_of_cast env j DEFAULTcast tj in
 	assert (eq_constr t tj.utj_val);
-	t
+	RegularArity t
 
 let local_constrain_type env j = function
   | None ->
@@ -65,12 +68,12 @@ let handle_side_effects env body side_eff =
       | Undef _ -> assert false
       | Def b ->
           let b = Lazyconstr.force b in
-          let b_ty = cb.const_type in
+          let b_ty = Typeops.type_of_constant_type env cb.const_type in
           let t = sub c 1 (Vars.lift 1 t) in
           mkLetIn (cname c, b, b_ty, t)
       | OpaqueDef b -> 
           let b = Lazyconstr.force_opaque (Future.force b) in
-          let b_ty = cb.const_type in
+          let b_ty = Typeops.type_of_constant_type env cb.const_type in
           let t = sub c 1 (Vars.lift 1 t) in
           mkApp (mkLambda (cname c, b_ty, t), [|b|]) in
     List.fold_right fix_body cbl t
@@ -100,7 +103,7 @@ let infer_declaration ?(what="UNKNOWN") env kn dcl =
         let def = OpaqueDef body in
         let typ = match c.const_entry_type with
         | None -> assert false
-        | Some typ -> typ in
+        | Some typ -> RegularArity typ in
           def, typ, None, c.const_entry_polymorphic, 
 	  c.const_entry_universes, c.const_entry_inline_code, ctx
       else
@@ -123,7 +126,7 @@ let infer_declaration ?(what="UNKNOWN") env kn dcl =
 	    let body = it_mkLambda_or_LetIn body context in
 	  (* let tj = infer_type env' (Option.get c.const_entry_type) in *)
 	      Def (Lazyconstr.from_val (hcons_constr body)),
-	      hcons_constr (Option.get c.const_entry_type), Some pb
+	      RegularArity (hcons_constr (Option.get c.const_entry_type)), Some pb
 	  | None ->
             let j =
               try infer env body 
@@ -142,15 +145,15 @@ let infer_declaration ?(what="UNKNOWN") env kn dcl =
       let env = push_context uctx env in
       let j = infer env t in
       let t = hcons_constr (Typeops.assumption_of_judgment env j) in
-      Undef nl, t, None, poly, Future.from_val uctx, false, ctx
+      Undef nl, RegularArity t, None, poly, Future.from_val uctx, false, ctx
 
-(* let global_vars_set_constant_type env = function *)
-(*   | NonPolymorphicType t -> global_vars_set env t *)
-(*   | PolymorphicArity (ctx,_) -> *)
-(*       Context.fold_rel_context *)
-(*         (fold_rel_declaration *)
-(* 	  (fun t c -> Id.Set.union (global_vars_set env t) c)) *)
-(*       ctx ~init:Id.Set.empty *)
+let global_vars_set_constant_type env = function
+  | RegularArity t -> global_vars_set env t
+  | TemplateArity (ctx,_) ->
+      Context.fold_rel_context
+        (fold_rel_declaration
+	  (fun t c -> Id.Set.union (global_vars_set env t) c))
+      ctx ~init:Id.Set.empty
 
 let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) =
   let check declared inferred =
@@ -166,7 +169,7 @@ let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) 
     | None when not (List.is_empty (named_context env)) -> 
         (* No declared section vars, and non-empty section context:
            we must look at the body NOW, if any *)
-        let ids_typ = global_vars_set env typ in
+        let ids_typ = global_vars_set_constant_type env typ in
         let ids_def = match def with
         | Undef _ -> Idset.empty
         | Def cs -> global_vars_set env (Lazyconstr.force cs)
@@ -182,14 +185,14 @@ let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) 
         match def with
         | Undef _ as x -> x (* nothing to check *)
         | Def cs as x ->
-            let ids_typ = global_vars_set env typ in
+            let ids_typ = global_vars_set_constant_type env typ in
             let ids_def = global_vars_set env (Lazyconstr.force cs) in
             let inferred = keep_hyps env (Idset.union ids_typ ids_def) in
             check declared inferred;
             x
         | OpaqueDef lc -> (* In this case we can postpone the check *)
             OpaqueDef (Future.chain ~id:(string_of_con kn) lc (fun lc ->
-              let ids_typ = global_vars_set env typ in
+              let ids_typ = global_vars_set_constant_type env typ in
               let ids_def =
                 global_vars_set env (Lazyconstr.force_opaque lc) in
               let inferred = keep_hyps env (Idset.union ids_typ ids_def) in
@@ -223,7 +226,8 @@ let translate_recipe env kn r =
 let translate_local_def env id centry =
   let def,typ,proj,poly,univs,inline_code,ctx =
     infer_declaration ~what:(string_of_id id) env None (DefinitionEntry centry) in
-  def, typ, univs
+  let typ = type_of_constant_type env typ in
+    def, typ, univs
 
 let translate_local_assum env t =
   let j = infer env t in
