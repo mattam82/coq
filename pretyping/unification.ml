@@ -706,44 +706,43 @@ let unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb flag
       try Evarconv.check_conv_record f1l1 f2l2
       with Not_found -> error_cannot_unify (fst curenvnb) sigma (cM,cN)
     in
-    if Reductionops.compare_stack_shape ts ts1 then
-      let sigma = Evd.merge_context_set Evd.univ_flexible sigma ctx in
-      let (evd,ks,_) =
-	List.fold_left
-	  (fun (evd,ks,m) b ->
-	    if Int.equal m n then (evd,t2::ks, m-1) else
-              let mv = new_meta () in
-	      let evd' = meta_declare mv (substl ks b) evd in
-	      (evd', mkMeta mv :: ks, m - 1))
-	  (sigma,[],List.length bs - 1) bs
-      in
-      let unilist2 f substn l l' =
-	try List.fold_left2 f substn l l'
-	with Invalid_argument "List.fold_left2" -> error_cannot_unify (fst curenvnb) sigma (cM,cN)
-      in
-      let substn = unilist2 (fun s u1 u -> unirec_rec curenvnb pb b false s u1 (substl ks u))
-	(evd,ms,es) us2 us in
-      let substn = unilist2 (fun s u1 u -> unirec_rec curenvnb pb b false s u1 (substl ks u))
-	substn params1 params in
+      if Reductionops.compare_stack_shape ts ts1 then
+	let sigma = Evd.merge_context_set Evd.univ_flexible sigma ctx in
+	let (evd,ks,_) =
+	  List.fold_left
+	    (fun (evd,ks,m) b ->
+	      if Int.equal m n then (evd,t2::ks, m-1) else
+		let mv = new_meta () in
+		let evd' = meta_declare mv (substl ks b) evd in
+		  (evd', mkMeta mv :: ks, m - 1))
+	    (sigma,[],List.length bs - 1) bs
+	in
+	let unilist2 f substn l l' =
+	  try List.fold_left2 f substn l l'
+	  with Invalid_argument "List.fold_left2" -> error_cannot_unify (fst curenvnb) sigma (cM,cN)
+	in
+	let substn = unilist2 (fun s u1 u -> unirec_rec curenvnb pb b false s u1 (substl ks u))
+	  (evd,ms,es) us2 us in
+	let substn = unilist2 (fun s u1 u -> unirec_rec curenvnb pb b false s u1 (substl ks u))
+	  substn params1 params in
 	let (substn,_,_) = Reductionops.fold_stack2 (unirec_rec curenvnb pb b false) substn ts ts1 in
-	unirec_rec curenvnb pb b false substn c1 (applist (c,(List.rev ks)))
-    else error_cannot_unify (fst curenvnb) sigma (cM,cN)
-      in
-  let evd = sigma in
+	  unirec_rec curenvnb pb b false substn c1 (applist (c,(List.rev ks)))
+      else error_cannot_unify (fst curenvnb) sigma (cM,cN)
+  in
   let res = 
-    if occur_meta_or_undefined_evar evd m || occur_meta_or_undefined_evar evd n
+    if occur_meta_or_undefined_evar sigma m || occur_meta_or_undefined_evar sigma n
       || subterm_restriction conv_at_top flags then None
     else 
       let sigma, b = match flags.modulo_conv_on_closed_terms with
-      | Some convflags -> infer_conv ~pb:cv_pb ~ts:convflags env sigma m n
-      | _ -> constr_cmp cv_pb sigma flags m n in
+	| Some convflags -> infer_conv ~pb:cv_pb ~ts:convflags env sigma m n
+	| _ -> constr_cmp cv_pb sigma flags m n in
 	if b then Some sigma
 	else if (match flags.modulo_conv_on_closed_terms, flags.modulo_delta with
-            | Some (cv_id, cv_k), (dl_id, dl_k) ->
-                Id.Pred.subset dl_id cv_id && Cpred.subset dl_k cv_k
-            | None,(dl_id, dl_k) ->
-                Id.Pred.is_empty dl_id && Cpred.is_empty dl_k)
-      then error_cannot_unify env sigma (m, n) else None
+        | Some (cv_id, cv_k), (dl_id, dl_k) ->
+          Id.Pred.subset dl_id cv_id && Cpred.subset dl_k cv_k
+        | None,(dl_id, dl_k) ->
+          Id.Pred.is_empty dl_id && Cpred.is_empty dl_k)
+	then error_cannot_unify env sigma (m, n) else None
   in 
     match res with 
     | Some sigma -> sigma, ms, es
