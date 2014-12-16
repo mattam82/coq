@@ -55,6 +55,46 @@ end
 
 type universe_set = LSet.t
 
+module Levels :
+sig
+  type t
+  (** A universe instance represents a vector of universes
+      to a polymorphic definition (constant, inductive or constructor). *)
+
+  val empty : t
+  val is_empty : t -> bool
+
+  val of_array : Level.t array -> t
+  val to_array : t -> Level.t array
+
+  val append : t -> t -> t
+  (** To concatenate two instances, used for discharge *)
+
+  val equal : t -> t -> bool
+  (** Equality *)
+
+  val length : t -> int
+  (** Instance length *)
+
+  val hcons : t -> t
+  (** Hash-consing. *)
+
+  val hash : t -> int
+  (** Hash value *)
+
+  val share : t -> t * int
+  (** Simultaneous hash-consing and hash-value computation *)
+
+  val pr : t -> Pp.std_ppcmds
+  (** Pretty-printing, no comments *)
+
+  val pr_with : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+  (** Pretty-printing, no comments *)
+
+  val levels : t -> LSet.t
+  (** The set of levels in the instance *)
+end
+
 module Universe :
 sig
   type t
@@ -165,7 +205,7 @@ val add_universe : universe_level -> universes -> universes
 (** {6 Constraints. } *)
 
 type constraint_type = Lt | Le | Eq
-type univ_constraint = universe_level * constraint_type * universe_level
+type univ_constraint = universe * constraint_type * universe
 
 module Constraint : sig
  include Set.S with type elt = univ_constraint
@@ -268,9 +308,6 @@ sig
   val empty : t
   val is_empty : t -> bool
 
-  val of_array : Level.t array -> t
-  val to_array : t -> Level.t array
-
   val append : t -> t -> t
   (** To concatenate two instances, used for discharge *)
 
@@ -295,16 +332,13 @@ sig
   val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
   (** Pretty-printing, no comments *)
 
-  val levels : t -> LSet.t
-  (** The set of levels in the instance *)
-
   val check_eq : t check_function 
   (** Check equality of instances w.r.t. a universe graph *)
 end
 
 type universe_instance = Instance.t
 
-val enforce_eq_instances : universe_instance constraint_function
+(* val enforce_eq_instances : universe_instance constraint_function *)
 
 type 'a puniverses = 'a * universe_instance
 val out_punivs : 'a puniverses -> 'a
@@ -319,15 +353,15 @@ module UContext :
 sig 
   type t
 
-  val make : Instance.t constrained -> t
+  val make : Levels.t constrained -> t
 
   val empty : t
   val is_empty : t -> bool
     
-  val instance : t -> Instance.t
+  val levels : t -> Levels.t
   val constraints : t -> constraints
 
-  val dest : t -> Instance.t * constraints
+  val dest : t -> Levels.t * constraints
 
   (** Keeps the order of the instances *)
   val union : t -> t -> t
@@ -346,7 +380,7 @@ sig
   val is_empty : t -> bool
 
   val singleton : universe_level -> t
-  val of_instance : Instance.t -> t
+  (* val of_instance : Instance.t -> t *)
   val of_set : universe_set -> t
 
   val union : t -> t -> t
@@ -358,7 +392,6 @@ sig
   val diff : t -> t -> t
   val add_universe : universe_level -> t -> t
   val add_constraints : constraints -> t -> t
-  val add_instance : Instance.t -> t -> t
 
   (** Arbitrary choice of linear order of the variables *)
   val to_context : t -> universe_context

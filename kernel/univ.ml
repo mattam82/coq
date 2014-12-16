@@ -617,6 +617,12 @@ struct
 
   let smartmap = Huniv.smartmap
 
+  let subst_fn fn u =
+    let f x = Expr.map (fun u -> fn u) x in
+    let u' = smartmap f u in
+      if u == u' then u
+      else sort u'
+
 end
 
 type universe = Universe.t
@@ -643,8 +649,7 @@ type status = Unset | SetLe | SetLt
 (* Comparison on this type is pointer equality *)
 type canonical_arc =
     { univ: Level.t;
-      lt: Level.t list;
-      le: Level.t list;
+      arcs: (Level.t * int) list;
       rank : int;
       predicative : bool;
       mutable status : status;
@@ -661,7 +666,7 @@ let arc_is_lt arc = match arc.status with
 | Unset | SetLe -> false
 | SetLt -> true
 
-let terminal u = {univ=u; lt=[]; le=[]; rank=0; predicative=false; status = Unset}
+let terminal u = {univ=u; arcs=[]; rank=0; predicative=false; status = Unset}
 
 module UMap :
 sig
@@ -741,19 +746,54 @@ let safe_repr g u =
     let can = terminal u in
     enter_arc can g, can
 
+let rec change_assq x k = 
+  let rec aux acc = function
+    | [] -> acc
+    | (a, b as pair) :: l ->
+      if a == x then List.rev_append acc ((x, k)::l)
+      else aux (pair :: acc) l
+  in aux []
+
+(* v <1= w /\ w <-1= v -> w = v
+   v <1= w /\ w <-2= v <-> v + 1 <= w /\ w - 2 <= v <-> v+1 <= w /\ w - 1 <= v+1 <-> w-1<=v+1<=w <-> w-2<=v<=w-1 ok.
+   v <1= w /\ w <0= v <-> v + 1 <= w /\ w <= v <-> v+1 <= v false positive length
+   
+   v - 1 <= w -> v <= w + 1
+   
+   v + 2 <= w -> v <= w
+   v <= w -/> v + 1 <= w
+
+   v <= w -> v - 1 <= w
+   v - 1 <= w -/> v <= w
+
+   v - 1 <= w /\ v > w <-> v - 1 <= w /\ w + 1 <= v 
+   <-> v <= w + 1 /\ w + 1 <= v <-> v = w + 1
+   
+   v <-n= w /\ v = w ok
+
+   v - 1 <= w /\ w + 1 <= v -> v = w
+   v - 1 <= w /\ w <= v -> w - 1 <= v - 1 <= w <= v -> v = w \/ v = w + 1
+ *)
 (* reprleq : canonical_arc -> canonical_arc list *)
 (* All canonical arcv such that arcu<=arcv with arcv#arcu *)
 let reprleq g arcu =
   let rec searchrec w = function
     | [] -> w
-    | v :: vl ->
+    | (v, m) :: vl ->
 	let arcv = repr g v in
-        if List.memq arcv w || arcu==arcv then
+        if (arcu==arcv) then
 	  searchrec w vl
-        else
-	  searchrec (arcv :: w) vl
+	else 
+	  try let k = List.assq arcv w in
+		if k >= m (* Stronger condition *) then 
+		  searchrec w vl
+		else
+		  let w' = change_assq arcv m w in
+		    searchrec w' vl 
+	  with Not_found ->
+	    searchrec ((arcv,m) :: w) vl
   in
-  searchrec [] arcu.le
+    searchrec [] arcu.arcs
 
 
 (* between : Level.t -> canonical_arc -> canonical_arc list *)
@@ -765,10 +805,10 @@ let between g arcu arcv =
   (* bad are all w | u <= w ~<= v *)
     (* find good and bad nodes in {w | u <= w} *)
     (* explore b u = (b or "u is good") *)
-  let rec explore ((good, bad, b) as input) arcu =
-    if List.memq arcu good then
+  let rec explore ((good, bad, b) as input) (arcu,n) k =
+    if List.mem_assq arcu good then
       (good, bad, true) (* b or true *)
-    else if List.memq arcu bad then
+    else if List.mem_assq arcu bad then
       input    (* (good, bad, b or false) *)
     else
       let leq = reprleq g arcu in
@@ -777,11 +817,11 @@ let between g arcu arcv =
 	List.fold_left explore (good, bad, false) leq
       in
 	if b_leq then
-	  arcu::good, bad, true (* b or true *)
+	  (arcu,n)::good, bad, true (* b or true *)
 	else
-	  good, arcu::bad, b    (* b or false *)
+	  good, (arcu,n)::bad, b    (* b or false *)
   in
-  let good,_,_ = explore ([arcv],[],false) arcu in
+  let good,_,_ = explore ([(arcv,0)],[],false) (arcu,0) 0 in
     good
 
 (* We assume  compare(u,v) = LE with v canonical (see compare below).
@@ -1233,7 +1273,7 @@ let add_universe vlev g =
       
 (* Constraints and sets of constraints. *)    
 
-type univ_constraint = Level.t * constraint_type * Level.t
+type univ_constraint = Universe.t * constraint_type * Universe.t
 
 let enforce_constraint cst g =
   match cst with
@@ -1255,9 +1295,9 @@ struct
     let i = constraint_type_ord c c' in
     if not (Int.equal i 0) then i
     else
-      let i' = Level.compare u u' in
+      let i' = Universe.compare u u' in
       if not (Int.equal i' 0) then i'
-      else Level.compare v v'
+      else Universe.compare v v'
 end
 
 module Constraint = 
@@ -1267,16 +1307,14 @@ struct
 
   let pr prl c =
     fold (fun (u1,op,u2) pp_std ->
-      pp_std ++ prl u1 ++ pr_constraint_type op ++
-	prl u2 ++ fnl () )  c (str "")
+      pp_std ++ Universe.pr_with prl u1 ++ pr_constraint_type op ++
+	Universe.pr_with prl u2 ++ fnl () )  c (str "")
 
 end
 
 let empty_constraint = Constraint.empty
 let union_constraint = Constraint.union
 let eq_constraint = Constraint.equal
-let merge_constraints c g =
-  Constraint.fold enforce_constraint c g
 
 type constraints = Constraint.t
 
@@ -1284,7 +1322,7 @@ module Hconstraint =
   Hashcons.Make(
     struct
       type t = univ_constraint
-      type u = universe_level -> universe_level
+      type u = universe -> universe
       let hashcons hul (l1,k,l2) = (hul l1, k, hul l2)
       let equal (l1,k,l2) (l1',k',l2') =
 	l1 == l1' && k == k' && l2 == l2'
@@ -1305,9 +1343,8 @@ module Hconstraints =
       let hash = Hashtbl.hash
     end)
 
-let hcons_constraint = Hashcons.simple_hcons Hconstraint.generate Hconstraint.hcons Level.hcons
+let hcons_constraint = Hashcons.simple_hcons Hconstraint.generate Hconstraint.hcons Universe.hcons
 let hcons_constraints = Hashcons.simple_hcons Hconstraints.generate Hconstraints.hcons hcons_constraint
-
 
 (** A value with universe constraints. *)
 type 'a constrained = 'a * constraints
@@ -1323,7 +1360,7 @@ let enforce_eq_level u v c =
   if Level.equal u v then c 
   else if Level.apart u v then
     error_inconsistency Eq u v None
-  else Constraint.add (u,Eq,v) c
+  else Constraint.add (Universe.make u,Eq,Universe.make v) c
 
 let enforce_eq u v c =
   match Universe.level u, Universe.level v with
@@ -1389,6 +1426,9 @@ let enforce_univ_constraint (u,d,v) =
   | Eq -> enforce_eq u v
   | Le -> enforce_leq u v
   | Lt -> enforce_leq (super u) v
+
+let merge_constraints c g =
+  Constraint.fold enforce_univ_constraint c g
 
 (* Normalization *)
 
@@ -1622,13 +1662,13 @@ let level_subst_of f =
     with Not_found -> l
      
 module Instance : sig 
-    type t = Level.t array
+    type t = Universe.t array
 
     val empty : t
     val is_empty : t -> bool
       
-    val of_array : Level.t array -> t
-    val to_array : t -> Level.t array
+    (* val of_array : Level.t array -> t *)
+    (* val to_array : t -> Level.t array *)
 
     val append : t -> t -> t
     val equal : t -> t -> bool
@@ -1642,13 +1682,118 @@ module Instance : sig
     val subst_fn : universe_level_subst_fn -> t -> t
     
     val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
-    val levels : t -> LSet.t
+    (* val levels : t -> LSet.t *)
     val check_eq : t check_function 
 end = 
 struct
-  type t = Level.t array
+  type t = Universe.t array
 
   let empty : t = [||]
+
+  module HInstancestruct =
+  struct
+    type _t = t
+    type t = _t
+    type u = Universe.t -> Universe.t
+
+    let hashcons huniv a = 
+      let len = Array.length a in
+	if Int.equal len 0 then empty
+	else begin
+	  for i = 0 to len - 1 do
+	    let x = Array.unsafe_get a i in
+	    let x' = huniv x in
+	      if x == x' then ()
+	      else Array.unsafe_set a i x'
+	  done;
+	  a
+	end
+
+    let equal t1 t2 =
+      t1 == t2 ||
+	(Int.equal (Array.length t1) (Array.length t2) &&
+	   let rec aux i =
+	     (Int.equal i (Array.length t1)) || (t1.(i) == t2.(i) && aux (i + 1))
+	   in aux 0)
+	
+    let hash a = 
+      let accu = ref 0 in
+	for i = 0 to Array.length a - 1 do
+	  let l = Array.unsafe_get a i in
+	  let h = Universe.hash l in
+	    accu := Hashset.Combine.combine !accu h;
+	done;
+	(* [h] must be positive. *)
+	let h = !accu land 0x3FFFFFFF in
+	  h
+  end
+
+  module HInstance = Hashcons.Make(HInstancestruct)
+
+  let hcons = Hashcons.simple_hcons HInstance.generate HInstance.hcons Universe.hcons
+    
+  let hash = HInstancestruct.hash
+    
+  let share a = (hcons a, hash a)
+	      
+  let empty = hcons [||]
+
+  let is_empty x = Int.equal (Array.length x) 0
+
+  let append x y =
+    if Array.length x = 0 then y
+    else if Array.length y = 0 then x 
+    else Array.append x y
+
+  let of_array a = a
+
+  let to_array a = a
+
+  let length a = Array.length a
+
+  let subst_fn fn u = CArray.smartmap (fun x -> Universe.subst_fn fn x) u
+
+  let pr prl =
+    prvect_with_sep spc (Universe.pr_with prl)
+
+  let equal t u = 
+    t == u ||
+      (Array.is_empty t && Array.is_empty u) ||
+      (CArray.for_all2 Universe.equal t u 
+	 (* Necessary as universe instances might come from different modules and 
+	    unmarshalling doesn't preserve sharing *))
+
+  let check_eq g t1 t2 =
+    t1 == t2 ||
+      (Int.equal (Array.length t1) (Array.length t2) &&
+	 let rec aux i =
+	   (Int.equal i (Array.length t1)) || (check_eq g t1.(i) t2.(i) && aux (i + 1))
+	 in aux 0)
+
+end
+
+(* let enforce_eq_instances x y =  *)
+(*   let ax = Instance.to_array x and ay = Instance.to_array y in *)
+(*     if Array.length ax != Array.length ay then *)
+(*       anomaly (Pp.(++) (Pp.str "Invalid argument: enforce_eq_instances called with") *)
+(* 		 (Pp.str " instances of different lengths")); *)
+(*     CArray.fold_right2 enforce_eq_level ax ay *)
+
+type universe_instance = Instance.t
+
+type 'a puniverses = 'a * Instance.t
+let out_punivs (x, y) = x
+let in_punivs x = (x, Instance.empty)
+let eq_puniverses f (x, u) (y, u') =
+  f x y && Instance.equal u u'
+
+(** A context of universe levels with universe constraints,
+    representiong local universe variables and constraints *)
+
+module Levels = struct
+  type t = Level.t array
+  let empty : t = [||]
+  let is_empty x = Int.equal (Array.length x) 0
 
   module HInstancestruct =
   struct
@@ -1690,15 +1835,28 @@ struct
 
   module HInstance = Hashcons.Make(HInstancestruct)
 
-  let hcons = Hashcons.simple_hcons HInstance.generate HInstance.hcons Level.hcons
+  let hcons = Hashcons.simple_hcons HInstance.generate Level.hcons
     
   let hash = HInstancestruct.hash
-    
-  let share a = (hcons a, hash a)
-	      
-  let empty = hcons [||]
 
-  let is_empty x = Int.equal (Array.length x) 0
+  let share a = (hcons a, hash a)
+    
+  let pr_with = prvect_with_sep spc 
+    
+  let pr = pr_with Level.pr
+
+  let equal t u = 
+    t == u ||
+      (CArray.for_all2 Level.equal t u 
+	    (* Necessary as universe instances might come from different modules and 
+	       unmarshalling doesn't preserve sharing *))
+
+  let check_eq g t1 t2 =
+    t1 == t2 ||
+      (Int.equal (Array.length t1) (Array.length t2) &&
+	 let rec aux i =
+	   (Int.equal i (Array.length t1)) || (check_eq_level g t1.(i) t2.(i) && aux (i + 1))
+	 in aux 0)
 
   let append x y =
     if Array.length x = 0 then y
@@ -1711,71 +1869,32 @@ struct
 
   let length a = Array.length a
 
-  let subst_fn fn t = 
-    let t' = CArray.smartmap fn t in
-      if t' == t then t else t'
-
   let levels x = LSet.of_array x
-
-  let pr =
-    prvect_with_sep spc
-
-  let equal t u = 
-    t == u ||
-      (Array.is_empty t && Array.is_empty u) ||
-      (CArray.for_all2 Level.equal t u 
-	 (* Necessary as universe instances might come from different modules and 
-	    unmarshalling doesn't preserve sharing *))
-
-  let check_eq g t1 t2 =
-    t1 == t2 ||
-      (Int.equal (Array.length t1) (Array.length t2) &&
-	 let rec aux i =
-	   (Int.equal i (Array.length t1)) || (check_eq_level g t1.(i) t2.(i) && aux (i + 1))
-	 in aux 0)
 
 end
 
-let enforce_eq_instances x y = 
-  let ax = Instance.to_array x and ay = Instance.to_array y in
-    if Array.length ax != Array.length ay then
-      anomaly (Pp.(++) (Pp.str "Invalid argument: enforce_eq_instances called with")
-		 (Pp.str " instances of different lengths"));
-    CArray.fold_right2 enforce_eq_level ax ay
-
-type universe_instance = Instance.t
-
-type 'a puniverses = 'a * Instance.t
-let out_punivs (x, y) = x
-let in_punivs x = (x, Instance.empty)
-let eq_puniverses f (x, u) (y, u') =
-  f x y && Instance.equal u u'
-
-(** A context of universe levels with universe constraints,
-    representiong local universe variables and constraints *)
-
 module UContext =
 struct
-  type t = Instance.t constrained
+  type t = Levels.t constrained
 
   let make x = x
 
   (** Universe contexts (variables as a list) *)
-  let empty = (Instance.empty, Constraint.empty)
-  let is_empty (univs, cst) = Instance.is_empty univs && Constraint.is_empty cst
+  let empty = (Levels.empty, Constraint.empty)
+  let is_empty (univs, cst) = Levels.is_empty univs && Constraint.is_empty cst
 
   let pr prl (univs, cst as ctx) =
     if is_empty ctx then mt() else
-      Instance.pr prl univs ++ str " |= " ++ v 0 (Constraint.pr prl cst)
+      Levels.pr_with prl univs ++ str " |= " ++ v 0 (Constraint.pr prl cst)
 
   let hcons (univs, cst) =
-    (Instance.hcons univs, hcons_constraints cst)
+    (Levels.hcons univs, hcons_constraints cst)
 
-  let instance (univs, cst) = univs
+  let levels (univs, cst) = univs
   let constraints (univs, cst) = cst
 
   let union (univs, cst) (univs', cst') =
-    Instance.append univs univs', Constraint.union cst cst'
+    Levels.append univs univs', Constraint.union cst cst'
       
   let dest x = x
 end
@@ -1797,7 +1916,7 @@ struct
 
   let of_set s = (s, Constraint.empty)
   let singleton l = of_set (LSet.singleton l)
-  let of_instance i = of_set (Instance.levels i)
+  (* let of_instance i = of_set (Instance.levels i) *)
 
   let union (univs, cst as x) (univs', cst' as y) =
     if x == y then x
@@ -1817,20 +1936,14 @@ struct
   let add_constraints cst' (univs, cst) =
     univs, Constraint.union cst cst'
 
-  let add_instance inst (univs, cst) =
-    let v = Instance.to_array inst in
-    let fold accu u = LSet.add u accu in
-    let univs = Array.fold_left fold univs v in
-    (univs, cst)
-
   let sort_levels a = 
     Array.sort Level.natural_compare a; a
 
   let to_context (ctx, cst) =
-    (Instance.of_array (sort_levels (Array.of_list (LSet.elements ctx))), cst)
+    (Levels.of_array (sort_levels (Array.of_list (LSet.elements ctx))), cst)
 
   let of_context (ctx, cst) =
-    (Instance.levels ctx, cst)
+    (Levels.levels ctx, cst)
 
   let pr prl (univs, cst as ctx) =
     if is_empty ctx then mt() else
@@ -1862,11 +1975,8 @@ let subst_univs_level_level subst l =
   try LMap.find l subst
   with Not_found -> l
 
-let subst_univs_level_universe subst u =
-  let f x = Universe.Expr.map (fun u -> subst_univs_level_level subst u) x in
-  let u' = Universe.smartmap f u in
-    if u == u' then u
-    else Universe.sort u'
+let subst_univs_level_universe subst = 
+  Universe.subst_fn (subst_univs_level_level subst)
 
 let subst_univs_level_instance subst i =
   let i' = Instance.subst_fn (subst_univs_level_level subst) i in
@@ -1928,21 +2038,28 @@ let subst_univs_constraints subst csts =
 
 let subst_instance_level s l =
   match l.Level.data with
-  | Level.Var n -> s.(n) 
+  | Level.Var n -> s.(n)
   | _ -> l
 
-let subst_instance_instance s i = 
-  Array.smartmap (fun l -> subst_instance_level s l) i
+let subst_instance_level_exn s l =
+  match l.Level.data with
+  | Level.Var n -> s.(n)
+  | _ -> raise Not_found
 
 let subst_instance_universe s u =
-  let f x = Universe.Expr.map (fun u -> subst_instance_level s u) x in
-  let u' = Universe.smartmap f u in
-    if u == u' then u
-    else Universe.sort u'
+  (* let f x = Universe.Expr.map (fun u -> subst_instance_level s u) x in *)
+  (* let u' = Universe.smartmap f u in *)
+  (*   if u == u' then u *)
+  (*   else Universe.sort u' *)
+  subst_univs_universe (subst_instance_level_exn s) u
+
+
+let subst_instance_instance s i = 
+  Array.smartmap (fun l -> subst_instance_universe s l) i
 
 let subst_instance_constraint s (u,d,v as c) =
-  let u' = subst_instance_level s u in
-  let v' = subst_instance_level s v in
+  let u' = subst_instance_universe s u in
+  let v' = subst_instance_universe s v in
     if u' == u && v' == v then c
     else (u',d,v')
 
@@ -1959,25 +2076,25 @@ let instantiate_univ_constraints u (_, csts) =
   subst_instance_constraints u csts
 
 let make_instance_subst i = 
-  let arr = Instance.to_array i in
+  let arr = Levels.to_array i in
     Array.fold_left_i (fun i acc l ->
-      LMap.add l (Level.var i) acc)
+      LMap.add l (Univ.make (Level.var i)) acc)
       LMap.empty arr
 
 let make_inverse_instance_subst i = 
-  let arr = Instance.to_array i in
+  let arr = Levels.to_array i in
     Array.fold_left_i (fun i acc l ->
-      LMap.add (Level.var i) l acc)
+      LMap.add (Level.var i) (Univ.make l) acc)
       LMap.empty arr
 
 let abstract_universes poly ctx =
-  let instance = UContext.instance ctx in
+  let levels = UContext.levels ctx in
     if poly then
-      let subst = make_instance_subst instance in
+      let subst = make_instance_subst levels in
       let cstrs = subst_univs_level_constraints subst 
 	(UContext.constraints ctx)
       in
-      let ctx = UContext.make (instance, cstrs) in
+      let ctx = UContext.make (levels, cstrs) in
 	subst, ctx
     else empty_level_subst, ctx
 
@@ -2069,7 +2186,6 @@ let explain_universe_inconsistency prl (o,u,v,p) =
 let compare_levels = Level.compare
 let eq_levels = Level.equal
 let equal_universes = Universe.equal
-
 
 let subst_instance_constraints = 
   if Flags.profile then 
