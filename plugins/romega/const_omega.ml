@@ -232,9 +232,9 @@ let mk_list univ typ l =
 
 let mk_plist = 
   let type1lev = Universes.new_univ_level (Global.current_dirpath ()) in
-    fun l -> mk_list (Universe.make type1lev) Term.mkProp l
+    fun l -> mk_list (Univ.Universe.make type1lev) Term.mkProp l
 
-let mk_list = mk_list Univ.Level.set
+let mk_list = mk_list Univ.Universe.type0
 let mk_shuffle_list l = mk_list (Lazy.force coq_t_fusion) l
 
 

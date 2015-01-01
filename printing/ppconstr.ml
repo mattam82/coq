@@ -138,10 +138,15 @@ end) = struct
 
   let pr_in_comment pr x = str "(* " ++ pr x ++ str " *)"
 
+  let pr_expr (_, (l, k)) = 
+    str l ++ (if k == 0 then mt () 
+      else if k > 0 then str"+" ++ int k else
+	str"-" ++ int (-k))
+    
   let pr_univ l =
     match l with
-      | [x] -> str x
-      | l -> str"max(" ++ prlist_with_sep (fun () -> str",") str l ++ str")"
+      | [x] -> pr_expr x
+      | l -> str"max(" ++ prlist_with_sep (fun () -> str",") pr_expr l ++ str")"
 
   let pr_univ_annot pr x = str "@{" ++ pr x ++ str "}"
 

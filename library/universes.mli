@@ -47,7 +47,15 @@ val new_sort_in_family : sorts_family -> sorts
 
 type universe_constraint_type = ULe | UEq | ULub
 
-type universe_constraint = universe * universe_constraint_type * universe
+
+module UniverseConstraint : sig
+  type t = universe * universe_constraint_type * universe
+
+  val pr : t -> Pp.std_ppcmds
+end
+
+type universe_constraint = UniverseConstraint.t
+
 module Constraints : sig
   include Set.S with type elt = universe_constraint
 		       
@@ -215,14 +223,14 @@ val pr_universe_opt_subst : universe_opt_subst -> Pp.std_ppcmds
 
 (* For tracing *)
 
-type constraints_map = (Univ.constraint_type * Univ.LMap.key) list Univ.LMap.t
+type constraints_map = Univ.Expr.t list Univ.LMap.t
 
 val pr_constraints_map : constraints_map -> Pp.std_ppcmds
 
 val choose_canonical : universe_set -> (Level.t -> bool) (* flexibles *) -> universe_set -> universe_set -> 
   universe_level * (universe_set * universe_set * universe_set)
     
-val compute_lbound : (constraint_type * Univ.universe) list -> universe option
+val compute_lbound : Univ.universe list -> universe option
 
 val instantiate_with_lbound : 
   Univ.LMap.key ->

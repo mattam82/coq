@@ -344,6 +344,8 @@ let instantiate_variable l b v =
 
 exception UniversesDiffer
 
+let pr_constraint c = Universes.UniverseConstraint.pr c
+
 let process_universe_constraints univs vars alg cstrs =
   let vars = ref vars in
   let normalize = Universes.normalize_universe_opt_subst vars in
@@ -368,7 +370,9 @@ let process_universe_constraints univs vars alg cstrs =
 	      else local
 	    else
 	      match Univ.Universe.level r with
-	      | None -> error ("Algebraic universe on the right")
+	      | None -> errorlabstrm "add_constraint"
+		(str "Algebraic universe on the right: cannot enforce " ++
+		   pr_constraint (l,d,r))
 	      | Some rl ->
 		if Univ.Level.is_small rl then
 		  let levels = Univ.Universe.levels l in

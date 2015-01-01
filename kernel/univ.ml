@@ -442,11 +442,9 @@ struct
 	(Level.is_prop u && Level.is_small v)
       else false
 
-  let succ (u,n) =
-    if Level.is_prop u then type1
-    else hcons (u, n + 1)
+  let succ (u,n) = hcons (u, n + 1)
 
-  let addn k (u,n as x) = 
+  let add k (u,n as x) = 
     if k = 0 then x 
     else if Level.is_prop u then
       hcons (Level.set,n+k)
@@ -463,11 +461,13 @@ struct
 
   let to_string (v, n) =
     if Int.equal n 0 then Level.to_string v
-    else Level.to_string v ^ "+" ^ string_of_int n
+    else if n > 0 then Level.to_string v ^ "+" ^ string_of_int n
+    else Level.to_string v ^ "-" ^ string_of_int (-n)
 
   let pr f (v, n) = 
     if Int.equal n 0 then f v
-    else f v ++ str"+" ++ int n
+    else if n > 0 then f v ++ str"+" ++ int n
+    else f v ++ str"-" ++ int (-n)
 
   let is_level = function
     | (v, 0) -> true
@@ -587,8 +587,8 @@ struct
     else
       Huniv.map (fun x -> Expr.succ x) l
 
-  let addn n l =
-    Huniv.map (fun x -> Expr.addn n x) l
+  let add n l =
+    Huniv.map (fun x -> Expr.add n x) l
 
   let rec merge_univs l1 l2 =
     match l1, l2 with
@@ -636,7 +636,7 @@ struct
       else sort u'
 
   let subst_univs_expr_opt fn (l,n) =
-    addn n (fn l)
+    add n (fn l)
       
   let subst fn ul =
     let subst, nosubst = 
@@ -1037,78 +1037,53 @@ let constraint_type_ord c1 c2 = match c1, c2 with
 
 *)
 
-(* let get_explanation strict g arcu arcv = *)
-(*   (\* [c] characterizes whether (and how) arcv has already been related *)
-(*      to arcu among the lt_done,le_done universe *\) *)
-(*   let rec cmp c to_revert lt_todo le_todo = match lt_todo, le_todo with *)
-(*   | [],[] -> (to_revert, c) *)
-(*   | (arc,p)::lt_todo, le_todo -> *)
-(*     if arc_is_lt arc then *)
-(*       cmp c to_revert lt_todo le_todo *)
-(*     else *)
-(*       let rec find lt_todo lt le = match le with *)
-(*       | [] -> *)
-(*         begin match lt with *)
-(*         | [] -> *)
-(*           let () = arc.status <- SetLt in *)
-(*           cmp c (arc :: to_revert) lt_todo le_todo *)
-(*         | u :: lt -> *)
-(*           let arc = repr g u in *)
-(*           let p = (Lt, make u) :: p in *)
-(*           if arc == arcv then *)
-(*             if strict then (to_revert, p) else (to_revert, p) *)
-(*           else find ((arc, p) :: lt_todo) lt le *)
-(*         end *)
-(*       | u :: le -> *)
-(*         let arc = repr g u in *)
-(*         let p = (Le, make u) :: p in *)
-(*         if arc == arcv then *)
-(*           if strict then (to_revert, p) else (to_revert, p) *)
-(*         else find ((arc, p) :: lt_todo) lt le *)
-(*       in *)
-(*       find lt_todo arc.lt arc.le *)
-(*   | [], (arc,p)::le_todo -> *)
-(*     if arc == arcv then *)
-(*       (\* No need to continue inspecting universes above arc: *)
-(* 	 if arcv is strictly above arc, then we would have a cycle. *)
-(*          But we cannot answer LE yet, a stronger constraint may *)
-(* 	 come later from [le_todo]. *\) *)
-(*       if strict then cmp p to_revert [] le_todo else (to_revert, p) *)
-(*     else *)
-(*       if arc_is_le arc then *)
-(*         cmp c to_revert [] le_todo *)
-(*       else *)
-(*         let rec find lt_todo lt = match lt with *)
-(*         | [] -> *)
-(*           let fold accu u = *)
-(*             let p = (Le, make u) :: p in *)
-(*             let node = (repr g u, p) in *)
-(*             node :: accu *)
-(*           in *)
-(*           let le_new = List.fold_left fold le_todo arc.le in *)
-(*           let () = arc.status <- SetLe in *)
-(*           cmp c (arc :: to_revert) lt_todo le_new *)
-(*         | u :: lt -> *)
-(*           let arc = repr g u in *)
-(*           let p = (Lt, make u) :: p in *)
-(*           if arc == arcv then *)
-(*             if strict then (to_revert, p) else (to_revert, p) *)
-(*           else find ((arc, p) :: lt_todo) lt *)
-(*         in *)
-(*         find [] arc.lt *)
-(*   in *)
-(*   try *)
-(*     let (to_revert, c) = cmp [] [] [] [(arcu, [])] in *)
-(*     (\** Reset all the touched arcs. *\) *)
-(*     let () = List.iter (fun arc -> arc.status <- Unset) to_revert in *)
-(*     List.rev c *)
-(*   with e -> *)
-(*     (\** Unlikely event: fatal error or signal *\) *)
-(*     let () = cleanup_universes g in *)
-(*     raise e *)
+let get_explanation strict g arcu w arcv =
+  (* [c] characterizes whether (and how) arcv has already been related
+     to arcu among the lt_done,le_done universe *)
+  let rec cmp c to_revert todo = match todo with
+  | [] -> (to_revert, c)
+  | (arc,k,p)::todo ->
+    if arc_is_lt arc then
+      cmp c to_revert todo
+    else
+      let rec find todo l = match l with
+      | [] ->
+        let () = arc.status <- SetLt in
+          cmp c (arc :: to_revert) todo
+      | (u,m) :: l ->
+        let arc, m' = repr g u (k-m) in
+	let p = (Le, Universe.make_expr (u, k-m)) :: p in
+          if arc == arcv then begin
+	    let p' = (Le, Universe.make_expr (arcv.univ,m')) :: p in
+	    if m' == 0 (* Le *) then
+	      (to_revert, p')
+	    else if m' > 0 (* Lt *) then
+	      if strict then (to_revert, p') else (to_revert, p')
+	    else (* m' < 0 *)
+	      find ((arc,m',p) :: todo) l
+	  end
+          else find ((arc,m',p) :: todo) l
+      in find todo arc.arcs
+  in
+  try
+    if arcu == arcv then begin
+      [(Le, Universe.make_expr (arcu.univ,-w))]
+    end
+    else
+      let (to_revert, c) = 
+	cmp [] [] [(arcu, w, [])] in
+      (** Reset all the touched arcs. *)
+      let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
+	List.rev c
+  with e ->
+    (** Unlikely event: fatal error or signal *)
+    let () = cleanup_universes g in
+    raise e
 
-let get_explanation strict g arcu arcv =
-  if !Flags.univ_print then Some []  (* (get_explanation strict g arcu arcv) *)
+let get_explanation strict g (arcu,k) (arcv,l) =
+  if !Flags.univ_print then 
+    let w = k - l in
+      Some (get_explanation strict g arcu w arcv)
   else None
 
 type fast_order = FastEQ | FastLT | FastLE | FastNLE
@@ -1178,7 +1153,7 @@ let fast_compare_neq strict g arcu k arcv =
     let () = cleanup_universes g in
     raise e
 
-let get_explanation_strict g arcu arcv = assert false (* get_explanation true g arcu arcv *)
+let get_explanation_strict g arcu arcv = get_explanation true g arcu arcv
 
 let compare_indices k l = 
   if k == l then FastEQ
@@ -1194,17 +1169,20 @@ let fast_compare_leq g (arcu,k) (arcv,l) =
   else fast_compare_neq false g arcu (k-l) arcv
 
 let is_leq g (arcu,k as x) (arcv,l as y) =
-  (x == y || (arcu == arcv && k <= l)) ||
-    (match fast_compare_neq false g arcu (k-l) arcv with
-    | FastNLE -> false
-    | (FastEQ|FastLE|FastLT) -> true)
+  x == y || 
+    (if arcu == arcv then k <= l
+     else
+	(match fast_compare_neq false g arcu (k-l) arcv with
+	| FastNLE -> false
+	| (FastEQ|FastLE|FastLT) -> true))
     
 let is_lt g (arcu,k as x) (arcv,l as y) =
-  if x == y || (arcu == arcv && k >= l) then false
-  else
-    match fast_compare_neq true g arcu (k-l) arcv with
-    | FastLT -> true
-    | (FastEQ|FastLE|FastNLE) -> false
+  x != y && 
+   if arcu == arcv then k < l
+   else
+     match fast_compare_neq true g arcu (k-l) arcv with
+     | FastLT -> true
+     | (FastEQ|FastLE|FastNLE) -> false
 
 (* Invariants : compare(u,v) = EQ <=> compare(v,u) = EQ
                 compare(u,v) = LT or LE => compare(v,u) = NLE
@@ -1670,7 +1648,7 @@ let constraints_of_universes g =
   let constraints_of u v acc =
     match v with
     | Canonical {univ=u; arcs=arcs} ->
-      List.fold_left (fun acc v -> Constraint.add (Expr.make u,Le,v) acc) acc arcs
+      List.fold_left (fun acc (v,k) -> Constraint.add ((u,k),Le,Expr.make v) acc) acc arcs
     | Equiv (v,k) -> Constraint.add (Expr.make u,Eq,(v,k)) acc
   in
   UMap.fold constraints_of g Constraint.empty
@@ -2175,7 +2153,7 @@ let subst_univs_level_constraints subst csts =
 let make_subst subst = fun l -> LMap.find l subst
 
 let subst_univs_expr fn (l,n) = 
-  try Some (Universe.addn n (fn l))
+  try Some (Universe.add n (fn l))
   with Not_found -> None
 
 let subst_univs_constraint fn (u,d,v as c) cstrs =

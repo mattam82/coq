@@ -127,7 +127,8 @@ let name_colon =
 let aliasvar = function CPatAlias (loc, _, id) -> Some (loc,Name id) | _ -> None
 
 GEXTEND Gram
-  GLOBAL: binder_constr lconstr constr operconstr sort global
+  GLOBAL: binder_constr lconstr constr operconstr sort 
+  universe universe_expression global
   constr_pattern lconstr_pattern Constr.ident
   closed_binder open_binders binder binders binders_fixannot
   record_declaration typeclass_constraint pattern appl_arg;
@@ -153,12 +154,20 @@ GEXTEND Gram
     [ [ "Set"  -> GSet
       | "Prop" -> GProp
       | "Type" -> GType []
-      | "Type"; "@{"; u = universe; "}" -> GType (List.map Id.to_string u)
+      | "Type"; "@{"; u = universe; "}" -> GType u
       ] ]
   ;
+  incr:
+    [ [ "+"; i = natural -> i
+      | "-"; i = natural -> i
+      | -> 0 ] ]
+  ;
+  universe_expression:
+    [ [ id = ident; i = incr -> (!@loc, (Id.to_string id, i)) ] ]
+  ;
   universe:
-    [ [ "max("; ids = LIST1 ident SEP ","; ")" -> ids
-      | id = ident -> [id]
+    [ [ "max("; es = LIST1 universe_expression SEP ","; ")" -> es
+      | e = universe_expression -> [e]
       ] ]
   ;
   lconstr:
@@ -308,7 +317,7 @@ GEXTEND Gram
     [ [ "Set" -> GSet
       | "Prop" -> GProp
       | "Type" -> GType []
-      | u = universe -> GType (List.map Id.to_string u)
+      | u = universe -> GType u
       ] ]
   ;
   fix_constr:

@@ -94,13 +94,16 @@ end
 
 module Expr :
 sig
-  type t
+  type t = Level.t * int
 
+  val is_level : t -> bool
+  (** If the expression is just the level, without a constant *)
   val level : t -> Level.t
+
   val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
 
   val make : Level.t -> t
-  val addn : int -> t -> t
+  val add : int -> t -> t
 end
 
 module Universe :
@@ -159,6 +162,9 @@ sig
     
   val sup   : t -> t -> t
   (** The l.u.b. of 2 universes *)
+
+  val add : int -> t -> t
+  (** Add n levels *)
 
   val type0m : t  
   (** image of Prop in the universes hierarchy *)

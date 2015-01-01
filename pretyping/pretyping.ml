@@ -115,9 +115,9 @@ let interp_universe evd = function
   | [] -> let evd, l = new_univ_level_variable univ_rigid evd in
 	    evd, Univ.Universe.make l
   | l ->
-    List.fold_left (fun (evd, u) l -> 
+    List.fold_left (fun (evd, u) (loc, (l, k)) -> 
       let evd', l = interp_universe_level_name evd l in
-	(evd', Univ.sup u (Univ.Universe.make l)))
+	(evd', Univ.sup u (Univ.Universe.make_expr (l,k))))
     (evd, Univ.Universe.type0m) l
 
 let interp_universe_level evd = function
