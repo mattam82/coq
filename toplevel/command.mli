@@ -22,7 +22,7 @@ open Pfedit
     ones and top-level declaration of the main Gallina objects *)
 
 val do_universe : Id.t Loc.located list -> unit
-val do_constraint : (Id.t Loc.located * Univ.constraint_type * Id.t Loc.located) list -> unit
+val do_constraint : ((Id.t * int) Loc.located * Univ.constraint_type * (Id.t * int) Loc.located) list -> unit
 
 (** {6 Hooks for Pcoq} *)
 

@@ -1027,9 +1027,17 @@ let ml_of_instance instance u =
        mkMLapp (MLprimitive MLarrayget) [|univ; MLint i|]
     | None -> let i = push_symbol (SymbLevel l) in get_level_code i
   in
+  let ml_of_expr l = (* FIXME *)
+    ml_of_level (Univ.Expr.level l)
+  in
+  let ml_of_universe u = 
+    let l = Univ.Universe.exprs u in
+    let l' = Array.of_list (List.map ml_of_expr l) in
+      MLapp (MLprimitive MLmagic, [|MLarray l'|])
+  in
   let u = Univ.Instance.to_array u in
   if Array.is_empty u then [||]
-  else let u = Array.map ml_of_level u in
+  else let u = Array.map ml_of_universe u in
        [|MLapp (MLprimitive MLmagic, [|MLarray u|])|]
 
  let rec ml_of_lam env l t =

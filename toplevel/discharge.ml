@@ -81,8 +81,7 @@ let process_inductive (sechyps,abs_ctx) modlist mib =
   let subst, univs = 
     if mib.mind_polymorphic then 
       let inst = Univ.UContext.instance mib.mind_universes in
-      let cstrs = Univ.UContext.constraints mib.mind_universes in
-	inst, Univ.UContext.make (inst, Univ.subst_instance_constraints inst cstrs)
+	inst, Univ.instantiate_univ_context mib.mind_universes
     else Univ.Instance.empty, mib.mind_universes
   in
   let inds =

@@ -842,8 +842,14 @@ module Make
                      prlist_with_sep (fun _ -> str",") pr_lident v)
           )
         | VernacConstraint v ->
-          let pr_uconstraint (l, d, r) =
-            pr_lident l ++ spc () ++ Univ.pr_constraint_type d ++ spc () ++ pr_lident r
+	  let pr_incr = function
+	    | 0 -> mt()
+	    | n when n > 0 -> str" + " ++ int n
+	    | n -> str" - " ++ int (-n)
+	  in
+          let pr_uconstraint ((loc,(l,k)), d, (loc',(r,k'))) =
+            pr_lident (loc,l) ++ pr_incr k ++ spc () ++ Univ.pr_constraint_type d ++ 
+	      spc () ++ pr_lident (loc',r) ++ pr_incr k'
           in
           return (
             hov 2 (keyword "Constraint" ++ spc () ++

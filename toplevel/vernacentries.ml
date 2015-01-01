@@ -328,8 +328,8 @@ let dump_universes_gen g s =
       begin fun kind left right ->
         let () = Lazy.force init in
         match kind with
-          | Univ.Lt ->
-            Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold];\n" right left
+          (* | Univ.Lt -> *)
+          (*   Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold];\n" right left *)
           | Univ.Le ->
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=solid];\n" right left
           | Univ.Eq ->
@@ -341,7 +341,7 @@ let dump_universes_gen g s =
     end else begin
       begin fun kind left right ->
         let kind = match kind with
-          | Univ.Lt -> "<"
+          (* | Univ.Lt -> "<" *)
           | Univ.Le -> "<="
           | Univ.Eq -> "="
         in Printf.fprintf output "%s %s %s ;\n" left kind right

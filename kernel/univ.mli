@@ -85,14 +85,22 @@ sig
   val share : t -> t * int
   (** Simultaneous hash-consing and hash-value computation *)
 
-  val pr : t -> Pp.std_ppcmds
-  (** Pretty-printing, no comments *)
-
-  val pr_with : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+  val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
   (** Pretty-printing, no comments *)
 
   val levels : t -> LSet.t
   (** The set of levels in the instance *)
+end
+
+module Expr :
+sig
+  type t
+
+  val level : t -> Level.t
+  val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+
+  val make : Level.t -> t
+  val addn : int -> t -> t
 end
 
 module Universe :
@@ -119,6 +127,9 @@ sig
   val make : Level.t -> t
   (** Create a universe representing the given level. *)
 
+  val make_expr : Expr.t -> t
+  (** Create a universe representing the given level expression. *)
+
   val pr : t -> Pp.std_ppcmds
   (** Pretty-printing *)
 
@@ -130,6 +141,15 @@ sig
   val level : t -> Level.t option
   (** Try to get a level out of a universe, returns [None] if it
       is an algebraic universe. *)
+
+  val is_expr : t -> bool
+  (** Test if the universe is a level expression or an algebraic universe. *)
+
+  val expr : t -> Expr.t option
+  (** Return the atomic level expression *)
+
+  val exprs : t -> Expr.t list
+  (** Return the atomic level expressions making the universe *)
 
   val levels : t -> LSet.t
   (** Get the levels inside the universe, forgetting about increments *)
@@ -183,7 +203,30 @@ val univ_level_rem : universe_level -> universe -> universe -> universe
 
 (** {6 Graphs of universes. } *)
 
-type universes
+(* type universes *)
+
+
+(*****)
+(* For debugging *)
+type status = Unset | SetLe | SetLt
+
+type canonical_arc =
+    { univ: Level.t;
+      arcs: (Level.t * int) list;
+      rank : int;
+      predicative : bool;
+      mutable status : status;
+      (** Guaranteed to be unset out of the [compare_neq] functions. It is used
+          to do an imperative traversal of the graph, ensuring a O(1) check that
+          a node has already been visited. Quite performance critical indeed. *)
+    }
+
+type univ_entry =
+    Canonical of canonical_arc
+  | Equiv of Level.t * int
+
+module UMap : sig type 'a t end
+type universes = univ_entry UMap.t
 
 type 'a check_function = universes -> 'a -> 'a -> bool
 val check_leq : universe check_function
@@ -204,8 +247,8 @@ val add_universe : universe_level -> universes -> universes
 
 (** {6 Constraints. } *)
 
-type constraint_type = Lt | Le | Eq
-type univ_constraint = universe * constraint_type * universe
+type constraint_type = Le | Eq
+type univ_constraint = Expr.t * constraint_type * Expr.t
 
 module Constraint : sig
  include Set.S with type elt = univ_constraint
@@ -295,8 +338,6 @@ type universe_level_subst_fn = universe_level -> universe_level
 type universe_subst = universe universe_map
 type universe_level_subst = universe_level universe_map
 
-val level_subst_of : universe_subst_fn -> universe_level_subst_fn
-
 (** {6 Universe instances} *)
 
 module Instance : 
@@ -326,19 +367,31 @@ sig
   val share : t -> t * int
   (** Simultaneous hash-consing and hash-value computation *)
 
-  val subst_fn : universe_level_subst_fn -> t -> t
+  val level_subst : universe_level_subst_fn -> t -> t
   (** Substitution by a level-to-level function. *)
 
   val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
   (** Pretty-printing, no comments *)
 
+  val subst : universe_subst_fn -> t -> t
+  (** Substitution by a level-to-universe function. *)
+
   val check_eq : t check_function 
   (** Check equality of instances w.r.t. a universe graph *)
+
+  val fold2 : (Universe.t -> Universe.t -> 'a -> 'a) -> t -> t -> 'a -> 'a
+  (** Folds over two instances of the same length. *)
+
+  val levels : t -> LSet.t
+  (** All the levels appearing in the instance *)
+
+  val to_array : t -> Universe.t array
+  val of_array : Universe.t array -> t
 end
 
 type universe_instance = Instance.t
 
-(* val enforce_eq_instances : universe_instance constraint_function *)
+val enforce_eq_instances : universe_instance constraint_function
 
 type 'a puniverses = 'a * universe_instance
 val out_punivs : 'a puniverses -> 'a
@@ -360,6 +413,8 @@ sig
     
   val levels : t -> Levels.t
   val constraints : t -> constraints
+
+  val instance : t -> universe_instance
 
   val dest : t -> Levels.t * constraints
 
@@ -428,14 +483,15 @@ val make_subst : universe_subst -> universe_subst_fn
 
 val subst_univs_universe : universe_subst_fn -> universe -> universe
 val subst_univs_constraints : universe_subst_fn -> constraints -> constraints
+val subst_univs_instance : universe_subst_fn -> universe_instance -> universe_instance
 
 (** Substitution of instances *)
 val subst_instance_instance : universe_instance -> universe_instance -> universe_instance
 val subst_instance_universe : universe_instance -> universe -> universe
 val subst_instance_constraints : universe_instance -> constraints -> constraints
 
-val make_instance_subst : universe_instance -> universe_level_subst
-val make_inverse_instance_subst : universe_instance -> universe_level_subst
+val make_instance_subst : Levels.t -> universe_level_subst
+val make_inverse_instance_subst : Levels.t -> universe_subst
 
 val abstract_universes : bool -> universe_context -> universe_level_subst * universe_context
 

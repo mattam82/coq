@@ -686,7 +686,7 @@ let magicaly_constant_of_fixbody env reference bd = function
     	  Univ.LMap.add (Option.get (Universe.level l)) (Option.get (Universe.level r)) acc)
     	  csts Univ.LMap.empty
     	in
-    	let inst = Instance.subst_fn (fun u -> Univ.LMap.find u subst) u in
+    	let inst = Instance.level_subst (fun u -> Univ.LMap.find u subst) u in
           if b then mkConstU (cst,inst) else bd
     with
     | Not_found -> bd

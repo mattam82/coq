@@ -39,7 +39,7 @@ let hcons_template_arity ar =
 
 let instantiate cb c =
   if cb.const_polymorphic then 
-    Vars.subst_instance_constr (Univ.UContext.instance cb.const_universes) c
+    Vars.subst_levels_constr (Univ.UContext.levels cb.const_universes) c
   else c
 
 let body_of_constant otab cb = match cb.const_body with

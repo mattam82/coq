@@ -59,9 +59,9 @@ type atom =
 val mk_accu : atom -> t
 val mk_rel_accu : int -> t
 val mk_rels_accu : int -> int -> t array
-val mk_constant_accu : constant -> Univ.Level.t array -> t
-val mk_ind_accu : inductive -> Univ.Level.t array -> t
-val mk_sort_accu : sorts -> Univ.Level.t array -> t
+val mk_constant_accu : constant -> Univ.Universe.t array -> t
+val mk_ind_accu : inductive -> Univ.Universe.t array -> t
+val mk_sort_accu : sorts -> Univ.Universe.t array -> t
 val mk_var_accu : identifier -> t
 val mk_sw_accu : annot_sw -> accumulator -> t -> (t -> t)
 val mk_prod_accu : name -> t -> t -> t

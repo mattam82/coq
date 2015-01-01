@@ -125,10 +125,10 @@ let typeclass_univ_instance (cl,u') =
 	  if mib.mind_polymorphic then Univ.UContext.instance mib.mind_universes
 	  else Univ.Instance.empty
       | _ -> Univ.Instance.empty
-    in Array.fold_left2 (fun subst u u' -> Univ.LMap.add u u' subst) 
-      Univ.LMap.empty (Univ.Instance.to_array u) (Univ.Instance.to_array u')
+    in Univ.Instance.fold2 (fun u u' subst -> Univ.LMap.add (Option.get (Univ.Universe.level u)) u' subst) 
+      u u' Univ.LMap.empty
   in
-  let subst_ctx = Context.map_rel_context (subst_univs_level_constr subst) in
+  let subst_ctx = Context.map_rel_context (subst_univs_constr subst) in
     { cl with cl_context = fst cl.cl_context, subst_ctx (snd cl.cl_context);
       cl_props = subst_ctx cl.cl_props}, u'
 

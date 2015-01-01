@@ -178,12 +178,12 @@ let cook_constr { Opaqueproof.modlist ; abstract } c =
 
 let lift_univs cb subst =
   if cb.const_polymorphic && not (Univ.LMap.is_empty subst) then
-    let inst = Univ.UContext.instance cb.const_universes in
+    let inst = Univ.UContext.levels cb.const_universes in
     let cstrs = Univ.UContext.constraints cb.const_universes in
     let len = Univ.LMap.cardinal subst in
     let subst = 
       Array.fold_left_i (fun i acc v -> Univ.LMap.add (Level.var i) (Level.var (i + len)) acc)
-	subst (Univ.Instance.to_array inst)
+	subst (Univ.Levels.to_array inst)
     in
     let cstrs' = Univ.subst_univs_level_constraints subst cstrs in
       subst, Univ.UContext.make (inst,cstrs')

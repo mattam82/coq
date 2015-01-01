@@ -30,31 +30,37 @@ type universe_constraint_type = ULe | UEq | ULub
 
 type universe_constraint = universe * universe_constraint_type * universe
 
-module Constraints = struct
-  module S = Set.Make(
-  struct 
-    type t = universe_constraint
-
-    let compare_type c c' =
-      match c, c' with
-      | ULe, ULe -> 0
-      | ULe, _ -> -1
-      | _, ULe -> 1
-      | UEq, UEq -> 0
-      | UEq, _ -> -1
-      | ULub, ULub -> 0
-      | ULub, _ -> 1
+module UniverseConstraint = struct
+  type t = universe_constraint
       
-    let compare (u,c,v) (u',c',v') =
-      let i = compare_type c c' in
-	if Int.equal i 0 then
-	  let i' = Universe.compare u u' in
-	    if Int.equal i' 0 then Universe.compare v v'
-	    else 
-	      if c != ULe && Universe.compare u v' = 0 && Universe.compare v u' = 0 then 0
-	      else i'
-	else i
-  end)
+  let compare_type c c' =
+    match c, c' with
+    | ULe, ULe -> 0
+    | ULe, _ -> -1
+    | _, ULe -> 1
+    | UEq, UEq -> 0
+    | UEq, _ -> -1
+    | ULub, ULub -> 0
+    | ULub, _ -> 1
+      
+  let compare (u,c,v) (u',c',v') =
+    let i = compare_type c c' in
+      if Int.equal i 0 then
+	let i' = Universe.compare u u' in
+	  if Int.equal i' 0 then Universe.compare v v'
+	  else 
+	    if c != ULe && Universe.compare u v' = 0 && Universe.compare v u' = 0 then 0
+	    else i'
+      else i
+
+  let op_str = function ULe -> " <= " | UEq -> " = " | ULub -> " /\\ "
+
+  let pr (u1,op,u2) = 
+    Universe.pr u1 ++ str (op_str op) ++ Universe.pr u2
+end
+
+module Constraints = struct
+  module S = Set.Make(UniverseConstraint)
   
   include S
   
@@ -67,12 +73,9 @@ module Constraints = struct
     | UEq -> Eq
     | ULub -> Eq
 
-  let op_str = function ULe -> " <= " | UEq -> " = " | ULub -> " /\\ "
-
   let pr c =
-    fold (fun (u1,op,u2) pp_std ->
-	pp_std ++ Universe.pr u1 ++ str (op_str op) ++
-	Universe.pr u2 ++ fnl ()) c (str "")
+    fold (fun c pp_std ->
+	pp_std ++ UniverseConstraint.pr c ++ fnl ()) c (str "")
 
   let equal x y = 
     x == y || equal x y
@@ -84,14 +87,13 @@ type 'a universe_constrained = 'a * universe_constraints
 
 type 'a universe_constraint_function = 'a -> 'a -> universe_constraints -> universe_constraints
 
-let enforce_eq_instances_univs strict x y c = 
+let enforce_eq_instances_univs strict ax ay c = 
   let d = if strict then ULub else UEq in
-  let ax = Instance.to_array x and ay = Instance.to_array y in
-    if Array.length ax != Array.length ay then
+    if Instance.length ax != Instance.length ay then
       Errors.anomaly (Pp.str "Invalid argument: enforce_eq_instances_univs called with" ++
 	       Pp.str " instances of different lengths");
-    CArray.fold_right2
-      (fun x y -> Constraints.add (Universe.make x, d, Universe.make y))
+    Instance.fold2
+      (fun x y -> Constraints.add (x, d, y))
       ax ay c
 
 let subst_univs_universe_constraint fn (u,d,v) =
@@ -108,7 +110,7 @@ let subst_univs_universe_constraints subst csts =
 let to_constraints g s = 
   let tr (x,d,y) acc =
     let add l d l' acc = Constraint.add (l,Constraints.tr_dir d,l') acc in
-      match Universe.level x, d, Universe.level y with
+      match Universe.expr x, d, Universe.expr y with
       | Some l, (ULe | UEq | ULub), Some l' -> add l d l' acc
       | _, ULe, Some l' -> enforce_leq x y acc
       | _, ULub, _ -> acc
@@ -116,7 +118,8 @@ let to_constraints g s =
 	let f = if d == ULe then check_leq else check_eq in
 	  if f g x y then acc else 
 	    raise (Invalid_argument 
-		   "to_constraints: non-trivial algebraic constraint between universes")
+		     ("to_constraints: non-trivial algebraic constraint between universes:" ^
+			 Pp.string_of_ppcmds (UniverseConstraint.pr (x,d,y))))
   in Constraints.fold tr s Constraint.empty
 
 let eq_constr_univs_infer univs m n =
@@ -267,7 +270,7 @@ let new_Type dp = mkType (new_univ dp)
 let new_Type_sort dp = Type (new_univ dp)
 
 let fresh_universe_instance ctx =
-  Instance.subst_fn (fun _ -> new_univ_level (Global.current_dirpath ())) 
+  Instance.level_subst (fun _ -> new_univ_level (Global.current_dirpath ())) 
     (UContext.instance ctx)
 
 let fresh_instance_from_context ctx =
@@ -278,7 +281,7 @@ let fresh_instance_from_context ctx =
 let fresh_instance ctx =
   let ctx' = ref LSet.empty in
   let inst = 
-    Instance.subst_fn (fun v -> 
+    Instance.level_subst (fun v -> 
       let u = new_univ_level (Global.current_dirpath ()) in
 	ctx' := LSet.add u !ctx'; u) 
       (UContext.instance ctx)
@@ -286,9 +289,8 @@ let fresh_instance ctx =
 
 let existing_instance ctx inst = 
   let () = 
-    let a1 = Instance.to_array inst 
-    and a2 = Instance.to_array (UContext.instance ctx) in
-    let len1 = Array.length a1 and len2 = Array.length a2 in 
+    let len1 = Instance.length inst 
+    and len2 = Instance.length (UContext.instance ctx) in
       if not (len1 == len2) then
 	Errors.errorlabstrm "Universes"
 	  (str "Polymorphic constant expected " ++ int len2 ++ 
@@ -541,13 +543,12 @@ let choose_canonical ctx flexible algs s =
 	      let canon = LSet.choose algs in
 		canon, (global, rigid, LSet.remove canon flexible)
 
-let subst_univs_fn_puniverses lsubst (c, u as cu) =
-  let u' = Instance.subst_fn lsubst u in
+let subst_univs_puniverses lsubst (c, u as cu) =
+  let u' = Instance.subst lsubst u in
     if u' == u then cu else (c, u')
 
 let nf_evars_and_universes_opt_subst f subst =
   let subst = fun l -> match LMap.find l subst with None -> raise Not_found | Some l' -> l' in
-  let lsubst = Univ.level_subst_of subst in
   let rec aux c =
     match kind_of_term c with
     | Evar (evk, args) ->
@@ -556,13 +557,13 @@ let nf_evars_and_universes_opt_subst f subst =
       | None -> c
       | Some c -> aux c)
     | Const pu -> 
-      let pu' = subst_univs_fn_puniverses lsubst pu in
+      let pu' = subst_univs_puniverses subst pu in
 	if pu' == pu then c else mkConstU pu'
     | Ind pu ->
-      let pu' = subst_univs_fn_puniverses lsubst pu in
+      let pu' = subst_univs_puniverses subst pu in
 	if pu' == pu then c else mkIndU pu'
     | Construct pu ->
-      let pu' = subst_univs_fn_puniverses lsubst pu in
+      let pu' = subst_univs_puniverses subst pu in
 	if pu' == pu then c else mkConstructU pu'
     | Sort (Type u) ->
       let u' = Univ.subst_univs_universe subst u in
@@ -671,12 +672,7 @@ let compute_lbound left =
     | Some l' -> Some (Universe.sup l l')
   in
     List.fold_left (fun lbound (d, l) -> 
-      if d == Le (* l <= ?u *) then sup l lbound
-      else (* l < ?u *) 
-	(assert (d == Lt); 
-	 if not (Universe.level l == None) then
-	   sup (Universe.super l) lbound
-	 else None))
+      assert (d == Le); sup l lbound)
       None left
   
 let instantiate_with_lbound u lbound alg enforce (ctx, us, algs, insts, cstrs) =
@@ -770,8 +766,8 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	      if d == Univ.Le then
 		enforce_leq inst (Universe.make r) cstrs
 	      else 
-		try let lev = Option.get (Universe.level inst) in
-		      Constraint.add (lev, d, r) cstrs
+		try let lev = Option.get (Universe.expr inst) in
+		      Constraint.add (lev, d, Obj.magic (r,0)) cstrs
 		with Option.IsNone -> assert false)
 	      cstrs dangling
 	    in
@@ -795,63 +791,65 @@ let minimize_univ_variables ctx us algs left right cstrs =
       us (ctx, us, algs, lbounds, cstrs)
       
 let normalize_context_set ctx us algs = 
-  let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
-  let uf = UF.create () in
-  let csts = 
-    (* We first put constraints in a normal-form: all self-loops are collapsed
-       to equalities. *)
-    let g = Univ.merge_constraints csts Univ.empty_universes in
-      Univ.constraints_of_universes g
-  in
-  let noneqs =
-    Constraint.fold (fun (l,d,r) noneqs ->
-      if d == Eq then (UF.union l r uf; noneqs) 
-      else Constraint.add (l,d,r) noneqs)
-    csts Constraint.empty
-  in
-  let partition = UF.partition uf in
-  let flex x = LMap.mem x us in
-  let ctx, subst, eqs = List.fold_left (fun (ctx, subst, cstrs) s -> 
-    let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in
-    (* Add equalities for globals which can't be merged anymore. *)
-    let cstrs = LSet.fold (fun g cst -> 
-      Constraint.add (canon, Univ.Eq, g) cst) global
-      cstrs 
-    in
-    let subst = LSet.fold (fun f -> LMap.add f canon) rigid subst in 
-    let subst = LSet.fold (fun f -> LMap.add f canon) flexible subst in 
-      (LSet.diff (LSet.diff ctx rigid) flexible, subst, cstrs))
-    (ctx, LMap.empty, Constraint.empty) partition
-  in
-  (* Noneqs is now in canonical form w.r.t. equality constraints, 
-     and contains only inequality constraints. *)
-  let noneqs = subst_univs_level_constraints subst noneqs in
-  let us = LMap.fold (fun u v acc -> LMap.add u (Some (Universe.make v)) acc) subst us in
-  (* Compute the left and right set of flexible variables, constraints
-     mentionning other variables remain in noneqs. *)
-  let noneqs, ucstrsl, ucstrsr = 
-    Constraint.fold (fun (l,d,r as cstr) (noneq, ucstrsl, ucstrsr) -> 
-      let lus = LMap.mem l us 
-      and rus = LMap.mem r us
-      in
-      let ucstrsl' = 
-	if lus then add_list_map l (d, r) ucstrsl
-	else ucstrsl
-      and ucstrsr' = 
-	add_list_map r (d, l) ucstrsr
-      in 
-      let noneqs = 
-	if lus || rus then noneq 
-	else Constraint.add cstr noneq
-      in (noneqs, ucstrsl', ucstrsr'))
-    noneqs (Constraint.empty, LMap.empty, LMap.empty)
-  in
-  (* Now we construct the instantiation of each variable. *)
-  let ctx', us, algs, inst, noneqs = 
-    minimize_univ_variables ctx us algs ucstrsr ucstrsl noneqs
-  in
-  let us = normalize_opt_subst us in
-    (us, algs), (ctx', Constraint.union noneqs eqs)
+  (us, algs), ctx
+
+  (* let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in *)
+  (* let uf = UF.create () in *)
+  (* let csts =  *)
+  (*   (\* We first put constraints in a normal-form: all self-loops are collapsed *)
+  (*      to equalities. *\) *)
+  (*   let g = Univ.merge_constraints csts Univ.empty_universes in *)
+  (*     Univ.constraints_of_universes g *)
+  (* in *)
+  (* let noneqs = *)
+  (*   Constraint.fold (fun (l,d,r) noneqs -> *)
+  (*     if d == Eq then (UF.union l r uf; noneqs)  *)
+  (*     else Constraint.add (l,d,r) noneqs) *)
+  (*   csts Constraint.empty *)
+  (* in *)
+  (* let partition = UF.partition uf in *)
+  (* let flex x = LMap.mem x us in *)
+  (* let ctx, subst, eqs = List.fold_left (fun (ctx, subst, cstrs) s ->  *)
+  (*   let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in *)
+  (*   (\* Add equalities for globals which can't be merged anymore. *\) *)
+  (*   let cstrs = LSet.fold (fun g cst ->  *)
+  (*     Constraint.add (canon, Univ.Eq, g) cst) global *)
+  (*     cstrs  *)
+  (*   in *)
+  (*   let subst = LSet.fold (fun f -> LMap.add f canon) rigid subst in  *)
+  (*   let subst = LSet.fold (fun f -> LMap.add f canon) flexible subst in  *)
+  (*     (LSet.diff (LSet.diff ctx rigid) flexible, subst, cstrs)) *)
+  (*   (ctx, LMap.empty, Constraint.empty) partition *)
+  (* in *)
+  (* (\* Noneqs is now in canonical form w.r.t. equality constraints,  *)
+  (*    and contains only inequality constraints. *\) *)
+  (* let noneqs = subst_univs_level_constraints subst noneqs in *)
+  (* let us = LMap.fold (fun u v acc -> LMap.add u (Some (Universe.make v)) acc) subst us in *)
+  (* (\* Compute the left and right set of flexible variables, constraints *)
+  (*    mentionning other variables remain in noneqs. *\) *)
+  (* let noneqs, ucstrsl, ucstrsr =  *)
+  (*   Constraint.fold (fun (l,d,r as cstr) (noneq, ucstrsl, ucstrsr) ->  *)
+  (*     let lus = LMap.mem l us  *)
+  (*     and rus = LMap.mem r us *)
+  (*     in *)
+  (*     let ucstrsl' =  *)
+  (* 	if lus then add_list_map l (d, r) ucstrsl *)
+  (* 	else ucstrsl *)
+  (*     and ucstrsr' =  *)
+  (* 	add_list_map r (d, l) ucstrsr *)
+  (*     in  *)
+  (*     let noneqs =  *)
+  (* 	if lus || rus then noneq  *)
+  (* 	else Constraint.add cstr noneq *)
+  (*     in (noneqs, ucstrsl', ucstrsr')) *)
+  (*   noneqs (Constraint.empty, LMap.empty, LMap.empty) *)
+  (* in *)
+  (* (\* Now we construct the instantiation of each variable. *\) *)
+  (* let ctx', us, algs, inst, noneqs =  *)
+  (*   minimize_univ_variables ctx us algs ucstrsr ucstrsl noneqs *)
+  (* in *)
+  (* let us = normalize_opt_subst us in *)
+  (*   (us, algs), (ctx', Constraint.union noneqs eqs) *)
 
 (* let normalize_conkey = Profile.declare_profile "normalize_context_set" *)
 (* let normalize_context_set a b c = Profile.profile3 normalize_conkey normalize_context_set a b c *)
@@ -875,10 +873,10 @@ let restrict_universe_context (univs,csts) s =
     let (diff', candid', univs', ness') = 
       Constraint.fold
 	(fun (l, d, r as c) (diff, candid, univs, csts) ->
-	  if not (LSet.mem l diff) then
-	    (LSet.remove r diff, candid, univs, Constraint.add c csts)
-	  else if not (LSet.mem r diff) then
-	    (LSet.remove l diff, candid, univs, Constraint.add c csts)
+	  if not (LSet.mem (Expr.level l) diff) then
+	    (LSet.remove (Expr.level r) diff, candid, univs, Constraint.add c csts)
+	  else if not (LSet.mem (Expr.level r) diff) then
+	    (LSet.remove (Expr.level l) diff, candid, univs, Constraint.add c csts)
 	  else (diff, Constraint.add c candid, univs, csts))
 	candid (diff, Constraint.empty, univs, ness)
     in
@@ -886,47 +884,47 @@ let restrict_universe_context (univs,csts) s =
       else aux diff' candid' univs' ness'
   in aux diff csts univs Constraint.empty
 
-let simplify_universe_context (univs,csts) =
-  let uf = UF.create () in
-  let noneqs =
-    Constraint.fold (fun (l,d,r) noneqs ->
-      if d == Eq && (LSet.mem l univs || LSet.mem r univs) then 
-	(UF.union l r uf; noneqs)
-      else Constraint.add (l,d,r) noneqs)
-      csts Constraint.empty
-  in
-  let partition = UF.partition uf in
-  let flex x = LSet.mem x univs in
-  let subst, univs', csts' = List.fold_left (fun (subst, univs, cstrs) s -> 
-    let canon, (global, rigid, flexible) = choose_canonical univs flex LSet.empty s in
-    (* Add equalities for globals which can't be merged anymore. *)
-    let cstrs = LSet.fold (fun g cst -> 
-      Constraint.add (canon, Univ.Eq, g) cst) (LSet.union global rigid)
-      cstrs 
-    in
-    let subst = LSet.fold (fun f -> LMap.add f canon)
-      flexible subst
-    in (subst, LSet.diff univs flexible, cstrs))
-    (LMap.empty, univs, noneqs) partition
-  in
-  (* Noneqs is now in canonical form w.r.t. equality constraints, 
-     and contains only inequality constraints. *)
-  let csts' = subst_univs_level_constraints subst csts' in
-    (univs', csts'), subst
+let simplify_universe_context (univs,csts) = (univs, csts), LMap.empty
+  (* let uf = UF.create () in *)
+  (* let noneqs = *)
+  (*   Constraint.fold (fun (l,d,r) noneqs -> *)
+  (*     if d == Eq && (LSet.mem l univs || LSet.mem r univs) then  *)
+  (* 	(UF.union l r uf; noneqs) *)
+  (*     else Constraint.add (l,d,r) noneqs) *)
+  (*     csts Constraint.empty *)
+  (* in *)
+  (* let partition = UF.partition uf in *)
+  (* let flex x = LSet.mem x univs in *)
+  (* let subst, univs', csts' = List.fold_left (fun (subst, univs, cstrs) s ->  *)
+  (*   let canon, (global, rigid, flexible) = choose_canonical univs flex LSet.empty s in *)
+  (*   (\* Add equalities for globals which can't be merged anymore. *\) *)
+  (*   let cstrs = LSet.fold (fun g cst ->  *)
+  (*     Constraint.add (canon, Univ.Eq, g) cst) (LSet.union global rigid) *)
+  (*     cstrs  *)
+  (*   in *)
+  (*   let subst = LSet.fold (fun f -> LMap.add f canon) *)
+  (*     flexible subst *)
+  (*   in (subst, LSet.diff univs flexible, cstrs)) *)
+  (*   (LMap.empty, univs, noneqs) partition *)
+  (* in *)
+  (* (\* Noneqs is now in canonical form w.r.t. equality constraints,  *)
+  (*    and contains only inequality constraints. *\) *)
+  (* let csts' = subst_univs_level_constraints subst csts' in *)
+  (*   (univs', csts'), subst *)
 
 let is_small_leq (l,d,r) =
-  Level.is_small l && d == Univ.Le
+  Level.is_small (Expr.level l) && d == Univ.Le
 
 (* Prop < i <-> Set+1 <= i <-> Set < i *)
 let translate_cstr (l,d,r as cstr) =
-  if Level.equal Level.prop l && d == Univ.Lt then
+  if Level.equal Level.prop l && d == Univ.Le then
     (Level.set, d, r)
   else cstr
 
 let refresh_constraints univs (ctx, cstrs) =
   let cstrs', univs' = 
     Univ.Constraint.fold (fun c (cstrs', univs as acc) -> 
-      let c = translate_cstr c in
+      (* let c = translate_cstr c in *)
       if Univ.check_constraint univs c && not (is_small_leq c) then acc
       else (Univ.Constraint.add c cstrs', Univ.enforce_constraint c univs))
       cstrs (Univ.Constraint.empty, univs)

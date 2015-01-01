@@ -301,22 +301,24 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
 	if poly then 
 	  let ctx1 = Univ.instantiate_univ_context cb1.const_universes in
 	  let ctx2 = Univ.instantiate_univ_context cb2.const_universes in
-	  let inst1, ctx1 = Univ.UContext.dest ctx1 in
-	  let inst2, ctx2 = Univ.UContext.dest ctx2 in
-	    if not (Univ.Instance.length inst1 == Univ.Instance.length inst2) then
+	  let levels1, cstrs1 = Univ.UContext.dest ctx1 in
+	  let levels2, cstrs2 = Univ.UContext.dest ctx2 in
+	    if not (Univ.Levels.length levels1 == Univ.Levels.length levels2) then
 	      error IncompatibleInstances
 	    else 
+	      let inst1 = Univ.UContext.instance ctx1 
+	      and inst2 = Univ.UContext.instance ctx2 in
 	      let cstrs = Univ.enforce_eq_instances inst1 inst2 cst in
-	      let cstrs = Univ.Constraint.union cstrs ctx2 in
+	      let cstrs = Univ.Constraint.union cstrs cstrs2 in
 		try 
 		  (* The environment with the expected universes plus equality 
 		     of the body instances with the expected instance *)
 		  let env = Environ.add_constraints cstrs env in
 		    (* Check that the given definition does not add any constraint over
 		       the expected ones, so that it can be used in place of the original. *)
-		    if Univ.check_constraints ctx1 (Environ.universes env) then
+		    if Univ.check_constraints cstrs1 (Environ.universes env) then
 		      cstrs, env, inst2
-		    else error (IncompatibleConstraints ctx1)
+		    else error (IncompatibleConstraints cstrs1)
 		with Univ.UniverseInconsistency incon -> 
 		  error (IncompatibleUniverses incon)
 	else cst, env, Univ.Instance.empty

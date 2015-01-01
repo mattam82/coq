@@ -307,8 +307,8 @@ GEXTEND Gram
   level:
     [ [ "Set" -> GSet
       | "Prop" -> GProp
-      | "Type" -> GType None
-      | id = ident -> GType (Some (Id.to_string id))
+      | "Type" -> GType []
+      | u = universe -> GType (List.map Id.to_string u)
       ] ]
   ;
   fix_constr:

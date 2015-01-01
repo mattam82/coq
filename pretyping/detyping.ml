@@ -412,7 +412,8 @@ let detype_anonymous = ref (fun loc n -> anomaly ~label:"detype" (Pp.str "index 
 let set_detype_anonymous f = detype_anonymous := f
 
 let detype_level sigma l =
-  GType (Some (Pp.string_of_ppcmds (Evd.pr_evd_level sigma l)))
+  GType (List.map (fun x -> Pp.string_of_ppcmds (Univ.Expr.pr (Evd.pr_evd_level sigma) x)) 
+	   (Univ.Universe.exprs l))
 
 let detype_instance sigma l = 
   if Univ.Instance.is_empty l then None

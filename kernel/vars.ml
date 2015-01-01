@@ -217,13 +217,13 @@ let subst_vars subst c = substn_vars 1 subst c
 open Constr
 
 let subst_univs_fn_puniverses fn =
-  let f = Univ.Instance.subst_fn fn in
+  let f = Univ.subst_univs_instance fn in
     fun ((c, u) as x) -> let u' = f u in if u' == u then x else (c, u')
 
 let subst_univs_fn_constr f c =
   let changed = ref false in
   let fu = Univ.subst_univs_universe f in
-  let fi = Univ.Instance.subst_fn (Univ.level_subst_of f) in
+  let fi = Univ.subst_univs_instance f in
   let rec aux t = 
     match kind t with
     | Sort (Sorts.Type u) -> 
@@ -262,7 +262,7 @@ let subst_univs_constr =
 let subst_univs_level_constr subst c =
   if Univ.is_empty_level_subst subst then c
   else 
-    let f = Univ.Instance.subst_fn (Univ.subst_univs_level_level subst) in
+    let f = Univ.Instance.level_subst (Univ.subst_univs_level_level subst) in
     let changed = ref false in
     let rec aux t = 
       match kind t with
@@ -339,3 +339,14 @@ let subst_instance_context s ctx =
 
 type id_key = pconstant tableKey
 let eq_id_key x y = Names.eq_table_key (Univ.eq_puniverses Constant.equal) x y
+
+let subst_levels_constr levels c = 
+  let s = Univ.make_instance_subst levels in
+  let fn x = Univ.Universe.make (Univ.LMap.find x s) in
+    subst_univs_fn_constr fn c 
+
+let subst_levels_context levels ctx = 
+  let s = Univ.make_instance_subst levels in
+  let fn x = Univ.Universe.make (Univ.LMap.find x s) in
+    if Univ.Levels.is_empty levels then ctx
+    else map_rel_context (fun x -> subst_univs_fn_constr fn x) ctx

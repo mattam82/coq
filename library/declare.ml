@@ -475,8 +475,9 @@ let input_constraints : Univ.constraints -> Libobject.obj =
 let do_constraint l = 
   let u_of_id = 
     let names, _ = Universes.global_universe_names () in
-      fun (loc, id) -> 
-	try Idmap.find id names
+      fun (loc, (id, k)) -> 
+	try let l = Idmap.find id names in
+	      Univ.Expr.addn k (Univ.Expr.make l)
 	with Not_found ->
 	  user_err_loc (loc, "Constraint", str "Undeclared universe " ++ pr_id id)	    
   in

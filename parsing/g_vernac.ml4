@@ -255,9 +255,23 @@ GEXTEND Gram
       | IDENT "Inline" -> DefaultInline
       | -> NoInline] ]
   ;
+  incr:
+    [ [ "+"; i = natural -> i
+      | "-"; i = natural -> i ] ]
+  ;
+  univ_expr:
+    [ [ id = ident; i = incr -> (!@loc, (id, i)) ] ]
+  ;
   univ_constraint:
-    [ [ l = identref; ord = [ "<" -> Univ.Lt | "=" -> Univ.Eq | "<=" -> Univ.Le ];
-	r = identref -> (l, ord, r) ] ]
+    [ [ l = univ_expr; ord = [ "<" -> -1 | "=" -> 0 | "<=" -> 1 ];
+	r = univ_expr -> 
+	let ord, l' = 
+	  if ord = -1 then 
+	    let (loc, (id, k)) = l in
+	      Univ.Le, (loc, (id, k+1))
+	  else if ord == 0 then Univ.Eq, l else Univ.Le, l
+	in
+	  (l', ord, r) ] ]
   ;
   finite_token:
     [ [ "Inductive" -> (Inductive_kw,Finite)

@@ -331,7 +331,7 @@ let strengthen_const mp_from l cb resolver =
     let kn = KerName.make2 mp_from l in
     let con = constant_of_delta_kn resolver kn in
     let u = 
-      if cb.const_polymorphic then 
+      if cb.const_polymorphic then
 	Univ.UContext.instance cb.const_universes
       else Univ.Instance.empty
     in

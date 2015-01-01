@@ -172,10 +172,10 @@ end) = struct
       tag_type (str "Prop")
     | GSet ->
       tag_type (str "Set")
-    | GType u ->
-      (match u with
-        | Some u -> str u
-        | None -> tag_type (str "Type"))
+    | GType u -> 
+      match u with
+      | [] -> tag_type (str "Type")
+      | l -> tag_type (pr_univ u)
 
   let pr_universe_instance l =
     pr_opt_no_spc (pr_univ_annot (prlist_with_sep spc pr_glob_sort_instance)) l

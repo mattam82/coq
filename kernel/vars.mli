@@ -74,7 +74,7 @@ val substn_vars : int -> Id.t list -> constr -> constr
 open Univ
 
 val subst_univs_fn_constr : universe_subst_fn -> constr -> constr
-val subst_univs_fn_puniverses : universe_level_subst_fn -> 
+val subst_univs_fn_puniverses : universe_subst_fn -> 
   'a puniverses -> 'a puniverses
 
 val subst_univs_constr : universe_subst -> constr -> constr
@@ -90,3 +90,6 @@ val subst_instance_context : universe_instance -> rel_context -> rel_context
 
 type id_key = pconstant tableKey
 val eq_id_key : id_key -> id_key -> bool
+
+val subst_levels_constr : Univ.Levels.t -> constr -> constr
+val subst_levels_context : Univ.Levels.t -> rel_context -> rel_context

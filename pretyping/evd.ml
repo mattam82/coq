@@ -360,10 +360,10 @@ let process_universe_constraints univs vars alg cstrs =
 	    if Univ.check_leq univs l r then
 	      (** Keep Prop/Set <= var around if var might be instantiated by prop or set
 		  later. *)
-	      if Univ.Universe.is_level l then 
-		match Univ.Universe.level r with
+	      if Univ.Universe.is_expr l then 
+		match Univ.Universe.expr r with
 		| Some r ->
-		  Univ.Constraint.add (Option.get (Univ.Universe.level l),Univ.Le,r) local
+		  Univ.Constraint.add (Option.get (Univ.Universe.expr l),Univ.Le,r) local
 		| _ -> local
 	      else local
 	    else
@@ -419,10 +419,9 @@ let process_universe_constraints univs vars alg cstrs =
 let add_constraints_context ctx cstrs =
   let univs, local = ctx.uctx_local in
   let cstrs' = Univ.Constraint.fold (fun (l,d,r) acc -> 
-    let l = Univ.Universe.make l and r = Univ.Universe.make r in
+    let l = Univ.Universe.make_expr l and r = Univ.Universe.make_expr r in
     let cstr' = 
-      if d == Univ.Lt then (Univ.Universe.super l, Universes.ULe, r)
-      else (l, (if d == Univ.Le then Universes.ULe else Universes.UEq), r)
+      (l, (if d == Univ.Le then Universes.ULe else Universes.UEq), r)
     in Universes.Constraints.add cstr' acc)
     cstrs Universes.Constraints.empty
   in
@@ -1107,8 +1106,8 @@ let normalize_universe evd =
 
 let normalize_universe_instance evd l =
   let vars = ref evd.universes.uctx_univ_variables in
-  let normalize = Univ.level_subst_of (Universes.normalize_univ_variable_opt_subst vars) in
-    Univ.Instance.subst_fn normalize l
+  let normalize = Universes.normalize_univ_variable_opt_subst vars in
+    Univ.Instance.subst normalize l
 
 let normalize_sort evars s =
   match s with

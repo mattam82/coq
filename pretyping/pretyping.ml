@@ -359,8 +359,8 @@ let pretype_global loc rigid env evd gr us =
 			str "Universe instance should have length " ++ int len)
 	else
 	  let evd, l' = List.fold_left (fun (evd, univs) l -> 
-	    let evd, l = interp_universe_level_name evd l in
-	      (evd, l :: univs)) (evd, []) l
+	    let evd, l = interp_sort evd l in
+	      (evd, Sorts.univ_of_sort l :: univs)) (evd, []) l
       in 
 	evd, Some (Univ.Instance.of_array (Array.of_list (List.rev l')))
   in
