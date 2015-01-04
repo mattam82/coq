@@ -681,7 +681,7 @@ open Universe
 
 let universe_level = Universe.level
 
-type status = Unset | SetLe | SetLt
+type status = Unset | Isset of int
 
 (* Comparison on this type is pointer equality *)
 type canonical_arc =
@@ -695,13 +695,9 @@ type canonical_arc =
           a node has already been visited. Quite performance critical indeed. *)
     }
 
-let arc_is_le arc = match arc.status with
+let arc_is_lt arc w = match arc.status with
 | Unset -> false
-| SetLe | SetLt -> true
-
-let arc_is_lt arc = match arc.status with
-| Unset | SetLe -> false
-| SetLt -> true
+| Isset k -> w <= k
 
 let terminal u = {univ=u; arcs=[]; rank=0; predicative=false; status = Unset}
 
@@ -794,121 +790,8 @@ let rec change_assq x k =
       else aux (pair :: acc) l
   in aux []
 
-(* v <1= w /\ w <-1= v -> w = v
-   v <1= w /\ w <-2= v <-> v + 1 <= w /\ w - 2 <= v <-> v+1 <= w /\ w - 1 <= v+1 <-> w-1<=v+1<=w <-> w-2<=v<=w-1 ok.
-   v <1= w /\ w <0= v <-> v + 1 <= w /\ w <= v <-> v+1 <= v false positive length
-   
-   v - 1 <= w -> v <= w + 1
-   
-   v + 2 <= w -> v <= w
-   v <= w -/> v + 1 <= w
-
-   v <= w -> v - 1 <= w
-   v - 1 <= w -/> v <= w
-
-   v - 1 <= w /\ v > w <-> v - 1 <= w /\ w + 1 <= v 
-   <-> v <= w + 1 /\ w + 1 <= v <-> v = w + 1
-   
-   v <-n= w /\ v = w ok
-
-   v - 1 <= w /\ w + 1 <= v -> v = w
-   v - 1 <= w /\ w <= v -> w - 1 <= v - 1 <= w <= v -> v = w \/ v = w + 1
-
-   v + n = w + m <-> v = w + m - n.
-
-   v = max (i, j) ? Substitute v by max(i,j) everywhere.
-   v <= u -> max(i,j) <= u -> i <= u /\ j <= u
-   u <= v -> u <= max(i,j) -> u <= i \/ u <= j must be decided right away.
-
-   i + 1 <= j <- i + 2 <= j. 
-   So i <n= j /\ i <m= j can be simplified to i <max(n,m)= j.
-
-
-   i + 1 <= j <-> i <1= j <-> i < j
-   
-   i + m <= j + k <-> i + (m - k) <= j <-> i <m-k= j.
-   
-   Suppose m = k, ok.
-   m > k. i + m - k <= j. i + 2 <= j + 1 <=> i + 1 <= j
-   m < k . i + (m - k) <= j. i + 1 <= j + 2 <=> i - 1 <= j
-
-   i - 1 <= j /\ i <= j -> i <= j.
-   
-| Equiv (int, level)
-| Canon
-| Alg (univ)
- 
-   v < k = w -> i <= v + k
-
-
-  i = j + 1 -> i -> Equiv(j,1).
-   repr i 0 = arcj, 1 
-   repr j 1 = arcj, 1
-
-How to enforce i + k = j + l: 
-   i = j + (l - k) \/ j = i + k - l depending on the ranks of i, j
-   1st case: add a i -> Equiv (j, l - k) arc.
-   For each v s.t. i + m <= v <-> i + k-l + m <= v + k - l <->
-   j + m <= v + k - l <-> j + (m - (k - l)) <= v
-   
-   add j <m-(k-l)= v. If j <n= v then j <max(n,m-k+l)= v
-   
-   Assume i + n <= j + m. 
-
-   Suppose i <n= j <=> i + n <= j. Then i + k <n= j + k <-> i + k + n <= j + k + n.
-   
-   i <1= j /\ j <= i. i + 1 <= j /\ j <= i positive cycle weight 1. 
-
- *)
 (* reprleq : canonical_arc -> canonical_arc list *)
 (* All canonical arcv such that arcu<=arcv with arcv#arcu *)
-(* arcu + k. 
-   Suppose arcu <m= v <-> arcu + m <= v.
-   If k = m then v, 0 is in.
-   If k <= m then arcu + k <= arcu + m <= v. arcv + (m - k).
-   arcu + m + k - k <= v + k - k. arcu + k + (m - k) <= v
-   arcu + k <m-k= v
-
-   k > m. 
-   arcu + m <= arcu + k /\ arcu + m <= v.
-   arcu + k - (k - m) <= v.
-   arcu + k <-(k-m)= v.
-   arcu + k <m-k= v.
-   
-
-
-   arcu + m + k - m <= v + k - m. 
-   arcu + m + k - m - (k - m) <= v
-   
-   
-   arcu + k 
-
-
-   If k > m then arcu + m <= arcu + k /\ arcu + m <= v.
-   arcu + m + (k - m) <= v + k - m.
-   arcu + m <= arcu + k <= v + k - m <-> 
-   u + (k - m) <= 
-   
-
-   Example: k = 1, m = 0. we have arcu <= v. The arcu + 1 <= v + 1. 
-   arcv - (k - m). 
-
-   suppose arcu + j <= v. 
-
-   u + k -> u <-k= u <-> u - k <= u 
-   
-   u + 1 <= v /\ v - 1 <= u -> u+1 = v
-
-   u + 1 <= v + 1 /\ v <= u -> u = v
-
-   u <= v + 1 /\ v <= u -> u = v \/ u = v + 1
-
-   u + 1 <= w <= v + 1 <-> u <1= w /\ w <-1= v
-   between (u + 1) (v + 1) = w
-   between u v = w-1
-   between (u + 2) (v + 2) = w+1
-
- *)
 let reprleq g arcu k =
   let rec searchrec w = function
     | [] -> w
@@ -935,42 +818,6 @@ let reprleq g arcu k =
 (* between : Level.t -> canonical_arc -> canonical_arc list *)
 (* between u v = { w | u<=w<=v, w canonical }          *)
 (* between is the most costly operation *)
-(*    u + 1 <= w <= v + 2 <-> u <1= w /\ w <-2= v
-   between (u + 1) (v + 2) = w ? 
-      reprleq u 1 = w, 0
-      explore [v,2] (w, 0) 
-      reprleq w 0 = [v, -2]
-      explore [v,2] [v, -2]
-
-    u + 1 <= w <= v + 1 <-> u <1= w /\ w <-1= v
-   between (u + 1) (v + 2) = [] ? 
-      reprleq u 1 = w, 0
-      explore [v,-2] (w, 0) 
-      reprleq w 0 = [v, -1]
-      explore [v,-2] [v, -1] -> false w < v + 2
-      
-
-      compare (u + k) (v + l) <-> compare (u + k - l) v ?
-
-      u + 1 <= v + 1. -> u <= v.
-
-      compare (u+1) (v+1) = LE
-      compare u v = LE
-
-
-      u + 2 <= v + 1. u <1= v
-      compare (u+2) (v+1) = LE (w_uv - (k-l) = 0)
-      compare (u+2) (v+2) = w_uv - (k-l) = 1 -> LT
-      compare u+1 v = LE (w_uv - k = 0)
-      compare u v = LT (w_uv - k > 0)
-      compare (u+2) v = NLE (w_uv - k < 0)
-
-      if w_uv = 0 then LE
-      if w_uv > 0 then u < v
-      if w_uv < 0 then NLE
-      w_uv < 0 : u <-1= v <-> u - 1 <= v <-> u <= v + 1 -> u <= v \/ u = v + 1
-*)
-
 let between g arcu arcv =
   (* good are all w | u <= w <= v  *)
   (* bad are all w | u <= w ~<= v *)
@@ -1049,12 +896,12 @@ let get_explanation strict g arcu w arcv =
   let rec cmp c to_revert todo = match todo with
   | [] -> (to_revert, c)
   | (arc,k,p)::todo ->
-    if arc_is_lt arc then
+    if arc_is_lt arc k then
       cmp c to_revert todo
     else
       let rec find todo l = match l with
       | [] ->
-        let () = arc.status <- SetLt in
+        let () = arc.status <- Isset k in
           cmp c (arc :: to_revert) todo
       | (u,m) :: l ->
         let arc, m' = repr g u (k-m) in
@@ -1094,65 +941,49 @@ let get_explanation strict g (arcu,k) (arcv,l) =
 
 type fast_order = FastEQ | FastLT | FastLE | FastNLE
 
-  (* | [], arc::le_todo -> *)
-  (*   if arc == arcv then *)
-  (*     (\* No need to continue inspecting universes above arc: *)
-  (* 	 if arcv is strictly above arc, then we would have a cycle. *)
-  (*        But we cannot answer LE yet, a stronger constraint may *)
-  (* 	 come later from [le_todo]. *\) *)
-  (*     if strict then cmp FastLE to_revert [] le_todo else (to_revert, FastLE) *)
-  (*   else *)
-  (*     if arc_is_le arc then *)
-  (*       cmp c to_revert [] le_todo *)
-  (*     else *)
-  (*       let rec find lt_todo lt = match lt with *)
-  (*       | [] -> *)
-  (*         let fold accu u = *)
-  (*           let node = repr g u in *)
-  (*           node :: accu *)
-  (*         in *)
-  (*         let le_new = List.fold_left fold le_todo arc.le in *)
-  (*         let () = arc.status <- SetLe in *)
-  (*         cmp c (arc :: to_revert) lt_todo le_new *)
-  (*       | u :: lt -> *)
-  (*         let arc = repr g u in *)
-  (*         if arc == arcv then *)
-  (*           if strict then (to_revert, FastLT) else (to_revert, FastLE) *)
-  (*         else find (arc :: lt_todo) lt *)
-  (*       in *)
-  (*       find [] arc.lt *)
-  (* in *)
-
 let fast_compare_neq strict g arcu k arcv =
   (* [c] characterizes whether arcv has already been related
      to arcu among the lt_done,le_done universe *)
+  (* Printf.printf "Checking %s - %i -> %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ)) *)
+  (*   k (Pp.string_of_ppcmds (Level.pr arcv.univ)); *)
   let rec cmp c to_revert todo = match todo with
   | [] -> (to_revert, c)
   | (arc,w)::todo ->
-    if arc_is_lt arc then
+    (* Printf.printf "Todo: - %i -> %s\n%!" w (Pp.string_of_ppcmds (Level.pr arc.univ)); *)
+    if arc_is_lt arc w then
       cmp c to_revert todo
     else
       let rec find todo l = match l with
       | [] ->
-        let () = arc.status <- SetLt in
+        let () = arc.status <- Isset w in
           cmp c (arc :: to_revert) todo
       | (u,w') :: l ->
-          let arc, w = repr g u (w'+w) in
-            if arc == arcv then begin
+	(* Printf.printf "Following - %i -> %s\n%!" w' (Pp.string_of_ppcmds (Level.pr u)); *)
+          let arc', n = repr g u 0 in
+	  let w = w'+w-n in
+	(* Printf.printf "Found %s, %i\n%!" (Pp.string_of_ppcmds (Level.pr arc'.univ)) w; *)
+            if arc' == arcv then begin
 	      if w == k (* Le *) then
 		(to_revert, FastLE)
 	      else if w > k (* Lt *) then
 		if strict then (to_revert, FastLT) else (to_revert, FastLE)
-	      else (* w < k: the weight is lower, continue *)
-		find ((arc,w) :: todo) l
+	      else (* w < k: the weight is lower, no need to go further as any 
+		      path from arcv to itself must be of non-positive weight *)
+		find todo l
 	    end
-            else find ((arc,w) :: todo) l
+	    else find ((arc',w) :: todo) l
       in find todo arc.arcs
   in
   try
     let (to_revert, c) = cmp FastNLE [] [arcu,0] in
     (** Reset all the touched arcs. *)
     let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
+      (* Printf.printf "Proved %s + %i %s %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ)) *)
+      (* 	k (match c with  *)
+      (* 	  FastLT -> "<" *)
+      (* 	| FastLE -> "<=" *)
+      (* 	| FastNLE -> "~<=" *)
+      (* 	| FastEQ -> "=") (Pp.string_of_ppcmds (Level.pr arcv.univ)); *)
     c
   with e ->
     (** Unlikely event: fatal error or signal *)
@@ -1310,7 +1141,8 @@ let merge g arcu arcv =
   (* we find the arc with the biggest rank, and we redirect all others to it *)
   let (arcu, k), g, v =
     let best_ranked (max_rank, old_max_rank, best_arc, rest) (arc,k) =
-      if Level.is_small arc.univ || arc.rank >= max_rank
+      if Level.is_small arc.univ || 
+	(not (Level.is_small (fst best_arc).univ) && arc.rank >= max_rank)
       then (arc.rank, max_rank, (arc,k), best_arc::rest)
       else (max_rank, old_max_rank, best_arc, (arc,k)::rest)
     in
@@ -1326,9 +1158,11 @@ let merge g arcu arcv =
 	      (arcu, k), enter_arc arcu g, rest
           end 
   in
-  let redirect (g,w) (arcv,l) = (* v + l = u + k <-> v = u + k - l *)
-    let g' = enter_equiv_arc arcv.univ (arcu.univ,k - l) g in
-    (g',List.unionq arcv.arcs w)
+  let redirect (g,arcs) (arcv,w') = 
+    (* u + k <w= arcv becomes arcv = u + k + w *)
+    let g' = enter_equiv_arc arcv.univ (arcu.univ,k + w') g in
+    (* u + k <w= arcv <=w' l' becomes u + k <=w+w' l' *)
+    (g', List.unionq (List.map (fun (u,w) -> (u,k+w'+w)) arcv.arcs) arcs)
   in
   let (g',w) = List.fold_left redirect (g,[]) v in
   let g_arcu = (g',(arcu,k)) in

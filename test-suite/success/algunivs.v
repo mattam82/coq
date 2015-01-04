@@ -1,6 +1,14 @@
-Universes i j k l.
+Universes i j k.
+Print Universes.
+Constraint i <= j, j <= k.
+Constraint i + 1 = j.
 
-Constraint i <= j, j <= k, k <= l.
+Universes l.
+
+Constraint i <= j. 
+Print Universes.
+
+Constraint j <= l, k <= l.
 
 Print Universes.
 Constraint i <= j, j <= k.
@@ -140,3 +148,4 @@ Constraint U0+1 <= U3.
 Constraint U0+2 <= U3.
 
 Constraint U0+1 <= U3.
+

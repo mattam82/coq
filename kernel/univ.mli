@@ -219,7 +219,7 @@ val univ_level_rem : universe_level -> universe -> universe -> universe
 
 (*****)
 (* For debugging *)
-type status = Unset | SetLe | SetLt
+type status = Unset | Isset of int
 
 type canonical_arc =
     { univ: Level.t;
@@ -238,6 +238,10 @@ type univ_entry =
 
 module UMap : sig type 'a t end
 type universes = univ_entry UMap.t
+
+val between : universes ->            canonical_arc * int ->
+           canonical_arc * int -> (canonical_arc * int) list
+
 
 type 'a check_function = universes -> 'a -> 'a -> bool
 val check_leq : universe check_function

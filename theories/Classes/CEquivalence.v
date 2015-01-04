@@ -23,6 +23,8 @@ Require Import Coq.Classes.CMorphisms.
 Set Implicit Arguments.
 Unset Strict Implicit.
 
+Set Universe Polymorphism.
+
 Generalizable Variables A R eqA B S eqB.
 Local Obligation Tactic := try solve [simpl_crelation].
 
@@ -125,15 +127,18 @@ End Respecting.
 
 (** The default equivalence on function spaces, with higher-priority than [eq]. *)
 
-Instance pointwise_reflexive {A} `(reflb : Reflexive B eqB) :
+Instance pointwise_reflexive {A B} `(reflb : Reflexive B eqB) :
   Reflexive (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
-Instance pointwise_symmetric {A} `(symb : Symmetric B eqB) :
+Instance pointwise_symmetric {A B} `(symb : Symmetric B eqB) :
   Symmetric (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
-Instance pointwise_transitive {A} `(transb : Transitive B eqB) :
+Instance pointwise_transitive {A B} `(transb : Transitive B eqB) :
   Transitive (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
-Instance pointwise_equivalence {A} `(eqb : Equivalence B eqB) :
+Instance pointwise_equivalence {A : Type@{i}} {B : Type@{j}} `(eqb : Equivalence@{j k} B eqB) :
   Equivalence (pointwise_relation A eqB) | 9.
-Proof. split; apply _. Qed.
+Proof. split. apply pointwise_reflexive@{i j k}. apply _.
+       apply pointwise_symmetric@{i j k}. apply _.
+       apply pointwise_transitive@{i j k}. apply _.
+Qed.

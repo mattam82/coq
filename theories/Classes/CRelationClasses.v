@@ -269,7 +269,6 @@ Instance iff_Symmetric : Symmetric iff := iff_sym.
 Instance iff_Transitive : Transitive iff := iff_trans.
 
 (** Logical equivalence [iff] is an equivalence crelation. *)
-
 Program Instance iff_equivalence : Equivalence iff. 
 Program Instance arrow_Reflexive : Reflexive arrow.
 Program Instance arrow_Transitive : Transitive arrow.
