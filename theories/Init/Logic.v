@@ -260,7 +260,7 @@ Section universal_quantification.
 
   Theorem inst : forall x:A, all (fun x => P x) -> P x.
   Proof.
-    unfold all; auto. Show Universes.
+    unfold all; auto.
   Qed.
 
   Theorem gen : forall (B:Prop) (f:forall y:A, B -> P y), B -> all P.

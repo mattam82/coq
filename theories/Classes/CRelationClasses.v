@@ -355,5 +355,3 @@ Hint Extern 3 (PartialOrder (flip _)) => class_apply PartialOrder_inverse : type
 (* Qed. *)
 
 Typeclasses Opaque relation_equivalence.
-
-

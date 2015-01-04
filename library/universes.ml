@@ -111,7 +111,7 @@ let to_constraints g s =
   let tr (x,d,y) acc =
     let add l d l' acc = Constraint.add (l,Constraints.tr_dir d,l') acc in
       match Universe.expr x, d, Universe.expr y with
-      | Some l, (ULe | UEq | ULub), Some l' -> add l d l' acc
+      | Some _, (ULe | UEq | ULub), Some _ -> add x d y acc
       | _, ULe, Some l' -> enforce_leq x y acc
       | _, ULub, _ -> acc
       | _, d, _ -> 
@@ -729,22 +729,21 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	  (* u is not algebraic but has no upper bounds,
 	     we instantiate it with its lower bound if it is a 
 	     different level, otherwise we keep it. *)
-	  if not (Level.equal l u) && not (LSet.mem l algs) then
+	  if not (Level.equal l u) (* && not (LSet.mem l algs) *) then
 	    (* if right = None then. Should check that u does not 
 	       have upper constraints that are not already in right *)
 	      instantiate_with_lbound u lbound false false acc
 	    (* else instantiate_with_lbound u lbound false true acc *)
-	  else
-	    (* assert false: l can't be alg *)
+	  else (* What's up here ? *)
 	    acc, (true, false, lbound)
 	| None -> 
-	  try 
-	    (* if right <> None then raise Not_found; *)
-	    (* Another universe represents the same lower bound, 
-	       we can share them with no harm. *)
-	    let can = find_inst insts lbound in
-	      instantiate_with_lbound u (Universe.make can) false false acc
-	  with Not_found -> 
+	  (* try  *)
+	  (*   (\* if right <> None then raise Not_found; *\) *)
+	  (*   (\* Another universe represents the same lower bound,  *)
+	  (*      we can share them with no harm. *\) *)
+	  (*   let can = find_inst insts lbound in *)
+	  (*     instantiate_with_lbound u (Universe.make can) false false acc *)
+	  (* with Not_found ->  *)
 	    (* We set u as the canonical universe representing lbound *)
 	    instantiate_with_lbound u lbound false true acc
     in
@@ -752,6 +751,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       match right with
       | None -> acc
       | Some cstrs -> 
+	(* let dangling = cstrs in *)
 	let dangling = List.filter (fun (r, k') -> not (LMap.mem r us)) cstrs in
 	  if List.is_empty dangling then acc
 	  else
@@ -772,7 +772,9 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	    acc' (instantiate_lbound lbound)
   and aux (ctx', us, algs, seen, cstrs as acc) u =
     try acc, LMap.find u seen 
-    with Not_found -> instance acc u
+    with Not_found -> 
+      let (ctx, us, algs, seen, cstrs), i = instance acc u in
+	(ctx, us, algs, LMap.add u i seen, cstrs), i
   in
     LMap.fold (fun u v (ctx', us, algs, seen, cstrs as acc) -> 
       if v == None then fst (aux acc u)
@@ -780,8 +782,6 @@ let minimize_univ_variables ctx us algs left right cstrs =
       us (ctx, us, algs, lbounds, cstrs)
       
 let normalize_context_set ctx us algs = 
-  (* (us, algs), ctx *)
-
   let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
   let uf = UF.create () in
   let csts =
@@ -795,7 +795,8 @@ let normalize_context_set ctx us algs =
   in
   let noneqs =
     Constraint.fold (fun (l,d,r) noneqs ->
-      if d == Eq && Expr.is_level r then (UF.union (Expr.level l) (Expr.level r) uf; noneqs)
+      if d == Eq && Universe.is_level r && Universe.is_level l then 
+	(UF.union (Option.get (Universe.level l)) (Option.get (Universe.level r)) uf; noneqs)
       else Constraint.add (l,d,r) noneqs)
     csts Constraint.empty
   in
@@ -805,7 +806,7 @@ let normalize_context_set ctx us algs =
     let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in
     (* Add equalities for globals which can't be merged anymore. *)
     let cstrs = LSet.fold (fun g cst ->
-      Constraint.add (Expr.make canon, Univ.Eq, Expr.make g) cst) global
+      Constraint.add (Universe.make canon, Univ.Eq, Universe.make g) cst) global
       cstrs
     in
     let subst = LSet.fold (fun f -> LMap.add f canon) rigid subst in
@@ -820,8 +821,18 @@ let normalize_context_set ctx us algs =
   (* Compute the left and right set of flexible variables, constraints
      mentionning other variables remain in noneqs. *)
   let noneqs, ucstrsl, ucstrsr =
-    Constraint.fold (fun ((l,k),d,r as cstr) (noneq, ucstrsl, ucstrsr) ->
-      let r = Expr.level r in
+    Constraint.fold (fun (l,d,r as cstr) (noneq, ucstrsl, ucstrsr) ->
+      (* let lus, ucstrsl' =  *)
+      (* 	match Universe.expr l with *)
+      (* 	| Some (l,k) when LMap.mem l us -> true, add_list_map l (r,k) ucstrsl *)
+      (* 	| _ -> false, ucstrsl *)
+      (* and rus, ucstrsr' =  *)
+      (* 	match Universe.expr r with *)
+      (* 	| Some (r,k) when LMap.mem r us -> true, add_list_map r (l,k) ucstrsr *)
+      (* 	| _ -> false, ucstrsr *)
+      (* in *)
+      let (l,k) = Option.get (Universe.expr l) in
+      let r = Option.get (Universe.level r) in
       let lus = LMap.mem l us
       and rus = LMap.mem r us
       in
@@ -866,11 +877,14 @@ let restrict_universe_context (univs,csts) s =
     let (diff', candid', univs', ness') = 
       Constraint.fold
 	(fun (l, d, r as c) (diff, candid, univs, csts) ->
-	  if not (LSet.mem (Expr.level l) diff) then
-	    (LSet.remove (Expr.level r) diff, candid, univs, Constraint.add c csts)
-	  else if not (LSet.mem (Expr.level r) diff) then
-	    (LSet.remove (Expr.level l) diff, candid, univs, Constraint.add c csts)
-	  else (diff, Constraint.add c candid, univs, csts))
+	  match Universe.level l, Universe.level r with
+	  | Some l, Some r -> 
+	    if not (LSet.mem l diff) then
+	      (LSet.remove r diff, candid, univs, Constraint.add c csts)
+	    else if not (LSet.mem r diff) then
+	      (LSet.remove l diff, candid, univs, Constraint.add c csts)
+	    else (diff, Constraint.add c candid, univs, csts)
+	  | _ -> (LSet.diff diff (LSet.union (Universe.levels l) (Universe.levels r)), candid, univs, Constraint.add c csts))
 	candid (diff, Constraint.empty, univs, ness)
     in
       if ness' == ness then (LSet.diff univs diff', ness)
@@ -906,7 +920,7 @@ let simplify_universe_context (univs,csts) = (univs, csts), LMap.empty
   (*   (univs', csts'), subst *)
 
 let is_small_leq (l,d,r) =
-  Level.is_small (Expr.level l) && d == Univ.Le
+  is_small_univ l && d == Univ.Le
 
 (* Prop < i <-> Set+1 <= i <-> Set < i *)
 let translate_cstr (l,d,r as cstr) =

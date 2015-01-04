@@ -251,13 +251,13 @@ Section GenericInstances.
 
   (** We can build a PER on the Coq function space if we have PERs on the domain and
    codomain. *)
-  
+
   Program Instance respectful_per `(PER A R, PER B R') : PER (R ==> R').
 
   Next Obligation.
   Proof with auto.
     assert(R x0 x0).
-    transitivity y0... symmetry...
+    transitivity y0... symmetry... 
     transitivity (y x0)... 
   Qed.
 

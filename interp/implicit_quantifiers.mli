@@ -17,7 +17,7 @@ val declare_generalizable : Vernacexpr.locality_flag -> (Id.t located) list opti
 
 val ids_of_list : Id.t list -> Id.Set.t
 val destClassApp : constr_expr -> Loc.t * reference * constr_expr list
-val destClassAppExpl : constr_expr -> Loc.t * reference * (constr_expr * explicitation located option) list
+val destClassAppExpl : constr_expr -> Loc.t * reference * instance_expr option * (constr_expr * explicitation located option) list
 
 (** Fragile, should be used only for construction a set of identifiers to avoid *)
 

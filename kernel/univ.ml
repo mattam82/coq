@@ -637,7 +637,13 @@ struct
 
   let subst_univs_expr_opt fn (l,n) =
     add n (fn l)
-      
+
+  let make_exprs = function
+    | [] -> raise (Invalid_argument "make_exprs: empty list")
+    | hd :: tl ->
+      List.fold_left (fun acc u -> merge_univs acc (make_expr u)) (* FIXME inefficient *)
+	(make_expr hd) tl
+	
   let subst fn ul =
     let subst, nosubst = 
       Huniv.fold (fun u (subst,nosubst) -> 
@@ -1122,7 +1128,7 @@ let fast_compare_neq strict g arcu k arcv =
      to arcu among the lt_done,le_done universe *)
   let rec cmp c to_revert todo = match todo with
   | [] -> (to_revert, c)
-  | (arc,k)::todo ->
+  | (arc,w)::todo ->
     if arc_is_lt arc then
       cmp c to_revert todo
     else
@@ -1130,21 +1136,21 @@ let fast_compare_neq strict g arcu k arcv =
       | [] ->
         let () = arc.status <- SetLt in
           cmp c (arc :: to_revert) todo
-      | (u,m) :: l ->
-          let arc, m' = repr g u (m-k) in
+      | (u,w') :: l ->
+          let arc, w = repr g u (w'+w) in
             if arc == arcv then begin
-	      if m' == 0 (* Le *) then
+	      if w == k (* Le *) then
 		(to_revert, FastLE)
-	      else if m' > 0 (* Lt *) then
+	      else if w > k (* Lt *) then
 		if strict then (to_revert, FastLT) else (to_revert, FastLE)
-	      else (* m' < 0 *)
-		find ((arc,m') :: todo) l
+	      else (* w < k: the weight is lower, continue *)
+		find ((arc,w) :: todo) l
 	    end
-            else find ((arc,m') :: todo) l
+            else find ((arc,w) :: todo) l
       in find todo arc.arcs
   in
   try
-    let (to_revert, c) = cmp FastNLE [] [arcu,k] in
+    let (to_revert, c) = cmp FastNLE [] [arcu,0] in
     (** Reset all the touched arcs. *)
     let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
     c
@@ -1293,7 +1299,7 @@ let setleq g (arcu, k) (arcv,l) =
 
 (* checks that non-redundant *)
 let setleq_if (g,arcu) (v,k') =
-  let arcv = repr g v k' in
+  let arcv = repr g v (-k') in
   if is_leq g arcu arcv then g, arcu
   else setleq g arcu arcv
 
@@ -1341,7 +1347,7 @@ let merge_disc g arc1 arc2 =
       arcu, enter_arc arcu g
   in
   let g' = enter_equiv_arc arcv.univ (arcu.univ,k-l) g in
-  let g_arcu = (g',(arcu,k)) in
+  let g_arcu = (g',(arcu,k-l)) in
   let g_arcu = List.fold_left setleq_if g_arcu arcv.arcs in
   fst g_arcu
 
@@ -1432,12 +1438,7 @@ let add_universe vlev g =
       
 (* Constraints and sets of constraints. *)    
 
-type univ_constraint = Expr.t * constraint_type * Expr.t
-
-let enforce_constraint cst g =
-  match cst with
-  | (u,Le,v) -> enforce_univ_leq u v g
-  | (u,Eq,v) -> enforce_univ_eq u v g
+type univ_constraint = Universe.t * constraint_type * Universe.t
       
 let pr_constraint_type op = 
   let op_str = match op with
@@ -1452,9 +1453,9 @@ struct
     let i = constraint_type_ord c c' in
     if not (Int.equal i 0) then i
     else
-      let i' = Expr.compare u u' in
+      let i' = Universe.compare u u' in
       if not (Int.equal i' 0) then i'
-      else Expr.compare v v'
+      else Universe.compare v v'
 end
 
 module Constraint = 
@@ -1464,8 +1465,8 @@ struct
 
   let pr prl c =
     fold (fun (u1,op,u2) pp_std ->
-      pp_std ++ Expr.pr prl u1 ++ pr_constraint_type op ++
-	Expr.pr prl u2 ++ fnl () )  c (str "")
+      pp_std ++ Universe.pr_with prl u1 ++ pr_constraint_type op ++
+	Universe.pr_with prl u2 ++ fnl () )  c (str "")
 
 end
 
@@ -1479,7 +1480,7 @@ module Hconstraint =
   Hashcons.Make(
     struct
       type t = univ_constraint
-      type u = Expr.t -> Expr.t
+      type u = Universe.t -> Universe.t
       let hashcons hul (l1,k,l2) = (hul l1, k, hul l2)
       let equal (l1,k,l2) (l1',k',l2') =
 	l1 == l1' && k == k' && l2 == l2'
@@ -1500,14 +1501,15 @@ module Hconstraints =
       let hash = Hashtbl.hash
     end)
 
-let hcons_constraint = Hashcons.simple_hcons Hconstraint.generate Hconstraint.hcons Expr.HExpr.hcons
-let hcons_constraints = Hashcons.simple_hcons Hconstraints.generate Hconstraints.hcons hcons_constraint
+let hcons_constraint = 
+  Hashcons.simple_hcons Hconstraint.generate Hconstraint.hcons Universe.hcons
+let hcons_constraints = 
+  Hashcons.simple_hcons Hconstraints.generate Hconstraints.hcons hcons_constraint
 
 let check_constraint g (l,d,r) =
   match d with
-  | Eq -> check_equal g l r
-  | Le -> check_smaller g false l r
-  (* | Lt -> check_smaller g true l r *)
+  | Eq -> check_eq g l r
+  | Le -> check_leq g l r
 
 let check_constraints c g =
   Constraint.for_all (check_constraint g) c
@@ -1527,69 +1529,48 @@ let check_univ_leq_one u v = Universe.exists (Expr.leq u) v
 
 let check_univ_leq u v = 
   Universe.for_all (fun u -> check_univ_leq_one u v) u
-
-let enforce_eq_expr u v c =
-  (* We discard trivial constraints like u=u *)
-  if Expr.equal u v then c 
-  else if Expr.apart u v then
-    error_inconsistency Eq u v None
-  else Constraint.add (u,Eq,v) c
-
-let enforce_leq_expr u v c =
-  (* We just discard trivial constraints like u<=u *)
-  if Expr.leq u v then c
-  else Constraint.add (u, Le, v) c
-
-    (* match v, u with *)
-    (* | (x,n), (y,m) ->  *)
-    (* let j = m - n in *)
-    (*   if j = -1 (\* n = m+1, v+1 <= u <-> v < u *\) then *)
-    (* 	Constraint.add (x,Lt,y) c *)
-    (*   else if j <= -1 (\* n = m+k, v+k <= u <-> v+(k-1) < u *\) then *)
-    (* 	if Level.equal x y then (\* u+(k+1) <= u *\) *)
-    (* 	  raise (UniverseInconsistency (Le, Universe.tip v, Universe.tip u, None)) *)
-    (* 	else anomaly (Pp.str"Unable to handle arbitrary u+k <= v constraints") *)
-    (*   else if j = 0 then *)
-    (* 	Constraint.add (x,Le,y) c *)
-    (*   else (\* j >= 1 *\) (\* m = n + k, u <= v+k *\) *)
-    (* 	if Level.equal x y then c (\* u <= u+k, trivial *\) *)
-    (* 	else if Level.is_small x then c (\* Prop,Set <= u+S k, trivial *\) *)
-    (* 	else anomaly (Pp.str"Unable to handle arbitrary u <= v+k constraints") *)
 	  
 (* Transforms u <= max(i,j) constraints into u <= i /\ u <= j, which 
    implies the original constraint but is obviously less general *)
-let enforce_leq u v c =
-  Universe.Huniv.fold (fun v c -> 
-    Universe.Huniv.fold (fun u -> enforce_leq_expr u v) u c) v c
+let enforce_univ_leq u v g =
+  Universe.Huniv.fold (fun v g -> 
+    Universe.Huniv.fold (fun u -> enforce_univ_leq u v) u g) v g
 
 (* Transforms u = max(i,j) constraints into u = i /\ u = j, which 
    implies the original constraint but is obviously less general *)
-let enforce_eq u v c =
-  Universe.Huniv.fold (fun v c -> 
-    Universe.Huniv.fold (fun u -> enforce_eq_expr u v) u c) v c
+let enforce_univ_eq u v g =
+  Universe.Huniv.fold (fun v g -> 
+    Universe.Huniv.fold (fun u -> enforce_univ_eq u v) u g) v g
 
 (* let enforce_leq u v c = *)
 (*   if check_univ_leq u v then c *)
 (*   else enforce_leq u v c *)
 
 let enforce_eq_level u v c =
-  if Level.equal u v then c else Constraint.add (Expr.make u,Eq,Expr.make v) c
+  if Level.equal u v then c else Constraint.add (Universe.make u,Eq,Universe.make v) c
 
 let enforce_leq_level u v c =
-  if Level.equal u v then c else Constraint.add (Expr.make u,Le,Expr.make v) c
+  if Level.equal u v then c else Constraint.add (Universe.make u,Le,Universe.make v) c
 
-let enforce_expr_constraint (u,d,v) =
-  match d with
-  | Eq -> enforce_eq_expr u v
-  | Le -> enforce_leq_expr u v
+(* let enforce_expr_constraint (u,d,v) = *)
+(*   match d with *)
+(*   | Eq -> enforce_eq_expr u v *)
+(*   | Le -> enforce_leq_expr u v *)
 
-let enforce_univ_constraint (u,d,v) =
+let enforce_constraint (u,d,v) =
   match d with
-  | Eq -> enforce_eq u v
-  | Le -> enforce_leq u v
+  | Eq -> enforce_univ_eq u v
+  | Le -> enforce_univ_leq u v
 
 let merge_constraints c g =
   Constraint.fold enforce_constraint c g
+
+let enforce_eq u v c = 
+  if check_univ_eq u v then c else Constraint.add (u,Eq,v) c
+
+let enforce_leq u v c = 
+  if check_univ_leq u v then c else 
+    Universe.Huniv.fold (fun u c -> Constraint.add (Universe.make_expr u,Le,v) c) u c
 
 (* Normalization *)
 
@@ -1648,8 +1629,8 @@ let constraints_of_universes g =
   let constraints_of u v acc =
     match v with
     | Canonical {univ=u; arcs=arcs} ->
-      List.fold_left (fun acc (v,k) -> Constraint.add ((u,k),Le,Expr.make v) acc) acc arcs
-    | Equiv (v,k) -> Constraint.add (Expr.make u,Eq,(v,k)) acc
+      List.fold_left (fun acc (v,k) -> Constraint.add (Universe.make_expr (u,k),Le,Universe.make v) acc) acc arcs
+    | Equiv (v,k) -> Constraint.add (Universe.make u,Eq,Universe.make_expr (v,k)) acc
   in
   UMap.fold constraints_of g Constraint.empty
 
@@ -2138,9 +2119,9 @@ let subst_univs_level_instance subst i =
     else i'
 	
 let subst_univs_level_constraint subst (u,d,v) =
-  let u' = Expr.map (subst_univs_level_level subst) u 
-  and v' = Expr.map (subst_univs_level_level subst) v in
-    if Expr.leq u' v' then None
+  let u' = Universe.level_subst (subst_univs_level_level subst) u 
+  and v' = Universe.level_subst (subst_univs_level_level subst) v in
+    if check_univ_leq u' v' then None
     else Some (u',d,v')
 
 let subst_univs_level_constraints subst csts =
@@ -2157,13 +2138,10 @@ let subst_univs_expr fn (l,n) =
   with Not_found -> None
 
 let subst_univs_constraint fn (u,d,v as c) cstrs =
-  let u' = subst_univs_expr fn u in
-  let v' = subst_univs_expr fn v in
-  match u', v' with
-  | None, None -> Constraint.add c cstrs
-  | Some u, None -> enforce_univ_constraint (u,d,make_expr v) cstrs
-  | None, Some v -> enforce_univ_constraint (make_expr u,d,v) cstrs
-  | Some u, Some v -> enforce_univ_constraint (u,d,v) cstrs
+  let u' = Universe.subst fn u in
+  let v' = Universe.subst fn v in
+  let cstr = if u' == u && v' == v then c else (u',d,v') in
+    Constraint.add cstr cstrs
 
 let subst_univs_constraints fn csts =
   Constraint.fold 
@@ -2199,11 +2177,12 @@ let subst_instance_instance s csts =
 
 (** Levels *)
 
+let subst_levels_level_exn s l =
+  match l.Level.data with
+  | Level.Var n -> Universe.make s.(n)
+  | _ -> raise Not_found
+
 let subst_levels_universe s u =
-  (* let f x = Expr.map (fun u -> subst_levels_level s u) x in *)
-  (* let u' = Universe.smartmap f u in *)
-  (*   if u == u' then u *)
-  (*   else Universe.sort u' *)
   subst_univs_universe (subst_levels_level_exn s) u
 
 let subst_levels_instance s i = 
@@ -2213,8 +2192,8 @@ let subst_levels_expr s u =
   Expr.map (subst_levels_level s) u
 
 let subst_levels_constraint s (u,d,v as c) =
-  let u' = subst_levels_expr s u in
-  let v' = subst_levels_expr s v in
+  let u' = subst_levels_universe s u in
+  let v' = subst_levels_universe s v in
     if u' == u && v' == v then c
     else (u',d,v')
 
@@ -2257,7 +2236,7 @@ let abstract_universes poly ctx =
 
 let pr_arc prl = function
   | _, Canonical {univ=u; arcs=[]} ->
-      mt ()
+      mt () (* Level.pr u ++ fnl () *)
   | _, Canonical {univ=u; arcs=arcs} ->
       prl u ++ str " " ++
       v 0

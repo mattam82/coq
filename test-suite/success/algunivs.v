@@ -1,6 +1,5 @@
 Universes i j k l.
 
-
 Constraint i <= j, j <= k, k <= l.
 
 Print Universes.
@@ -83,7 +82,61 @@ Polymorphic Inductive typestruct (A : Type) :=
 
 Definition typesig := @sigma Type (fun T => T).
 
-Definition typesigstruct := @sigma@{i+1 max(i,j+1)} Type@{i} (fun T => typestruct@{i j} T).
+Polymorphic Definition typesigstruct := @sigma Type (fun T => typestruct T).
 
+Polymorphic Definition projtypestruct (x : typesigstruct) := fst _ _ x.
+
+Universes L uni H.
+Constraint L < uni, uni < H.
+
+Constraint L < H.
+
+Constraint uni = L+1.
+
+Polymorphic Definition leq (A : Type@{u0}) : Type@{u1} := A.
+
+Polymorphic Definition foo' (A : Type@{u0}) (B : leq@{u0 u1} A) := B.
+
+Polymorphic Definition three (A : Type@{u0}) (B : leq@{u0 u1} A) (C : leq@{u1 u2} A) := C.
+Polymorphic Definition leq2 (A : Type@{u0}) (B : Type@{u1}) : Type@{u2} := (A * B)%type.
+
+Check three@{v max(v) x}.
+Check three@{v w+1 max(v,v+1)}.
+Check three@{v w+1 max(v,v+1)}.
+Definition bar' (A : Type@{x}) (B : Type@{y}) := leq2@{x y max(x,y)}.
 
 Check (unit -> unit).
+
+Universes x y z.
+
+Constraint x < z.
+
+Constraint x + 1 <= y.
+
+Constraint x + 1 <= y.
+
+Polymorphic Definition twice {A : Type} (x y : A) := A.
+
+Check twice Type@{v} Type@{v}.
+
+Check twice Type@{v} Type@{w}.
+
+Check twice Type@{v+1} Type@{w}.
+
+Check twice Type@{max(v+1,v2)} Type@{w}.
+
+Universe U0 U1 U2 U3.
+
+Constraint U0+1 <= U1.
+Constraint U1 <= U2.
+Constraint U2 <= U3.
+
+Polymorphic Definition check_smaller (a : Type@{v}) : Type@{w} := a.
+
+Check check_smaller Type@{U0} : Type@{U3}.
+
+Constraint U0 <= U3.
+Constraint U0+1 <= U3.
+Constraint U0+2 <= U3.
+
+Constraint U0+1 <= U3.

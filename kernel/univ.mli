@@ -104,6 +104,8 @@ sig
 
   val make : Level.t -> t
   val add : int -> t -> t
+
+  val equal : t -> t -> bool
 end
 
 module Universe :
@@ -132,6 +134,9 @@ sig
 
   val make_expr : Expr.t -> t
   (** Create a universe representing the given level expression. *)
+
+  val make_exprs : Expr.t list -> t
+  (** Create a universe representing the lub of the given level expressions. *)
 
   val pr : t -> Pp.std_ppcmds
   (** Pretty-printing *)
@@ -254,7 +259,7 @@ val add_universe : universe_level -> universes -> universes
 (** {6 Constraints. } *)
 
 type constraint_type = Le | Eq
-type univ_constraint = Expr.t * constraint_type * Expr.t
+type univ_constraint = Universe.t * constraint_type * Universe.t
 
 module Constraint : sig
  include Set.S with type elt = univ_constraint

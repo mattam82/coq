@@ -340,13 +340,14 @@ let subst_instance_context s ctx =
 type id_key = pconstant tableKey
 let eq_id_key x y = Names.eq_table_key (Univ.eq_puniverses Constant.equal) x y
 
+(* FIXME inneficient *)
 let subst_levels_constr levels c = 
-  let s = Univ.make_instance_subst levels in
-  let fn x = Univ.Universe.make (Univ.LMap.find x s) in
+  let s = Univ.make_inverse_instance_subst levels in
+  let fn x = Univ.LMap.find x s in
     subst_univs_fn_constr fn c 
 
 let subst_levels_context levels ctx = 
-  let s = Univ.make_instance_subst levels in
-  let fn x = Univ.Universe.make (Univ.LMap.find x s) in
+  let s = Univ.make_inverse_instance_subst levels in
+  let fn x = Univ.LMap.find x s in
     if Univ.Levels.is_empty levels then ctx
     else map_rel_context (fun x -> subst_univs_fn_constr fn x) ctx

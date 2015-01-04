@@ -406,10 +406,10 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
     let b,univs = Universes.eq_constr_universes term term' in
       if b then
        ise_and evd [(fun i ->
-         let cstrs = Universes.to_constraints (Evd.universes i) univs in
-           try Success (Evd.add_constraints i cstrs)
-           with Univ.UniverseInconsistency p -> UnifFailure (i, UnifUnivInconsistency p));
-                  (fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk sk')]
+         try Success (Evd.add_universe_constraints i univs)
+         with Univ.UniverseInconsistency p -> UnifFailure (i, UnifUnivInconsistency p)
+	 | Evd.UniversesDiffer -> UnifFailure (i, NotSameHead));
+                    (fun i -> exact_ise_stack2 env i (evar_conv_x ts) sk sk')]
       else UnifFailure (evd,NotSameHead)
   in
   let flex_maybeflex on_left ev ((termF,skF as apprF),cstsF) ((termM, skM as apprM),cstsM) vM =

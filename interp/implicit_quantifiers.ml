@@ -252,14 +252,14 @@ let destClassApp cl =
 
 let destClassAppExpl cl =
   match cl with
-    | CApp (loc, (None, CRef (ref,_)), l) -> loc, ref, l
-    | CRef (ref,_) -> loc_of_reference ref, ref, []
+    | CApp (loc, (None, CRef (ref,us)), l) -> loc, ref, us, l
+    | CRef (ref,us) -> loc_of_reference ref, ref, us, []
     | _ -> raise Not_found
 
 let implicit_application env ?(allow_partial=true) f ty =
   let is_class =
     try
-      let (loc, r, _ as clapp) = destClassAppExpl ty in
+      let (loc, r, us, _ as clapp) = destClassAppExpl ty in
       let (loc, qid) = qualid_of_reference r in
       let gr = Nametab.locate qid in
 	if Typeclasses.is_class gr then Some (clapp, gr) else None
@@ -267,7 +267,7 @@ let implicit_application env ?(allow_partial=true) f ty =
   in
     match is_class with
     | None -> ty, env
-    | Some ((loc, id, par), gr) ->
+    | Some ((loc, id, us, par), gr) ->
 	let avoid = Id.Set.union env (ids_of_list (free_vars_of_constr_expr ty ~bound:env [])) in
 	let c, avoid =
 	  let c = class_info gr in
@@ -285,7 +285,7 @@ let implicit_application env ?(allow_partial=true) f ty =
 	    end;
 	  let pars = List.rev (List.combine ci rd) in
 	  let args, avoid = combine_params avoid f par pars in
-	    CAppExpl (loc, (None, id, None), args), avoid
+	    CAppExpl (loc, (None, id, us), args), avoid
 	in c, avoid
 
 let implicits_of_glob_constr ?(with_products=true) l =

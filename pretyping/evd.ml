@@ -346,111 +346,177 @@ exception UniversesDiffer
 
 let pr_constraint c = Universes.UniverseConstraint.pr c
 
-let process_universe_constraints univs vars alg cstrs =
+let replace_max i u (univs,local) =
+  let open Univ in
+  let i = Universe.make i in
+  let univs', local' = 
+    Constraint.fold 
+      (fun (l,d,r as cstr) (univs,local) ->
+	if d == Eq then (univs,local)
+	else
+	  if Universe.equal i r then 
+	    if check_leq univs l u then
+	      (univs, Constraint.remove cstr local)
+	    else raise (UniverseInconsistency (Le, l, u, None))
+	  else if Universe.equal i l then
+	    if check_leq univs u r then
+	      (univs, Constraint.remove cstr local)
+	    else 
+	      let cstrs = enforce_leq u r empty_constraint in
+		(merge_constraints cstrs univs, Constraint.union cstrs local)
+	  else (univs, local)) local (univs, local)
+  in (univs', local')
+    
+let process_universe_constraints univs vars alg local cstrs =
+  let open Univ in
   let vars = ref vars in
   let normalize = Universes.normalize_universe_opt_subst vars in
-  let rec unify_universes fo l d r local =
+  let add_leq l r (univs, local) = 
+    let cstrs = enforce_leq l r empty_constraint in
+      (merge_constraints cstrs univs, Constraint.union cstrs local)
+  in
+  let add_eq_expr l r (univs, local) = 
+    let cstr = (Universe.make_expr l,Eq,Universe.make_expr r) in
+      (enforce_constraint cstr univs, Constraint.add cstr local)
+  in
+  let rec unify_universes fo l d r univs =
     let l = normalize l and r = normalize r in
-      if Univ.Universe.equal l r then local
+      if Universe.equal l r then univs
       else 
 	let varinfo x = 
-	  match Univ.Universe.level x with
+	  match Universe.expr x with
 	  | None -> Inl x
-	  | Some l -> Inr (l, Univ.LMap.mem l !vars, Univ.LSet.mem l alg)
+	  | Some (l,k as e) -> Inr (e, LMap.mem l !vars, LSet.mem l alg)
 	in
 	  if d == Universes.ULe then
-	    if Univ.check_leq univs l r then
+	    if check_leq (fst univs) l r then
 	      (** Keep Prop/Set <= var around if var might be instantiated by prop or set
 		  later. *)
-	      if Univ.Universe.is_expr l then 
-		match Univ.Universe.expr r with
-		| Some r ->
-		  Univ.Constraint.add (Option.get (Univ.Universe.expr l),Univ.Le,r) local
-		| _ -> local
-	      else local
+	      if Universe.is_expr l && Universe.is_expr r then 
+		add_leq l r univs
+	      else univs
 	    else
-	      match Univ.Universe.level r with
-	      | None -> errorlabstrm "add_constraint"
-		(str "Algebraic universe on the right: cannot enforce " ++
-		   pr_constraint (l,d,r))
-	      | Some rl ->
-		if Univ.Level.is_small rl then
-		  let levels = Univ.Universe.levels l in
-		    Univ.LSet.fold (fun l local ->
-		      if Univ.Level.is_small l || Univ.LMap.mem l !vars then
-			Univ.enforce_eq (Univ.Universe.make l) r local
-		      else raise (Univ.UniverseInconsistency (Univ.Le, Univ.Universe.make l, r, None)))
-		      levels local
-		else
-		  Univ.enforce_leq l r local
+	      match varinfo r with
+	      | Inl _ -> 
+		unify_universes fo l Universes.UEq r univs
+		(* (try  with e -> *)
+		(*    errorlabstrm "add_constraint" *)
+		(*      (str "Algebraic universe on the right: cannot enforce " ++ *)
+		(* 	pr_constraint (l,d,r))) *)
+	      | Inr ((rl,k),_,_) ->
+		if Level.is_small rl && k == 0 then
+		  let levels = Universe.exprs l in
+		    List.fold_left (fun univs (l,k') ->
+		      if (Level.is_small l && k' == 0) || LMap.mem l !vars then
+		  	add_eq_expr (l,k') (rl,k) univs
+		      else
+		  	raise (UniverseInconsistency
+		  		 (Le, Universe.make l, r, None)))
+		      univs levels 
+		else add_leq l r univs
 	  else if d == Universes.ULub then
 	    match varinfo l, varinfo r with
-	    | (Inr (l, true, _), Inr (r, _, _)) 
-	    | (Inr (r, _, _), Inr (l, true, _)) -> 
-	      instantiate_variable l (Univ.Universe.make r) vars; 
-	      Univ.enforce_eq_level l r local
-	    | Inr (_, _, _), Inr (_, _, _) ->
-	      unify_universes true l Universes.UEq r local
-	    | _, _ -> assert false
+	    | (Inr ((l,k), true, _), Inr ((r,k'), _, _))
+	    | (Inr ((r,k'), _, _), Inr ((l,k), true, _)) -> 
+	      instantiate_variable l (Universe.make_expr (r,k'-k)) vars; 
+	      add_eq_expr (l,k) (r,k') univs
+	    | _, _ -> unify_universes true l Universes.UEq r univs
 	  else (* d = Universes.UEq *)
 	    match varinfo l, varinfo r with
-	    | Inr (l', lloc, _), Inr (r', rloc, _) ->
+	    | Inr ((l',k), lloc, _), Inr ((r',k'), rloc, _) ->
 	      let () = 
 		if lloc then
-		  instantiate_variable l' r vars
+		  instantiate_variable l' (Universe.make_expr (r',k'-k)) vars
 		else if rloc then 
-		  instantiate_variable r' l vars
-		else if not (Univ.check_eq univs l r) then
+		  instantiate_variable r' (Universe.make_expr (l',k-k')) vars
+		else if not (check_eq (fst univs) l r) then
 		  (* Two rigid/global levels, none of them being local,
 		     one of them being Prop/Set, disallow *)
-		  if Univ.Level.is_small l' || Univ.Level.is_small r' then
-		    raise (Univ.UniverseInconsistency (Univ.Eq, l, r, None))
+		  if Level.is_small l' || Level.is_small r' then
+		    raise (UniverseInconsistency (Eq, l, r, None))
 		  else
 		    if fo then 
 		      raise UniversesDiffer
-	      in
-	        Univ.enforce_eq_level l' r' local
-           | _, _ (* One of the two is algebraic or global *) -> 
-	     if Univ.check_eq univs l r then local
-	     else raise (Univ.UniverseInconsistency (Univ.Eq, l, r, None))
+	      in add_eq_expr (l',k) (r',k') univs
+	    | Inr ((l',k as le), true, _), _ -> 
+	      let rs = Universe.exprs r in
+		if List.mem le rs then  (* FIXME wrong *)
+		  let r' = Universe.make_exprs (List.remove Expr.equal le rs) in
+		    unify_universes fo r' Universes.ULe l univs
+		else
+		  let r' = Universe.add (-k) r in
+		  let () = instantiate_variable l' r' vars in
+		    replace_max l' r' univs
+	    | _, Inr ((r',k as re), true, _) -> 
+	      let ls = Universe.exprs l in
+		if List.mem re ls then 
+		  let l' = Universe.make_exprs (List.remove Expr.equal re ls) in
+		    unify_universes fo l' Universes.ULe r univs
+		else
+		  let l' = Universe.add (-k) l in
+		  let () = instantiate_variable r' l' vars in 
+		    replace_max r' l' univs
+            | _, _ (* One of the two is algebraic or global *) -> 
+	      if check_eq (fst univs) l r then univs
+	      else
+		(** Equality of lub's, try unification of flexible universes otherwise give up *)
+		let ls = Universe.exprs l and rs = Universe.exprs r in
+		let rem, rs = 
+		  List.fold_left (fun (acc,rs') l -> 
+		    if List.mem l rs then (acc,List.remove Expr.equal l rs') 
+		    else (l :: acc,rs')) ([], rs) ls 
+		in
+		  match rem, rs with
+		  | [], [] -> assert false (* check_eq should have figured this *)
+		  | reml, [] -> (** All universes of r appear in l, the remaining must be <= r *)
+		    unify_universes fo (Universe.make_exprs reml) Universes.UEq r univs
+		  | _, _ ->
+		    let rs' = Universe.make_exprs rs in
+		      List.fold_left (fun univs e -> 
+			let ul = Universe.make_expr e in
+			  if Universe.equal ul l then 
+			    raise (UniverseInconsistency (Eq, l, r, None))
+			  else
+			    unify_universes fo ul Universes.UEq rs' univs)
+			univs rem
   in
-  let local = 
-    Universes.Constraints.fold (fun (l,d,r) local -> unify_universes false l d r local)
-      cstrs Univ.Constraint.empty
+  let univs, local = 
+    Universes.Constraints.fold 
+      (fun (l,d,r) acc -> unify_universes false l d r acc)
+      cstrs (univs, local)
   in
-    !vars, local
+    !vars, univs, local
 
 let add_constraints_context ctx cstrs =
-  let univs, local = ctx.uctx_local in
+  let us, local = ctx.uctx_local in
   let cstrs' = Univ.Constraint.fold (fun (l,d,r) acc -> 
-    let l = Univ.Universe.make_expr l and r = Univ.Universe.make_expr r in
     let cstr' = 
       (l, (if d == Univ.Le then Universes.ULe else Universes.UEq), r)
     in Universes.Constraints.add cstr' acc)
     cstrs Universes.Constraints.empty
   in
-  let vars, local' =
+  let vars, univs', local' =
     process_universe_constraints ctx.uctx_universes
       ctx.uctx_univ_variables ctx.uctx_univ_algebraic
-      cstrs'
+      local cstrs'
   in
-    { ctx with uctx_local = (univs, Univ.Constraint.union local local');
+    { ctx with uctx_local = (us, local');
       uctx_univ_variables = vars;
-      uctx_universes = Univ.merge_constraints cstrs ctx.uctx_universes }
+      uctx_universes = univs' }
 
 (* let addconstrkey = Profile.declare_profile "add_constraints_context";; *)
 (* let add_constraints_context = Profile.profile2 addconstrkey add_constraints_context;; *)
 
 let add_universe_constraints_context ctx cstrs =
-  let univs, local = ctx.uctx_local in
-  let vars, local' = 
+  let us, local = ctx.uctx_local in
+  let vars, univs', local' = 
     process_universe_constraints ctx.uctx_universes 
       ctx.uctx_univ_variables ctx.uctx_univ_algebraic 
-      cstrs 
+      local cstrs 
   in
-    { ctx with uctx_local = (univs, Univ.Constraint.union local local');
+    { ctx with uctx_local = (us, local');
       uctx_univ_variables = vars;
-      uctx_universes = Univ.merge_constraints local' ctx.uctx_universes }
+      uctx_universes = univs' }
 
 (* let addunivconstrkey = Profile.declare_profile "add_universe_constraints_context";; *)
 (* let add_universe_constraints_context =  *)
@@ -1075,7 +1141,7 @@ let fresh_inductive_instance env evd i =
 let fresh_constructor_instance env evd c =
   with_context_set univ_flexible evd (Universes.fresh_constructor_instance env c)
 
-let fresh_global ?(rigid=univ_flexible) ?names env evd gr =
+let fresh_global ?(rigid=univ_flexible_alg) ?names env evd gr =
   with_context_set rigid evd (Universes.fresh_global_instance ?names env gr)
 
 let whd_sort_variable evd t = t

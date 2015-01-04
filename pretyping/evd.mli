@@ -313,6 +313,12 @@ val whd_sort_variable : evar_map -> constr -> constr
 
 exception UniversesDiffer
 
+val replace_max :            Univ.Level.t ->
+           Univ.universe ->
+           Univ.universes * Univ.Constraint.t ->
+           Univ.universes * Univ.Constraint.t
+
+
 val add_universe_constraints : evar_map -> Universes.universe_constraints -> evar_map
 (** Add the given universe unification constraints to the evar map.
     @raises UniversesDiffer in case a first-order unification fails.

@@ -303,7 +303,7 @@ let constr_display csr =
 	"Type("^(string_of_int !cnt)^")"
 
   and universes_display l = 
-    Array.fold_right (fun x i -> level_display x; (string_of_int !cnt)^(if not(i="")
+    Array.fold_right (fun x i -> univ_display x; (string_of_int !cnt)^(if not(i="")
         then (" "^i) else "")) (Instance.to_array l) ""
 
   and name_display = function
@@ -414,7 +414,7 @@ let print_pure_constr csr =
   and box_display c = open_hovbox 1; term_display c; close_box()
 
   and universes_display u =
-    Array.iter (fun u -> print_space (); pp (Level.pr u)) (Instance.to_array u)
+    Array.iter (fun u -> print_space (); pp (pr_uni u)) (Instance.to_array u)
 
   and sort_display = function
     | Prop(Pos) -> print_string "Set"
