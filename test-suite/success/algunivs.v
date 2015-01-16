@@ -1,6 +1,9 @@
-Universes i j k.
+Universes i j k l. 
 Print Universes.
-Constraint i <= j, j <= k.
+Constraint i <= j, j <= k, j <= l.
+
+Constraint i = k.
+
 Constraint i + 1 = j.
 
 Universes l.

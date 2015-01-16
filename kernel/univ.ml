@@ -796,24 +796,26 @@ let reprleq g arcu k =
   let rec searchrec w = function
     | [] -> w
     | (v, m) :: vl ->
-	let arcv, vk = repr g v (m-k) in
+        (** arcu + m <= v *)
+	let arcv, vk = repr g v 0 in
+	(** arcu + m <= arcv + vk <-> 
+	    arcu + k <= arcv + vk - m + k *)
+	let diff = vk - m + k in
         if (arcu==arcv) then
 	  searchrec w vl
 	else 
-	  if vk > 0 then (* Strictly above *)
-	    searchrec w vl
-	  else
-	    try let uv = List.assq arcv w in
-		  if vk <= uv (* Stronger condition holds *) then 
-		    searchrec w vl
-		  else
-		    let w' = change_assq arcv vk w in
-		      searchrec w' vl 
-	    with Not_found ->
-	      searchrec ((arcv,vk) :: w) vl
+	  try let uv = List.assq arcv w in
+		if diff <= uv (* Stronger condition holds:
+				 arcu + k <= arcv + diff
+				 -> arcu + k <= arcv + uv *)
+		then 
+		  let w' = change_assq arcv vk w in
+		    searchrec w' vl 
+		else searchrec w vl
+	  with Not_found ->
+	    searchrec ((arcv,vk) :: w) vl
   in
     searchrec [] arcu.arcs
-
 
 (* between : Level.t -> canonical_arc -> canonical_arc list *)
 (* between u v = { w | u<=w<=v, w canonical }          *)
@@ -823,22 +825,23 @@ let between g arcu arcv =
   (* bad are all w | u <= w ~<= v *)
     (* find good and bad nodes in {w | u <= w} *)
     (* explore b u = (b or "u is good") *)
-  let rec explore ((good, bad, b) as input) (arcu,n) =
-    try let uk = List.assq arcu good in
-	  (good, bad, -uk >= n) (* b or true *)
+  let rec explore ((good, bad, b) as input) (arcu,k) =
+    try let _ = List.assq arcu good in
+	  (* arcu + k <= arcu + n -> k <= n *)
+	  (good, bad, true) (* b or true *)
     with Not_found ->
       if List.mem_assq arcu bad then
 	input    (* (good, bad, b or false) *)
       else
-	let leq = reprleq g arcu n in
+	let leq = reprleq g arcu k in
 	(* is some universe >= u good ? *)
 	let good, bad, b_leq =
 	  List.fold_left explore (good, bad, false) leq
 	in
 	  if b_leq then
-	    (arcu,n)::good, bad, true (* b or true *)
+	    (arcu,k)::good, bad, true (* b or true *)
 	  else
-	    good, (arcu,n)::bad, b    (* b or false *)
+	    good, (arcu,k)::bad, b    (* b or false *)
   in
   let good,_,_ = explore ([arcv],[],false) arcu in
     good
