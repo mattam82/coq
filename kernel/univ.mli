@@ -314,7 +314,9 @@ val enforce_leq_level : universe_level constraint_function
   system stores the graph and may result from combination of several
   constraints...
 *)
-type explanation = (constraint_type * universe) list
+
+type explanation_constraint_type = IsLe | IsEq | IsLt
+type explanation = (explanation_constraint_type * universe) list
 type univ_inconsistency = constraint_type * universe * universe * explanation option
 
 exception UniverseInconsistency of univ_inconsistency

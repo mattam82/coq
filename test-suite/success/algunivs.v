@@ -2,9 +2,11 @@ Universes i j k l.
 Print Universes.
 Constraint i <= j, j <= k, j <= l.
 
-Constraint i = k.
+(* Constraint i = k. *)
 
-Constraint i + 1 = j.
+(* Fail Constraint j = i + 1. *)
+(* Fail Constraint i + 1 = j. *)
+(* Fail Constraint k + 1 = k. *)
 
 Universes l.
 
@@ -151,4 +153,3 @@ Constraint U0+1 <= U3.
 Constraint U0+2 <= U3.
 
 Constraint U0+1 <= U3.
-

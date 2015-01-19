@@ -852,8 +852,6 @@ let between g arcu arcv =
 
 type constraint_type = Le | Eq
 
-type explanation = (constraint_type * universe) list
-
 let constraint_type_ord c1 c2 = match c1, c2 with
 | Le, Le -> 0
 | Le, Eq -> -1
@@ -892,7 +890,10 @@ let constraint_type_ord c1 c2 = match c1, c2 with
 
 *)
 
-let get_explanation strict g arcu w arcv =
+type explanation_constraint_type = IsLe | IsEq | IsLt
+type explanation = (explanation_constraint_type * universe) list
+
+let get_explanation strict g arcu k arcv l =
   (* [c] characterizes whether (and how) arcv has already been related
      to arcu among the lt_done,le_done universe *)
   let rec cmp c to_revert todo = match todo with
@@ -907,11 +908,11 @@ let get_explanation strict g arcu w arcv =
           cmp c (arc :: to_revert) todo
       | (u,m) :: l ->
         let arc', m' = repr g u (k-m) in
-	let p = (Le, Universe.make_expr (u, k-m)) :: p in
+	let p = (IsLe, Universe.make_expr (u, k-m)) :: p in
 	  if arc == arc' then
             (assert(m' >= 0); (* Self-loop *) find todo l)
 	  else if arc' == arcv then begin
-	    let p' = (Le, Universe.make_expr (arcv.univ,m')) :: p in
+	    let p' = (IsLe, Universe.make_expr (arcv.univ,m')) :: p in
 	    if m' == 0 (* Le *) then
 	      (to_revert, p')
 	    else if m' > 0 (* Lt *) then
@@ -923,12 +924,13 @@ let get_explanation strict g arcu w arcv =
       in find todo arc.arcs
   in
   try
+    let w = k - l in
     if arcu == arcv then begin
-      [(Le, Universe.make_expr (arcu.univ,-w))]
+      [(IsEq, Universe.make_expr (arcu.univ,k));(IsLt,Universe.make_expr (arcv.univ,l))]
     end
     else
       let (to_revert, c) = 
-	cmp [] [] [(arcu, w, [])] in
+	cmp [] [] [(arcu, w, [IsEq, Universe.make_expr (arcu.univ,k)])] in
       (** Reset all the touched arcs. *)
       let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
 	List.rev c
@@ -939,8 +941,7 @@ let get_explanation strict g arcu w arcv =
 
 let get_explanation strict g (arcu,k) (arcv,l) =
   if !Flags.univ_print then 
-    let w = k - l in
-      Some (get_explanation strict g arcu w arcv)
+    Some (get_explanation strict g arcu k arcv l)
   else None
 
 type fast_order = FastEQ | FastLT | FastLE | FastNLE
@@ -1257,7 +1258,7 @@ let enforce_univ_lt u v g =
 	fst (setleq g arcu arcv)
     | FastEQ -> 
       let u = Expr.succ u in
-	error_inconsistency Le u v (Some [(Eq,make_expr (Expr.succ v))])
+	error_inconsistency Le u v (Some [(IsEq,make_expr (Expr.succ v))])
     | FastNLE ->
       match fast_compare_leq g arcv arcu with
 	FastNLE -> 
@@ -2146,19 +2147,20 @@ let hcons_univ x = Universe.hcons x
 let explain_universe_inconsistency prl (o,u,v,p) =
   let pr_uni = Universe.pr_with prl in
   let pr_rel = function
-    | Eq -> str"=" | Le -> str"<=" 
+    | IsEq -> str"=" | IsLe -> str"<=" | IsLt -> str"<"
   in
   let reason = match p with
     | None | Some [] -> mt()
     | Some p ->
       str " because" ++ spc() ++ pr_uni v ++
-	prlist (fun (r,v) -> spc() ++ pr_rel r ++ str" " ++ pr_uni v)
-	p ++
-	(if Universe.equal (snd (List.last p)) u then mt() else
-	    (spc() ++ str "= " ++ pr_uni u)) 
+	let p = if Universe.equal (snd (List.hd p)) v then List.tl p else p in
+	  prlist (fun (r,v) -> spc() ++ pr_rel r ++ str" " ++ pr_uni v)
+	    p ++
+	    (if Universe.equal (snd (List.last p)) u then mt() else
+		(spc() ++ str "= " ++ pr_uni u)) 
   in
-    str "Cannot enforce" ++ spc() ++ pr_uni u ++ spc() ++
-      pr_rel o ++ spc() ++ pr_uni v ++ reason
+    str "Cannot enforce" ++ spc() ++ pr_uni u ++ 
+      pr_constraint_type o ++ pr_uni v ++ reason
 
 let compare_levels = Level.compare
 let eq_levels = Level.equal
