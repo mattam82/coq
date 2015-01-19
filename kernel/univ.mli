@@ -236,11 +236,17 @@ type univ_entry =
     Canonical of canonical_arc
   | Equiv of Level.t * int
 
-module UMap : sig type 'a t end
+module UMap : sig type 'a t
+		  type key = Level.t end
 type universes = univ_entry UMap.t
 
 val between : universes ->            canonical_arc * int ->
            canonical_arc * int -> (canonical_arc * int) list
+
+val enter_equiv_arc :            UMap.key ->
+           Level.t * int -> univ_entry UMap.t -> univ_entry UMap.t
+val setleq_if :            univ_entry UMap.t * (canonical_arc * int) ->
+           UMap.key * int -> univ_entry UMap.t * (canonical_arc * int)
 
 
 type 'a check_function = universes -> 'a -> 'a -> bool

@@ -253,4 +253,3 @@ Module KeyOrderedType(Import O:OrderedType).
  Hint Resolve In_inv_2 In_inv_3.
 
 End KeyOrderedType.
-
