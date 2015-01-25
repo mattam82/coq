@@ -159,7 +159,7 @@ GEXTEND Gram
   ;
   incr:
     [ [ "+"; i = natural -> i
-      | "-"; i = natural -> i
+      | "-"; i = natural -> -i
       | -> 0 ] ]
   ;
   universe_expression:
