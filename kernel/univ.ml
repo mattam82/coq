@@ -791,7 +791,7 @@ let rec change_assq x k =
   in aux []
 
 (* reprleq : canonical_arc -> canonical_arc list *)
-(* All canonical arcv such that arcu<=arcv with arcv#arcu *)
+(* All canonical arcv such that arcu + k <= arcv + m with arcv#arcu *)
 let reprleq g arcu k =
   let rec searchrec w = function
     | [] -> w
@@ -809,11 +809,11 @@ let reprleq g arcu k =
 				 arcu + k <= arcv + diff
 				 -> arcu + k <= arcv + uv *)
 		then 
-		  let w' = change_assq arcv vk w in
+		  let w' = change_assq arcv diff w in
 		    searchrec w' vl 
 		else searchrec w vl
 	  with Not_found ->
-	    searchrec ((arcv,vk) :: w) vl
+	    searchrec ((arcv,diff) :: w) vl
   in
     searchrec [] arcu.arcs
 
@@ -954,44 +954,52 @@ let fast_compare_neq strict g arcu k arcv =
       k (Pp.string_of_ppcmds (Level.pr arcv.univ));
   let rec cmp c to_revert todo = match todo with
   | [] -> (to_revert, c)
-  | (arc,w)::todo ->
+  | (arc,k)::todo ->
       if !Flags.univ_print then
-	Printf.printf "Todo: - %i -> %s\n%!" w (Pp.string_of_ppcmds (Level.pr arc.univ));
-    if arc_is_lt arc w then
+      	Printf.printf "Todo: %s + %i\n%!" (Pp.string_of_ppcmds (Level.pr arc.univ)) k;
+    if arc_is_lt arc k then
       cmp c to_revert todo
     else
-      let rec find todo l = match l with
+      let rec find todo c l = match l with
       | [] ->
-        let () = arc.status <- Isset w in
+        let () = arc.status <- Isset k in
           cmp c (arc :: to_revert) todo
-      | (u,w') :: l ->
+      | (u,w) :: l ->
+	  (* arc <w= u <-> arc + w <= u -> arc + k + w <= u + k <-> arc + k <= u + k - w *)
 	  if !Flags.univ_print then
-	    Printf.printf "Following - %i -> %s\n%!" w' (Pp.string_of_ppcmds (Level.pr u));
-          let arc', n = repr g u 0 in
-	  let w = w'+w-n in
+	    Printf.printf "Following <= %i   %s\n%!" w (Pp.string_of_ppcmds (Level.pr u));
+          let arc', w' = repr g u (k-w) in
 	    if !Flags.univ_print then
-	      Printf.printf "Found %s, %i\n%!" (Pp.string_of_ppcmds (Level.pr arc'.univ)) w;
+	      Printf.printf "Found %s, %i\n%!" (Pp.string_of_ppcmds (Level.pr arc'.univ)) w';
 	    if arc == arc' then 
-	      (assert(w' >= 0); (* Self-loop *) 
-	       find todo l)
+	      (* arc + k <= arc + w' *)
+	      (if not (k <= w') && !Flags.univ_print then
+		  Printf.printf "Self-loop on %s, %i </= %i\n%!" (Pp.string_of_ppcmds (Level.pr arc'.univ)) k w';
+	       assert(k <= w'); (* Self-loop *)
+	       find todo c l)
 	    else if arc' == arcv then begin
-	      if w == k (* Le *) then
-		(to_revert, FastLE)
-	      else if w > k (* Lt *) then
+	      (* arc + k <= arcv + w' *)
+	      if w' == 0 (* Le *) then
+		if strict then (* Maybe a tighter bound exists *) 
+		  find todo FastLE l
+		else (to_revert, FastLE)
+	      else if w' < 0 (* Lt *) then
 		if strict then (to_revert, FastLT) else (to_revert, FastLE)
-	      else (* w < k: the weight is lower, no need to go further as any 
+	      else (* w' > 0: the weight is lower, no need to go further as any 
 		      path from arcv to itself must be of non-positive weight *)
-		find todo l
+		find todo c l
 	    end
-	    else find ((arc',w) :: todo) l
-      in find todo arc.arcs
+	    else 
+	      (* arc + k <= arc' + w' *)
+	      find ((arc',w') :: todo) c l
+      in find todo c arc.arcs
   in
   try
-    let (to_revert, c) = cmp FastNLE [] [arcu,0] in
+    let (to_revert, c) = cmp FastNLE [] [arcu,k] in
     (** Reset all the touched arcs. *)
     let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
       if !Flags.univ_print then
-	Printf.printf "Proved %s + %i %s %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ))
+      	Printf.printf "Proved %s + %i %s %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ))
       	  k (match c with
       	    FastLT -> "<"
       	  | FastLE -> "<="
@@ -1143,7 +1151,7 @@ let setleq g (arcu, k) (arcv,l) =
 
 (* checks that non-redundant *)
 let setleq_if (g,arcu) (v,k') =
-  let arcv = repr g v (-k') in
+  let arcv = repr g v k' in
   if is_leq g arcu arcv then g, arcu
   else setleq g arcu arcv
 
@@ -1174,8 +1182,10 @@ let merge g arcu arcv =
   let redirect (g,arcs) (arcv,k') = 
     (* u + k <0= arcv + k' becomes arcv = u + k - k' *)
     let g' = enter_equiv_arc arcv.univ (arcu.univ,k - k') g in
-    (* arcv + k' <w= l becomes arcu + k - k' <w= l <-> arcu <w+k-k'= l *)
-    (g', List.unionq (List.map (fun (l,w) -> (l,w-k')) arcv.arcs) arcs)
+    (* arcv <w= l becomes arcu + k - k' <w= l <-> arcu + k <w-k'= l
+       <-> arcu + k <= l - w + k'
+    *)
+    (g', List.unionq (List.map (fun (l,w) -> (l,k'-w)) arcv.arcs) arcs)
   in
   let (g',w) = List.fold_left redirect (g,[]) v in
   let g_arcu = (g',(arcu,k)) in
@@ -1197,7 +1207,7 @@ let merge_disc g arc1 arc2 =
   (* arcv <w= arcw <-> arcv + l <w= arcw + l <-> arcu + k <w= arcw + l <->
      arcu + k - l <w= arcw *)
   let g_arcu = (g',(arcu,k-l)) in
-  let g_arcu = List.fold_left setleq_if g_arcu arcv.arcs in
+  let g_arcu = List.fold_left (fun garcu (l,w) -> setleq_if garcu (l,-w)) g_arcu arcv.arcs in
   fst g_arcu
 
 (* Universe inconsistency: error raised when trying to enforce a relation
