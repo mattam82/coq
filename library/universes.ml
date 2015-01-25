@@ -791,8 +791,10 @@ let normalize_context_set ctx us algs =
 	(UF.union (Option.get (Universe.level l)) (Option.get (Universe.level r)) uf; 
 	 (noneqs, ctx, algeqs))
       else if d == Eq then 
-	let l = Option.get (Universe.level l) in
-	  (noneqs, LSet.remove l ctx, LMap.add l (Some r) algeqs)
+	let ll = Option.get (Universe.level l) in
+	  if LSet.mem ll ctx then
+	    (noneqs, LSet.remove ll ctx, LMap.add ll (Some r) algeqs)
+	  else (Constraint.add (l,d,r) noneqs, ctx, algeqs)
       else (Constraint.add (l,d,r) noneqs, ctx, algeqs))
       csts (Constraint.empty, ctx, us)
   in
