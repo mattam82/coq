@@ -357,13 +357,18 @@ let replace_max i u (univs,local) =
 	  if Universe.equal i r then 
 	    if check_leq univs l u then
 	      (univs, Constraint.remove cstr local)
-	    else raise (UniverseInconsistency (Le, l, u, None))
+	    else
+	      let cstrs = enforce_leq l u empty_constraint in
+		(merge_constraints cstrs univs, 
+		 Constraint.union cstrs (Constraint.remove cstr local))
+ (* raise (UniverseInconsistency (Le, l, u, None)) *)
 	  else if Universe.equal i l then
 	    if check_leq univs u r then
 	      (univs, Constraint.remove cstr local)
 	    else 
 	      let cstrs = enforce_leq u r empty_constraint in
-		(merge_constraints cstrs univs, Constraint.union cstrs local)
+		(merge_constraints cstrs univs, 
+		 Constraint.union cstrs (Constraint.remove cstr local))
 	  else (univs, local)) local (univs, local)
   in (univs', local')
     
@@ -398,6 +403,7 @@ let process_universe_constraints univs vars alg local cstrs =
 	    else
 	      match varinfo r with
 	      | Inl _ -> 
+		(* u <= max() *)
 		unify_universes fo l Universes.UEq r univs
 		(* (try  with e -> *)
 		(*    errorlabstrm "add_constraint" *)
