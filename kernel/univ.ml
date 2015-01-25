@@ -697,7 +697,7 @@ type canonical_arc =
 
 let arc_is_lt arc w = match arc.status with
 | Unset -> false
-| Isset k -> w <= k
+| Isset k -> k <= w
 
 let terminal u = {univ=u; arcs=[]; rank=0; predicative=false; status = Unset}
 
