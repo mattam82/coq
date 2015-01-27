@@ -1207,8 +1207,9 @@ let solve_simple_evar_eqn ts env evd ev rhs =
   match solve_simple_eqn (Evarconv.evar_conv_x ts) env evd (None,ev,rhs) with
   | UnifFailure (evd,reason) ->
       error_cannot_unify env evd ~reason (mkEvar ev,rhs);
-  | Success evd ->
-      Evarconv.consider_remaining_unif_problems env evd
+  | Success evd -> evd
+    (* try Evarconv.consider_remaining_unif_problems env evd *)
+    (* with PretypeError (_, _, Pretype_errors.CannotUnify _) -> evd *)
 
 (* [w_merge env sigma b metas evars] merges common instances in metas
    or in evars, possibly generating new unification problems; if [b]
@@ -1327,8 +1328,11 @@ let w_merge env with_types flags (evd,metas,evars) =
   let res =  (* merge constraints *)
     w_merge_rec evd (order_metas metas) (List.rev evars) []
   in
+  let res = 
     if with_types then check_types res
     else res
+  in
+    Evarconv.consider_remaining_unif_problems env res
 
 let w_unify_meta_types env ?(flags=default_unify_flags ()) evd =
   let metas,evd = retract_coercible_metas evd in
