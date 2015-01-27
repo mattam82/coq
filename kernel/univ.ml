@@ -896,31 +896,33 @@ type explanation = (explanation_constraint_type * universe) list
 let get_explanation strict g arcu k arcv l =
   (* [c] characterizes whether (and how) arcv has already been related
      to arcu among the lt_done,le_done universe *)
-  let rec cmp c to_revert todo = match todo with
-  | [] -> (to_revert, c)
-  | (arc,k,p)::todo ->
+  let rec cmp p to_revert todo = match todo with
+  | [] -> (to_revert, p)
+  | (arc,k,p')::todo ->
     if arc_is_lt arc k then
-      cmp c to_revert todo
+      cmp p to_revert todo
     else
-      let rec find todo l = match l with
+      let rec find todo arcs = match arcs with
       | [] ->
         let () = arc.status <- Isset k in
-          cmp c (arc :: to_revert) todo
-      | (u,m) :: l ->
-        let arc', m' = repr g u (k-m) in
-	let p = (IsLe, Universe.make_expr (u, k-m)) :: p in
+          cmp p (arc :: to_revert) todo
+      | (u,w) :: arcs ->
+        let arc', w' = repr g u (k-w) in
+	let p' = (IsLe, Universe.make_expr (u, k-w)) :: p' in
 	  if arc == arc' then
-            (assert(m' >= 0); (* Self-loop *) find todo l)
+            (assert(k <= w'); (* Self-loop *) find todo arcs)
 	  else if arc' == arcv then begin
-	    let p' = (IsLe, Universe.make_expr (arcv.univ,m')) :: p in
-	    if m' == 0 (* Le *) then
-	      (to_revert, p')
-	    else if m' > 0 (* Lt *) then
-	      if strict then (to_revert, p') else (to_revert, p')
-	    else (* m' < 0 *)
-	      find ((arc',m',p) :: todo) l
+	    let p' d = (d, Universe.make_expr (arcv.univ,l)) :: p' in
+	    if w' == 0 (* Le *) then
+	      if strict then 
+		find todo arcs
+	      else (to_revert, p' IsEq)
+	    else if w' < 0 (* Lt *) then
+	      if strict then (to_revert, p' IsLt) else (to_revert, p' IsLe)
+	    else (* w' > 0 *)
+	      find todo arcs
 	  end
-          else find ((arc,m',p) :: todo) l
+          else find ((arc',w',p') :: todo) arcs
       in find todo arc.arcs
   in
   try
@@ -929,11 +931,11 @@ let get_explanation strict g arcu k arcv l =
       [(IsEq, Universe.make_expr (arcu.univ,k));(IsLt,Universe.make_expr (arcv.univ,l))]
     end
     else
-      let (to_revert, c) = 
+      let (to_revert, p) = 
 	cmp [] [] [(arcu, w, [IsEq, Universe.make_expr (arcu.univ,k)])] in
       (** Reset all the touched arcs. *)
       let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
-	List.rev c
+	List.rev p
   with e ->
     (** Unlikely event: fatal error or signal *)
     let () = cleanup_universes g in
@@ -1137,17 +1139,32 @@ let set_predicative g arcv =
 (*   if is_lt g arcu arcv then g, arcu *)
 (*   else setlt g arcu arcv *)
 
+
+(* Universe inconsistency: error raised when trying to enforce a relation
+   that would create a cycle in the graph of universes. *)
+
+type univ_inconsistency = constraint_type * universe * universe * explanation option
+
+exception UniverseInconsistency of univ_inconsistency
+
+let error_inconsistency o u v (p:explanation option) =
+  raise (UniverseInconsistency (o,make_expr u,make_expr v,p))
+
 (* setleq : Level.t -> Level.t -> unit *)
 (* forces u <= v *)
 (* this is normally an update of u in g rather than a creation. *)
-let setleq g (arcu, k) (arcv,l) =
+let setleq g (arcu, k) (arcv,l as v) =
   let arcu' = {arcu with arcs=change_assq arcv.univ (k-l) arcu.arcs} in
+  let u' = (arcu',k) in
   let g = 
-    if is_set_arc (arcu',k) then
+    if is_set_arc u' then
       set_predicative g arcv
+    else if is_prop_arc v then
+      if k <= 0 then g else
+	error_inconsistency Le (arcu.univ, k) (arcv.univ,l) None
     else g
   in
-    enter_arc arcu' g, (arcu',k)
+    enter_arc arcu' g, u'
 
 (* checks that non-redundant *)
 let setleq_if (g,arcu) (v,k') =
@@ -1209,16 +1226,6 @@ let merge_disc g arc1 arc2 =
   let g_arcu = (g',(arcu,k-l)) in
   let g_arcu = List.fold_left (fun garcu (l,w) -> setleq_if garcu (l,-w)) g_arcu arcv.arcs in
   fst g_arcu
-
-(* Universe inconsistency: error raised when trying to enforce a relation
-   that would create a cycle in the graph of universes. *)
-
-type univ_inconsistency = constraint_type * universe * universe * explanation option
-
-exception UniverseInconsistency of univ_inconsistency
-
-let error_inconsistency o u v (p:explanation option) =
-  raise (UniverseInconsistency (o,make_expr u,make_expr v,p))
 
 (* enforc_univ_eq : Level.t -> Level.t -> unit *)
 (* enforc_univ_eq u v will force u=v if possible, will fail otherwise *)
