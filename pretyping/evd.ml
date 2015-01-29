@@ -277,6 +277,7 @@ end
 type evar_universe_context = 
  { uctx_names : Univ.Level.t UNameMap.t * string Univ.LMap.t;
    uctx_local : Univ.universe_context_set; (** The local context of variables *)
+   uctx_postponed : Universes.Constraints.t;
     uctx_univ_variables : Universes.universe_opt_subst;
       (** The local universes that are unification variables *)
     uctx_univ_algebraic : Univ.universe_set; 
@@ -290,6 +291,7 @@ type evar_universe_context =
 let empty_evar_universe_context = 
   { uctx_names = UNameMap.empty, Univ.LMap.empty;
     uctx_local = Univ.ContextSet.empty;
+    uctx_postponed = Universes.Constraints.empty;
     uctx_univ_variables = Univ.LMap.empty;
     uctx_univ_algebraic = Univ.LSet.empty;
     uctx_universes = Univ.initial_universes;
@@ -309,9 +311,11 @@ let union_evar_universe_context ctx ctx' =
   else if is_empty_evar_universe_context ctx' then ctx
   else
     let local = Univ.ContextSet.union ctx.uctx_local ctx'.uctx_local in
+    let postponed = Universes.Constraints.union ctx.uctx_postponed ctx'.uctx_postponed in
     let names = UNameMap.union (fst ctx.uctx_names) (fst ctx'.uctx_names) in
     let names_rev = Univ.LMap.union (snd ctx.uctx_names) (snd ctx'.uctx_names) in
       { uctx_names = (names, names_rev);
+	uctx_postponed = postponed;
 	uctx_local = local;
 	uctx_univ_variables = 
 	  Univ.LMap.subst_union ctx.uctx_univ_variables ctx'.uctx_univ_variables;
@@ -346,43 +350,48 @@ exception UniversesDiffer
 
 let pr_constraint c = Universes.UniverseConstraint.pr c
 
-let replace_max i u (univs,local) =
+let replace_max i u (univs,local,post) =
   let open Univ in
   let i = Universe.make i in
-  let univs', local' = 
+  let univs', local', post' = 
     Constraint.fold 
-      (fun (l,d,r as cstr) (univs,local) ->
-	if d == Eq then (univs,local)
+      (fun (l,d,r as cstr) (univs,local,post) ->
+	if d == Eq then (univs,local,post)
 	else
 	  if Universe.equal i r then 
 	    if check_leq univs l u then
-	      (univs, Constraint.remove cstr local)
+	      (univs, Constraint.remove cstr local, post)
 	    else
 	      let cstrs = enforce_leq l u empty_constraint in
 		(merge_constraints cstrs univs, 
-		 Constraint.union cstrs (Constraint.remove cstr local))
+		 Constraint.union cstrs (Constraint.remove cstr local),
+		 post)
  (* raise (UniverseInconsistency (Le, l, u, None)) *)
 	  else if Universe.equal i l then
 	    if check_leq univs u r then
-	      (univs, Constraint.remove cstr local)
+	      (univs, Constraint.remove cstr local, post)
 	    else 
 	      let cstrs = enforce_leq u r empty_constraint in
 		(merge_constraints cstrs univs, 
-		 Constraint.union cstrs (Constraint.remove cstr local))
-	  else (univs, local)) local (univs, local)
-  in (univs', local')
+		 Constraint.union cstrs (Constraint.remove cstr local),
+		 post)
+	  else (univs, local, post)) local (univs, local, post)
+  in (univs', local', post')
     
-let process_universe_constraints univs vars alg local cstrs =
+let process_universe_constraints univs vars alg local post cstrs =
   let open Univ in
   let vars = ref vars in
   let normalize = Universes.normalize_universe_opt_subst vars in
-  let add_leq l r (univs, local) = 
+  let add_leq l r (univs, local, post) = 
     let cstrs = enforce_leq l r empty_constraint in
-      (merge_constraints cstrs univs, Constraint.union cstrs local)
+      (merge_constraints cstrs univs, Constraint.union cstrs local, post)
   in
-  let add_eq_expr l r (univs, local) = 
+  let add_eq_expr l r (univs, local, post) = 
     let cstr = (Universe.make_expr l,Eq,Universe.make_expr r) in
-      (enforce_constraint cstr univs, Constraint.add cstr local)
+      (enforce_constraint cstr univs, Constraint.add cstr local, post)
+  in
+  let postpone l d r (univs, local, post) =
+    (univs, local, Universes.Constraints.add (l,d,r) post)
   in
   let rec unify_universes fo l d r univs =
     let l = normalize l and r = normalize r in
@@ -394,7 +403,7 @@ let process_universe_constraints univs vars alg local cstrs =
 	  | Some (l,k as e) -> Inr (e, LMap.mem l !vars, LSet.mem l alg)
 	in
 	  if d == Universes.ULe then
-	    if check_leq (fst univs) l r then
+	    if check_leq (pi1 univs) l r then
 	      (** Keep Prop/Set <= var around if var might be instantiated by prop or set
 		  later. *)
 	      if Universe.is_expr l && Universe.is_expr r then 
@@ -402,9 +411,9 @@ let process_universe_constraints univs vars alg local cstrs =
 	      else univs
 	    else
 	      match varinfo r with
-	      | Inl _ -> 
+	      | Inl _ -> postpone l Universes.ULe r univs
 		(* u <= max() *)
-		unify_universes fo l Universes.UEq r univs
+		(* unify_universes fo l Universes.UEq r univs *)
 		(* (try  with e -> *)
 		(*    errorlabstrm "add_constraint" *)
 		(*      (str "Algebraic universe on the right: cannot enforce " ++ *)
@@ -435,7 +444,7 @@ let process_universe_constraints univs vars alg local cstrs =
 		  instantiate_variable l' (Universe.make_expr (r',k'-k)) vars
 		else if rloc then 
 		  instantiate_variable r' (Universe.make_expr (l',k-k')) vars
-		else if not (check_eq (fst univs) l r) then
+		else if not (check_eq (pi1 univs) l r) then
 		  (* Two rigid/global levels, none of them being local,
 		     one of them being Prop/Set, disallow *)
 		  if Level.is_small l' || Level.is_small r' then
@@ -463,7 +472,7 @@ let process_universe_constraints univs vars alg local cstrs =
 		  let () = instantiate_variable r' l' vars in 
 		    replace_max r' l' univs
             | _, _ (* One of the two is algebraic or global *) -> 
-	      if check_eq (fst univs) l r then univs
+	      if check_eq (pi1 univs) l r then univs
 	      else
 		(** Equality of lub's, try unification of flexible universes otherwise give up *)
 		let ls = Universe.exprs l and rs = Universe.exprs r in
@@ -475,23 +484,24 @@ let process_universe_constraints univs vars alg local cstrs =
 		  match rem, rs with
 		  | [], [] -> assert false (* check_eq should have figured this *)
 		  | reml, [] -> (** All universes of r appear in l, the remaining must be <= r *)
-		    unify_universes fo (Universe.make_exprs reml) Universes.UEq r univs
-		  | _, _ ->
-		    let rs' = Universe.make_exprs rs in
-		      List.fold_left (fun univs e -> 
-			let ul = Universe.make_expr e in
-			  if Universe.equal ul l then 
-			    raise (UniverseInconsistency (Eq, l, r, None))
-			  else
-			    unify_universes fo ul Universes.UEq rs' univs)
-			univs rem
+		    unify_universes fo (Universe.make_exprs reml) Universes.ULe r univs
+		  | _, _ -> postpone l Universes.UEq r univs
+
+		    (* let rs' = Universe.make_exprs rs in *)
+		    (*   List.fold_left (fun univs e ->  *)
+		    (* 	let ul = Universe.make_expr e in *)
+		    (* 	  if Universe.equal ul l then  *)
+		    (* 	    raise (UniverseInconsistency (Eq, l, r, None)) *)
+		    (* 	  else *)
+		    (* 	    unify_universes fo ul Universes.UEq rs' univs) *)
+		    (* 	univs rem *)
   in
-  let univs, local = 
+  let univs, local, post = 
     Universes.Constraints.fold 
       (fun (l,d,r) acc -> unify_universes false l d r acc)
-      cstrs (univs, local)
+      cstrs (univs, local, post)
   in
-    !vars, univs, local
+    !vars, univs, local, post
 
 let add_constraints_context ctx cstrs =
   let us, local = ctx.uctx_local in
@@ -501,12 +511,13 @@ let add_constraints_context ctx cstrs =
     in Universes.Constraints.add cstr' acc)
     cstrs Universes.Constraints.empty
   in
-  let vars, univs', local' =
+  let vars, univs', local', postponed' =
     process_universe_constraints ctx.uctx_universes
       ctx.uctx_univ_variables ctx.uctx_univ_algebraic
-      local cstrs'
+      local ctx.uctx_postponed cstrs'
   in
     { ctx with uctx_local = (us, local');
+      uctx_postponed = postponed';
       uctx_univ_variables = vars;
       uctx_universes = univs' }
 
@@ -515,12 +526,13 @@ let add_constraints_context ctx cstrs =
 
 let add_universe_constraints_context ctx cstrs =
   let us, local = ctx.uctx_local in
-  let vars, univs', local' = 
+  let vars, univs', local', postponed' = 
     process_universe_constraints ctx.uctx_universes 
       ctx.uctx_univ_variables ctx.uctx_univ_algebraic 
-      local cstrs 
+      local ctx.uctx_postponed cstrs 
   in
     { ctx with uctx_local = (us, local');
+      uctx_postponed = postponed';
       uctx_univ_variables = vars;
       uctx_universes = univs' }
 
@@ -1272,6 +1284,7 @@ let abstract_undefined_variables uctx =
 
 
 let refresh_undefined_univ_variables uctx =
+  assert (Universes.Constraints.is_empty uctx.uctx_postponed);
   let subst, ctx' = Universes.fresh_universe_context_set_instance uctx.uctx_local in
   let alg = Univ.LSet.fold (fun u acc -> Univ.LSet.add (Univ.subst_univs_level_level subst u) acc) 
     uctx.uctx_univ_algebraic Univ.LSet.empty 
@@ -1285,6 +1298,7 @@ let refresh_undefined_univ_variables uctx =
   in 
   let uctx' = {uctx_names = uctx.uctx_names;
 	       uctx_local = ctx'; 
+	       uctx_postponed = Universes.Constraints.empty;
 	       uctx_univ_variables = vars; uctx_univ_algebraic = alg;
 	       uctx_universes = Univ.initial_universes;
 	       uctx_initial_universes = uctx.uctx_initial_universes } in
@@ -1302,12 +1316,24 @@ let normalize_evar_universe_context uctx =
         uctx.uctx_univ_algebraic
     in
       if Univ.LSet.equal (fst us') (fst uctx.uctx_local) then 
-        uctx
+	let uctx' = 
+	  add_universe_constraints_context 
+	    {uctx with uctx_postponed = Universes.Constraints.empty}
+	    uctx.uctx_postponed
+	in
+	  if (Universes.Constraints.is_empty uctx'.uctx_postponed) then
+            uctx'
+	  else 
+	    Type_errors.error_unsatisfied_constraints (Global.env())(*Fixme*)
+	      (Universes.Constraints.fold (fun (l,d,r) acc ->
+	    	let d' = if d == Universes.ULe then Univ.Le else Univ.Eq in
+	    	  Univ.Constraint.add (l,d',r) acc) uctx'.uctx_postponed Univ.Constraint.empty)
       else
 	let us', universes = Universes.refresh_constraints uctx.uctx_initial_universes us' in
 	let uctx' = 
 	  { uctx_names = uctx.uctx_names;
-	    uctx_local = us'; 
+	    uctx_local = us';
+	    uctx_postponed = uctx.uctx_postponed;
 	    uctx_univ_variables = vars'; 
 	    uctx_univ_algebraic = algs';
 	    uctx_universes = universes;
@@ -1782,6 +1808,8 @@ let pr_evar_universe_context ctx =
   else
     (str"UNIVERSES:"++brk(0,1)++ 
        h 0 (Univ.pr_universe_context_set prl ctx.uctx_local) ++ fnl () ++
+     str"POSTPONED:"++brk(0,1)++
+       h 0 (Universes.Constraints.pr ctx.uctx_postponed) ++ fnl() ++
      str"ALGEBRAIC UNIVERSES:"++brk(0,1)++
      h 0 (Univ.LSet.pr prl ctx.uctx_univ_algebraic) ++ fnl() ++
      str"UNDEFINED UNIVERSES:"++brk(0,1)++

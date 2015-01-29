@@ -315,8 +315,8 @@ exception UniversesDiffer
 
 val replace_max :            Univ.Level.t ->
            Univ.universe ->
-           Univ.universes * Univ.Constraint.t ->
-           Univ.universes * Univ.Constraint.t
+           Univ.universes * Univ.Constraint.t * Universes.Constraints.t ->
+           Univ.universes * Univ.Constraint.t * Universes.Constraints.t
 
 
 val add_universe_constraints : evar_map -> Universes.universe_constraints -> evar_map
