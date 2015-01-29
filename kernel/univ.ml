@@ -951,14 +951,14 @@ type fast_order = FastEQ | FastLT | FastLE | FastNLE
 let fast_compare_neq strict g arcu k arcv =
   (* [c] characterizes whether arcv has already been related
      to arcu among the lt_done,le_done universe *)
-  if !Flags.univ_print then
-    Printf.printf "Checking %s - %i -> %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ))
-      k (Pp.string_of_ppcmds (Level.pr arcv.univ));
+  (* if !Flags.univ_print then *)
+  (*   Printf.printf "Checking %s - %i -> %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ)) *)
+  (*     k (Pp.string_of_ppcmds (Level.pr arcv.univ)); *)
   let rec cmp c to_revert todo = match todo with
   | [] -> (to_revert, c)
   | (arc,k)::todo ->
-      if !Flags.univ_print then
-      	Printf.printf "Todo: %s + %i\n%!" (Pp.string_of_ppcmds (Level.pr arc.univ)) k;
+      (* if !Flags.univ_print then *)
+      (* 	Printf.printf "Todo: %s + %i\n%!" (Pp.string_of_ppcmds (Level.pr arc.univ)) k; *)
     if arc_is_lt arc k then
       cmp c to_revert todo
     else
@@ -968,11 +968,11 @@ let fast_compare_neq strict g arcu k arcv =
           cmp c (arc :: to_revert) todo
       | (u,w) :: l ->
 	  (* arc <w= u <-> arc + w <= u -> arc + k + w <= u + k <-> arc + k <= u + k - w *)
-	  if !Flags.univ_print then
-	    Printf.printf "Following <= %i   %s\n%!" w (Pp.string_of_ppcmds (Level.pr u));
+	  (* if !Flags.univ_print then *)
+	  (*   Printf.printf "Following <= %i   %s\n%!" w (Pp.string_of_ppcmds (Level.pr u)); *)
           let arc', w' = repr g u (k-w) in
-	    if !Flags.univ_print then
-	      Printf.printf "Found %s, %i\n%!" (Pp.string_of_ppcmds (Level.pr arc'.univ)) w';
+	    (* if !Flags.univ_print then *)
+	    (*   Printf.printf "Found %s, %i\n%!" (Pp.string_of_ppcmds (Level.pr arc'.univ)) w'; *)
 	    if arc == arc' then 
 	      (* arc + k <= arc + w' *)
 	      (if not (k <= w') && !Flags.univ_print then
@@ -1000,13 +1000,13 @@ let fast_compare_neq strict g arcu k arcv =
     let (to_revert, c) = cmp FastNLE [] [arcu,k] in
     (** Reset all the touched arcs. *)
     let () = List.iter (fun arc -> arc.status <- Unset) to_revert in
-      if !Flags.univ_print then
-      	Printf.printf "Proved %s + %i %s %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ))
-      	  k (match c with
-      	    FastLT -> "<"
-      	  | FastLE -> "<="
-      	  | FastNLE -> "~<="
-      	  | FastEQ -> "=") (Pp.string_of_ppcmds (Level.pr arcv.univ));
+      (* if !Flags.univ_print then *)
+      (* 	Printf.printf "Proved %s + %i %s %s\n%!" (Pp.string_of_ppcmds (Level.pr arcu.univ)) *)
+      (* 	  k (match c with *)
+      (* 	    FastLT -> "<" *)
+      (* 	  | FastLE -> "<=" *)
+      (* 	  | FastNLE -> "~<=" *)
+      (* 	  | FastEQ -> "=") (Pp.string_of_ppcmds (Level.pr arcv.univ)); *)
       c
   with e ->
     (** Unlikely event: fatal error or signal *)
