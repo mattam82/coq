@@ -293,9 +293,6 @@ let constr_display csr =
   and univ_display u =
     incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ pr_uni u ++ fnl ())
 
-  and level_display u =
-    incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ Level.pr u ++ fnl ())
-
   and sort_display = function
     | Prop(Pos) -> "Prop(Pos)"
     | Prop(Null) -> "Prop(Null)"
