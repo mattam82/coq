@@ -785,18 +785,24 @@ let normalize_context_set ctx us algs =
     let g = Univ.merge_constraints csts Univ.empty_universes in
       Univ.constraints_of_universes g
   in
-  let noneqs, ctx, subst =
-    Constraint.fold (fun (l,d,r) (noneqs, ctx, algeqs) ->
+  let noneqs, ctx, subst, eqs =
+    Constraint.fold (fun (l,d,r) (noneqs, ctx, subst, eqs) ->
       if d == Eq && Universe.is_level r && Universe.is_level l then 
 	(UF.union (Option.get (Universe.level l)) (Option.get (Universe.level r)) uf; 
-	 (noneqs, ctx, algeqs))
+	 (noneqs, ctx, subst, eqs))
       else if d == Eq then 
 	let ll = Option.get (Universe.level l) in
 	  if LSet.mem ll ctx then
-	    (noneqs, LSet.remove ll ctx, LMap.add ll (Some r) algeqs)
-	  else (Constraint.add (l,d,r) noneqs, ctx, algeqs)
-      else (Constraint.add (l,d,r) noneqs, ctx, algeqs))
-      csts (Constraint.empty, ctx, us)
+	    (noneqs, LSet.remove ll ctx, LMap.add ll (Some r) subst, eqs)
+	  else 
+	    let (rl,k) = Option.get (Universe.expr r) in
+	      if LSet.mem rl ctx then
+		(* ll = rl + k -> rl = ll - k *)
+		(noneqs, LSet.remove rl ctx, LMap.add rl (Some (Universe.add (-k) l)) subst, eqs) 
+	      else 
+		(noneqs, ctx, subst, Constraint.add (l,d,r) eqs)
+      else (Constraint.add (l,d,r) noneqs, ctx, subst, eqs))
+      csts (Constraint.empty, ctx, us, Constraint.empty)
   in
   let partition = UF.partition uf in
   let flex x = LMap.mem x us in
@@ -811,7 +817,7 @@ let normalize_context_set ctx us algs =
     let subst = LSet.fold (fun f -> LMap.add f (Some canonu)) rigid subst in
     let subst = LSet.fold (fun f -> LMap.add f (Some canonu)) flexible subst in
       (LSet.diff (LSet.diff ctx rigid) flexible, subst, cstrs))
-    (ctx, subst, Constraint.empty) partition
+    (ctx, subst, eqs) partition
   in
   (* Noneqs is now in canonical form w.r.t. equality constraints,
      and contains only inequality constraints. *)
