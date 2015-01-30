@@ -368,13 +368,10 @@ let replace_max i u (univs,local,post) =
 		 post)
  (* raise (UniverseInconsistency (Le, l, u, None)) *)
 	  else if Universe.equal i l then
-	    if check_leq univs u r then
-	      (univs, Constraint.remove cstr local, post)
-	    else 
-	      let cstrs = enforce_leq u r empty_constraint in
-		(merge_constraints cstrs univs, 
-		 Constraint.union cstrs (Constraint.remove cstr local),
-		 post)
+	    let cstrs = enforce_leq u r empty_constraint in
+	      (merge_constraints cstrs univs, 
+	       Constraint.union cstrs (Constraint.remove cstr local),
+	       post)
 	  else (univs, local, post)) local (univs, local, post)
   in (univs', local', post')
     
@@ -440,7 +437,7 @@ let process_universe_constraints univs vars alg local post cstrs =
 	    match varinfo l, varinfo r with
 	    | Inr ((l',k), lloc, _), Inr ((r',k'), rloc, _) ->
 	      let () = 
-		if lloc then
+		if lloc && not (rloc && k > k') then
 		  instantiate_variable l' (Universe.make_expr (r',k'-k)) vars
 		else if rloc then 
 		  instantiate_variable r' (Universe.make_expr (l',k-k')) vars
@@ -468,6 +465,7 @@ let process_universe_constraints univs vars alg local post cstrs =
 		  let l' = Universe.make_exprs (List.remove Expr.equal re ls) in
 		    unify_universes fo l' Universes.ULe r univs
 		else
+		  (* u = max() *)
 		  let l' = Universe.add (-k) l in
 		  let () = instantiate_variable r' l' vars in 
 		    replace_max r' l' univs
@@ -478,14 +476,21 @@ let process_universe_constraints univs vars alg local post cstrs =
 		let ls = Universe.exprs l and rs = Universe.exprs r in
 		let rem, rs = 
 		  List.fold_left (fun (acc,rs') l -> 
-		    if List.mem l rs then (acc,List.remove Expr.equal l rs') 
-		    else (l :: acc,rs')) ([], rs) ls 
+		    let fn l = 
+		      let lu = Universe.make_expr l in
+			fun r -> check_eq (pi1 univs) lu (Universe.make_expr r) in
+		      if List.mem_f fn l rs 
+		      then (acc,List.remove fn l rs') 
+		      else (l :: acc,rs')) ([], rs) ls 
 		in
 		  match rem, rs with
 		  | [], [] -> assert false (* check_eq should have figured this *)
 		  | reml, [] -> (** All universes of r appear in l, the remaining must be <= r *)
 		    unify_universes fo (Universe.make_exprs reml) Universes.ULe r univs
-		  | _, _ -> postpone l Universes.UEq r univs
+		  | [], remr -> (** All universes of l appear in r, the remaining must be <= l *)
+		    unify_universes fo (Universe.make_exprs remr) Universes.ULe l univs
+		  | _, _ -> 
+		    postpone l (* (Universe.make_exprs rem) *) Universes.UEq (* (Universe.make_exprs rs) *) r univs
 
 		    (* let rs' = Universe.make_exprs rs in *)
 		    (*   List.fold_left (fun univs e ->  *)
@@ -1323,7 +1328,9 @@ let normalize_evar_universe_context uctx =
 	in
 	  if (Universes.Constraints.is_empty uctx'.uctx_postponed) then
             uctx'
-	  else 
+	  (* else if not (Universes.Constraints.equal uctx'.uctx_postponed uctx.uctx_postponed) then *)
+	  (*   fixpoint uctx' *)
+	  else
 	    Type_errors.error_unsatisfied_constraints (Global.env())(*Fixme*)
 	      (Universes.Constraints.fold (fun (l,d,r) acc ->
 	    	let d' = if d == Universes.ULe then Univ.Le else Univ.Eq in
