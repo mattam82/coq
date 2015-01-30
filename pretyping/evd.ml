@@ -366,7 +366,6 @@ let replace_max i u (univs,local,post) =
 		(merge_constraints cstrs univs, 
 		 Constraint.union cstrs (Constraint.remove cstr local),
 		 post)
- (* raise (UniverseInconsistency (Le, l, u, None)) *)
 	  else if Universe.equal i l then
 	    let cstrs = enforce_leq u r empty_constraint in
 	      (merge_constraints cstrs univs, 
@@ -409,12 +408,6 @@ let process_universe_constraints univs vars alg local post cstrs =
 	    else
 	      match varinfo r with
 	      | Inl _ -> postpone l Universes.ULe r univs
-		(* u <= max() *)
-		(* unify_universes fo l Universes.UEq r univs *)
-		(* (try  with e -> *)
-		(*    errorlabstrm "add_constraint" *)
-		(*      (str "Algebraic universe on the right: cannot enforce " ++ *)
-		(* 	pr_constraint (l,d,r))) *)
 	      | Inr ((rl,k),_,_) ->
 		if Level.is_small rl && k == 0 then
 		  let levels = Universe.exprs l in
@@ -489,17 +482,7 @@ let process_universe_constraints univs vars alg local post cstrs =
 		    unify_universes fo (Universe.make_exprs reml) Universes.ULe r univs
 		  | [], remr -> (** All universes of l appear in r, the remaining must be <= l *)
 		    unify_universes fo (Universe.make_exprs remr) Universes.ULe l univs
-		  | _, _ -> 
-		    postpone l (* (Universe.make_exprs rem) *) Universes.UEq (* (Universe.make_exprs rs) *) r univs
-
-		    (* let rs' = Universe.make_exprs rs in *)
-		    (*   List.fold_left (fun univs e ->  *)
-		    (* 	let ul = Universe.make_expr e in *)
-		    (* 	  if Universe.equal ul l then  *)
-		    (* 	    raise (UniverseInconsistency (Eq, l, r, None)) *)
-		    (* 	  else *)
-		    (* 	    unify_universes fo ul Universes.UEq rs' univs) *)
-		    (* 	univs rem *)
+		  | _, _ -> postpone l Universes.UEq r univs
   in
   let univs, local, post = 
     Universes.Constraints.fold 
