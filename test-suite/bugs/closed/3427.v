@@ -99,17 +99,15 @@ Definition transport2 {A : Type} (P : A -> Type) {x y : A} {p q : x = y}
 Inductive Unit : Type0 :=
   tt : Unit.
 
-Instance contr_unit : Contr Unit | 0 := let x := {|
-                                              center := tt;
-                                              contr := fun t : Unit => match t with tt => 1 end
-                                            |} in x.
+Instance contr_unit : Contr@{i} Unit | 0 := 
+  BuildContr@{i} Unit tt (fun t : Unit => match t with tt => 1 end).
 
 Instance trunc_succ `{IsTrunc n A} : IsTrunc (trunc_S n) A | 1000.
 admit.
 Defined.
 
 Record hProp := hp { hproptype :> Type ; isp : IsHProp hproptype}.
-Definition Unit_hp:hProp:=(hp Unit _).
+Definition Unit_hp:hProp:=(hp@{i} Unit _).
 
 Global Instance isequiv_ap_hproptype `{Funext} X Y : IsEquiv (@ap _ _ hproptype X Y).
 admit.
@@ -169,6 +167,7 @@ Section AssumingUA.
          forall (x : setT X) (_ : Univalence) (_ : Funext),
            @paths hProp (fib (f x)) Unit_hp.
   intros.
+  Show Universes.
 
   apply path_hprop.
   simpl.

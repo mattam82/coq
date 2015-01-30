@@ -32,7 +32,7 @@ Defined.
 
 Definition hProp := sigT' (fun X : Type => admit).
 
-Definition hProppair ( X : UU ) ( is : admit ) : hProp@{i j Set k}.
+Definition hProppair ( X : UU ) ( is : admit ) : hProp@{i Set}.
 intros; exact (existT' (fun X : UU => admit ) X is ).
 Defined.
 Definition hProptoType := @projT1' _ _ : hProp -> Type .
@@ -169,9 +169,9 @@ Defined.
 Definition setwithbinop : Type.
 exact (sigT' ( fun X : hSet => binop X ) ).
 Defined.
-Definition pr1setwithbinop : setwithbinop -> hSet@{j k Set l}.
+Definition pr1setwithbinop : setwithbinop -> hSet@{j k}.
 unfold setwithbinop.
-exact ( @projT1' _ ( fun X : hSet@{j k Set l} => binop@{Set} X ) ).
+exact ( @projT1' _ ( fun X : hSet@{j Set} => binop@{k} X ) ).
 Defined.
 Coercion pr1setwithbinop : setwithbinop >-> hSet .
 
@@ -286,7 +286,7 @@ Proof .
   apply ( setquotuniv2 RX ( setquotinset RY ) admit admit admit admit ) .
 Defined .
 
-Definition quotrel  { X : UU } { R : hrel X } : hrel ( setquot R ).
+Definition quotrel  { X : UU } { R : hrel X } : hrel ( setquot@{Set Type Set Prop Type Set} R ).
 intros; exact ( setquotuniv2 R hPropset admit admit ).
 Defined.
 

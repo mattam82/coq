@@ -1,5 +1,5 @@
 (* Bug report #2830 (evar defined twice) covers different bugs *)
-
+Require Import Utf8.
 (* 1- This was submitted by qb.h.agws *)
 
 Module A.
@@ -124,6 +124,7 @@ Module C.
 Reserved Notation "a ~> b" (at level 70, right associativity).
 Reserved Notation "a ≈ b" (at level 54).
 Generalizable All Variables.
+Reserved Notation "g ∘ f" (at level 20).
 
 Class Category (Object:Type) (Hom:Object -> Object -> Type) := {
     hom := Hom where "a ~> b" := (hom a b) : category_scope
