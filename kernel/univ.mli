@@ -253,6 +253,9 @@ type 'a check_function = universes -> 'a -> 'a -> bool
 val check_leq : universe check_function
 val check_eq : universe check_function
 
+val check_leq_expr : Expr.t check_function
+val check_eq_expr : Expr.t check_function
+
 (** The empty graph of universes *)
 val empty_universes : universes
 

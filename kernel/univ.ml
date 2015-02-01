@@ -1087,22 +1087,16 @@ type 'a check_function = universes -> 'a -> 'a -> bool
 let check_equal_expr g x y =
   x == y || check_equal g x y
 
+let check_eq_expr g x y = check_equal_expr g x y
+
 let check_eq_univs g l1 l2 =
   let f x1 x2 = check_equal_expr g x1 x2 in
   let exists x1 l = Huniv.exists (fun x2 -> f x1 x2) l in
     Huniv.for_all (fun x1 -> exists x1 l2) l1
     && Huniv.for_all (fun x2 -> exists x2 l1) l2
 
-let check_eq g u v =
-  Universe.equal u v || check_eq_univs g u v
-
-(* let check_smaller_expr g (u,n) (v,m) = *)
-(*   let diff = n - m in *)
-(*     match diff with *)
-(*     | 0 -> check_smaller g false u v *)
-(*     | 1 -> check_smaller g true u v *)
-(*     | x when x < 0 -> check_smaller g false u v *)
-(*     | _ -> false *)
+let check_leq_expr g x y =
+  check_smaller g false x y
 
 let exists_bigger g ul l =
   Huniv.exists (fun ul' -> 
@@ -1115,6 +1109,9 @@ let check_leq g u v =
   Universe.equal u v ||
     Universe.is_type0m u ||
     check_eq_univs g u v || real_check_leq g u v
+
+let check_eq g u v =
+  Universe.equal u v || (real_check_leq g u v && real_check_leq g v u)
 
 (** Enforcing new constraints : [setlt], [setleq], [merge], [merge_disc] *)
 
