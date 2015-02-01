@@ -217,6 +217,8 @@ val simplify_universe_context : universe_context_set ->
 
 val refresh_constraints : universes -> universe_context_set -> universe_context_set * universes
 
+val reduce_max : universes -> universe -> universe
+
 (** Pretty-printing *)
 
 val pr_universe_opt_subst : universe_opt_subst -> Pp.std_ppcmds

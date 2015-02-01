@@ -683,6 +683,21 @@ let instantiate_with_lbound u lbound alg enforce (ctx, us, algs, insts, cstrs) =
     (Univ.LSet.remove u ctx, Univ.LMap.add u (Some lbound) us, algs,
      LMap.add u (enforce,alg,lbound) insts, cstrs), (enforce, alg, lbound)
 
+let reduce_max univs u =
+  if Univ.Universe.is_expr u then u else
+  let exprs = Univ.Universe.exprs u in
+  let rec aux prev next =
+    match next with
+    | l :: next ->
+      if List.exists (Univ.check_leq_expr univs l) prev ||
+	List.exists (Univ.check_leq_expr univs l) next then
+	aux prev next
+      else aux (l :: prev) next
+    | [] -> prev
+  in
+  let rest = aux [] exprs in
+    Univ.Universe.make_exprs rest
+
 type constraints_map = Univ.Expr.t list Univ.LMap.t
 
 let pr_constraints_map cmap =
