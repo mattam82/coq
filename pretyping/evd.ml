@@ -362,10 +362,12 @@ let replace_max i u (univs,local,post) =
 	    if check_leq univs l u then
 	      (univs, Constraint.remove cstr local, post)
 	    else
-	      let cstrs = enforce_leq l u empty_constraint in
-		(merge_constraints cstrs univs, 
-		 Constraint.union cstrs (Constraint.remove cstr local),
-		 post)
+	      (univs, Constraint.remove cstr local, 
+	       Universes.Constraints.add (l, (if d == Le then Universes.ULe else Universes.UEq), u) post)
+	    (* let cstrs = enforce_leq l u empty_constraint in *)
+	    (*   (merge_constraints cstrs univs,  *)
+	    (*    Constraint.union cstrs (Constraint.remove cstr local), *)
+	    (*    post) *)
 	  else if Universe.equal i l then
 	    let cstrs = enforce_leq u r empty_constraint in
 	      (merge_constraints cstrs univs, 
@@ -377,7 +379,10 @@ let replace_max i u (univs,local,post) =
 let process_universe_constraints univs vars alg local post cstrs =
   let open Univ in
   let vars = ref vars in
-  let normalize = Universes.normalize_universe_opt_subst vars in
+  let normalize (univs, _, _) u = 
+    let u' = Universes.normalize_universe_opt_subst vars u in
+      Universes.reduce_max univs u'
+  in
   let add_leq l r (univs, local, post) = 
     let cstrs = enforce_leq l r empty_constraint in
       (merge_constraints cstrs univs, Constraint.union cstrs local, post)
@@ -390,7 +395,7 @@ let process_universe_constraints univs vars alg local post cstrs =
     (univs, local, Universes.Constraints.add (l,d,r) post)
   in
   let rec unify_universes fo l d r univs =
-    let l = normalize l and r = normalize r in
+    let l = normalize univs l and r = normalize univs r in
       if Universe.equal l r then univs
       else 
 	let varinfo x = 
@@ -407,7 +412,10 @@ let process_universe_constraints univs vars alg local post cstrs =
 	      else univs
 	    else
 	      match varinfo r with
-	      | Inl _ -> postpone l Universes.ULe r univs
+	      | Inl _ -> 
+		if check_leq (pi1 univs) r l then
+		  unify_universes fo l Universes.UEq r univs
+		else postpone l Universes.ULe r univs
 	      | Inr ((rl,k),_,_) ->
 		if Level.is_small rl && k == 0 then
 		  let levels = Universe.exprs l in
@@ -469,9 +477,7 @@ let process_universe_constraints univs vars alg local post cstrs =
 		let ls = Universe.exprs l and rs = Universe.exprs r in
 		let rem, rs = 
 		  List.fold_left (fun (acc,rs') l -> 
-		    let fn l = 
-		      let lu = Universe.make_expr l in
-			fun r -> check_eq (pi1 univs) lu (Universe.make_expr r) in
+		    let fn l r = check_eq_expr (pi1 univs) l r in
 		      if List.mem_f fn l rs 
 		      then (acc,List.remove fn l rs') 
 		      else (l :: acc,rs')) ([], rs) ls 
