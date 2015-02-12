@@ -2302,7 +2302,7 @@ let () =
   Geninterp.register_interp0 wit_intro_pattern interp;
   let interp ist gl pat = (project gl, interp_clause ist (pf_env gl) (project gl) pat) in
   Geninterp.register_interp0 wit_clause_dft_concl interp;
-  let interp ist gl s = interp_sort (project gl) s in
+  let interp ist gl s = interp_sort (project gl) Univ.Levels.Invariant s in
   Geninterp.register_interp0 wit_sort interp
 
 let () =

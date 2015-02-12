@@ -238,7 +238,7 @@ let add_inversion_lemma name env sigma t sort dep inv_op =
 let add_inversion_lemma_exn na com comsort bool tac =
   let env = Global.env () and evd = ref Evd.empty in
   let c = Constrintern.interp_type_evars env evd com in
-  let sigma, sort = Pretyping.interp_sort !evd comsort in
+  let sigma, sort = Pretyping.interp_sort !evd Univ.Levels.Invariant comsort in
   try
     add_inversion_lemma na env sigma c sort bool tac
   with

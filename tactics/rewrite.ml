@@ -361,7 +361,8 @@ end) = struct
 	  (try
 	   let params, args = Array.chop (Array.length args - 2) args in
 	   let env' = Environ.push_rel_context rels env in
-	   let evars, (evar, _) = Evarutil.new_type_evar env' sigma Evd.univ_flexible in
+	   let evars, (evar, _) = 
+	     Evarutil.new_type_evar env' sigma Evd.univ_flexible Univ.Levels.Invariant in
 	   let evars, inst = 
 	     app_poly env (evars,Evar.Set.empty)
 	       rewrite_relation_class [| evar; mkApp (c, params) |] in
@@ -421,7 +422,7 @@ module TypeGlobal = struct
 
 
   let inverse env (evd,cstrs) car rel = 
-    let evd, (sort,_) = Evarutil.new_type_evar env evd Evd.univ_flexible in
+    let evd, (sort,_) = Evarutil.new_type_evar env evd Evd.univ_flexible Univ.Levels.CoVariant in
       app_poly_check env (evd,cstrs) coq_inverse [| car ; car; sort; rel |]
 
 end

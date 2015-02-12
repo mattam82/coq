@@ -47,14 +47,15 @@ val e_new_evar :
 val new_type_evar :
   env -> evar_map -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
   ?naming:Misctypes.intro_pattern_naming_expr -> ?principal:bool -> rigid ->
-  evar_map * (constr * sorts)
+  Univ.Levels.variance -> evar_map * (constr * sorts)
 
 val e_new_type_evar : env -> evar_map ref ->
   ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
-  ?naming:Misctypes.intro_pattern_naming_expr -> ?principal:bool -> rigid -> constr * sorts
+  ?naming:Misctypes.intro_pattern_naming_expr -> ?principal:bool -> 
+  rigid -> Univ.Levels.variance -> constr * sorts
 
-val new_Type : ?rigid:rigid -> env -> evar_map -> evar_map * constr
-val e_new_Type : ?rigid:rigid -> env -> evar_map ref -> constr
+val new_Type : ?rigid:rigid -> ?var:Univ.Levels.variance -> env -> evar_map -> evar_map * constr
+val e_new_Type : ?rigid:rigid -> ?var:Univ.Levels.variance -> env -> evar_map ref -> constr
 
 val restrict_evar : evar_map -> existential_key -> Filter.t ->
   constr list option -> evar_map * existential_key
@@ -139,7 +140,8 @@ val occur_evar_upto : evar_map -> Evar.t -> Constr.t -> bool
 
 (** {6 Value/Type constraints} *)
 
-val judge_of_new_Type : evar_map -> evar_map * unsafe_judgment
+val judge_of_new_Type : ?var:Univ.Levels.variance -> 
+  evar_map -> evar_map * unsafe_judgment
 
 type type_constraint = types option
 type val_constraint = constr option

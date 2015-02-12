@@ -55,9 +55,9 @@ let refresh_universes ?(inferred=false) ?(onlyalg=false) pbty env evd t =
     | Sort (Type u as s) when
       (match Univ.universe_level u with
       | None -> true 
-      | Some l -> not onlyalg && Option.is_empty (Evd.is_sort_variable evd s)) ->
+      | Some l -> not onlyalg && Option.is_empty (Evd.dest_sort_variable evd s)) ->
     let status = if inferred then Evd.univ_flexible_alg else Evd.univ_flexible in
-    let s' = evd_comb0 (new_sort_variable status) evdref in
+    let s' = evd_comb0 (new_sort_variable status Univ.Levels.Invariant) evdref in
     let evd = 
       if dir then set_leq_sort env !evdref s' s
       else set_leq_sort env !evdref s s'
@@ -1155,7 +1155,7 @@ let solve_evar_evar ?(force=false) f g env evd pbty ev1 ev2 =
           let t1 = it_mkProd_or_LetIn (mkSort j) ctx1 in
           downcast evk1 t1 evd
 	else
-	  let evd, k = Evd.new_sort_variable univ_flexible_alg evd in
+	  let evd, k = Evd.new_sort_variable univ_flexible_alg Univ.Levels.Invariant evd in
           let t1 = it_mkProd_or_LetIn (mkSort k) ctx1 in
           let t2 = it_mkProd_or_LetIn (mkSort k) ctx2 in
 	  let evd = Evd.set_leq_sort env (Evd.set_leq_sort env evd k i) k j in

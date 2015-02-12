@@ -55,17 +55,49 @@ end
 
 type universe_set = LSet.t
 
+(** Polymorphic maps from universe levels to 'a *)
+module LMap : 
+sig
+  include CMap.ExtS with type key = universe_level and module Set := LSet
+
+  val union : 'a t -> 'a t -> 'a t
+  (** [union x y] favors the bindings in the first map. *)
+
+  val diff : 'a t -> 'a t -> 'a t
+  (** [diff x y] removes bindings from x that appear in y (whatever the value). *)
+    
+  val diff_set : 'a t -> LSet.t -> 'a t
+  (** [diff x y] removes bindings from x that from y. *)
+
+  val subst_union : 'a option t -> 'a option t -> 'a option t
+  (** [subst_union x y] favors the bindings of the first map that are [Some],
+      otherwise takes y's bindings. *)
+
+  val pr : (universe_level -> Pp.std_ppcmds) -> ('a -> Pp.std_ppcmds) -> 'a t -> Pp.std_ppcmds
+  (** Pretty-printing *)
+end
+
+type 'a universe_map = 'a LMap.t
+
 module Levels :
 sig
   type t
-  (** A universe instance represents a vector of universes
-      to a polymorphic definition (constant, inductive or constructor). *)
+  (** Levels represent a vector of universe parameters to a polymorphic
+      definition (constant, inductive or constructor). *)
+
+  type variance = 
+    | Invariant
+    | CoVariant
+    | ContraVariant
+
+  val pr_variance : variance -> Pp.std_ppcmds
+  val opp_variance : variance -> variance
 
   val empty : t
   val is_empty : t -> bool
 
-  val of_array : Level.t array -> t
-  val to_array : t -> Level.t array
+  val of_array : (Level.t * variance) array -> t
+  val to_array : t -> Level.t array * variance array
 
   val append : t -> t -> t
   (** To concatenate two instances, used for discharge *)
@@ -88,7 +120,7 @@ sig
   val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
   (** Pretty-printing, no comments *)
 
-  val levels : t -> LSet.t
+  val levels : t -> variance LMap.t
   (** The set of levels in the instance *)
 end
 
@@ -334,27 +366,6 @@ val check_constraints : constraints -> universes -> bool
 
 (** {6 Support for universe polymorphism } *)
 
-(** Polymorphic maps from universe levels to 'a *)
-module LMap : 
-sig
-  include CMap.ExtS with type key = universe_level and module Set := LSet
-
-  val union : 'a t -> 'a t -> 'a t
-  (** [union x y] favors the bindings in the first map. *)
-
-  val diff : 'a t -> 'a t -> 'a t
-  (** [diff x y] removes bindings from x that appear in y (whatever the value). *)
-
-  val subst_union : 'a option t -> 'a option t -> 'a option t
-  (** [subst_union x y] favors the bindings of the first map that are [Some],
-      otherwise takes y's bindings. *)
-
-  val pr : ('a -> Pp.std_ppcmds) -> 'a t -> Pp.std_ppcmds
-  (** Pretty-printing *)
-end
-
-type 'a universe_map = 'a LMap.t
-
 (** {6 Substitution} *)
 
 type universe_subst_fn = universe_level -> universe
@@ -455,14 +466,12 @@ type universe_context = UContext.t
 
 module ContextSet :
 sig 
-  type t = universe_set constrained
+  type t = Levels.variance universe_map constrained
 
   val empty : t
   val is_empty : t -> bool
 
   val singleton : universe_level -> t
-  (* val of_instance : Instance.t -> t *)
-  val of_set : universe_set -> t
 
   val union : t -> t -> t
 
@@ -471,7 +480,7 @@ sig
       much smaller than the right one. *)
 
   val diff : t -> t -> t
-  val add_universe : universe_level -> t -> t
+  val add_universe : universe_level -> Levels.variance -> t -> t
   val add_constraints : constraints -> t -> t
 
   (** Arbitrary choice of linear order of the variables *)
@@ -479,7 +488,7 @@ sig
   val of_context : universe_context -> t
 
   val constraints : t -> constraints
-  val levels : t -> universe_set
+  val levels : t -> Levels.variance universe_map
 end
 
 (** A set of universes with universe constraints.

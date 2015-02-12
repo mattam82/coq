@@ -395,22 +395,22 @@ let new_evar env evd ?src ?filter ?candidates ?store ?naming ?principal typ =
     | Some filter -> Filter.filter_list filter instance in
   new_evar_instance sign evd typ' ?src ?filter ?candidates ?store ?naming ?principal instance
 
-let new_type_evar env evd ?src ?filter ?naming ?principal rigid =
-  let evd', s = new_sort_variable rigid evd in
+let new_type_evar env evd ?src ?filter ?naming ?principal rigid var =
+  let evd', s = new_sort_variable rigid var evd in
   let evd', e = new_evar env evd' ?src ?filter ?naming ?principal (mkSort s) in
     evd', (e, s)
 
-let e_new_type_evar env evdref ?src ?filter ?naming ?principal rigid =
-  let evd', c = new_type_evar env !evdref ?src ?filter ?naming ?principal rigid in
+let e_new_type_evar env evdref ?src ?filter ?naming ?principal rigid var =
+  let evd', c = new_type_evar env !evdref ?src ?filter ?naming ?principal rigid var in
     evdref := evd';
     c
 
-let new_Type ?(rigid=Evd.univ_flexible) env evd = 
-  let evd', s = new_sort_variable rigid evd in
+let new_Type ?(rigid=Evd.univ_flexible) ?(var=Univ.Levels.Invariant) env evd = 
+  let evd', s = new_sort_variable rigid var evd in
     evd', mkSort s
 
-let e_new_Type ?(rigid=Evd.univ_flexible) env evdref =
-  let evd', s = new_sort_variable rigid !evdref in
+let e_new_Type ?(rigid=Evd.univ_flexible) ?(var=Univ.Levels.Invariant) env evdref =
+  let evd', s = new_sort_variable rigid var !evdref in
     evdref := evd'; mkSort s
 
   (* The same using side-effect *)
@@ -711,7 +711,13 @@ let define_pure_evar_as_product evd evk =
   let id = next_ident_away idx (ids_of_named_context (evar_context evi)) in
   let concl = whd_evar evd evi.evar_concl in
   let s = destSort concl in
-  let evd1,(dom,u1) = new_type_evar evenv evd univ_flexible_alg ~filter:(evar_filter evi) in
+  let var = match dest_sort_variable evd s with
+    | None -> Univ.Levels.Invariant
+    | Some (_, v) -> v
+  in
+  let evd1,(dom,u1) = new_type_evar evenv evd univ_flexible_alg 
+    Univ.Levels.Invariant (* Unclear *)
+    ~filter:(evar_filter evi) in
   let evd2,rng =
     let newenv = push_named (id, None, dom) evenv in
     let src = evar_source evk evd1 in
@@ -721,7 +727,7 @@ let define_pure_evar_as_product evd evk =
         new_evar newenv evd1 concl ~src ~filter
       else
 	let evd3, (rng, srng) =
-	  new_type_evar newenv evd1 univ_flexible_alg ~src ~filter in
+	  new_type_evar newenv evd1 univ_flexible_alg var ~src ~filter in
 	let prods = Univ.sup (univ_of_sort u1) (univ_of_sort srng) in
 	let evd3 = Evd.set_leq_sort evenv evd3 (Type prods) s in
 	  evd3, rng
@@ -788,7 +794,7 @@ let rec evar_absorb_arguments env evd (evk,args as ev) = function
 (* Refining an evar to a sort *)
 
 let define_evar_as_sort env evd (ev,args) =
-  let evd, u = new_univ_variable univ_rigid evd in
+  let evd, u = new_univ_variable univ_rigid Univ.Levels.Invariant evd in
   let evi = Evd.find_undefined evd ev in 
   let s = Type u in
   let evd' = Evd.define ev (mkSort s) evd in
@@ -797,8 +803,8 @@ let define_evar_as_sort env evd (ev,args) =
 (* We don't try to guess in which sort the type should be defined, since
    any type has type Type. May cause some trouble, but not so far... *)
 
-let judge_of_new_Type evd =
-  let evd', s = new_univ_variable univ_rigid evd in
+let judge_of_new_Type ?(var=Univ.Levels.Invariant) evd =
+  let evd', s = new_univ_variable univ_rigid var evd in
     evd', { uj_val = mkSort (Type s); uj_type = mkSort (Type (Univ.super s)) }
 
 (* Propagation of constraints through application and abstraction:

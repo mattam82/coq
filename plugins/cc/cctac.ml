@@ -378,7 +378,8 @@ let discriminate_tac (cstr,u as cstru) p =
     let identity = Universes.constr_of_global _I in
     (* let trivial=pf_type_of gls identity in *)
     let trivial = Universes.constr_of_global _True in
-    let evm, outtype = Evd.new_sort_variable Evd.univ_flexible (Proofview.Goal.sigma gl) in 
+    let evm, outtype = Evd.new_sort_variable Evd.univ_flexible Univ.Levels.Invariant 
+      (Proofview.Goal.sigma gl) in 
     let outtype = mkSort outtype in
     let pred=mkLambda(Name xid,outtype,mkRel 1) in
     let hid = Tacmach.New.of_old (pf_get_new_id (Id.of_string "Heq")) gl in

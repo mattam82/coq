@@ -563,7 +563,9 @@ let rec instantiate_universes env evdref scl is = function
           scl (* constrained sort: replace by scl *)
         else
           (* unconstrained sort: replace by fresh universe *)
-          let evm, s = Evd.new_sort_variable Evd.univ_flexible !evdref in
+          let evm, s = Evd.new_sort_variable Evd.univ_flexible 
+	    Univ.Levels.Invariant (* Maybe CoVariant would be correct here *)
+	    !evdref in
 	  let evm = Evd.set_leq_sort env evm s (Sorts.sort_of_univ u) in
 	    evdref := evm; s
       in

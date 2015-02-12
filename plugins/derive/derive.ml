@@ -25,7 +25,8 @@ let start_deriving f suchthat lemma =
   (** create a sort variable for the type of [f] *)
   (* spiwack: I don't know what the rigidity flag does, picked the one
      that looked the most general. *)
-  let (sigma,f_type_sort) = Evd.new_sort_variable Evd.univ_flexible_alg sigma in
+  let (sigma,f_type_sort) = 
+    Evd.new_sort_variable Evd.univ_flexible_alg Univ.Levels.Invariant sigma in
   let f_type_type = Term.mkSort f_type_sort in
   (** create the initial goals for the proof: |- Type ; |- ?1 ; f:=?2 |- suchthat *)
   let goals =

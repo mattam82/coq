@@ -239,25 +239,28 @@ val instantiate_with_lbound :
   Univ.universe ->
   bool ->
   bool ->
-  Univ.LSet.t * Univ.universe option Univ.LMap.t *
+  'a Univ.LMap.t * Univ.universe option Univ.LMap.t *
     Univ.LSet.t *
     (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints ->
-  (Univ.LSet.t * Univ.universe option Univ.LMap.t *
+  ('a Univ.LMap.t * Univ.universe option Univ.LMap.t *
     Univ.LSet.t *
      (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints) *
     (bool * bool * Univ.universe)
 
 val minimize_univ_variables : 
-           Univ.LSet.t ->
-           Univ.universe option Univ.LMap.t ->
-           Univ.LSet.t ->
+  'a Univ.LMap.t ->
+  Univ.universe option Univ.LMap.t ->
+  Univ.LSet.t ->
   constraints_map -> constraints_map ->
-           Univ.constraints ->
-           Univ.LSet.t * Univ.universe option Univ.LMap.t *
-	     Univ.LSet.t *
-           (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints
+  Univ.constraints ->
+  'a Univ.LMap.t * Univ.universe option Univ.LMap.t *
+    Univ.LSet.t *
+    (bool * bool * Univ.universe) Univ.LMap.t * Univ.constraints
 
 (** {6 Support for old-style sort-polymorphism } *)
 
 val solve_constraints_system : universe option array -> universe array -> universe array ->
   universe array
+
+
+val compute_variance : universe_context -> constr -> Univ.Levels.variance option array

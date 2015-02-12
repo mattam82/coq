@@ -124,11 +124,11 @@ val check_evars_are_solved :
 (** Internal of Pretyping... *)
 val pretype :
   bool -> type_constraint -> env -> evar_map ref ->
-  ltac_var_map -> glob_constr -> unsafe_judgment
+  ltac_var_map -> Univ.Levels.variance -> glob_constr -> unsafe_judgment
 
 val pretype_type :
   bool -> val_constraint -> env -> evar_map ref ->
-  ltac_var_map -> glob_constr -> unsafe_type_judgment
+  ltac_var_map -> Univ.Levels.variance -> glob_constr -> unsafe_type_judgment
 
 val ise_pretype_gen :
   inference_flags -> env -> evar_map ->
@@ -141,7 +141,7 @@ val ise_pretype_gen :
 val constr_in : constr -> Dyn.t
 val constr_out : Dyn.t -> constr
 
-val interp_sort : evar_map -> glob_sort -> evar_map * sorts
+val interp_sort : evar_map -> Univ.Levels.variance -> glob_sort -> evar_map * sorts
 val interp_elimination_sort : glob_sort -> sorts_family
 
 val genarg_interp_hook :

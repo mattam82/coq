@@ -186,6 +186,11 @@ let declare_constant_common id cst =
 
 let definition_entry ?(opaque=false) ?(inline=false) ?types 
     ?(poly=false) ?(univs=Univ.UContext.empty) ?(eff=Declareops.no_seff) body =
+  let variance = Universes.compute_variance univs body in
+    msg_debug (str"Computed variance: " ++ 
+		 prlist_with_sep spc (function None -> str"?" 
+		   | Some v -> Univ.Levels.pr_variance v)
+		 (Array.to_list variance));
   { const_entry_body = Future.from_val ((body,Univ.ContextSet.empty), eff);
     const_entry_secctx = None;
     const_entry_type = types;

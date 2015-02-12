@@ -1060,14 +1060,14 @@ let merge_uctx rigid uctx ctx' =
     | UnivRigid -> uctx
     | UnivFlexible b ->
       let levels = ContextSet.levels ctx' in
-      let fold u accu =
+      let fold u _ accu =
         if LMap.mem u accu then accu
         else LMap.add u None accu
       in
-      let uvars' = LSet.fold fold levels uctx.uctx_univ_variables in
+      let uvars' = LMap.fold fold levels uctx.uctx_univ_variables in
 	if b then
 	  { uctx with uctx_univ_variables = uvars';
-	  uctx_univ_algebraic = LSet.union uctx.uctx_univ_algebraic levels }
+	  uctx_univ_algebraic = LSet.union uctx.uctx_univ_algebraic (LMap.domain levels) }
 	else { uctx with uctx_univ_variables = uvars' }
   in
   let uctx_local = ContextSet.append ctx' uctx.uctx_local in
@@ -1089,10 +1089,10 @@ let with_context_set rigid d (a, ctx) =
 let add_uctx_names s l (names, names_rev) =
     (UNameMap.add s l names, Univ.LMap.add l s names_rev)
 
-let uctx_new_univ_variable rigid name
+let uctx_new_univ_variable rigid name var
   ({ uctx_local = ctx; uctx_univ_variables = uvars; uctx_univ_algebraic = avars} as uctx) =
   let u = Universes.new_univ_level (Global.current_dirpath ()) in
-  let ctx' = Univ.ContextSet.add_universe u ctx in
+  let ctx' = Univ.ContextSet.add_universe u var ctx in
   let uctx' = 
     match rigid with
     | UnivRigid -> uctx
@@ -1109,16 +1109,16 @@ let uctx_new_univ_variable rigid name
     {uctx' with uctx_names = names; uctx_local = ctx';
       uctx_universes = Univ.add_universe u uctx.uctx_universes}, u
 
-let new_univ_level_variable ?name rigid evd =
-  let uctx', u = uctx_new_univ_variable rigid name evd.universes in
+let new_univ_level_variable ?name rigid var evd =
+  let uctx', u = uctx_new_univ_variable rigid name var evd.universes in
     ({evd with universes = uctx'}, u)
 
-let new_univ_variable ?name rigid evd =
-  let uctx', u = uctx_new_univ_variable rigid name evd.universes in
+let new_univ_variable ?name rigid var evd =
+  let uctx', u = uctx_new_univ_variable rigid name var evd.universes in
     ({evd with universes = uctx'}, Univ.Universe.make u)
 
-let new_sort_variable ?name rigid d =
-  let (d', u) = new_univ_variable rigid ?name d in
+let new_sort_variable ?name rigid var d =
+  let (d', u) = new_univ_variable rigid ?name var d in
     (d', Type u)
 
 let make_flexible_variable evd b u =
@@ -1158,14 +1158,14 @@ let fresh_global ?(rigid=univ_flexible_alg) ?names env evd gr =
 
 let whd_sort_variable evd t = t
 
-let is_sort_variable evd s = 
+let dest_sort_variable evd s = 
   match s with 
   | Type u -> 
     (match Univ.universe_level u with
-    | Some l as x -> 
+    | Some l -> 
       let uctx = evd.universes in
-	if Univ.LSet.mem l (Univ.ContextSet.levels uctx.uctx_local) then x
-	else None
+	(try Some (l, Univ.LMap.find l (Univ.ContextSet.levels uctx.uctx_local))
+	 with Not_found -> None)
     | None -> None)
   | _ -> None
 
@@ -1251,7 +1251,7 @@ let check_leq evd s s' =
   Univ.check_leq evd.universes.uctx_universes s s'
 
 let subst_univs_context_with_def def usubst (ctx, cst) =
-  (Univ.LSet.diff ctx def, Univ.subst_univs_constraints usubst cst)
+  (Univ.LMap.diff_set ctx def, Univ.subst_univs_constraints usubst cst)
 
 let normalize_evar_universe_context_variables uctx =
   let normalized_variables, undef, def, subst = 
@@ -1309,7 +1309,8 @@ let normalize_evar_universe_context uctx =
       Universes.normalize_context_set uctx.uctx_local uctx.uctx_univ_variables
         uctx.uctx_univ_algebraic
     in
-      if Univ.LSet.equal (fst us') (fst uctx.uctx_local) then 
+      if Univ.LSet.equal (Univ.LMap.domain (fst us')) (Univ.LMap.domain (fst uctx.uctx_local)) 
+      then 
 	let uctx' = 
 	  add_universe_constraints_context 
 	    {uctx with uctx_postponed = Universes.Constraints.empty}

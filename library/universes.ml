@@ -279,13 +279,14 @@ let fresh_instance_from_context ctx =
     inst, constraints
 
 let fresh_instance ctx =
-  let ctx' = ref LSet.empty in
+  let ctx' = ref LMap.empty in
+  let levs = UContext.levels ctx in
   let inst = 
-    Instance.level_subst (fun v -> 
+    Array.map (fun v -> 
       let u = new_univ_level (Global.current_dirpath ()) in
-	ctx' := LSet.add u !ctx'; u) 
-      (UContext.instance ctx)
-  in !ctx', inst
+	ctx' := LMap.add u v !ctx'; Universe.make u) 
+      (snd (Levels.to_array levs))
+  in !ctx', Instance.of_array inst
 
 let existing_instance ctx inst = 
   let () = 
@@ -296,7 +297,7 @@ let existing_instance ctx inst =
 	  (str "Polymorphic constant expected " ++ int len2 ++ 
 	     str" levels but was given " ++ int len1)
       else ()
-  in LSet.empty, inst
+  in LMap.empty, inst
 
 let fresh_instance_from ctx inst =
   let ctx', inst = 
@@ -398,7 +399,7 @@ let unsafe_global_instance env gr =
 let constr_of_global gr =
   let c, ctx = fresh_global_instance (Global.env ()) gr in
     if not (Univ.ContextSet.is_empty ctx) then
-      if Univ.LSet.is_empty (Univ.ContextSet.levels ctx) then 
+      if Univ.LMap.is_empty (Univ.ContextSet.levels ctx) then 
 	(* Should be an error as we might forget constraints, allow for now
 	   to make firstorder work with "using" clauses *)
 	c
@@ -575,11 +576,11 @@ let fresh_universe_context_set_instance ctx =
   if ContextSet.is_empty ctx then LMap.empty, ctx
   else
     let (univs, cst) = ContextSet.levels ctx, ContextSet.constraints ctx in
-    let univs',subst = LSet.fold
-      (fun u (univs',subst) ->
+    let univs',subst = LMap.fold
+      (fun u v (univs',subst) ->
 	let u' = fresh_level () in
-	  (LSet.add u' univs', LMap.add u u' subst))
-      univs (LSet.empty, LMap.empty)
+	  (LMap.add u' v univs', LMap.add u u' subst))
+      univs (LMap.empty, LMap.empty)
     in
     let cst' = subst_univs_level_constraints subst cst in
       subst, (univs', cst')
@@ -654,7 +655,7 @@ let pr_universe_body = function
   | None -> mt ()
   | Some v -> str" := " ++ Univ.Universe.pr v
 
-let pr_universe_opt_subst = Univ.LMap.pr pr_universe_body
+let pr_universe_opt_subst = Univ.LMap.pr Univ.Level.pr pr_universe_body
 
 exception Found of Level.t
 let find_inst insts v =
@@ -680,7 +681,7 @@ let instantiate_with_lbound u lbound alg enforce (ctx, us, algs, insts, cstrs) =
       (ctx, us, LSet.remove u algs, 
        LMap.add u (enforce,alg,lbound) insts, cstrs'), (enforce, alg, inst)
   else (* Actually instantiate *)
-    (Univ.LSet.remove u ctx, Univ.LMap.add u (Some lbound) us, algs,
+    (Univ.LMap.remove u ctx, Univ.LMap.add u (Some lbound) us, algs,
      LMap.add u (enforce,alg,lbound) insts, cstrs), (enforce, alg, lbound)
 
 let reduce_max univs u =
@@ -710,7 +711,7 @@ let pr_constraints_map cmap =
 let minimize_univ_variables ctx us algs left right cstrs =
   let left, lbounds = 
     Univ.LMap.fold (fun r lower (left, lbounds as acc)  ->
-      if Univ.LMap.mem r us || not (Univ.LSet.mem r ctx) then acc
+      if Univ.LMap.mem r us || not (Univ.LMap.mem r ctx) then acc
       else (* Fixed universe, just compute its glb for sharing *)
 	let lbounds' = 
 	  match compute_lbound (List.map Universe.make_expr lower) with
@@ -769,7 +770,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	    in
 	      (ctx', us, algs, insts, cstrs'), b
     in
-      if not (LSet.mem u ctx) then acc' (acc, (true, false, Universe.make u))
+      if not (LMap.mem u ctx) then acc' (acc, (true, false, Universe.make u))
       else
 	let lbound = compute_lbound left in
 	  match lbound with
@@ -785,7 +786,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
   in
     LMap.fold (fun u v (ctx', us, algs, seen, cstrs as acc) -> 
       if v == None then fst (aux acc u)
-      else LSet.remove u ctx', us, LSet.remove u algs, seen, cstrs)
+      else LMap.remove u ctx', us, LSet.remove u algs, seen, cstrs)
       us (ctx, us, algs, lbounds, cstrs)
       
 let normalize_context_set ctx us algs = 
@@ -807,13 +808,13 @@ let normalize_context_set ctx us algs =
 	 (noneqs, ctx, subst, eqs))
       else if d == Eq then 
 	let ll = Option.get (Universe.level l) in
-	  if LSet.mem ll ctx then
-	    (noneqs, LSet.remove ll ctx, LMap.add ll (Some r) subst, eqs)
+	  if LMap.mem ll ctx then
+	    (noneqs, LMap.remove ll ctx, LMap.add ll (Some r) subst, eqs)
 	  else 
 	    let (rl,k) = Option.get (Universe.expr r) in
-	      if LSet.mem rl ctx then
+	      if LMap.mem rl ctx then
 		(* ll = rl + k -> rl = ll - k *)
-		(noneqs, LSet.remove rl ctx, LMap.add rl (Some (Universe.add (-k) l)) subst, eqs) 
+		(noneqs, LMap.remove rl ctx, LMap.add rl (Some (Universe.add (-k) l)) subst, eqs) 
 	      else 
 		(noneqs, ctx, subst, Constraint.add (l,d,r) eqs)
       else (Constraint.add (l,d,r) noneqs, ctx, subst, eqs))
@@ -821,7 +822,7 @@ let normalize_context_set ctx us algs =
   in
   let partition = UF.partition uf in
   let flex x = LMap.mem x us in
-  let ctx, subst, eqs = List.fold_left (fun (ctx, subst, cstrs) s ->
+  let ctxs, subst, eqs = List.fold_left (fun (ctx, subst, cstrs) s ->
     let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in
     (* Add equalities for globals which can't be merged anymore. *)
     let canonu = Universe.make canon in
@@ -832,7 +833,10 @@ let normalize_context_set ctx us algs =
     let subst = LSet.fold (fun f -> LMap.add f (Some canonu)) rigid subst in
     let subst = LSet.fold (fun f -> LMap.add f (Some canonu)) flexible subst in
       (LSet.diff (LSet.diff ctx rigid) flexible, subst, cstrs))
-    (ctx, subst, eqs) partition
+    (LMap.domain ctx, subst, eqs) partition
+  in
+  let ctx = LMap.fold 
+    (fun k v acc -> if not (LSet.mem k ctxs) then LMap.remove k acc else acc) ctx ctx
   in
   (* Noneqs is now in canonical form w.r.t. equality constraints,
      and contains only inequality constraints. *)
@@ -882,7 +886,8 @@ let universes_of_constr c =
 let restrict_universe_context (univs,csts) s =
   (* Universes that are not necessary to typecheck the term.
      E.g. univs introduced by tactics and not used in the proof term. *)
-  let diff = LSet.diff univs s in
+  let univsset = LMap.domain univs in
+  let diff = LSet.diff univsset s in
   let rec aux diff candid univs ness = 
     let (diff', candid', univs', ness') = 
       Constraint.fold
@@ -899,7 +904,10 @@ let restrict_universe_context (univs,csts) s =
     in
       if ness' == ness then (LSet.diff univs diff', ness)
       else aux diff' candid' univs' ness'
-  in aux diff csts univs Constraint.empty
+  in
+  let res, ness = aux diff csts univsset Constraint.empty in
+    LMap.fold (fun u l acc -> if not (LSet.mem u res) then LMap.remove u acc else acc)
+      univs univs, ness
 
 let simplify_universe_context (univs,csts) = (univs, csts), LMap.empty
   (* let uf = UF.create () in *)
@@ -1019,3 +1027,61 @@ let solve_constraints_system levels level_bounds level_min =
     done
   done;
   v
+
+let variance_of_ref gr =
+  let (c, ctx) = unsafe_constr_of_global gr in
+  let levels, cstrs = UContext.dest ctx in
+    Array.make (Levels.length levels) Levels.CoVariant
+
+let variance_nesting nest v =
+  if nest then v
+  else Levels.opp_variance v
+
+let compute_variance ctx c = 
+  let open Univ in
+  let open Levels in
+  let levels, cstrs = UContext.dest ctx in
+  let levelsarr = Levels.to_array levels in
+  let vars = Array.map (fun v -> Some v) (snd levelsarr) in
+  let level_index l = 
+    Array.findi (fun i l' -> Level.equal l l') (fst levelsarr)
+  in
+  let merge_vars old newv = 
+    match old with
+    | None -> Some newv
+    | Some ov ->
+      if ov == newv then old
+      else Some Invariant
+  in
+  let update_univ_variance nest v u = 
+    let l = Universe.exprs u in
+      List.iter (fun (l,k) ->
+	match level_index l with
+	| Some n -> 
+	  vars.(n) <- merge_vars vars.(n) (variance_nesting nest v)
+	| _ -> ()) l
+  in
+  let update_variance var cvars inst =
+    let inst = Instance.to_array inst in
+      Array.iteri (fun n v ->
+	update_univ_variance var v inst.(n)) cvars
+  in
+  let rec aux var c = 
+    match kind_of_term c with
+    | Const (c, u) -> 
+      let cvars = variance_of_ref (ConstRef c) in
+	update_variance var cvars u
+    | Ind (i, u) ->
+      let cvars = variance_of_ref (IndRef i) in
+	update_variance var cvars u
+    | Construct (c, u) ->
+      let cvars = variance_of_ref (ConstructRef c) in
+	update_variance var cvars u
+    | Sort (Type u) ->
+      update_univ_variance var CoVariant u
+    | Prod (na, t, u) ->
+      aux (not var) t; aux var u
+    | _ -> iter_constr (aux var) c
+  in 
+    aux true c;
+    vars

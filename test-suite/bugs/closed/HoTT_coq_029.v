@@ -240,7 +240,7 @@ Module SecondComment.
                     (Identity (C := C))
                     (fun _ _ _ m1 m2 => Compose m2 m1).
 
-  Parameter FunctorCategory : forall `(C : @Category objC) `(D : @Category objD), @Category (Functor C D).
+  Parameter FunctorCategory : forall `(C : @Category objC) `(D : @Category objD), @Category@{j k} (Functor C D).
 
   Parameter TerminalCategory : Category unit.
 
@@ -296,9 +296,12 @@ Module SecondComment.
   Defined.
 
   Section CommaCategoryProjectionFunctor.
-    Context `(A : Category objA).
-    Context `(B : Category objB).
-    Context `(C : Category objC).
+    (* Context `(A : Category objA). *)
+    (* Context `(B : Category objB). *)
+    (* Context `(C : Category objC). *)
+    Context `(A : Category@{i j} objA) `(B : Category@{k l} objB) 
+            `(C : Category@{m n} objC).
+    
 
     Variable S : (OppositeCategory (FunctorCategory A C)).
     Variable T : (FunctorCategory B C).

@@ -183,7 +183,7 @@ let lift_univs cb subst =
     let len = Univ.LMap.cardinal subst in
     let subst = 
       Array.fold_left_i (fun i acc v -> Univ.LMap.add (Level.var i) (Level.var (i + len)) acc)
-	subst (Univ.Levels.to_array inst)
+	subst (fst (Univ.Levels.to_array inst))
     in
     let cstrs' = Univ.subst_univs_level_constraints subst cstrs in
       subst, Univ.UContext.make (inst,cstrs')

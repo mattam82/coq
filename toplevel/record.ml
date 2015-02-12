@@ -112,14 +112,15 @@ let typecheck_params_and_fields def id t ps nots fs =
        let sred = Reductionops.whd_betadeltaiota env !evars s in
 	 (match kind_of_term sred with
 	 | Sort s' -> 
-	   (match Evd.is_sort_variable !evars s' with
-	   | Some l -> evars := Evd.make_flexible_variable !evars true (* (not def) *) l; 
+	   (match Evd.dest_sort_variable !evars s' with
+	   | Some (l,v) -> evars := Evd.make_flexible_variable !evars true (* (not def) *) l; 
 	     sred, true
 	   | None -> s, false)
 	 | _ -> user_err_loc (constr_loc t,"", str"Sort expected."))
     | None -> 
       let uvarkind = if (* not def *) true then Evd.univ_flexible_alg else Evd.univ_flexible in
-	mkSort (Evarutil.evd_comb0 (Evd.new_sort_variable uvarkind) evars), false
+	mkSort (Evarutil.evd_comb0 (Evd.new_sort_variable uvarkind Univ.Levels.CoVariant) evars), 
+	  false
   in
   let fullarity = it_mkProd_or_LetIn t' newps in
   let env_ar = push_rel_context newps (push_rel (Name id,None,fullarity) env0) in
