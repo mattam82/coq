@@ -569,6 +569,7 @@ let parse_args arglist =
       if Coq_config.no_native_compiler then
 	warning "Native compilation was disabled at configure time."
       else native_compiler := true
+    |"-no-positivity-check" -> Indtypes.disable_positivity_check ()
     |"-output-context" -> output_context := true
     |"-profile-ltac" -> Flags.profile_ltac := true
     |"-q" -> no_load_rc ()

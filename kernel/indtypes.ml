@@ -36,9 +36,12 @@ nmr = ongoing computation of recursive parameters
 (* If yes, this is compatible with the univalent model *)
 
 let indices_matter = ref false
-
 let enforce_indices_matter () = indices_matter := true
 let is_indices_matter () = !indices_matter
+
+let positivity_check = ref true
+let disable_positivity_check () = positivity_check := false
+let is_positivity_check () = !positivity_check
 
 (* [weaker_noccur_between env n nvars t] (defined above), checks that
    no de Bruijn indices between [n] and [n+nvars] occur in [t]. If
@@ -504,6 +507,9 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
                 such an occurrence is a non-strictly-positive
                 recursive call. Occurrences in the right-hand side of
                 the product must be strictly positive.*)
+            if not (is_positivity_check ()) then 
+              check_pos (ienv_push_var ienv (na, b, mk_norec)) nmr d
+            else
             (match weaker_noccur_between env n ntypes b with
 	      | None when chkpos ->
                   failwith_non_pos_list n ntypes [b]
@@ -522,10 +528,14 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
               (** The case where one of the inductives of the mutually
                   inductive block occurs as an argument of another is not
                   known to be safe. So Coq rejects it. *)
+            if not (is_positivity_check ()) then 
+              (nmr1,rarg)
+            else
 	      if chkpos &&
                  not (List.for_all (noccur_between n ntypes) largs)
 	      then failwith_non_pos_list n ntypes largs
 	      else (nmr1,rarg)
+              end
               with Failure _ | Invalid_argument _ -> (nmr,mk_norec))
 	| Ind ind_kn ->
             (** If one of the inductives of the mutually inductive
@@ -542,7 +552,9 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
               (noccur_between n ntypes x &&
                List.for_all (noccur_between n ntypes) largs)
 	    then (nmr,mk_norec)
-	    else failwith_non_pos_list n ntypes (x::largs)
+	    else if not (is_positivity_check ()) then 
+              (nmr,mk_norec)
+            else failwith_non_pos_list n ntypes (x::largs)
 
   (** [check_positive_nested] handles the case of nested inductive
       calls, that is, when an inductive types from the mutually
