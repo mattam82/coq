@@ -403,19 +403,26 @@ let extract_level env evd min tys =
   in sup_list min sorts
 
 let inductive_levels env evdref poly arities inds =
-  let destarities = List.map (Reduction.dest_arity env) arities in
-  let levels = List.map (fun (ctx,a) -> 
+  let destarities = List.map (fun x -> x, Reduction.dest_arity env x) arities in
+  let levels = List.map (fun (x,(ctx,a)) -> 
     if a = Prop Null then None
     else Some (univ_of_sort a)) destarities
   in
   let cstrs_levels, min_levels, sizes = 
     CList.split3
-      (List.map2 (fun (_,tys,_) (ctx,du) -> 
+      (List.map2 (fun (_,tys,_) (arity,(ctx,du)) -> 
 	let len = List.length tys in
 	let minlev =
 	  if len > 1 && not (is_impredicative env du) then
 	    Univ.type0_univ
 	  else Univ.type0m_univ
+	in
+	let minlev =
+	  (** Indices contribute. *)
+	  if Indtypes.is_indices_matter () && List.length ctx > 0 then (
+	    let ilev = sign_level env !evdref ctx in
+	      Univ.sup ilev minlev)
+	  else minlev
 	in
 	let clev = extract_level env !evdref minlev tys in
 	  (clev, minlev, len)) inds destarities)
@@ -426,31 +433,28 @@ let inductive_levels env evdref poly arities inds =
     (Array.of_list cstrs_levels) (Array.of_list min_levels)
   in
   let evd, arities =
-    CList.fold_left3 (fun (evd, arities) cu (ctx,du) len ->
+    CList.fold_left3 (fun (evd, arities) cu (arity,(ctx,du)) len ->
       if is_impredicative env du then
 	(** Any product is allowed here. *)
-	evd, arities
+	evd, arity :: arities
       else (** If in a predicative sort, or asked to infer the type,
 	       we take the max of:
 	       - indices (if in indices-matter mode)
 	       - constructors
 	       - Type(1) if there is more than 1 constructor
 	   *)
-	let evd = 
-	  (** Indices contribute. *) (* FIXME , put before solve *)
-	  if Indtypes.is_indices_matter () && List.length ctx > 0 then (
-	    let ilev = sign_level env !evdref ctx in
-	      Evd.set_leq_sort env evd (Type ilev) du)
-	  else evd
-	in
         (** Constructors contribute. *)
-	let evd = 
+	let arity, evd = 
 	  if Sorts.is_set du then
 	    if not (Evd.check_leq evd cu Univ.type0_univ) then 
 	      raise (Indtypes.InductiveError Indtypes.LargeNonPropInductiveNotInType)
-	    else evd
+	    else arity, evd
 	  else
-	    Evd.set_leq_sort env evd (Type cu) du
+	    if Evd.check_eq evd cu (Sorts.univ_of_sort du) then
+	      arity, evd
+	    else
+	      let ar = it_mkProd_or_LetIn (mkType cu) ctx in
+		ar, Evd.set_leq_sort env evd (Type cu) du
 	in
 	let evd = 
 	  if len >= 2 && Univ.is_type0m_univ cu then 
