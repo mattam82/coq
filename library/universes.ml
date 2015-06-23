@@ -1022,8 +1022,9 @@ let solve_constraints_system levels level_bounds level_min =
     done;
     for j=0 to nind-1 do
       match levels.(j) with
-      | Some u -> v.(i) <- univ_level_rem u v.(i) level_min.(i)
-      | None -> ()
+      | Some u when not (Univ.Level.is_small u) ->
+	 v.(i) <- univ_level_rem u v.(i) level_min.(i)
+      | _ -> ()
     done
   done;
   v
