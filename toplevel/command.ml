@@ -425,11 +425,11 @@ let inductive_levels env evdref poly arities inds =
   let levels' = Universes.solve_constraints_system (Array.of_list levels)
     (Array.of_list cstrs_levels) (Array.of_list min_levels)
   in
-  let evd =
-    CList.fold_left3 (fun evd cu (ctx,du) len ->
+  let evd, arities =
+    CList.fold_left3 (fun (evd, arities) cu (ctx,du) len ->
       if is_impredicative env du then
 	(** Any product is allowed here. *)
-	evd
+	evd, arities
       else (** If in a predicative sort, or asked to infer the type,
 	       we take the max of:
 	       - indices (if in indices-matter mode)
@@ -437,7 +437,7 @@ let inductive_levels env evdref poly arities inds =
 	       - Type(1) if there is more than 1 constructor
 	   *)
 	let evd = 
-	  (** Indices contribute. *)
+	  (** Indices contribute. *) (* FIXME , put before solve *)
 	  if Indtypes.is_indices_matter () && List.length ctx > 0 then (
 	    let ilev = sign_level env !evdref ctx in
 	      Evd.set_leq_sort env evd (Type ilev) du)
@@ -459,9 +459,11 @@ let inductive_levels env evdref poly arities inds =
 	       land in Prop directly (no informative arguments as well). *)
 	    Evd.set_leq_sort env evd (Prop Pos) du
 	  else evd
-	in evd)
-    !evdref (Array.to_list levels') destarities sizes
-  in evdref := evd; arities
+	in
+	let arity = it_mkProd_or_LetIn (mkType cu) ctx in
+	  (evd, arity :: arities))
+    (!evdref,[]) (Array.to_list levels') destarities sizes
+  in evdref := evd; List.rev arities
 
 let check_named (loc, na) = match na with
 | Name _ -> ()

@@ -757,7 +757,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	if alg then
 	  (* u is algebraic: we instantiate it with it's lower bound, if any, 
               or enforce the constraints if it is bounded from the top. *)
-	  instantiate_with_lbound u lbound true (not (Option.is_empty right)) acc
+	  instantiate_with_lbound u lbound true false acc
 	else (* u is non algebraic *)
 	  match Universe.level lbound with
 	  | Some l -> (* The lowerbound is directly a level *) 
