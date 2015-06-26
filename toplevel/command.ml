@@ -402,6 +402,11 @@ let extract_level env evd min tys =
       sign_level env evd ((Anonymous, None, concl) :: ctx)) tys 
   in sup_list min sorts
 
+let is_flexible_sort evd u =
+  match Univ.Universe.level u with
+  | Some l -> Evd.is_flexible_level evd l
+  | None -> false
+
 let inductive_levels env evdref poly arities inds =
   let destarities = List.map (fun x -> x, Reduction.dest_arity env x) arities in
   let levels = List.map (fun (x,(ctx,a)) -> 
@@ -412,10 +417,11 @@ let inductive_levels env evdref poly arities inds =
     CList.split3
       (List.map2 (fun (_,tys,_) (arity,(ctx,du)) -> 
 	let len = List.length tys in
+	let minlev = Sorts.univ_of_sort du in
 	let minlev =
 	  if len > 1 && not (is_impredicative env du) then
-	    Univ.type0_univ
-	  else Univ.type0m_univ
+	    Univ.sup minlev Univ.type0_univ
+	  else minlev
 	in
 	let minlev =
 	  (** Indices contribute. *)
@@ -444,17 +450,13 @@ let inductive_levels env evdref poly arities inds =
 	       - Type(1) if there is more than 1 constructor
 	   *)
         (** Constructors contribute. *)
-	let arity, evd = 
+	let evd = 
 	  if Sorts.is_set du then
 	    if not (Evd.check_leq evd cu Univ.type0_univ) then 
 	      raise (Indtypes.InductiveError Indtypes.LargeNonPropInductiveNotInType)
-	    else arity, evd
-	  else
-	    if Evd.check_eq evd cu (Sorts.univ_of_sort du) then
-	      arity, evd
-	    else
-	      let ar = it_mkProd_or_LetIn (mkType cu) ctx in
-		ar, Evd.set_leq_sort env evd (Type cu) du
+	    else evd
+	  else evd
+	    (* Evd.set_leq_sort env evd (Type cu) du *)
 	in
 	let evd = 
 	  if len >= 2 && Univ.is_type0m_univ cu then 
@@ -464,8 +466,16 @@ let inductive_levels env evdref poly arities inds =
 	    Evd.set_leq_sort env evd (Prop Pos) du
 	  else evd
 	in
-	let arity = it_mkProd_or_LetIn (mkType cu) ctx in
-	  (evd, arity :: arities))
+	  (* let arity = it_mkProd_or_LetIn (mkType cu) ctx in *\) *)
+	  let duu = Sorts.univ_of_sort du in
+	  let evd =
+	    if not (Univ.is_small_univ duu) && Evd.check_eq evd cu duu then
+	      if is_flexible_sort evd duu then
+		Evd.set_eq_sort env evd (Prop Null) du
+	      else evd
+	    else Evd.set_eq_sort env evd (Type cu) du
+	  in
+	    (evd, arity :: arities))
     (!evdref,[]) (Array.to_list levels') destarities sizes
   in evdref := evd; List.rev arities
 
