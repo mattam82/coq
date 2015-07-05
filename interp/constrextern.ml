@@ -990,7 +990,7 @@ let rec glob_of_pat env sigma = function
       GVar (loc,id)
   | PMeta None -> GHole (loc,Evar_kinds.InternalHole, Misctypes.IntroAnonymous,None)
   | PMeta (Some n) -> GPatVar (loc,(false,n))
-  | PProj (p,c) -> GApp (loc,GRef (loc, ConstRef (Projection.constant p),None),
+  | PProj (p,c) -> GApp (loc,GRef (loc, ConstRef (Environ.projection_constant (Global.env ()) p),None), (*FIXME env*)
 			 [glob_of_pat env sigma c])
   | PApp (f,args) ->
       GApp (loc,glob_of_pat env sigma f,Array.map_to_list (glob_of_pat env sigma) args)

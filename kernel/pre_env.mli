@@ -88,3 +88,5 @@ val lookup_constant : constant -> env -> constant_body
 (** Mutual Inductives *)
 val lookup_mind_key : mutual_inductive -> env -> mind_key
 val lookup_mind : mutual_inductive -> env -> mutual_inductive_body
+
+val lookup_projection : projection -> env -> projection_body

@@ -120,7 +120,7 @@ let inKeys : key_obj -> obj =
 let declare_equiv_keys ref ref' =
   Lib.add_anonymous_leaf (inKeys (ref,ref'))
 
-let constr_key c =
+let constr_key env c =
   let open Globnames in 
   try 
     let rec aux k = 
@@ -130,7 +130,7 @@ let constr_key c =
       | Construct (c,u) -> KGlob (ConstructRef c)
       | Var id -> KGlob (VarRef id)
       | App (f, _) -> aux f
-      | Proj (p, _) -> KGlob (ConstRef (Names.Projection.constant p))
+      | Proj (p, _) -> KGlob (ConstRef (Environ.projection_constant env p))
       | Cast (p, _, _) -> aux p
       | Lambda _ -> KLam 
       | Prod _ -> KProd

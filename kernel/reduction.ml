@@ -66,7 +66,7 @@ let compare_stack_shape stk1 stk2 =
 
 type lft_constr_stack_elt =
     Zlapp of (lift * fconstr) array
-  | Zlproj of constant * lift
+  | Zlproj of projection * lift
   | Zlfix of (lift * fconstr) * lft_constr_stack
   | Zlcase of case_info * lift * fconstr * fconstr array
 and lft_constr_stack = lft_constr_stack_elt list
@@ -213,8 +213,8 @@ let compare_stacks f fmind lft1 stk1 lft2 stk2 cuniv =
 	      if !left2right then
 		Array.fold_left2 (fun cu x y -> f x y cu) cu1 a1 a2
 	      else Array.fold_right2 f a1 a2 cu1
-	    | (Zlproj (c1,l1),Zlproj (c2,l2)) -> 
-	      if not (eq_constant c1 c2) then 
+	    | (Zlproj (p1,l1),Zlproj (p2,l2)) -> 
+	      if not (Projection.conv p1 p2) then 
 		raise NotConvertible
 	      else cu1
             | (Zlfix(fx1,a1),Zlfix(fx2,a2)) ->
@@ -277,11 +277,10 @@ let in_whnf (t,stk) =
 
 let unfold_projection infos p c =
   let unf = Projection.unfolded p in
-    if unf || RedFlags.red_set infos.i_flags (RedFlags.fCONST (Projection.constant p)) then
+    if unf || RedFlags.red_set infos.i_flags (RedFlags.fCONST (projection_constant (info_env infos) p)) then
       (match try Some (lookup_projection p (info_env infos)) with Not_found -> None with
       | Some pb -> 
-	let s = Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, 
-		       Projection.constant p) in
+	let s = Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p) in
 	  Some (c, s)
       | None -> None)
   else None
@@ -371,8 +370,7 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
 	| Some (def2,s2) ->
 	  eqappr cv_pb l2r infos appr1 (lft2, whd def2 (s2 :: v2)) cuniv
 	| None -> 
-          if Constant.equal (Projection.constant p1) (Projection.constant p2)
-	     && compare_stack_shape v1 v2 then
+          if Projection.conv p1 p2 && compare_stack_shape v1 v2 then
 	    let u1 = ccnv CONV l2r infos el1 el2 c1 c2 cuniv in
 	      convert_stacks l2r infos lft1 lft2 v1 v2 u1
 	  else (* Two projections in WHNF: unfold *)

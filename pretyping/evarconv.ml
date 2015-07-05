@@ -37,9 +37,9 @@ let _ = Goptions.declare_bool_option {
 }
 
 let unfold_projection env evd ts p c =
-  let cst = Projection.constant p in
+  let cst = projection_constant env p in
     if is_transparent_constant ts cst then
-      let c' = Some (mkProj (Projection.make cst true, c)) in
+      let c' = Some (mkProj (Projection.unfold p, c)) in
 	match ReductionBehaviour.get (Globnames.ConstRef cst) with
 	| None -> c'
 	| Some (recargs, nargs, flags) ->
@@ -133,7 +133,7 @@ let occur_rigidly ev evd t =
    projection would have been reduced) *)
 
 let check_conv_record env sigma (t1,sk1) (t2,sk2) =
-  let (proji, u), arg = Universes.global_app_of_constr t1 in
+  let (proji, u), arg = Universes.global_app_of_constr env t1 in
   let canon_s,sk2_effective =
     try
       match kind_of_term t2 with
@@ -249,7 +249,7 @@ let ise_stack2 no_app env evd f sk1 sk2 =
         | UnifFailure _ as x -> fail x)
       | UnifFailure _ as x -> fail x)
     | Stack.Proj (n1,a1,p1,_)::q1, Stack.Proj (n2,a2,p2,_)::q2 ->
-       if eq_constant (Projection.constant p1) (Projection.constant p2)
+       if Projection.conv p1 p2
        then ise_stack2 true i q1 q2
        else fail (UnifFailure (i, NotSameHead))
     | Stack.Fix (((li1, i1),(_,tys1,bds1 as recdef1)),a1,_)::q1,
@@ -293,7 +293,7 @@ let exact_ise_stack2 env evd f sk1 sk2 =
 	  (fun i -> ise_stack2 i a1 a2)]
       else UnifFailure (i,NotSameHead)
     | Stack.Proj (n1,a1,p1,_)::q1, Stack.Proj (n2,a2,p2,_)::q2 ->
-       if eq_constant (Projection.constant p1) (Projection.constant p2)
+       if Projection.conv p1 p2
        then ise_stack2 i q1 q2
        else (UnifFailure (i, NotSameHead))
     | Stack.Update _ :: _, _ | Stack.Shift _ :: _, _
@@ -569,7 +569,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	ise_try evd [f1; f2]
 
 	| Proj (p, c), Proj (p', c') 
-	  when Constant.equal (Projection.constant p) (Projection.constant p') ->
+	  when Projection.conv p p' ->
 	  let f1 i = 
 	    ise_and i 
 	    [(fun i -> evar_conv_x ts env i CONV c c');
@@ -582,7 +582,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	    ise_try evd [f1; f2]
 	      
 	(* Catch the p.c ~= p c' cases *)
-	| Proj (p,c), Const (p',u) when eq_constant (Projection.constant p) p' ->
+	| Proj (p,c), Const (p',u) when eq_constant (projection_constant env p) p' ->
 	  let res = 
 	    try Some (destApp (Retyping.expand_projection env evd p c []))
 	    with Retyping.RetypeError _ -> None
@@ -593,7 +593,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 		(appr2,csts2)
 	    | None -> UnifFailure (evd,NotSameHead))
 	      
-	| Const (p,u), Proj (p',c') when eq_constant p (Projection.constant p') ->
+	| Const (p,u), Proj (p',c') when eq_constant p (projection_constant env p') ->
 	  let res = 
 	    try Some (destApp (Retyping.expand_projection env evd p' c' []))
 	    with Retyping.RetypeError _ -> None
@@ -851,16 +851,16 @@ and conv_record trs env evd (ctx,(h,h2),c,bs,(params,params1),(us,us2),(sk1,sk2)
 and eta_constructor ts env evd sk1 ((ind, i), u) sk2 term2 =
   let mib = lookup_mind (fst ind) env in
     match mib.Declarations.mind_record with
-    | Some (Some (id, projs, pbs)) when mib.Declarations.mind_finite <> Decl_kinds.CoFinite -> 
+    | Some (Some (id, pbs)) when mib.Declarations.mind_finite <> Decl_kinds.CoFinite -> 
       let pars = mib.Declarations.mind_nparams in
 	(try 
 	   let l1' = Stack.tail pars sk1 in
 	   let l2' = 
 	     let term = Stack.zip (term2,sk2) in 
-	       List.map (fun p -> mkProj (Projection.make p false, term)) (Array.to_list projs)
+	       Array.mapi (fun i p -> mkProj (Projection.make (fst ind) i false, term)) pbs
 	   in
 	     exact_ise_stack2 env evd (evar_conv_x (fst ts, false)) l1' 
-	       (Stack.append_app_list l2' Stack.empty)
+	       (Stack.append_app l2' Stack.empty)
 	 with 
 	 | Invalid_argument _ ->
 	   (* Stack.tail: partially applied constructor *)

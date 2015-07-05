@@ -1094,7 +1094,7 @@ let enforce_prop_bound_names rename tac =
               if Retyping.get_sort_family_of env sigma t = InProp then
                 (* "very_standard" says that we should have "H" names only, but
                    this would break compatibility even more... *)
-                let s = match Namegen.head_name t with
+                let s = match Namegen.head_name env t with
                   | Some id when not very_standard -> string_of_id id
                   | _ -> "" in
                 Name (add_suffix Namegen.default_prop_ident s)
@@ -1347,7 +1347,7 @@ let make_projection env sigma params cstr sign elim i n c u =
 	  let args = extended_rel_vect 0 sign in
 	  let proj =
 	    if Environ.is_projection proj env then
-	      mkProj (Projection.make proj false, mkApp (c, args))
+	      mkProj (Environ.constant_projection proj env, mkApp (c, args))
 	    else
 	      mkApp (mkConstU (proj,u), Array.append (Array.of_list params)
 		[|mkApp (c, args)|])

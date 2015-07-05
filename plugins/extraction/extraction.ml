@@ -229,8 +229,13 @@ let oib_equal o1 o2 =
     end &&
     Array.equal Id.equal o1.mind_consnames o2.mind_consnames
 
+let eq_projection_body x y =
+  x.proj_arg = y.proj_arg &&
+  eq_constr x.proj_type y.proj_type &&
+  eq_constr x.proj_body y.proj_body
+		 
 let eq_record x y =
-  Option.equal (Option.equal (fun (_, x, y) (_, x', y') -> Array.for_all2 eq_constant x x')) x y
+  Option.equal (Option.equal (fun (_, x) (_, x') -> Array.for_all2 eq_projection_body x x')) x y
 
 let mib_equal m1 m2 =
   Array.equal oib_equal m1.mind_packets m1.mind_packets &&
@@ -306,7 +311,7 @@ let rec extract_type env db j c args =
 	   | (Info, TypeScheme) ->
 	       let mlt = extract_type_app env db (r, type_sign env typ) args in
 	       (match cb.const_body with
-		  | Undef _ | OpaqueDef _ -> mlt
+		  | Undef _ | OpaqueDef _ | Projection _ -> mlt
 		  | Def _ when is_custom r -> mlt
 		  | Def lbody ->
 		      let newc = applist (Mod_subst.force_constr lbody, args) in
@@ -320,7 +325,8 @@ let rec extract_type env db j c args =
 	   | (Info, Default) ->
                (* Not an ML type, for example [(c:forall X, X->X) Type nat] *)
 	       (match cb.const_body with
-		  | Undef _  | OpaqueDef _ -> Tunknown (* Brutal approx ... *)
+		| Undef _  | OpaqueDef _ -> Tunknown (* Brutal approx ... *)
+		| Projection _ -> Tunknown (* FIXME *)
 		  | Def lbody ->
 		      (* We try to reduce. *)
 		      let newc = applist (Mod_subst.force_constr lbody, args) in
@@ -547,7 +553,8 @@ and mlt_env env r = match r with
 	 let typ = Typeops.type_of_constant_type env cb.const_type
  (* FIXME not sure if we should instantiate univs here *) in
 	 match cb.const_body with
-	   | Undef _ | OpaqueDef _ -> None
+	 | Undef _ | OpaqueDef _ -> None
+	 | Projection _ -> None (* FIXME *)
 	   | Def l_body ->
 	       (match flag_of_type env typ with
 		  | Info,TypeScheme ->
@@ -633,7 +640,7 @@ let rec extract_term env mle mlt c args =
     | Construct (cp,u) ->
 	extract_cons_app env mle mlt cp u args
     | Proj (p, c) ->
-        extract_cst_app env mle mlt (Projection.constant p) Univ.Instance.empty (c :: args)
+        extract_cst_app env mle mlt (projection_constant env p) Univ.Instance.empty (c :: args)
     | Rel n ->
 	(* As soon as the expected [mlt] for the head is known, *)
 	(* we unify it with an fresh copy of the stored type of [Rel n]. *)
@@ -1026,6 +1033,7 @@ let extract_constant env kn cb =
         (match cb.const_body with
 	  | Undef _ -> warn_info (); mk_typ_ax ()
 	  | Def c -> mk_typ (Mod_subst.force_constr c)
+	  | Projection _ -> mk_typ_ax () (* FIXME *)
 	  | OpaqueDef c ->
 	    add_opaque r;
 	    if access_opaque () then
@@ -1035,6 +1043,7 @@ let extract_constant env kn cb =
         (match cb.const_body with
 	  | Undef _ -> warn_info (); mk_ax ()
 	  | Def c -> mk_def (Mod_subst.force_constr c)
+	  | Projection _ -> mk_ax () (* FIXME *)
 	  | OpaqueDef c ->
 	    add_opaque r;
 	    if access_opaque () then
@@ -1050,7 +1059,8 @@ let extract_constant_spec env kn cb =
     | (Info, TypeScheme) ->
 	let s,vl = type_sign_vl env typ in
 	(match cb.const_body with
-	  | Undef _ | OpaqueDef _ -> Stype (r, vl, None)
+	 | Undef _ | OpaqueDef _ -> Stype (r, vl, None)
+	 | Projection _ -> Stype (r, vl, None) (* FIXME *)
 	  | Def body ->
 	      let db = db_from_sign s in
               let body = Mod_subst.force_constr body in

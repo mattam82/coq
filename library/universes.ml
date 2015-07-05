@@ -249,7 +249,7 @@ let compare_head_gen_proj env equ eqs eqc' m n =
   | Proj (p, c), App (f, args)
   | App (f, args), Proj (p, c) -> 
       (match kind_of_term f with
-      | Const (p', u) when eq_constant (Projection.constant p) p' -> 
+      | Const (p', u) when eq_constant (projection_constant env p) p' -> 
           let pb = Environ.lookup_projection p env in
           let npars = pb.Declarations.proj_npars in
 	  if Array.length args == npars + 1 then
@@ -456,13 +456,14 @@ let global_of_constr c =
   | Var id -> VarRef id, Instance.empty
   | _ -> raise Not_found
 
-let global_app_of_constr c =
+(** FIXME: remove *)
+let global_app_of_constr env c =
   match kind_of_term c with
   | Const (c, u) -> (ConstRef c, u), None
   | Ind (i, u) -> (IndRef i, u), None
   | Construct (c, u) -> (ConstructRef c, u), None
   | Var id -> (VarRef id, Instance.empty), None
-  | Proj (p, c) -> (ConstRef (Projection.constant p), Instance.empty), Some c
+  | Proj (p, c) -> (ConstRef (projection_constant env p), Instance.empty), Some c
   | _ -> raise Not_found
 
 open Declarations
@@ -768,7 +769,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
 	       (* Should check that u does not 
   	          have upper constraints that are not already in right *)
 	       let acc' = (ctx', us, LSet.remove l algs, insts, cstrs) in
-		 instantiate_with_lbound u lbound false false acc
+		 instantiate_with_lbound u lbound false false acc'
 	     else acc, (true, false, lbound)
 	| None -> 
 	  try 

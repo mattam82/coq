@@ -67,7 +67,7 @@ module type RedFlagsSig = sig
     
   (** This tests if the projection is in unfolded state already or
       is unfodable due to delta. *)
-  val red_projection : reds -> projection -> bool
+  val red_projection : reds -> env -> projection -> bool
 end
 
 module RedFlags : RedFlagsSig
@@ -138,7 +138,7 @@ type stack_member =
   | Zapp of fconstr array
   | Zcase of case_info * fconstr * fconstr array
   | ZcaseT of case_info * constr * constr array * fconstr subs
-  | Zproj of int * int * constant
+  | Zproj of int * int * projection
   | Zfix of fconstr * stack
   | Zshift of int
   | Zupdate of fconstr

@@ -293,7 +293,7 @@ struct
        ++ str ")"
     | Proj (n,m,p,cst) ->
       str "ZProj(" ++ int n ++ pr_comma () ++ int m ++
-	pr_comma () ++ pr_con (Projection.constant p) ++ str ")"
+	pr_comma () ++ Projection.print p ++ str ")"
     | Fix (f,args,cst) ->
        str "ZFix(" ++ Termops.pr_fix Termops.print_constr f
        ++ pr_comma () ++ pr pr_c args ++ str ")"
@@ -316,7 +316,7 @@ struct
 	else str"(" ++ Constant.print c ++ str ", " ++ 
 	  Univ.Instance.pr Univ.Level.pr u ++ str")"
       | Cst_proj p ->
-	str".(" ++ Constant.print (Projection.constant p) ++ str")"
+	str".(" ++ Projection.print p ++ str")"
 
   let empty = []
   let is_empty = CList.is_empty
@@ -343,7 +343,7 @@ struct
       | Cst_const (c1,u1), Cst_const (c2, u2) ->
 	Constant.equal c1 c2 && Univ.Instance.equal u1 u2
       | Cst_proj p1, Cst_proj p2 ->
-	Constant.equal (Projection.constant p1) (Projection.constant p2)
+	Projection.conv p1 p2
       | _, _ -> false
     in
     let rec equal_rec sk1 lft1 sk2 lft2  =
@@ -362,7 +362,7 @@ struct
 	else None
       | (Proj (n1,m1,p,_)::s1, Proj(n2,m2,p2,_)::s2) ->
 	if Int.equal n1 n2 && Int.equal m1 m2
-	  && Constant.equal (Projection.constant p) (Projection.constant p2)
+	  && Projection.conv p p2
 	then equal_rec s1 lft1 s2 lft2
 	else None
       | Fix (f1,s1,_) :: s1', Fix (f2,s2,_) :: s2' ->
@@ -870,9 +870,9 @@ let rec whd_state_gen ?csts tactic_mode flags env sigma =
 		      whrec Cst_stack.empty 
 			(arg,Stack.Cst(Stack.Cst_const const,curr,remains,bef,cst_l)::s')
        )
-    | Proj (p, c) when Closure.RedFlags.red_projection flags p ->
+    | Proj (p, c) when Closure.RedFlags.red_projection flags env p ->
       (let pb = lookup_projection p env in
-       let kn = Projection.constant p in
+       let kn = projection_constant env p in
        let npars = pb.Declarations.proj_npars 
        and arg = pb.Declarations.proj_arg in
 	 if not tactic_mode then 
@@ -1032,7 +1032,7 @@ let local_whd_state_gen flags sigma =
 	| _ -> s)
       | _ -> s)
 
-    | Proj (p,c) when Closure.RedFlags.red_projection flags p ->
+    | Proj (p,c) when Closure.RedFlags.red_projection flags (Global.env()) p ->
       (let pb = lookup_projection p (Global.env ()) in
 	 whrec (c, Stack.Proj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, 
 			       p, Cst_stack.empty)

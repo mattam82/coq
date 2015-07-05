@@ -446,7 +446,7 @@ and applist_proj c l =
 and applist_projection c l =
   match kind_of_term c with
   | Const c when Environ.is_projection (fst c) (Global.env()) ->
-    let p = Projection.make (fst c) false in
+    let p = Environ.constant_projection (fst c) (Global.env()) in
     (match l with 
     | [] -> (* Expand the projection *)
       let ty,_ = Typeops.type_of_constant (Global.env ()) c in
@@ -479,7 +479,7 @@ let rec canonize_name c =
 	  mkApp (func ct,Array.smartmap func l)
       | Proj(p,c) ->
 	let p' = Projection.map (fun kn ->
-          constant_of_kn (canonical_con kn)) p in 
+          mind_of_kn (canonical_mind kn)) p in 
 	  (mkProj (p', func c))
       | _ -> c
 

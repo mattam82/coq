@@ -46,6 +46,7 @@ let body_of_constant otab cb = match cb.const_body with
   | Undef _ -> None
   | Def c -> Some (instantiate cb (force_constr c))
   | OpaqueDef o -> Some (instantiate cb (Opaqueproof.force_proof otab o))
+  | Projection p -> None
 
 let type_of_constant cb =
   match cb.const_type with
@@ -60,11 +61,12 @@ let constraints_of_constant otab cb = Univ.Constraint.union
   | Undef _ -> Univ.empty_constraint
   | Def c -> Univ.empty_constraint
   | OpaqueDef o ->
-      Univ.ContextSet.constraints (Opaqueproof.force_constraints otab o))
+     Univ.ContextSet.constraints (Opaqueproof.force_constraints otab o)
+  | Projection _ -> Univ.empty_constraint)
 
 let universes_of_constant otab cb = 
   match cb.const_body with
-  | Undef _ | Def _ -> cb.const_universes
+  | Undef _ | Def _ | Projection _ -> cb.const_universes
   | OpaqueDef o -> 
       let body_uctxs = Opaqueproof.force_constraints otab o in
       assert(not cb.const_polymorphic || Univ.ContextSet.is_empty body_uctxs);
@@ -78,12 +80,12 @@ let universes_of_polymorphic_constant otab cb =
   else Univ.UContext.empty
 
 let constant_has_body cb = match cb.const_body with
-  | Undef _ -> false
+  | Undef _ | Projection _ -> false
   | Def _ | OpaqueDef _ -> true
 
 let is_opaque cb = match cb.const_body with
   | OpaqueDef _ -> true
-  | Undef _ | Def _ -> false
+  | Undef _ | Def _ | Projection _ -> false
 
 (** {7 Constant substitutions } *)
 
@@ -108,9 +110,10 @@ let subst_const_def sub def = match def with
   | Undef _ -> def
   | Def c -> Def (subst_constr sub c)
   | OpaqueDef o -> OpaqueDef (Opaqueproof.subst_opaque sub o)
-
+  | Projection _ -> def
+		     
 let subst_const_proj sub pb =
-  { pb with proj_ind = subst_mind sub pb.proj_ind;
+  { pb with 
     proj_type = subst_mps sub pb.proj_type;
     proj_body = subst_const_type sub pb.proj_body }
 
@@ -120,14 +123,12 @@ let subst_const_body sub cb =
   else
     let body' = subst_const_def sub cb.const_body in
     let type' = subst_decl_arity subst_const_type subst_template_cst_arity sub cb.const_type in
-    let proj' = Option.smartmap (subst_const_proj sub) cb.const_proj in
     if body' == cb.const_body && type' == cb.const_type
-      && proj' == cb.const_proj then cb
+    then cb
     else
       { const_hyps = [];
         const_body = body';
         const_type = type';
-        const_proj = proj';
         const_body_code =
           Option.map (Cemitcodes.subst_to_patch_subst sub) cb.const_body_code;
         const_polymorphic = cb.const_polymorphic;
@@ -162,6 +163,7 @@ let hcons_const_def = function
     let constr = force_constr l_constr in
     Def (from_val (Term.hcons_constr constr))
   | OpaqueDef _ as x -> x (* hashconsed when turned indirect *)
+  | Projection p -> Projection p
 
 let hcons_const_body cb =
   { cb with
@@ -240,11 +242,10 @@ let subst_mind_packet sub mbp =
     mind_nb_args = mbp.mind_nb_args;
     mind_reloc_tbl = mbp.mind_reloc_tbl }
 
-let subst_mind_record sub (id, ps, pb as r) =
-  let ps' = Array.smartmap (subst_constant sub) ps in
+let subst_mind_record sub (id, pb as r) =
   let pb' = Array.smartmap (subst_const_proj sub) pb in
-    if ps' == ps && pb' == pb then r
-    else (id, ps', pb')
+    if pb' == pb then r
+    else (id, pb')
 
 let subst_mind_body sub mib =
   { mind_record = Option.smartmap (Option.smartmap (subst_mind_record sub)) mib.mind_record ;

@@ -228,7 +228,7 @@ let matches_core env sigma convert allow_partial_app allow_bound_rels pat c =
 	   
       | PApp (c1,arg1), App (c2,arg2) ->
 	(match c1, kind_of_term c2 with
-	| PRef (ConstRef r), Proj (pr,c) when not (eq_constant r (Projection.constant pr))
+	| PRef (ConstRef r), Proj (pr,c) when not (eq_constant r (Environ.projection_constant env pr))
 	    || Projection.unfolded pr ->
 	  raise PatternMatchingFailure
 	| PProj (pr1,c1), Proj (pr,c) ->
@@ -245,7 +245,7 @@ let matches_core env sigma convert allow_partial_app allow_bound_rels pat c =
           with Invalid_argument _ -> raise PatternMatchingFailure)
 	  
       | PApp (PRef (ConstRef c1), _), Proj (pr, c2) 
-	when Projection.unfolded pr || not (eq_constant c1 (Projection.constant pr)) -> 
+	when Projection.unfolded pr || not (eq_constant c1 (Environ.projection_constant env pr)) -> 
 	raise PatternMatchingFailure
 	
       | PApp (c, args), Proj (pr, c2) ->

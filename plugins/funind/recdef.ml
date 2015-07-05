@@ -1267,6 +1267,7 @@ let is_opaque_constant c =
     | Declarations.OpaqueDef _ -> Vernacexpr.Opaque None
     | Declarations.Undef _ -> Vernacexpr.Opaque None
     | Declarations.Def _ -> Vernacexpr.Transparent
+    | Declarations.Projection _ -> Vernacexpr.Transparent
 
 let open_new_goal build_proof sigma using_lemmas ref_ goal_name (gls_type,decompose_and_tac,nb_goal)   =
   (* Pp.msgnl (str "gls_type := " ++ Printer.pr_lconstr gls_type); *)

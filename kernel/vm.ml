@@ -150,7 +150,7 @@ type zipper =
   | Zapp of arguments
   | Zfix of vfix*arguments  (* Possibly empty *)
   | Zswitch of vswitch
-  | Zproj of Constant.t (* name of the projection *)
+  | Zproj of Projection.t (* name of the projection *)
 
 type stack = zipper list
 

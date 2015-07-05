@@ -271,7 +271,7 @@ and nf_atom env atom =
   | Aevar (ev,_) -> mkEvar ev
   | Aproj(p,c) ->
       let c = nf_accu env c in
-	mkProj(Projection.make p true,c)
+	mkProj(Projection.unfold p,c)
   | _ -> fst (nf_atom_type env atom)
 
 and nf_atom_type env atom =
@@ -347,7 +347,7 @@ and nf_atom_type env atom =
   | Aproj(p,c) ->
       let c,tc = nf_accu_type env c in
       let cj = make_judge c tc in
-      let uj = Typeops.judge_of_projection env (Projection.make p true) cj in
+      let uj = Typeops.judge_of_projection env (Projection.unfold p) cj in
       uj.uj_val, uj.uj_type
 
 

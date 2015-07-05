@@ -301,7 +301,7 @@ let judge_of_projection env p c ct =
     try find_rectype env ct
     with Not_found -> error_case_not_inductive env (make_judge c ct)
   in
-    assert(eq_mind pb.proj_ind (fst ind));
+    assert(eq_mind (Projection.record p) (fst ind));
     let ty = Vars.subst_instance_constr u pb.Declarations.proj_type in
       substl (c :: List.rev args) ty
       

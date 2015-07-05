@@ -588,9 +588,10 @@ let rec lambda_of_constr env sigma c =
 
   | Construct _ ->  lambda_of_app env sigma c empty_args
 
-  | Proj (p, c) ->
-    let kn = Projection.constant p in
-      mkLapp (Lproj (get_const_prefix !global_env kn, kn)) [|lambda_of_constr env sigma c|]
+  | Proj (p, c) -> (* FIXME *)
+     assert false 
+     (* let kn = Projection.constant p in *)
+     (*  mkLapp (Lproj (get_const_prefix !global_env kn, kn)) [|lambda_of_constr env sigma c|] *)
 
   | Case(ci,t,a,branches) ->  
       let (mind,i as ind) = ci.ci_ind in
@@ -662,6 +663,7 @@ and lambda_of_app env sigma f args =
 	  f args
       with Not_found ->
       begin match cb.const_body with
+      | Projection p -> assert false (* TODO *)		   
       | Def csubst -> (* TODO optimize if f is a proj and argument is known *)
           if cb.const_inline_code then
             lambda_of_app env sigma (Mod_subst.force_constr csubst) args

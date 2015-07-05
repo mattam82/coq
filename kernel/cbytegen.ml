@@ -540,12 +540,7 @@ let rec compile_constr reloc c sz cont =
   match kind_of_term c with
   | Meta _ -> invalid_arg "Cbytegen.compile_constr : Meta"
   | Evar _ -> invalid_arg "Cbytegen.compile_constr : Evar"
-  | Proj (p,c) ->
-     let kn = Projection.constant p in
-     let cb = lookup_constant kn !global_env in
-     let pb = Option.get cb.const_proj in
-     let n = pb.proj_arg in
-     compile_constr reloc c sz (Kproj (n,kn) :: cont)
+  | Proj (p,c) -> compile_constr reloc c sz (Kproj p :: cont)
 
   | Cast(c,_,_) -> compile_constr reloc c sz cont
 
@@ -791,6 +786,7 @@ let compile fail_on_error env c =
 
 let compile_constant_body fail_on_error env = function
   | Undef _ | OpaqueDef _ -> Some BCconstant
+  | Projection p -> (* FIXME *) assert false
   | Def sb ->
       let body = Mod_subst.force_constr sb in
       match kind_of_term body with
@@ -801,7 +797,7 @@ let compile_constant_body fail_on_error env = function
 	| _ ->
 	    let res = compile fail_on_error env body in
 	      Option.map (fun x -> BCdefined (to_memory x)) res
-
+	
 (* Shortcut of the previous function used during module strengthening *)
 
 let compile_alias (kn,u) = BCallias (constant_of_kn (canonical_con kn), u)

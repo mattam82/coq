@@ -399,7 +399,8 @@ let inline_delta_resolver env inl mp mbid mtb delta =
 	    | Undef _ | OpaqueDef _ -> l
 	    | Def body ->
 	      let constr = Mod_subst.force_constr body in
-	      add_inline_delta_resolver kn (lev, Some constr) l
+		add_inline_delta_resolver kn (lev, Some constr) l
+	    | Projection _ -> l (* FIXME? *)
 	with Not_found ->
 	  error_no_such_label_sub (con_label con)
 	    (string_of_mp (con_modpath con))

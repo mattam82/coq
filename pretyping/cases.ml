@@ -1326,9 +1326,9 @@ let build_branch initial current realargs deps (realnames,curname) pb arsign eqn
 let mk_case pb (ci,pred,c,brs) =
   let mib = lookup_mind (fst ci.ci_ind) pb.env in
     match mib.mind_record with
-    | Some (Some (_, cs, pbs)) ->
+    | Some (Some (_, pbs)) ->
       Reduction.beta_appvect brs.(0) 
-	(Array.map (fun p -> mkProj (Projection.make p true, c)) cs)
+	(Array.mapi (fun i p -> mkProj (Projection.make (fst ci.ci_ind) i true, c)) pbs)
     | _ -> mkCase (ci,pred,c,brs)
 
 (**********************************************************************)

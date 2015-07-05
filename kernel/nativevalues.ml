@@ -61,7 +61,7 @@ type atom =
   | Aprod of name * t * (t -> t)
   | Ameta of metavariable * t
   | Aevar of existential * t
-  | Aproj of constant * accumulator
+  | Aproj of projection * accumulator
 
 let accumulate_tag = 0
 

@@ -107,7 +107,7 @@ let rec head_pattern_bound t =
     | PCase (_,p,c,br) -> head_pattern_bound c
     | PRef r         -> r
     | PVar id        -> VarRef id
-    | PProj (p,c)    -> ConstRef (Projection.constant p)
+    | PProj (p,c)    -> ConstRef (projection_constant (Global.env ())(*FIXME*) p)
     | PEvar _ | PRel _ | PMeta _ | PSoApp _  | PSort _ | PFix _
 	-> raise BoundPattern
     (* Perhaps they were arguments, but we don't beta-reduce *)
@@ -265,7 +265,7 @@ let rec subst_pattern subst pat =
   | PRel _ -> pat
   | PProj (p,c) -> 
       let p' = Projection.map (fun p -> 
-	destConstRef (fst (subst_global subst (ConstRef p)))) p in
+	fst (destIndRef (fst (subst_global subst (IndRef (p,0)))))) p in
       let c' = subst_pattern subst c in
 	if p' == p && c' == c then pat else
 	  PProj(p',c')

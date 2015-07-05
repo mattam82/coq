@@ -173,7 +173,12 @@ val constant_opt_value_in : env -> constant puniverses -> constr option
 
 val lookup_projection    : Names.projection -> env -> projection_body
 val is_projection : constant -> env -> bool
+val constant_projection : constant -> env -> projection
+(** @raises Not_found if not a projection *)
+val projection_constant : env -> Names.projection -> constant
+(** Return the projection body associated to projection [i] *)
 
+				       
 (** {5 Inductive types } *)
 val add_mind_key : mutual_inductive -> Pre_env.mind_key -> env -> env
 val add_mind : mutual_inductive -> mutual_inductive_body -> env -> env

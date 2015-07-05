@@ -16,7 +16,7 @@ val declare_equiv_keys : key -> key -> unit
 val equiv_keys : key -> key -> bool
 (** Check equivalence of keys. *)
 
-val constr_key : Term.constr -> key option
+val constr_key : Environ.env -> Term.constr -> key option
 (** Compute the head key of a term. *)
 
 val pr_keys : (global_reference -> Pp.std_ppcmds) -> Pp.std_ppcmds

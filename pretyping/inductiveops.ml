@@ -340,7 +340,7 @@ let get_constructors env (ind,params) =
 let get_projections env (ind,params) =
   let (mib,mip) = Inductive.lookup_mind_specif env (fst ind) in
     match mib.mind_record with
-    | Some (Some (id, projs, pbs)) -> Some projs
+    | Some (Some (id, pbs)) -> Some pbs
     | _ -> None
 
 (* substitution in a signature *)

@@ -786,25 +786,29 @@ type constant = Constant.t
 
 module Projection = 
 struct 
-  type t = constant * bool
+  type t = MutInd.t * int * bool
     
-  let make c b = (c, b)
+  let make r i b =
+    assert(i >= 0); (r, i, b)
 
-  let constant = fst
-  let unfolded = snd
-  let unfold (c, b as p) = if b then p else (c, true)
-  let equal (c, b) (c', b') = Constant.equal c c' && b == b'
+  let record = pi1
+  let index = pi2	    
+  let unfolded = pi3
+    
+  let unfold (r, i, b as p) = if b then p else (r, i, true)
+  let equal (r, i, b) (r', i', b') = MutInd.equal r r' && Int.equal i i' && b == b'
+  let conv (r, i, b) (r', i', b') = MutInd.equal r r' && Int.equal i i'
 
-  let hash (c, b) = (if b then 0 else 1) + Constant.hash c
+  let hash (r, i, b) = (if b then 0 else 1) + i * MutInd.hash r
 
   module Self_Hashcons =
     struct
       type _t = t
       type t = _t
-      type u = Constant.t -> Constant.t
-      let hashcons hc (c,b) = (hc c,b)
-      let equal ((c,b) as x) ((c',b') as y) =
-        x == y || (c == c' && b == b')
+      type u = MutInd.t -> MutInd.t
+      let hashcons hc (r,i,b) = (hc r,i,b)
+      let equal ((r,i,b) as x) ((r',i',b') as y) =
+        x == y || (r == r' && i == i' && b == b')
       let hash = hash
     end
 
@@ -812,16 +816,24 @@ struct
 
   let hcons = Hashcons.simple_hcons HashProjection.generate HashProjection.hcons hcons_con
 
-  let compare (c, b) (c', b') =
-    if b == b' then Constant.CanOrd.compare c c'
+  let compare (r, i, b as x) (r', i', b' as y) =
+    if x == y then 0
+    else if b == b' then
+      let c = MutInd.CanOrd.compare r r' in
+	if c == 0 then Int.compare i i'
+	else c
     else if b then 1 else -1
 
-  let map f (c, b as x) =
-    let c' = f c in
-      if c' == c then x else (c', b)
+  let map f (r, i, b as x) =
+    let r' = f r in
+      if r' == r then x else (r', i, b)
 
-  let to_string p = Constant.to_string (constant p)
-  let print p = Constant.print (constant p)
+  let to_string (r, i, b) =
+    MutInd.to_string r ^
+      ".(" ^ string_of_int i ^ ")"
+			  
+  let print (r, i, b) =
+    MutInd.print r ++ str".(" ++ int i ++ str")"
 
 end
 

@@ -143,7 +143,7 @@ val get_constructor :
   pinductive * mutual_inductive_body * one_inductive_body * constr list ->
   int -> constructor_summary
 val get_constructors : env -> inductive_family -> constructor_summary array
-val get_projections  : env -> inductive_family -> constant array option
+val get_projections  : env -> inductive_family -> projection_body array option
 
 (** [get_arity] returns the arity of the inductive family instantiated
     with the parameters; if recursively non-uniform parameters are not

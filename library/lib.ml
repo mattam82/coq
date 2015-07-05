@@ -442,7 +442,7 @@ let add_section_kn kn =
   let f x (l1,l2) = (l1,Names.Mindmap.add kn x l2) in
     add_section_replacement f f
 
-let add_section_constant is_projection kn =
+let add_section_constant kn =
   let f x (l1,l2) = (Names.Cmap.add kn x l1,l2) in
     add_section_replacement f f
 
@@ -633,3 +633,11 @@ let discharge_con cst =
 
 let discharge_inductive (kn,i) =
   (discharge_kn kn,i)
+
+let discharge_projection p =
+  let open Names in
+  let ind = Projection.record p in
+    if defined_in_sec ind then
+      Projection.make (Globnames.pop_kn ind)
+		      (Projection.index p) (Projection.unfolded p)
+    else p

@@ -83,6 +83,7 @@ let rec check_with_def env struc (idl,(c,ctx)) mp equiv =
 	  let cst' = Reduction.infer_conv_leq env' (Environ.universes env')
 	    j.uj_type typ in
 	  j.uj_val,cst' +++ cst
+	| Projection _ -> error_not_a_constant lab
 	| Def cs ->
 	  let cst' = Reduction.infer_conv env' (Environ.universes env') c
 	    (Mod_subst.force_constr cs) in

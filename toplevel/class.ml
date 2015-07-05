@@ -72,7 +72,7 @@ let check_reference_arity ref =
 let check_arity = function
   | CL_FUN | CL_SORT -> ()
   | CL_CONST cst -> check_reference_arity (ConstRef cst)
-  | CL_PROJ cst -> check_reference_arity (ConstRef cst)
+  | CL_PROJ cst -> check_reference_arity (ConstRef (projection_constant (Global.env()) cst))
   | CL_SECVAR id -> check_reference_arity (VarRef id)
   | CL_IND kn -> check_reference_arity (IndRef kn)
 
@@ -98,7 +98,7 @@ let uniform_cond nargs lt =
 let class_of_global = function
   | ConstRef sp -> 
     if Environ.is_projection sp (Global.env ()) 
-    then CL_PROJ sp else CL_CONST sp
+    then CL_PROJ (Environ.constant_projection sp (Global.env())) else CL_CONST sp
   | IndRef sp -> CL_IND sp
   | VarRef id -> CL_SECVAR id
   | ConstructRef _ as c ->
@@ -144,7 +144,7 @@ let get_target t ind =
   else
     match pi1 (find_class_type Evd.empty t) with
     | CL_CONST p when Environ.is_projection p (Global.env ()) -> 
-      CL_PROJ p
+      CL_PROJ (Environ.constant_projection p (Global.env()))
     | x -> x
       
 
@@ -174,7 +174,8 @@ let get_strength stre ref cls clt =
 let ident_key_of_class = function
   | CL_FUN -> "Funclass"
   | CL_SORT -> "Sortclass"
-  | CL_CONST sp | CL_PROJ sp -> Label.to_string (con_label sp)
+  | CL_CONST sp -> Label.to_string (con_label sp)
+  | CL_PROJ sp -> Label.to_string (con_label (projection_constant (Global.env ()) sp))
   | CL_IND (sp,_) -> Label.to_string (mind_label sp)
   | CL_SECVAR id -> Id.to_string id
 

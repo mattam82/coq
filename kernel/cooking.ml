@@ -39,7 +39,8 @@ type my_global_reference =
   | ConstRef of constant
   | IndRef of inductive
   | ConstructRef of constructor
-
+  | ProjRef of projection
+		 
 module RefHash =
 struct
   type t = my_global_reference
@@ -47,21 +48,24 @@ struct
   | ConstRef c1, ConstRef c2 -> Constant.CanOrd.equal c1 c2
   | IndRef i1, IndRef i2 -> eq_ind i1 i2
   | ConstructRef c1, ConstructRef c2 -> eq_constructor c1 c2
+  | ProjRef p1, ProjRef p2 -> Projection.equal p1 p2
   | _ -> false
   open Hashset.Combine
   let hash = function
   | ConstRef c -> combinesmall 1 (Constant.hash c)
   | IndRef i -> combinesmall 2 (ind_hash i)
   | ConstructRef c -> combinesmall 3 (constructor_hash c)
+  | ProjRef p -> combinesmall 4 (Projection.hash p)
 end
 
 module RefTable = Hashtbl.Make(RefHash)
 
-let instantiate_my_gr gr u =
+let instantiate_my_gr gr u l =
   match gr with
-  | ConstRef c -> mkConstU (c, u)
-  | IndRef i -> mkIndU (i, u)
-  | ConstructRef c -> mkConstructU (c, u)
+  | ConstRef c -> mkApp (mkConstU (c, u), l)
+  | IndRef i -> mkApp (mkIndU (i, u), l)
+  | ConstructRef c -> mkApp (mkConstructU (c, u), l)
+  | ProjRef p -> mkApp (mkProj (p, l.(0)), Array.tl l)
 
 let share cache r (cstl,knl) =
   try RefTable.find cache r
@@ -73,14 +77,20 @@ let share cache r (cstl,knl) =
     | ConstructRef ((kn,i),j) ->
 	ConstructRef ((pop_mind kn,i),j), Mindmap.find kn knl
     | ConstRef cst ->
-	ConstRef (pop_con cst), Cmap.find cst cstl in
+       ConstRef (pop_con cst), Cmap.find cst cstl
+    | ProjRef p ->
+       let mind = pop_mind (Projection.record p) in
+       let p' = Projection.make mind (Projection.index p)
+				(Projection.unfolded p) in
+       ProjRef p', (Univ.Instance.empty, [||])
+  in
   let c = (f, (u, Array.map mkVar l)) in
   RefTable.add cache r c;
   c
 
 let share_univs cache r u l =
   let r', (u', args) = share cache r l in
-    mkApp (instantiate_my_gr r' (Instance.append u' u), args)
+    instantiate_my_gr r' (Instance.append u' u) args
 
 let update_case_info cache ci modlist =
   try
@@ -122,16 +132,8 @@ let expmod_constr cache modlist c =
 	    | Not_found -> map_constr substrec c)
 
       | Proj (p, c') ->
-          (try 
-	     let p' = share_univs (ConstRef (Projection.constant p)) Univ.Instance.empty modlist in
-	     let make c = Projection.make c (Projection.unfolded p) in
-	     match kind_of_term p' with
-	     | Const (p',_) -> mkProj (make p', substrec c')
-	     | App (f, args) -> 
-	       (match kind_of_term f with 
-	       | Const (p', _) -> mkProj (make p', substrec c')
-	       | _ -> assert false)
-	     | _ -> assert false
+         (try
+	     share_univs (ProjRef p) Univ.Instance.empty modlist
 	   with Not_found -> map_constr substrec c)
 
   | _ -> map_constr substrec c
@@ -150,7 +152,7 @@ type recipe = { from : constant_body; info : Opaqueproof.cooking_info }
 type inline = bool
 
 type result =
-  constant_def * constant_type * projection_body option * 
+  constant_def * constant_type * 
     bool * constant_universes * inline
     * Context.section_context option
 
@@ -159,13 +161,15 @@ let on_body ml hy f = function
   | Def cs -> Def (Mod_subst.from_val (f (Mod_subst.force_constr cs)))
   | OpaqueDef o ->
     OpaqueDef (Opaqueproof.discharge_direct_opaque ~cook_constr:f
-                 { Opaqueproof.modlist = ml; abstract = hy } o)
+						   { Opaqueproof.modlist = ml; abstract = hy } o)
+  | Projection p as x -> (* FIXME *) x
 
 let constr_of_def otab = function
   | Undef _ -> assert false
   | Def cs -> Mod_subst.force_constr cs
   | OpaqueDef lc -> Opaqueproof.force_proof otab lc
-
+  | Projection _ -> assert false
+			  
 let expmod_constr_subst cache modlist subst c =
   let c = expmod_constr cache modlist c in
     Vars.subst_univs_level_constr subst c
@@ -215,27 +219,6 @@ let cook_constant env { from = cb; info } =
   	let j = make_judge (constr_of_def (opaque_tables env) body) typ in
   	Typeops.make_polymorphic_if_constant_for_ind env j
   in
-  let projection pb =
-    let c' = abstract_constant_body (expmod pb.proj_body) hyps in
-    let etab = abstract_constant_body (expmod (fst pb.proj_eta)) hyps in
-    let etat = abstract_constant_body (expmod (snd pb.proj_eta)) hyps in
-    let ((mind, _), _), n' =
-      try 
-	let c' = share_univs cache (IndRef (pb.proj_ind,0)) Univ.Instance.empty modlist in
-	  match kind_of_term c' with
-	  | App (f,l) -> (destInd f, Array.length l)
-	  | Ind ind -> ind, 0
-	  | _ -> assert false 
-      with Not_found -> (((pb.proj_ind,0),Univ.Instance.empty), 0)
-    in 
-    let typ = (* By invariant, a regular arity *)
-      match typ with RegularArity t -> t | TemplateArity _ -> assert false 
-    in
-    let ctx, ty' = decompose_prod_n (n' + pb.proj_npars + 1) typ in
-      { proj_ind = mind; proj_npars = pb.proj_npars + n'; proj_arg = pb.proj_arg;
-	proj_eta = etab, etat;
-	proj_type = ty'; proj_body = c' }
-  in
   let univs = 
     let abs' = 
       if cb.const_polymorphic then abs_ctx
@@ -243,8 +226,7 @@ let cook_constant env { from = cb; info } =
     in
       UContext.union abs' univs
   in
-    (body, typ, Option.map projection cb.const_proj, 
-     cb.const_polymorphic, univs, cb.const_inline_code, 
+    (body, typ, cb.const_polymorphic, univs, cb.const_inline_code, 
      Some const_hyps)
 
 (* let cook_constant_key = Profile.declare_profile "cook_constant" *)

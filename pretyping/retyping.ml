@@ -245,5 +245,5 @@ let expand_projection env sigma pr c args =
     try Inductiveops.find_mrectype env sigma ty 
     with Not_found -> retype_error BadRecursiveType
   in
-    mkApp (mkConstU (Projection.constant pr,u), 
+    mkApp (mkConstU (projection_constant env pr,u), 
 	   Array.of_list (ind_args @ (c :: args)))

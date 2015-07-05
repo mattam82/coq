@@ -147,7 +147,7 @@ let check_fix env cb i =
 	  | Fix ((_,j),recd) when Int.equal i j -> check_arity env cb; (true,recd)
 	  | CoFix (j,recd) when Int.equal i j -> check_arity env cb; (false,recd)
 	  | _ -> raise Impossible)
-    | Undef _ | OpaqueDef _ -> raise Impossible
+    | Undef _ | OpaqueDef _ | Projection _ -> raise Impossible
 
 let prec_declaration_equal (na1, ca1, ta1) (na2, ca2, ta2) =
   Array.equal Name.equal na1 na2 &&

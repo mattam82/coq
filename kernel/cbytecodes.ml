@@ -31,7 +31,7 @@ let last_variant_tag = 245
 type structured_constant =
   | Const_sorts of sorts
   | Const_ind of pinductive
-  | Const_proj of Constant.t
+  | Const_proj of Projection.t
   | Const_b0 of tag
   | Const_bn of tag * structured_constant array
 
@@ -82,8 +82,8 @@ type instruction =
   | Ksetfield of int
   | Kstop
   | Ksequence of bytecodes * bytecodes
-  | Kproj of int * Constant.t  (* index of the projected argument,
-                                           name of projection *)
+  | Kproj of Projection.t               (* This stores the index of the projected argument,
+                                           and the record type *)
 (* spiwack: instructions concerning integers *)
   | Kbranch of Label.t                  (* jump to label *)
   | Kaddint31                           (* adds the int31 in the accu
@@ -170,7 +170,7 @@ let pp_sort s =
 let rec pp_struct_const = function
   | Const_sorts s -> pp_sort s
   | Const_ind ((mind, i), u) -> pr_mind mind ++ str"#" ++ int i
-  | Const_proj p -> Constant.print p
+  | Const_proj p -> Projection.print p
   | Const_b0 i -> int i
   | Const_bn (i,t) ->
      int i ++ surround (prvect_with_sep pr_comma pp_struct_const t)
@@ -232,7 +232,8 @@ let rec pp_instr i =
 
   | Kbranch lbl -> str "branch " ++ pp_lbl lbl
 
-  | Kproj(n,p) -> str "proj " ++ int n ++ str " " ++ Constant.print p
+  | Kproj p -> str "proj " ++ int (Projection.index p) ++
+		str " " ++ MutInd.print (Projection.record p)
 
   | Kaddint31 -> str "addint31"
   | Kaddcint31 -> str "addcint31"

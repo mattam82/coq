@@ -70,6 +70,9 @@ val arities_of_specif : mutual_inductive puniverses -> mind_specif -> types arra
 
 val inductive_params : mind_specif -> int
 
+val projection_body : mind_specif -> int -> projection_body
+(** Return the projection body associated to projection [i] *)
+
 (** [type_case_branches env (I,args) (p:A) c] computes useful types
    about the following Cases expression:
       <p>Cases (c :: (I args)) of b1..bn end

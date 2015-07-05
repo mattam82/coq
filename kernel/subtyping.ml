@@ -332,11 +332,16 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
            anything of the right type can implement it, even if bodies differ.
       *)
       (match cb2.const_body with
-	| Undef _ | OpaqueDef _ -> cst
+        | Undef _ | OpaqueDef _ -> cst
+	| Projection p ->
+	   (match cb1.const_body with
+	   | Projection p' when Projection.equal p p' -> cst
+	   | _ -> error NotConvertibleBodyField)
 	| Def lc2 ->
 	  (match cb1.const_body with
-	    | Undef _ | OpaqueDef _ -> error NotConvertibleBodyField
-	    | Def lc1 ->
+	   | Undef _ | OpaqueDef _ 
+	   | Projection _ -> error NotConvertibleBodyField
+	   | Def lc1 ->
 	      (* NB: cb1 might have been strengthened and appear as transparent.
 		 Anyway [check_conv] will handle that afterwards. *)
 	      let c1 = Mod_subst.force_constr lc1 in

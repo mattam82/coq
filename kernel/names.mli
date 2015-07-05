@@ -637,21 +637,32 @@ type constant = Constant.t
 
 module Projection : sig
   type t
-    
-  val make : constant -> bool -> t
 
-  val constant : t -> constant
+  val make : MutInd.t -> int -> bool -> t
+  (** Constructor *)
+
+  (** Accessors *)
+  val record : t -> MutInd.t
+  val index : t -> int
   val unfolded : t -> bool
+		       
   val unfold : t -> t
+  (** Switch the bool to true if not already unfolded *)
 
   val equal : t -> t -> bool
+  (** Equal syntactically *)
+
+  val conv : t -> t -> bool
+  (** Convertible *)
+			
   val hash : t -> int
   val hcons : t -> t
   (** Hashconsing of projections. *)
 
   val compare : t -> t -> int
+  (** Order *)
     
-  val map : (constant -> constant) -> t -> t
+  val map : (MutInd.t -> MutInd.t) -> t -> t
 
   val to_string : t -> string
   val print : t -> Pp.std_ppcmds

@@ -687,27 +687,26 @@ let compute_projections ((kn, _ as ind), u as indsp) n x nparamargs params
     let body = mkCase (ci, p, mkRel 1, [|lift 1 branch|]) in
       it_mkLambda_or_LetIn (mkLambda (x,rp,body)) params
   in
-  let projections (na, b, t) (i, j, kns, pbs, subst) =
+  let projections (na, b, t) (i, j, pbs, subst) =
     match b with
-    | Some c -> (i, j+1, kns, pbs, substl subst c :: subst)
+    | Some c -> (i, j+1, pbs, substl subst c :: subst)
     | None ->
       match na with
       | Name id ->
-	let kn = Constant.make1 (KerName.make mp dp (Label.of_id id)) in
+	(* let kn = Constant.make1 (KerName.make mp dp (Label.of_id id)) in *)
 	let ty = substl subst (liftn 1 j t) in
-	let term = mkProj (Projection.make kn true, mkRel 1) in
-	let fterm = mkProj (Projection.make kn false, mkRel 1) in
+	let term = mkProj (Projection.make kn i true, mkRel 1) in
+	let fterm = mkProj (Projection.make kn i false, mkRel 1) in
 	let compat = compat_body ty (j - 1) in
 	let etab = it_mkLambda_or_LetIn (mkLambda (x, rp, term)) params in
 	let etat = it_mkProd_or_LetIn (mkProd (x, rp, ty)) params in
-	let body = { proj_ind = fst ind; proj_npars = nparamargs;
+	let body = { proj_name = id; proj_npars = nparamargs;
 		     proj_arg = i; proj_type = ty; proj_eta = etab, etat; 
 		     proj_body = compat } in
-	  (i + 1, j + 1, kn :: kns, body :: pbs, fterm :: subst)
+	  (i + 1, j + 1, body :: pbs, fterm :: subst)
       | Anonymous -> raise UndefinableExpansion
   in
-  let (_, _, kns, pbs, subst) = List.fold_right projections ctx (0, 1, [], [], []) in
-    Array.of_list (List.rev kns),
+  let (_, _, pbs, subst) = List.fold_right projections ctx (0, 1, [], []) in
     Array.of_list (List.rev pbs)
 
 let build_inductive env p prv ctx env_ar params kn isrecord isfinite inds nmr recargs =
@@ -795,10 +794,10 @@ let build_inductive env p prv ctx env_ar params kn isrecord isfinite inds nmr re
       let rctx, _ = decompose_prod_assum (subst1 (mkIndU indsp) pkt.mind_nf_lc.(0)) in
 	(try 
 	   let fields = List.firstn pkt.mind_consnrealdecls.(0) rctx in
-	   let kns, projs = 
+	   let projs = 
 	     compute_projections indsp pkt.mind_typename rid nparamargs params
 	       pkt.mind_consnrealdecls pkt.mind_consnrealargs fields
-	   in Some (Some (rid, kns, projs))
+	   in Some (Some (rid, projs))
 	 with UndefinableExpansion -> Some None)
     | Some _ -> Some None
     | None -> None

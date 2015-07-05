@@ -173,8 +173,7 @@ val is_in_section : Globnames.global_reference -> bool
 
 val add_section_variable : Names.Id.t -> Decl_kinds.binding_kind -> Decl_kinds.polymorphic -> Univ.universe_context_set -> unit
 
-val add_section_constant : bool (* is_projection *) -> 
-  Names.constant -> Context.named_context -> unit
+val add_section_constant : Names.constant -> Context.named_context -> unit
 val add_section_kn : Names.mutual_inductive -> Context.named_context -> unit
 val replacement_context : unit -> Opaqueproof.work_list
 
@@ -184,6 +183,7 @@ val discharge_kn :  Names.mutual_inductive -> Names.mutual_inductive
 val discharge_con : Names.constant -> Names.constant
 val discharge_global : Globnames.global_reference -> Globnames.global_reference
 val discharge_inductive : Names.inductive -> Names.inductive
+val discharge_projection : Names.projection -> Names.projection
 
 (* discharging a constant in one go *)
 val full_replacement_context : unit -> Opaqueproof.work_list list

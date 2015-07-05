@@ -105,7 +105,7 @@ let process_inductive (sechyps,abs_ctx) modlist mib =
   let abs_ctx = Univ.instantiate_univ_context abs_ctx in
   let univs = Univ.UContext.union abs_ctx univs in
   let record = match mib.mind_record with
-    | Some (Some (id, _, _)) -> Some (Some id)
+    | Some (Some (id, _)) -> Some (Some id)
     | Some None -> Some None
     | None -> None
   in

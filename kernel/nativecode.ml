@@ -1850,13 +1850,11 @@ and compile_named env sigma univ auxdefs id =
       Glet(Gnamed id, MLprimitive (Mk_var id))::auxdefs
 
 let compile_constant env sigma prefix ~interactive con cb =
-  match cb.const_proj with
-  | None ->
-     let u =
-       if cb.const_polymorphic then Univ.UContext.instance cb.const_universes
-       else Univ.Instance.empty
-     in
-    begin match cb.const_body with
+  let u =
+    if cb.const_polymorphic then Univ.UContext.instance cb.const_universes
+    else Univ.Instance.empty
+  in
+  begin match cb.const_body with
     | Def t ->
       let t = Mod_subst.force_constr t in
       let code = lambda_of_constr env sigma t in
@@ -1881,22 +1879,11 @@ let compile_constant env sigma prefix ~interactive con cb =
       in
       if !Flags.debug then Pp.msg_debug (Pp.str "Optimized mllambda code");
       code, name
-    | _ -> 
-        let i = push_symbol (SymbConst con) in
-	let args =
-	  if Univ.Instance.is_empty u then [|get_const_code i; MLarray [||]|]
-	  else [|get_const_code i|]
-	in
-	(*
-	let t = mkMLlam [|univ|] (mkMLapp (MLprimitive Mk_const)
-	 *)
-        [Glet(Gconstant ("",(con,u)), mkMLapp (MLprimitive Mk_const) args)],
-	  if interactive then LinkedInteractive prefix
-	  else Linked prefix
-    end
-  | Some pb ->
+
+    | Projection p ->
+      let pb = lookup_projection p env in
       let u = Univ.Instance.empty in
-      let mind = pb.proj_ind in
+      let mind = Projection.record p in
       let ind = (mind,0) in
       let mib = lookup_mind mind env in
       let oib = mib.mind_packets.(0) in
@@ -1925,6 +1912,20 @@ let compile_constant env sigma prefix ~interactive con cb =
         Glet(Gconstant ("",(con,u)), mkMLlam fargs (MLapp (MLglobal gn, [|MLlocal
           arg|])))::
             [Glet(gn, mkMLlam [|c_uid|] code)], Linked prefix
+
+    | _ -> 
+        let i = push_symbol (SymbConst con) in
+	let args =
+	  if Univ.Instance.is_empty u then [|get_const_code i; MLarray [||]|]
+	  else [|get_const_code i|]
+	in
+	(*
+	let t = mkMLlam [|univ|] (mkMLapp (MLprimitive Mk_const)
+	 *)
+        [Glet(Gconstant ("",(con,u)), mkMLapp (MLprimitive Mk_const) args)],
+	  if interactive then LinkedInteractive prefix
+	  else Linked prefix
+    end
 
 let loaded_native_files = ref ([] : string list)
 
@@ -2016,11 +2017,12 @@ let rec compile_deps env sigma prefix ~interactive init t =
       then init
       else
       let comp_stack, (mind_updates, const_updates) =
-	match cb.const_proj, cb.const_body with
-        | None, Def t ->
+	match cb.const_body with
+        | Def t ->
 	   compile_deps env sigma prefix ~interactive init (Mod_subst.force_constr t)
-	| Some pb, _ ->
-	   let mind = pb.proj_ind in
+	| Projection p ->
+	   let pb = lookup_projection p env in (* compile ? *)
+	   let mind = Projection.record p in
 	   compile_mind_deps env prefix ~interactive init mind
         | _ -> init
       in
@@ -2032,8 +2034,8 @@ let rec compile_deps env sigma prefix ~interactive init t =
       comp_stack, (mind_updates, const_updates)
   | Construct (((mind,_),_),u) -> compile_mind_deps env prefix ~interactive init mind
   | Proj (p,c) ->
-    let term = mkApp (mkConst (Projection.constant p), [|c|]) in
-      compile_deps env sigma prefix ~interactive init term
+    (* let term = mkApp (mkConst (Environ.projection_constant env p), [|c|]) in FIXME ?*)
+      compile_deps env sigma prefix ~interactive init c
   | Case (ci, p, c, ac) ->
       let mind = fst ci.ci_ind in
       let init = compile_mind_deps env prefix ~interactive init mind in

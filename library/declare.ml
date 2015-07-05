@@ -114,7 +114,7 @@ let open_constant i ((sp,kn), obj) =
     let con = Global.constant_of_delta_kn kn in
     Nametab.push (Nametab.Exactly i) sp (ConstRef con);
     match (Global.lookup_constant con).const_body with
-    | (Def _ | Undef _) -> ()
+    | (Def _ | Undef _ | Projection _) -> ()
     | OpaqueDef lc ->
         match Opaqueproof.get_constraints (Global.opaque_tables ())lc with
         | Some f when Future.is_val f -> Global.push_context_set (Future.force f)
@@ -135,7 +135,7 @@ let cache_constant ((sp,kn), obj) =
   assert (eq_constant kn' (constant_of_kn kn));
   Nametab.push (Nametab.Until 1) sp (ConstRef (constant_of_kn kn));
   let cst = Global.lookup_constant kn' in
-  add_section_constant (cst.const_proj <> None) kn' cst.const_hyps;
+  add_section_constant kn' cst.const_hyps;
   Dischargedhypsmap.set_discharged_hyps sp obj.cst_hyps;
   add_constant_kind (constant_of_kn kn) obj.cst_kind
 
@@ -382,14 +382,13 @@ let inInductive : inductive_obj -> obj =
 let declare_projections mind =
   let spec,_ = Inductive.lookup_mind_specif (Global.env ()) (mind,0) in
     match spec.mind_record with
-    | Some (Some (_, kns, pjs)) -> 
-      Array.iteri (fun i kn -> 
-	let id = Label.to_id (Constant.label kn) in
+    | Some (Some (_, pjs)) -> 
+      Array.iteri (fun i pb -> 
+	let id = pb.proj_name in
 	let entry = {proj_entry_ind = mind; proj_entry_arg = i} in
-	let kn' = declare_constant id (ProjectionEntry entry,
-				       IsDefinition StructureComponent) 
-	in
-	  assert(eq_constant kn kn')) kns; true
+	  ignore(declare_constant id (ProjectionEntry entry,
+				      IsDefinition StructureComponent))) pjs;
+      true
     | Some None | None -> false
 
 (* for initial declaration *)

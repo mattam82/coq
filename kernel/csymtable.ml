@@ -60,7 +60,7 @@ let rec eq_structured_constant c1 c2 = match c1, c2 with
 | Const_sorts _, _ -> false
 | Const_ind i1, Const_ind i2 -> Univ.eq_puniverses eq_ind i1 i2
 | Const_ind _, _ -> false
-| Const_proj p1, Const_proj p2 -> Constant.equal p1 p2
+| Const_proj p1, Const_proj p2 -> Projection.equal p1 p2
 | Const_proj _, _ -> false
 | Const_b0 t1, Const_b0 t2 -> Int.equal t1 t2
 | Const_b0 _, _ -> false
@@ -73,7 +73,7 @@ let rec hash_structured_constant c =
   match c with
   | Const_sorts s -> combinesmall 1 (Sorts.hash s)
   | Const_ind (i,u) -> combinesmall 2 (combine (ind_hash i) (Univ.Instance.hash u))
-  | Const_proj p -> combinesmall 3 (Constant.hash p)
+  | Const_proj p -> combinesmall 3 (Projection.hash p)
   | Const_b0 t -> combinesmall 4 (Int.hash t)
   | Const_bn (t, a) ->
     let fold h c = combine h (hash_structured_constant c) in

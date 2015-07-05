@@ -731,10 +731,11 @@ and whd_simpl_stack env sigma =
 
       | Proj (p, c) ->
         (try 
-	   let unf = Projection.unfolded p in
-	     if unf || is_evaluable env (EvalConstRef (Projection.constant p)) then
+	    let unf = Projection.unfolded p in
+	    let kn = Environ.projection_constant env p in
+	     if unf || is_evaluable env (EvalConstRef kn) then
 	       let pb = lookup_projection p env in
- 		 (match unf, ReductionBehaviour.get (ConstRef (Projection.constant p)) with
+ 		 (match unf, ReductionBehaviour.get (ConstRef kn) with
  		 | false, Some (l, n, f) when List.mem `ReductionNeverUnfold f -> 
                    (* simpl never *) s'
 		 | false, Some (l, n, f) when not (List.is_empty l) ->
@@ -910,7 +911,7 @@ let whd_simpl_orelse_delta_but_fix env sigma c =
       | CoFix _ | Fix _ -> s'
       | Proj (p,t) when
 	  (match kind_of_term constr with
-	  | Const (c', _) -> eq_constant (Projection.constant p) c'
+	  | Const (c', _) -> eq_constant (projection_constant env p) c'
 	  | _ -> false) ->
 	let pb = Environ.lookup_projection p env in
 	  if List.length stack <= pb.Declarations.proj_npars then
@@ -937,7 +938,7 @@ let simpl env sigma c = strong whd_simpl env sigma c
 let matches_head env sigma c t =
   match kind_of_term t with
     | App (f,_) -> Constr_matching.matches env sigma c f
-    | Proj (p, _) -> Constr_matching.matches env sigma c (mkConst (Projection.constant p))
+    | Proj (p, _) -> Constr_matching.matches env sigma c (mkConst (projection_constant env p))
     | _ -> raise Constr_matching.PatternMatchingFailure
 
 let is_pattern_meta = function Pattern.PMeta _ -> true | _ -> false

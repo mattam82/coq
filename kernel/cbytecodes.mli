@@ -25,7 +25,7 @@ val last_variant_tag : tag
 type structured_constant =
   | Const_sorts of sorts
   | Const_ind of pinductive
-  | Const_proj of Constant.t
+  | Const_proj of Projection.t
   | Const_b0 of tag
   | Const_bn of tag * structured_constant array
 
@@ -73,8 +73,8 @@ type instruction =
   | Ksetfield of int
   | Kstop
   | Ksequence of bytecodes * bytecodes
-  | Kproj of int * Constant.t  (** index of the projected argument,
-                                            name of projection *)
+  | Kproj of Projection.t               (** This stores the index of the projected argument,
+                                            and the record type *)
 
 (** spiwack: instructions concerning integers *)
   | Kbranch of Label.t                  (** jump to label, is it needed ? *)

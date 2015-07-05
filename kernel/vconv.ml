@@ -135,7 +135,7 @@ and conv_stack env k stk1 stk2 cu =
 	conv_stack env k stk1 stk2 !rcu
       else raise NotConvertible
   | Zproj p1 :: stk1, Zproj p2 :: stk2 ->
-    if Constant.equal p1 p2 then conv_stack env k stk1 stk2 cu
+    if Projection.conv p1 p2 then conv_stack env k stk1 stk2 cu
     else raise NotConvertible
   | [], _ | Zapp _ :: _, _ | Zfix _ :: _, _ | Zswitch _ :: _, _
   | Zproj _ :: _, _ -> raise NotConvertible
@@ -210,7 +210,7 @@ let rec conv_eq env pb t1 t2 cu =
 	else raise NotConvertible
     | Const c1, Const c2 -> eq_puniverses eq_constant c1 c2 cu
     | Proj (p1,c1), Proj (p2,c2) ->
-	if eq_constant (Projection.constant p1) (Projection.constant p2) then
+	if Projection.conv p1 p2 then
 	  conv_eq env pb c1 c2 cu 
 	else raise NotConvertible
     | Ind c1, Ind c2 ->

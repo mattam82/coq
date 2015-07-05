@@ -110,7 +110,7 @@ let infer_declaration env kn dcl =
       let usubst, univs = Univ.abstract_universes abstract uctx in
       let c = Typeops.assumption_of_judgment env j in
       let t = hcons_constr (Vars.subst_univs_level_constr usubst c) in
-	Undef nl, RegularArity t, None, poly, univs, false, ctx
+	Undef nl, RegularArity t, poly, univs, false, ctx
 
   | DefinitionEntry ({ const_entry_type = Some typ;
                        const_entry_opaque = true;
@@ -130,7 +130,7 @@ let infer_declaration env kn dcl =
           feedback_completion_typecheck feedback_id;
           j.uj_val, ctx) in
       let def = OpaqueDef (Opaqueproof.create proofterm) in
-      def, RegularArity typ, None, c.const_entry_polymorphic, 
+      def, RegularArity typ, c.const_entry_polymorphic, 
 	c.const_entry_universes,
 	c.const_entry_inline_code, c.const_entry_secctx
 
@@ -151,21 +151,21 @@ let infer_declaration env kn dcl =
 	else Def (Mod_subst.from_val def) 
       in
 	feedback_completion_typecheck feedback_id;
-	def, typ, None, c.const_entry_polymorphic,
+	def, typ, c.const_entry_polymorphic,
         univs, c.const_entry_inline_code, c.const_entry_secctx
 
   | ProjectionEntry {proj_entry_ind = ind; proj_entry_arg = i} ->
     let mib, _ = Inductive.lookup_mind_specif env (ind,0) in
-    let kn, pb = 
+    let pb = 
       match mib.mind_record with
-      | Some (Some (id, kns, pbs)) -> 
+      | Some (Some (id, pbs)) -> 
 	if i < Array.length pbs then
-	  kns.(i), pbs.(i)
+	  pbs.(i)
 	else assert false
       | _ -> assert false
     in
     let term, typ = pb.proj_eta in
-      Def (Mod_subst.from_val (hcons_constr term)), RegularArity typ, Some pb,
+      Projection (Projection.make ind i false), RegularArity typ,
       mib.mind_polymorphic, mib.mind_universes, false, None
 
 let global_vars_set_constant_type env = function
@@ -186,7 +186,7 @@ let record_aux env s1 s2 =
 let suggest_proof_using = ref (fun _ _ _ _ _ -> ())
 let set_suggest_proof_using f = suggest_proof_using := f
 
-let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) =
+let build_constant_declaration kn env (def,typ,poly,univs,inline_code,ctx) =
   let check declared inferred =
     let mk_set l = List.fold_right Id.Set.add (List.map pi1 l) Id.Set.empty in
     let inferred_set, declared_set = mk_set inferred, mk_set declared in
@@ -207,7 +207,7 @@ let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) 
            we must look at the body NOW, if any *)
         let ids_typ = global_vars_set_constant_type env typ in
         let ids_def = match def with
-        | Undef _ -> Idset.empty
+          | Undef _ | Projection _ (* all in the type *) -> Idset.empty
         | Def cs -> global_vars_set env (Mod_subst.force_constr cs)
         | OpaqueDef lc ->
             let vars =
@@ -229,7 +229,7 @@ let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) 
         (* We use the declared set and chain a check of correctness *)
         declared,
         match def with
-        | Undef _ as x -> x (* nothing to check *)
+        | (Undef _ | Projection _) as x -> x (* nothing to check *)
         | Def cs as x ->
             let ids_typ = global_vars_set_constant_type env typ in
             let ids_def = global_vars_set env (Mod_subst.force_constr cs) in
@@ -247,34 +247,12 @@ let build_constant_declaration kn env (def,typ,proj,poly,univs,inline_code,ctx) 
        constants like opaque definitions. *)
     if poly then Some (Cemitcodes.from_val Cemitcodes.BCconstant)
     else
-      let res = 
-	match proj with
-	| None -> compile_constant_body env def
-	| Some pb ->
-	(* The compilation of primitive projections is a bit tricky, because
-           they refer to themselves (the body of p looks like fun c =>
-           Proj(p,c)). We break the cycle by building an ad-hoc compilation
-           environment. A cleaner solution would be that kernel projections are
-           simply Proj(i,c) with i an int and c a constr, but we would have to
-           get rid of the compatibility layer. *)
-	   let cb =
-	     { const_hyps = hyps;
-	       const_body = def;
-	       const_type = typ;
-	       const_proj = proj;
-	       const_body_code = None;
-	       const_polymorphic = poly;
-	       const_universes = univs;
-	       const_inline_code = inline_code }
-	   in
-	   let env = add_constant kn cb env in
-	   compile_constant_body env def
-      in Option.map Cemitcodes.from_val res
+      let res = compile_constant_body env def in
+	Option.map Cemitcodes.from_val res
   in
   { const_hyps = hyps;
     const_body = def;
     const_type = typ;
-    const_proj = proj;
     const_body_code = tps;
     const_polymorphic = poly;
     const_universes = univs;
@@ -294,7 +272,7 @@ let translate_recipe env kn r =
   build_constant_declaration kn env (Cooking.cook_constant env r)
 
 let translate_local_def env id centry =
-  let def,typ,proj,poly,univs,inline_code,ctx =
+  let def,typ,poly,univs,inline_code,ctx =
     infer_declaration env None (DefinitionEntry centry) in
   let typ = type_of_constant_type env typ in
   def, typ, univs

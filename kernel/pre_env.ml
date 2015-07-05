@@ -168,3 +168,12 @@ let lookup_mind kn env =
 
 let lookup_mind_key kn env =
   Mindmap_env.find kn env.env_globals.env_inductives
+
+let lookup_projection p env =
+  let mib = lookup_mind (Projection.record p) env in
+    match mib.mind_record with
+    | None | Some None -> raise Not_found
+    | Some (Some (c, pbs)) ->
+       let i = Projection.index p in
+	 if i >= 0 && i < Array.length pbs then pbs.(i)
+	 else raise Not_found

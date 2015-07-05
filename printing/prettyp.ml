@@ -172,7 +172,10 @@ let opacity env = function
 	| OpaqueDef _ -> Some FullyOpaque
 	| Def _ -> Some
           (TransparentMaybeOpacified
-            (Conv_oracle.get_strategy (Environ.oracle env) (ConstKey cst))))
+             (Conv_oracle.get_strategy (Environ.oracle env) (ConstKey cst)))
+	| Projection p -> Some (TransparentMaybeOpacified
+				 (Conv_oracle.get_strategy (Environ.oracle env)
+							   (ConstKey (projection_constant env p)))))
   | _ -> None
 
 let print_opacity ref =
@@ -206,7 +209,7 @@ let print_polymorphism ref =
   else []
 
 let print_primitive_record mipv = function
-  | Some (Some (_, ps,_)) ->
+  | Some (Some (_, _)) ->
     [pr_id mipv.(0).mind_typename ++ str" is primitive and has eta conversion."]
   | _ -> []
     
@@ -633,7 +636,12 @@ let print_full_pure_context () =
 	      | Def c ->
 		str "Definition " ++ print_basename con ++ cut () ++
 		str "  : " ++ pr_ltype typ ++ cut () ++ str " := " ++
-		pr_lconstr (Mod_subst.force_constr c))
+		  pr_lconstr (Mod_subst.force_constr c)
+	      | Projection pb ->
+		 let pb = lookup_projection pb (Global.env ()) in
+		   str "Projection " ++ print_basename con ++ cut () ++
+		     str "  : " ++ pr_ltype typ ++ cut () ++ str " := " ++
+		     pr_lconstr (pb.proj_body))
           ++ str "." ++ fnl () ++ fnl ()
       | "INDUCTIVE" ->
 	  let mind = Global.mind_of_delta_kn kn in

@@ -465,14 +465,14 @@ let rec detype flags avoid env sigma t =
 	let pars = pb.Declarations.proj_npars in
 	let hole = GHole(Loc.ghost,Evar_kinds.InternalHole,Misctypes.IntroAnonymous,None) in
 	let args = List.make pars hole in
- 	  GApp (dl, GRef (dl, ConstRef (Projection.constant p), None), 
+ 	  GApp (dl, GRef (dl, ConstRef (projection_constant (snd env) p), None), 
 		(args @ [detype flags avoid env sigma c]))
       in
       if fst flags || !Flags.in_debugger || !Flags.in_toplevel then
 	try noparams ()
 	with _ ->
 	    (* lax mode, used by debug printers only *) 
-	  GApp (dl, GRef (dl, ConstRef (Projection.constant p), None), 
+	  GApp (dl, GRef (dl, ConstRef (projection_constant (snd env) p), None), 
 		[detype flags avoid env sigma c])
       else 
 	if Projection.unfolded p then

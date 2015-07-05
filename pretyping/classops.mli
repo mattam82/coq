@@ -19,7 +19,7 @@ type cl_typ =
   | CL_SECVAR of variable
   | CL_CONST of constant
   | CL_IND of inductive
-  | CL_PROJ of constant
+  | CL_PROJ of projection
 
 (** Equality over [cl_typ] *)
 val cl_typ_eq : cl_typ -> cl_typ -> bool
@@ -98,7 +98,7 @@ val install_path_printer :
 (**/**)
 
 (** {6 This is for printing purpose } *)
-val string_of_class : cl_typ -> string
+val string_of_class : env -> cl_typ -> string
 val pr_class : cl_typ -> std_ppcmds
 val pr_cl_index : cl_index -> std_ppcmds
 val get_coercion_value : coe_index -> constr

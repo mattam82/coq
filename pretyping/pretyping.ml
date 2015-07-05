@@ -395,11 +395,11 @@ let new_type_evar env evdref loc =
   in e
 
 let get_projection env cst =
-  let cb = lookup_constant cst env in
-    match cb.Declarations.const_proj with
-    | Some {Declarations.proj_ind = mind; proj_npars = n; proj_arg = m; proj_type = ty} -> 
-      (cst,mind,n,m,ty)
-    | None -> raise Not_found
+  let p = constant_projection cst env in
+  let pb = lookup_projection p env in
+    match pb with
+    | {Declarations.proj_npars = n; proj_arg = m; proj_type = ty} -> 
+       (cst,Projection.record p,n,m,ty)
 
 let (f_genarg_interp, genarg_interp_hook) = Hook.make ()
 
@@ -577,7 +577,7 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
     let app_f = 
       match kind_of_term fj.uj_val with
       | Const (p, u) when Environ.is_projection p env ->
-	let p = Projection.make p false in
+	let p = constant_projection p env in
 	let pb = Environ.lookup_projection p env in
 	let npars = pb.Declarations.proj_npars in
 	  fun n -> 
@@ -705,6 +705,7 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
 	  error_case_not_inductive_loc cloc env !evdref cj
     in
     let cstrs = get_constructors env indf in
+    let ind,_ = dest_ind_family indf in
     if not (Int.equal (Array.length cstrs) 1) then
       user_err_loc (loc,"",str "Destructing let is only for inductive types" ++
 	str " with one constructor.");
@@ -713,7 +714,7 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
       user_err_loc (loc,"", str "Destructing let on this type expects " ++ 
 	int cs.cs_nargs ++ str " variables.");
     let nal = List.map (fun na -> ltac_interp_name lvar na) nal in
-    let na = ltac_interp_name lvar na in
+    let na = ltac_interp_name lvar na in	
     let fsign, record = 
       match get_projections env indf with
       | None -> List.map2 (fun na (_,c,t) -> (na,c,t))
@@ -722,7 +723,7 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
 	let rec aux n k names l =
 	  match names, l with
 	  | na :: names, ((_, None, t) :: l) -> 
-	    let proj = Projection.make ps.(cs.cs_nargs - k) true in
+	    let proj = Projection.make (fst (fst ind)) (cs.cs_nargs - k) true in
 	      (na, Some (lift (cs.cs_nargs - n) (mkProj (proj, cj.uj_val))), t)
 	    :: aux (n+1) (k + 1) names l
 	  | na :: names, ((_, c, t) :: l) -> 
@@ -746,9 +747,9 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
 	  List.map (fun (_,b,t) -> (Anonymous,b,t)) arsgn
 	else arsgn
     in
-      let psign = (na,None,build_dependent_inductive env indf)::arsgn in
-      let nar = List.length arsgn in
-	  (match po with
+    let psign = (na,None,build_dependent_inductive env indf)::arsgn in
+    let nar = List.length arsgn in
+      (match po with
 	  | Some p ->
 	    let env_p = push_rel_context psign env in
 	    let pj = pretype_type empty_valcon env_p evdref lvar p in
@@ -762,9 +763,8 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
 	    let fty = hnf_lam_applist env !evdref lp inst in
 	    let fj = pretype (mk_tycon fty) env_f evdref lvar d in
 	    let v =
-	      let ind,_ = dest_ind_family indf in
-		Typing.check_allowed_sort env !evdref ind cj.uj_val p;
-		obj ind p cj.uj_val fj.uj_val
+	      Typing.check_allowed_sort env !evdref ind cj.uj_val p;
+	      obj ind p cj.uj_val fj.uj_val
 	    in
 	      { uj_val = v; uj_type = substl (realargs@[cj.uj_val]) ccl }
 
@@ -781,9 +781,8 @@ let rec pretype resolve_tc (tycon : type_constraint) env evdref (lvar : ltac_var
 		 (* let ccl = refresh_universes ccl in *)
 	    let p = it_mkLambda_or_LetIn (lift (nar+1) ccl) psign in
 	    let v =
-	      let ind,_ = dest_ind_family indf in
-		Typing.check_allowed_sort env !evdref ind cj.uj_val p;
-		obj ind p cj.uj_val fj.uj_val
+	      Typing.check_allowed_sort env !evdref ind cj.uj_val p;
+	      obj ind p cj.uj_val fj.uj_val
 	    in { uj_val = v; uj_type = ccl })
 
   | GIf (loc,c,(na,po),b1,b2) ->

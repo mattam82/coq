@@ -42,7 +42,7 @@ let ppmbid mbid = pp (str (MBId.debug_to_string mbid))
 let ppdir dir = pp (pr_dirpath dir)
 let ppmp mp = pp(str (string_of_mp mp))
 let ppcon con = pp(debug_pr_con con)
-let ppproj con = pp(debug_pr_con (Projection.constant con))
+let ppproj con = pp(debug_pr_con (Environ.projection_constant (Global.env()) con))
 let ppkn kn = pp(pr_kn kn)
 let ppmind kn = pp(debug_pr_mind kn)
 let ppind (kn,i) = pp(debug_pr_mind kn ++ str"," ++int i)
@@ -265,7 +265,7 @@ let constr_display csr =
   | Construct (((sp,i),j),u) ->
       "MutConstruct(("^(string_of_mind sp)^","^(string_of_int i)^"),"
       ^","^(universes_display u)^(string_of_int j)^")"
-  | Proj (p, c) -> "Proj("^(string_of_con (Projection.constant p))^","^term_display c ^")"
+  | Proj (p, c) -> "Proj("^(Projection.to_string p)^","^term_display c ^")"
   | Case (ci,p,c,bl) ->
       "MutCase(<abs>,"^(term_display p)^","^(term_display c)^","
       ^(array_display bl)^")"
@@ -354,7 +354,7 @@ let print_pure_constr csr =
       print_string ","; universes_display u;
       print_string ")"
   | Proj (p,c') -> print_string "Proj(";
-      sp_con_display (Projection.constant p);
+      sp_con_display (Environ.projection_constant (Global.env()) p);
       print_string ",";
       box_display c';
       print_string ")"

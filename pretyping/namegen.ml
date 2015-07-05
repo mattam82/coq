@@ -78,12 +78,12 @@ let is_constructor id =
 (**********************************************************************)
 (* Generating "intuitive" names from its type *)
 
-let head_name c = (* Find the head constant of a constr if any *)
+let head_name env c = (* Find the head constant of a constr if any *)
   let rec hdrec c =
     match kind_of_term c with
     | Prod (_,_,c) | Lambda (_,_,c) | LetIn (_,_,_,c)
     | Cast (c,_,_) | App (c,_) -> hdrec c
-    | Proj (kn,_) -> Some (Label.to_id (con_label (Projection.constant kn)))
+    | Proj (p,_) -> Some (Label.to_id (con_label (projection_constant env p)))
     | Const _ | Ind _ | Construct _ | Var _ ->
 	Some (basename_of_global (global_of_constr c))
     | Fix ((_,i),(lna,_,_)) | CoFix (i,(lna,_,_)) ->
@@ -104,7 +104,7 @@ let hdchar env c =
     match kind_of_term c with
     | Prod (_,_,c) | Lambda (_,_,c) | LetIn (_,_,_,c) -> hdrec (k+1) c
     | Cast (c,_,_) | App (c,_) -> hdrec k c
-    | Proj (kn,_) -> lowercase_first_char (Label.to_id (con_label (Projection.constant kn)))
+    | Proj (p,_) -> lowercase_first_char (Label.to_id (con_label (projection_constant env p)))
     | Const (kn,_) -> lowercase_first_char (Label.to_id (con_label kn))
     | Ind (x,_) -> lowercase_first_char (basename_of_global (IndRef x))
     | Construct (x,_) -> lowercase_first_char (basename_of_global (ConstructRef x))

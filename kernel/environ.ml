@@ -249,16 +249,15 @@ exception NotEvaluableConst of const_evaluation_result
 
 let constant_value env (kn,u) =
   let cb = lookup_constant kn env in
-    if cb.const_proj = None then
-      match cb.const_body with
-      | Def l_body -> 
-	if cb.const_polymorphic then
-	  let csts = constraints_of cb u in
-	    (subst_instance_constr u (Mod_subst.force_constr l_body), csts)
-	else Mod_subst.force_constr l_body, Univ.Constraint.empty
-      | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
-      | Undef _ -> raise (NotEvaluableConst NoBody)
-    else raise (NotEvaluableConst IsProj)
+    match cb.const_body with
+    | Def l_body -> 
+       if cb.const_polymorphic then
+	 let csts = constraints_of cb u in
+	   (subst_instance_constr u (Mod_subst.force_constr l_body), csts)
+       else Mod_subst.force_constr l_body, Univ.Constraint.empty
+    | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
+    | Undef _ -> raise (NotEvaluableConst NoBody)
+    | Projection _ -> raise (NotEvaluableConst IsProj)
 
 let constant_opt_value env cst =
   try Some (constant_value env cst)
@@ -272,6 +271,7 @@ let constant_value_and_type env (kn, u) =
 	| Def l_body -> Some (subst_instance_constr u (Mod_subst.force_constr l_body))
 	| OpaqueDef _ -> None
 	| Undef _ -> None
+	| Projection _ -> None
       in
 	b', map_regular_arity (subst_instance_constr u) cb.const_type, cst
     else 
@@ -279,6 +279,7 @@ let constant_value_and_type env (kn, u) =
 	| Def l_body -> Some (Mod_subst.force_constr l_body)
 	| OpaqueDef _ -> None
 	| Undef _ -> None
+	| Projection _ -> None
       in b', cb.const_type, Univ.Constraint.empty
 
 (* These functions should be called under the invariant that [env] 
@@ -300,6 +301,7 @@ let constant_value_in env (kn,u) =
 	subst_instance_constr u b
     | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
     | Undef _ -> raise (NotEvaluableConst NoBody)
+    | Projection _ -> raise (NotEvaluableConst IsProj)
 
 let constant_opt_value_in env cst =
   try Some (constant_value_in env cst)
@@ -312,6 +314,7 @@ let evaluable_constant kn env =
     | Def _ -> true
     | OpaqueDef _ -> false
     | Undef _ -> false
+    | Projection _ -> false
 
 let polymorphic_constant cst env =
   (lookup_constant cst env).const_polymorphic
@@ -329,15 +332,22 @@ let template_polymorphic_pconstant (cst,u) env =
   if not (Univ.Instance.is_empty u) then false
   else template_polymorphic_constant cst env
 
-let lookup_projection cst env =
-  match (lookup_constant (Projection.constant cst) env).const_proj with 
-  | Some pb -> pb
-  | None -> anomaly (Pp.str "lookup_projection: constant is not a projection")
+let lookup_projection = lookup_projection
+
+let constant_projection cst env =
+  match (lookup_constant cst env).const_body with 
+  | Projection p -> p
+  | _ -> raise Not_found
 
 let is_projection cst env =
-  match (lookup_constant cst env).const_proj with 
-  | Some _ -> true
-  | None -> false
+  match (lookup_constant cst env).const_body with 
+  | Projection _ -> true
+  | _ -> false
+
+let projection_constant env p =
+  let pb = lookup_projection p env in
+  let mp, dp, l = MutInd.repr3 (Projection.record p) in
+    Constant.make1 (KerName.make mp dp (Label.of_id pb.proj_name))
 
 (* Mutual Inductives *)
 let lookup_mind = lookup_mind

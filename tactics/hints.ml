@@ -46,7 +46,7 @@ let head_constr_bound t =
   let hd,args = decompose_app ccl in
   match kind_of_term hd with
     | Const _ | Ind _ | Construct _ | Var _ -> hd
-    | Proj (p, _) -> mkConst (Projection.constant p)
+    | Proj (p, _) -> mkConst (projection_constant (Global.env ()) p)
     | _ -> raise Bound
 
 let head_constr c =
@@ -61,7 +61,7 @@ let decompose_app_bound t =
     | Ind (i,u) -> IndRef i, args
     | Construct (c,u) -> ConstructRef c, args
     | Var id -> VarRef id, args
-    | Proj (p, c) -> ConstRef (Projection.constant p), Array.cons c args
+    | Proj (p, c) -> ConstRef (projection_constant (Global.env()) p), Array.cons c args
     | _ -> raise Bound
 
 (************************************************************************)
@@ -255,14 +255,15 @@ let strip_params env c =
     (match kind_of_term f with
     | Const (p,_) ->
       let cb = lookup_constant p env in
-	(match cb.Declarations.const_proj with
-	| Some pb -> 
+	(match cb.Declarations.const_body with
+	 | Declarations.Projection p ->
+	    let pb = lookup_projection p env in
 	  let n = pb.Declarations.proj_npars in
 	    if Array.length args > n then
-	      mkApp (mkProj (Projection.make p false, args.(n)), 
+	      mkApp (mkProj (p, args.(n)), 
 		     Array.sub args (n+1) (Array.length args - (n + 1)))
 	    else c
-	| None -> c)
+	| _ -> c)
     | _ -> c)
   | _ -> c
 

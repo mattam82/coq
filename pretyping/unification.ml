@@ -479,7 +479,7 @@ let key_of env b flags f =
       Id.Pred.mem id (fst flags.modulo_delta) ->
     Some (IsKey (VarKey id))
   | Proj (p, c) when Projection.unfolded p
-      || Cpred.mem (Projection.constant p) (snd flags.modulo_delta) ->
+      || Cpred.mem (projection_constant env p) (snd flags.modulo_delta) ->
     Some (IsProj (p, c))
   | _ -> None
   
@@ -489,9 +489,9 @@ let translate_key = function
   | VarKey id -> VarKey id
   | RelKey n -> RelKey n
 
-let translate_key = function
+let translate_key env = function
   | IsKey k -> translate_key k    
-  | IsProj (c, _) -> ConstKey (Projection.constant c)
+  | IsProj (c, _) -> ConstKey (projection_constant env c)
   
 let oracle_order env cf1 cf2 =
   match cf1 with
@@ -505,14 +505,14 @@ let oracle_order env cf1 cf2 =
       | Some k2 ->
 	match k1, k2 with
 	| IsProj (p, _), IsKey (ConstKey (p',_)) 
-	  when eq_constant (Projection.constant p) p' -> 
+	  when eq_constant (projection_constant env p) p' -> 
 	  Some (not (Projection.unfolded p))
 	| IsKey (ConstKey (p,_)), IsProj (p', _) 
-	  when eq_constant p (Projection.constant p') -> 
+	  when eq_constant p (projection_constant env p') -> 
 	  Some (Projection.unfolded p')
 	| _ ->
           Some (Conv_oracle.oracle_order (fun x -> x)
-		  (Environ.oracle env) false (translate_key k1) (translate_key k2))
+		  (Environ.oracle env) false (translate_key env k1) (translate_key env k2))
 
 let is_rigid_head flags t =
   match kind_of_term t with
@@ -590,7 +590,7 @@ let is_eta_constructor_app env ts f l1 term =
   | Construct (((_, i as ind), j), u) when i == 0 && j == 1 ->
     let mib = lookup_mind (fst ind) env in
       (match mib.Declarations.mind_record with
-      | Some (Some (_,exp,projs)) when mib.Declarations.mind_finite <> Decl_kinds.CoFinite &&
+      | Some (Some (_,projs)) when mib.Declarations.mind_finite <> Decl_kinds.CoFinite &&
           Array.length projs == Array.length l1 - mib.Declarations.mind_nparams ->
 	(** Check that the other term is neutral *)
 	is_neutral env ts term
@@ -602,11 +602,10 @@ let eta_constructor_app env f l1 term =
   | Construct (((_, i as ind), j), u) ->
     let mib = lookup_mind (fst ind) env in
       (match mib.Declarations.mind_record with
-      | Some (Some (_, projs, _)) ->
+      | Some (Some (_, projs)) ->
         let npars = mib.Declarations.mind_nparams in
 	let pars, l1' = Array.chop npars l1 in
-	let arg = Array.append pars [|term|] in
-	let l2 = Array.map (fun p -> mkApp (mkConstU (p,u), arg)) projs in
+	let l2 = Array.mapi (fun i p -> mkProj (Projection.make (fst ind) i false, term)) projs in
 	  l1', l2
       | _ -> assert false)
   | _ -> assert false
@@ -711,8 +710,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb 
 	| _, LetIn (_,a,_,c) -> unirec_rec curenvnb pb opt substn cM (subst1 a c)
 
 	(** Fast path for projections. *)
-	| Proj (p1,c1), Proj (p2,c2) when eq_constant
-	    (Projection.constant p1) (Projection.constant p2) ->
+	| Proj (p1,c1), Proj (p2,c2) when Projection.equal p1 p2 ->
 	  (try unify_same_proj curenvnb cv_pb {opt with at_top = true}
 	       substn c1 c2
 	   with ex when precatchable_exception ex ->
@@ -808,7 +806,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb 
 	match kind_of_term c' with
 	| Meta _ -> true
 	| Evar _ -> true
-	| Const (c, u) -> Constant.equal c (Projection.constant p)
+	| Const (c, u) -> Constant.equal c (projection_constant env p)
 	| _ -> false
       in
       let expand_proj c c' l = 
@@ -1618,7 +1616,7 @@ let keyed_unify env evd kop =
     | None -> fun _ -> true
     | Some kop ->
       fun cl ->
-	let kc = Keys.constr_key cl in
+	let kc = Keys.constr_key env cl in
 	  match kc with
 	  | None -> false
 	  | Some kc -> Keys.equiv_keys kop kc
@@ -1628,7 +1626,7 @@ let keyed_unify env evd kop =
    Fails if no match is found *)
 let w_unify_to_subterm env evd ?(flags=default_unify_flags ()) (op,cl) =
   let bestexn = ref None in
-  let kop = Keys.constr_key op in
+  let kop = Keys.constr_key env op in
   let rec matchrec cl =
     let cl = strip_outer_cast cl in
     (try

@@ -197,7 +197,7 @@ let set_type_in_type senv =
 
 let get_opaque_body env cbo =
   match cbo.const_body with
-  | Undef _ -> assert false
+  | Undef _ | Projection _ -> assert false
   | Def _ -> `Nothing
   | OpaqueDef opaque ->
       `Opaque
@@ -375,7 +375,7 @@ let globalize_constant_universes env cb =
     let cstrs = Univ.UContext.constraints cb.const_universes in
       Now cstrs ::  
 	(match cb.const_body with
-	| (Undef _ | Def _) -> []
+	| (Undef _ | Def _ | Projection _) -> []
 	| OpaqueDef lc ->
 	  match Opaqueproof.get_constraints (Environ.opaque_tables env) lc with
 	  | None -> []

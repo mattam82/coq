@@ -53,7 +53,7 @@ let apply_coercion_args env evd check isproj argl funj =
     | [] ->
       if isproj then
 	let cst = fst (destConst (j_val funj)) in
-	let p = Projection.make cst false in
+	let p = constant_projection cst env in
 	let pb = lookup_projection p env in
 	let args = List.skipn pb.Declarations.proj_npars argl in
 	let hd, tl = match args with hd :: tl -> hd, tl | [] -> assert false in

@@ -88,7 +88,7 @@ module type RedFlagsSig = sig
   val red_add_transparent : reds -> transparent_state -> reds
   val mkflags : red_kind list -> reds
   val red_set : reds -> red_kind -> bool
-  val red_projection : reds -> projection -> bool
+  val red_projection : reds -> env -> projection -> bool
 end
 
 module RedFlags = (struct
@@ -169,9 +169,9 @@ module RedFlags = (struct
     | DELTA -> (* Used for Rel/Var defined in context *)
 	incr_cnt red.r_delta delta
 
-  let red_projection red p = 
+  let red_projection red env p = 
     if Projection.unfolded p then true
-    else red_set red (fCONST (Projection.constant p))
+    else red_set red (fCONST (Environ.projection_constant env p))
 
 end : RedFlagsSig)
 
@@ -378,7 +378,7 @@ type stack_member =
   | Zapp of fconstr array
   | Zcase of case_info * fconstr * fconstr array
   | ZcaseT of case_info * constr * constr array * fconstr subs
-  | Zproj of int * int * constant
+  | Zproj of int * int * projection
   | Zfix of fconstr * stack
   | Zshift of int
   | Zupdate of fconstr
@@ -652,8 +652,8 @@ let rec zip m stk =
     | ZcaseT(ci,p,br,e)::s ->
         let t = FCaseT(ci, p, m, br, e) in
         zip {norm=neutr m.norm; term=t} s
-    | Zproj (i,j,cst) :: s -> 
-        zip {norm=neutr m.norm; term=FProj(Projection.make cst true,m)} s
+    | Zproj (i,j,p) :: s -> 
+        zip {norm=neutr m.norm; term=FProj(Projection.unfold p,m)} s
     | Zfix(fx,par)::s ->
         zip fx (par @ append_stack [|m|] s)
     | Zshift(n)::s ->
@@ -783,7 +783,7 @@ let drop_parameters depth n argstk =
 let eta_expand_ind_stack env ind m s (f, s') =
   let mib = lookup_mind (fst ind) env in
     match mib.Declarations.mind_record with
-    | Some (Some (_,projs,pbs)) when
+    | Some (Some (_,pbs)) when
 	mib.Declarations.mind_finite <> Decl_kinds.CoFinite -> 
 	(* (Construct, pars1 .. parsm :: arg1...argn :: []) ~= (f, s') ->
 	   arg1..argn ~= (proj1 t...projn t) where t = zip (f,s') *)
@@ -792,8 +792,10 @@ let eta_expand_ind_stack env ind m s (f, s') =
       let (depth, args, s) = strip_update_shift_app m s in
       (** Try to drop the params, might fail on partially applied constructors. *)
       let argss = try_drop_parameters depth pars args in
-      let hstack = Array.map (fun p -> { norm = Red; (* right can't be a constructor though *)
-					 term = FProj (Projection.make p true, right) }) projs in
+	let hstack =
+	  Array.mapi
+	    (fun i p -> { norm = Red; (* right can't be a constructor though *)
+		       term = FProj (Projection.make (fst ind) i true, right) }) pbs in
 	argss, [Zapp hstack]	
     | _ -> raise Not_found (* disallow eta-exp for non-primitive records *)
 
@@ -851,12 +853,11 @@ let rec knh info m stk =
     | FCast(t,_,_) -> knh info t stk
     | FProj (p,c) ->
       let unf = Projection.unfolded p in
-        if unf || red_set info.i_flags (fCONST (Projection.constant p)) then
+        if unf || red_set info.i_flags (fCONST (Environ.projection_constant (info_env info) p)) then
           (match try Some (lookup_projection p (info_env info)) with Not_found -> None with
 	  | None -> (m, stk)
 	  | Some pb ->
-	     knh info c (Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, 
-				Projection.constant p)
+	     knh info c (Zproj (pb.Declarations.proj_npars, pb.Declarations.proj_arg, p)
 			 :: zupdate m stk))
 	else (m,stk)
 
@@ -961,7 +962,7 @@ let rec zip_term zfun m stk =
 		       Array.map (fun b -> zfun (mk_clos e b)) br) in
         zip_term zfun t s
     | Zproj(_,_,p)::s -> 
-        let t = mkProj (Projection.make p true, m) in 
+        let t = mkProj (Projection.unfold p, m) in 
 	zip_term zfun t s
     | Zfix(fx,par)::s ->
         let h = mkApp(zip_term zfun (zfun fx) par,[|m|]) in

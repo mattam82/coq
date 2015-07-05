@@ -31,7 +31,7 @@ type cl_typ =
   | CL_SECVAR of variable
   | CL_CONST of constant
   | CL_IND of inductive
-  | CL_PROJ of constant
+  | CL_PROJ of projection
 
 type cl_info_typ = {
   cl_param : int
@@ -61,7 +61,7 @@ let coe_info_typ_equal c1 c2 =
 let cl_typ_ord t1 t2 = match t1, t2 with
   | CL_SECVAR v1, CL_SECVAR v2 -> Id.compare v1 v2
   | CL_CONST c1, CL_CONST c2 -> con_ord c1 c2
-  | CL_PROJ c1, CL_PROJ c2 -> con_ord c1 c2
+  | CL_PROJ c1, CL_PROJ c2 -> Projection.compare c1 c2
   | CL_IND i1, CL_IND i2 -> ind_ord i1 i2
   | _ -> Pervasives.compare t1 t2 (** OK *)
 
@@ -197,7 +197,7 @@ let find_class_type sigma t =
     | Var id -> CL_SECVAR id, Univ.Instance.empty, args
     | Const (sp,u) -> CL_CONST sp, u, args
     | Proj (p, c) when not (Projection.unfolded p) ->
-      CL_PROJ (Projection.constant p), Univ.Instance.empty, c :: args
+      CL_PROJ p, Univ.Instance.empty, c :: args
     | Ind (ind_sp,u) -> CL_IND ind_sp, u, args
     | Prod (_,_,_) -> CL_FUN, Univ.Instance.empty, []
     | Sort _ -> CL_SORT, Univ.Instance.empty, []
@@ -209,7 +209,7 @@ let subst_cl_typ subst ct = match ct with
   | CL_FUN
   | CL_SECVAR _ -> ct
   | CL_PROJ c ->
-    let c',t = subst_con_kn subst c in
+    let c' = subst_projection subst c in
       if c' == c then ct else CL_PROJ c'
   | CL_CONST c ->
       let c',t = subst_con_kn subst c in
@@ -243,17 +243,20 @@ let inductive_class_of ind = fst (class_info (CL_IND ind))
 
 let class_args_of env sigma c = pi3 (find_class_type sigma c)
 
-let string_of_class = function
+let string_of_class env = function
   | CL_FUN -> "Funclass"
   | CL_SORT -> "Sortclass"
-  | CL_CONST sp | CL_PROJ sp ->
+  | CL_CONST sp ->
+      string_of_qualid (shortest_qualid_of_global Id.Set.empty (ConstRef sp))
+  | CL_PROJ sp ->
+     let sp = projection_constant env sp in
       string_of_qualid (shortest_qualid_of_global Id.Set.empty (ConstRef sp))
   | CL_IND sp ->
       string_of_qualid (shortest_qualid_of_global Id.Set.empty (IndRef sp))
   | CL_SECVAR sp ->
       string_of_qualid (shortest_qualid_of_global Id.Set.empty (VarRef sp))
 
-let pr_class x = str (string_of_class x)
+let pr_class x = str (string_of_class (Global.env ()) x)
 
 (* lookup paths *)
 
@@ -406,8 +409,9 @@ let reference_arity_length ref =
   List.length (fst (Reductionops.splay_arity (Global.env()) Evd.empty t))
 
 let projection_arity_length p =
-  let len = reference_arity_length (ConstRef p) in
-  let pb = Environ.lookup_projection (Projection.make p false) (Global.env ()) in 
+  let pc = projection_constant (Global.env ()) p in
+  let len = reference_arity_length (ConstRef pc) in
+  let pb = Environ.lookup_projection p (Global.env ()) in 
     len - pb.Declarations.proj_npars
 
 let class_params = function
@@ -474,7 +478,7 @@ let subst_coercion (subst, c) =
 let discharge_cl = function
   | CL_CONST kn -> CL_CONST (Lib.discharge_con kn)
   | CL_IND ind -> CL_IND (Lib.discharge_inductive ind)
-  | CL_PROJ p -> CL_PROJ (Lib.discharge_con p)
+  | CL_PROJ p -> CL_PROJ (Lib.discharge_projection p)
   | cl -> cl
 
 let discharge_coercion (_, c) =

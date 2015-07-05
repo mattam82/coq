@@ -83,9 +83,7 @@ let kind_of_head env t =
   | LetIn _ -> assert false
   | Meta _ | Evar _ -> NotImmediatelyComputableHead
   | App (c,al) -> aux k (Array.to_list al @ l) c b
-  | Proj (p,c) ->
-      (try on_subterm k (c :: l) b (constant_head (Projection.constant p))
-       with Not_found -> assert false)
+  | Proj (p,c) -> aux k [] c true
 
   | Case (_,_,c,_) -> aux k [] c true
   | Fix ((i,j),_) ->
@@ -122,7 +120,7 @@ let compute_head = function
    let cb = Environ.lookup_constant cst env in
    let is_Def = function Declarations.Def _ -> true | _ -> false in
    let body = 
-     if cb.Declarations.const_proj = None && is_Def cb.Declarations.const_body
+     if is_Def cb.Declarations.const_body
      then Declareops.body_of_constant (Environ.opaque_tables env) cb else None 
    in
      (match body with

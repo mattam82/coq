@@ -185,15 +185,8 @@ let judge_of_constant env cst =
   judge_of_constant_knowing_parameters env cst [||]
 
 let type_of_projection env (p,u) =
-  let cst = Projection.constant p in
-  let cb = lookup_constant cst env in
-  match cb.const_proj with
-  | Some pb -> 
-    if cb.const_polymorphic then
-      Vars.subst_instance_constr u pb.proj_type
-    else pb.proj_type
-  | None -> raise (Invalid_argument "type_of_projection: not a projection")
-
+  let pb = lookup_projection p env in
+    Vars.subst_instance_constr u pb.proj_type
 
 (* Type of a lambda-abstraction. *)
 
@@ -386,7 +379,7 @@ let judge_of_projection env p cj =
     try find_rectype env cj.uj_type
     with Not_found -> error_case_not_inductive env cj
   in
-    assert(eq_mind pb.proj_ind (fst ind));
+    assert(eq_mind (Projection.record p) (fst ind));
     let ty = Vars.subst_instance_constr u pb.Declarations.proj_type in
     let ty = substl (cj.uj_val :: List.rev args) ty in
       {uj_val = mkProj (p,cj.uj_val);

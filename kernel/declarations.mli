@@ -49,7 +49,7 @@ type inline = int option
     always transparent. *)
 
 type projection_body = {
-  proj_ind : mutual_inductive;
+  proj_name : Id.t;
   proj_npars : int;
   proj_arg : int;
   proj_type : types; (* Type under params *)
@@ -61,7 +61,8 @@ type constant_def =
   | Undef of inline
   | Def of constr Mod_subst.substituted
   | OpaqueDef of Opaqueproof.opaque
-
+  | Projection of Projection.t
+		    
 type constant_universes = Univ.universe_context
 
 (* some contraints are in constant_constraints, some other may be in
@@ -73,7 +74,6 @@ type constant_body = {
     const_body_code : Cemitcodes.to_patch_substituted option;
     const_polymorphic : bool; (** Is it polymorphic or not *)
     const_universes : constant_universes;
-    const_proj : projection_body option;
     const_inline_code : bool }
 
 type seff_env = [ `Nothing | `Opaque of Constr.t * Univ.universe_context_set ]
@@ -106,7 +106,7 @@ v}
     - The constants associated to each projection.
     - The checked projection bodies. *)
 
-type record_body = (Id.t * constant array * projection_body array) option
+type record_body = (Id.t * projection_body array) option
 
 type regular_inductive_arity = {
   mind_user_arity : types;

@@ -58,6 +58,12 @@ let instantiate_inductive_constraints mib u =
     Univ.subst_instance_constraints u (Univ.UContext.constraints mib.mind_universes)
   else Univ.Constraint.empty
 
+let projection_body (mib,u) i =
+  match mib.mind_record with
+  | None | Some None -> error "Inductive.projection_body: not a record"
+  | Some (Some (c, pbs)) ->
+     if i >= 0 && i < Array.length pbs then pbs.(i)
+     else error "Inductive.projection_body: invalid projection index"
 
 (************************************************************************)
 
