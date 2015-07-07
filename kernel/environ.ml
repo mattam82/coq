@@ -243,10 +243,14 @@ let constant_context env kn =
     if cb.const_polymorphic then cb.const_universes
     else Univ.UContext.empty
 
-type const_evaluation_result = NoBody | Opaque | IsProj
+type const_evaluation_result = NoBody | Opaque
 
 exception NotEvaluableConst of const_evaluation_result
 
+let lookup_projection_eta env cb u p =
+  let pb = lookup_projection p env in
+    subst_instance_constr u (fst pb.proj_eta)
+				 
 let constant_value env (kn,u) =
   let cb = lookup_constant kn env in
     match cb.const_body with
@@ -257,7 +261,10 @@ let constant_value env (kn,u) =
        else Mod_subst.force_constr l_body, Univ.Constraint.empty
     | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
     | Undef _ -> raise (NotEvaluableConst NoBody)
-    | Projection _ -> raise (NotEvaluableConst IsProj)
+    | Projection p ->
+       let t = lookup_projection_eta env cb u p in
+       let csts = constraints_of cb u in
+	 t, csts
 
 let constant_opt_value env cst =
   try Some (constant_value env cst)
@@ -271,7 +278,7 @@ let constant_value_and_type env (kn, u) =
 	| Def l_body -> Some (subst_instance_constr u (Mod_subst.force_constr l_body))
 	| OpaqueDef _ -> None
 	| Undef _ -> None
-	| Projection _ -> None
+	| Projection p -> Some (lookup_projection_eta env cb u p)
       in
 	b', map_regular_arity (subst_instance_constr u) cb.const_type, cst
     else 
@@ -279,7 +286,7 @@ let constant_value_and_type env (kn, u) =
 	| Def l_body -> Some (Mod_subst.force_constr l_body)
 	| OpaqueDef _ -> None
 	| Undef _ -> None
-	| Projection _ -> None
+	| Projection p -> Some (lookup_projection_eta env cb u p)
       in b', cb.const_type, Univ.Constraint.empty
 
 (* These functions should be called under the invariant that [env] 
@@ -301,7 +308,7 @@ let constant_value_in env (kn,u) =
 	subst_instance_constr u b
     | OpaqueDef _ -> raise (NotEvaluableConst Opaque)
     | Undef _ -> raise (NotEvaluableConst NoBody)
-    | Projection _ -> raise (NotEvaluableConst IsProj)
+    | Projection p -> lookup_projection_eta env cb u p
 
 let constant_opt_value_in env cst =
   try Some (constant_value_in env cst)
@@ -314,7 +321,7 @@ let evaluable_constant kn env =
     | Def _ -> true
     | OpaqueDef _ -> false
     | Undef _ -> false
-    | Projection _ -> false
+    | Projection _ -> true
 
 let polymorphic_constant cst env =
   (lookup_constant cst env).const_polymorphic

@@ -54,10 +54,7 @@ let is_evaluable env = function
 
 let value_of_evaluable_ref env evref u =
   match evref with
-  | EvalConstRef con -> 
-    (try constant_value_in env (con,u)
-    with NotEvaluableConst IsProj -> 
-      raise (Invalid_argument "value_of_evaluable_ref"))
+  | EvalConstRef con -> constant_value_in env (con,u)
   | EvalVarRef id -> Option.get (pi2 (lookup_named id env))
 
 let evaluable_of_global_reference env = function

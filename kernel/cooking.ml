@@ -60,12 +60,12 @@ end
 
 module RefTable = Hashtbl.Make(RefHash)
 
-let instantiate_my_gr gr u l =
+let instantiate_my_gr gr u arg l =
   match gr with
   | ConstRef c -> mkApp (mkConstU (c, u), l)
   | IndRef i -> mkApp (mkIndU (i, u), l)
   | ConstructRef c -> mkApp (mkConstructU (c, u), l)
-  | ProjRef p -> mkApp (mkProj (p, l.(0)), Array.tl l)
+  | ProjRef p -> mkProj (p, Option.get arg)
 
 let share cache r (cstl,knl) =
   try RefTable.find cache r
@@ -79,7 +79,9 @@ let share cache r (cstl,knl) =
     | ConstRef cst ->
        ConstRef (pop_con cst), Cmap.find cst cstl
     | ProjRef p ->
-       let mind = pop_mind (Projection.record p) in
+       let kn = Projection.record p in
+       let _r = Mindmap.find kn knl in
+       let mind = pop_mind kn in
        let p' = Projection.make mind (Projection.index p)
 				(Projection.unfolded p) in
        ProjRef p', (Univ.Instance.empty, [||])
@@ -88,9 +90,9 @@ let share cache r (cstl,knl) =
   RefTable.add cache r c;
   c
 
-let share_univs cache r u l =
+let share_univs cache r u l arg =
   let r', (u', args) = share cache r l in
-    instantiate_my_gr r' (Instance.append u' u) args
+    instantiate_my_gr r' (Instance.append u' u) arg args
 
 let update_case_info cache ci modlist =
   try
@@ -115,25 +117,25 @@ let expmod_constr cache modlist c =
 
       | Ind (ind,u) ->
 	  (try
-	    share_univs (IndRef ind) u modlist
+	    share_univs (IndRef ind) u modlist None
 	   with
 	    | Not_found -> map_constr substrec c)
 
       | Construct (cstr,u) ->
 	  (try
-	     share_univs (ConstructRef cstr) u modlist
+	     share_univs (ConstructRef cstr) u modlist None
 	   with
 	    | Not_found -> map_constr substrec c)
 
       | Const (cst,u) ->
 	  (try
-	    share_univs (ConstRef cst) u modlist
+	    share_univs (ConstRef cst) u modlist None
 	   with
 	    | Not_found -> map_constr substrec c)
 
       | Proj (p, c') ->
          (try
-	     share_univs (ProjRef p) Univ.Instance.empty modlist
+	     share_univs (ProjRef p) Univ.Instance.empty modlist (Some c')
 	   with Not_found -> map_constr substrec c)
 
   | _ -> map_constr substrec c
@@ -156,13 +158,17 @@ type result =
     bool * constant_universes * inline
     * Context.section_context option
 
-let on_body ml hy f = function
+let on_body ml cache hy f = function
   | Undef _ as x -> x
   | Def cs -> Def (Mod_subst.from_val (f (Mod_subst.force_constr cs)))
   | OpaqueDef o ->
     OpaqueDef (Opaqueproof.discharge_direct_opaque ~cook_constr:f
 						   { Opaqueproof.modlist = ml; abstract = hy } o)
-  | Projection p as x -> (* FIXME *) x
+  | Projection p as x ->
+     let r', (u', args) = share cache (ProjRef p) ml in
+       match r' with
+       | ProjRef p -> Projection p
+       | _ -> assert false
 
 let constr_of_def otab = function
   | Undef _ -> assert false
@@ -200,7 +206,7 @@ let cook_constant env { from = cb; info } =
   let usubst, univs = lift_univs cb usubst in
   let expmod = expmod_constr_subst cache modlist usubst in
   let hyps = Context.map_named_context expmod abstract in
-  let body = on_body modlist (hyps, usubst, abs_ctx)
+  let body = on_body modlist cache (hyps, usubst, abs_ctx)
     (fun c -> abstract_constant_body (expmod c) hyps)
     cb.const_body
   in

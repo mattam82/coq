@@ -1218,9 +1218,9 @@ let clos_norm_flags flgs env sigma t =
       (Closure.inject t)
   with e when is_anomaly e -> error "Tried to normalize ill-typed term"
 
-let nf_beta = clos_norm_flags Closure.beta (Global.env ())
-let nf_betaiota = clos_norm_flags Closure.betaiota (Global.env ())
-let nf_betaiotazeta = clos_norm_flags Closure.betaiotazeta (Global.env ())
+let nf_beta sigma = clos_norm_flags Closure.beta (Global.env ()) sigma
+let nf_betaiota sigma = clos_norm_flags Closure.betaiota (Global.env ()) sigma
+let nf_betaiotazeta sigma = clos_norm_flags Closure.betaiotazeta (Global.env ()) sigma
 let nf_betadeltaiota env sigma =
   clos_norm_flags Closure.betadeltaiota env sigma
 

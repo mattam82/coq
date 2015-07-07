@@ -149,7 +149,7 @@ val template_polymorphic_pconstant : pconstant -> env -> bool
    body and [NotEvaluableConst IsProj] if [c] is a projection 
    and [Not_found] if it does not exist in [env] *)
 
-type const_evaluation_result = NoBody | Opaque | IsProj
+type const_evaluation_result = NoBody | Opaque
 exception NotEvaluableConst of const_evaluation_result
 
 val constant_value : env -> constant puniverses -> constr constrained

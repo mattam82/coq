@@ -786,7 +786,7 @@ let compile fail_on_error env c =
 
 let compile_constant_body fail_on_error env = function
   | Undef _ | OpaqueDef _ -> Some BCconstant
-  | Projection p -> (* FIXME *) assert false
+  | Projection p -> Some BCconstant (* FIXME *)
   | Def sb ->
       let body = Mod_subst.force_constr sb in
       match kind_of_term body with

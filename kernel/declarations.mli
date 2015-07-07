@@ -54,7 +54,7 @@ type projection_body = {
   proj_arg : int;
   proj_type : types; (* Type under params *)
   proj_eta : constr * types; (* Eta-expanded term and type *)
-  proj_body : constr; (* For compatibility with VMs only, the match version *)
+  proj_body : constr; (* For printing only, the match version *)
 }
 
 type constant_def =
