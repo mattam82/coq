@@ -1,6 +1,54 @@
-Require Import Setoid. 
+Require Import RelationClasses Setoid. 
 
 Variable X : Set.
+
+Goal forall x y : nat, forall P : nat -> nat, x = y -> P x = P y.
+Proof.
+  intros.
+  rewrite_strat topdown H.
+  Show Proof.
+  reflexivity.
+Qed.
+
+Goal forall x y : nat, forall P : nat -> nat, x = y -> P x = P y.
+Proof.
+  intros.
+  rewrite_strat topdown <- H.
+  Show Proof.
+  reflexivity.
+Qed.
+
+Goal forall x y : nat, forall P : nat -> Prop, x = y -> P x <-> P y.
+Proof.
+  intros.
+  rewrite_strat topdown <- H.
+  Show Proof.
+  reflexivity.
+Qed.
+
+Goal forall x y : nat, forall P : nat -> Prop, x = y -> P x <-> P y.
+Proof.
+  intros.
+  rewrite_strat topdown <- H.
+  Show Proof.
+  reflexivity.
+Qed.
+
+Goal forall x y : nat, forall P : nat -> Prop, x = y -> P x <-> P y.
+Proof.
+  intros.
+  setoid_rewrite <- H.
+  Show Proof.
+  reflexivity.
+Qed.
+
+Goal forall x y : nat, forall P : nat -> Prop, x+0 = x -> P (x+0) <-> P x.
+Proof.
+  intros.
+  setoid_rewrite H.
+  Show Proof.
+  reflexivity.
+Qed.
 
 Variable f : X -> X.
 Variable g : X -> X -> X.
@@ -23,12 +71,14 @@ Time Qed. (* 0.53 *)
 Goal forall x, h 6 x = f x.
 intros.
   Time rewrite_strat topdown lem2.
+Show Proof.
   Time rewrite_strat topdown lem1.
   Time rewrite_strat topdown lem0.
   Time rewrite_strat topdown lem3.
   reflexivity.
 Undo 5.
   Time rewrite_strat topdown (choice lem2 lem1).
+Show Proof.
   Time rewrite_strat topdown (choice lem0 lem3).
   reflexivity.
 Undo 3. 
