@@ -60,6 +60,14 @@ Program Instance ex_impl_morphism {A : Type} :
 Program Instance ex_flip_impl_morphism {A : Type} :
   Proper (pointwise_relation A (flip impl) ==> flip impl) (@ex A) | 1.
 
+Instance ex_eq_morphism {A : Type} :
+  Proper (pointwise_relation A Logic.eq ==> iff) (@ex A) | 2.
+Proof.
+  unfold Proper. intros f g eqfg. red in eqfg.
+  split. intros [x fx]. exists x. now rewrite <- eqfg.
+  intros [x fx]; exists x; now rewrite eqfg.
+Qed.
+
 Program Instance all_iff_morphism {A : Type} :
   Proper (pointwise_relation A iff ==> iff) (@all A).
 
@@ -68,6 +76,14 @@ Program Instance all_impl_morphism {A : Type} :
 
 Program Instance all_flip_impl_morphism {A : Type} :
   Proper (pointwise_relation A (flip impl) ==> flip impl) (@all A) | 1.
+
+Instance all_eq_morphism {A : Type} :
+  Proper (pointwise_relation A Logic.eq ==> iff) (@all A) | 2.
+Proof.
+  unfold Proper, all. intros f g eqfg. red in eqfg.
+  split. intros x y; now rewrite <- eqfg.
+  intros x y; now rewrite eqfg.
+Qed.
 
 (** Equivalent points are simultaneously accessible or not *)
 

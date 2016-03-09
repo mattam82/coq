@@ -24,7 +24,9 @@ Require Import Coq.Relations.Relation_Definitions.
 
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
-(** We allow to unfold the [relation] definition while doing morphism search. *)
+(** A helper constant when doing rewriting with leibniz equality *)
+Definition eq_rew (A : Type) (P : A -> Type) (x y : A) (e : x = y) : P y -> P x :=
+  match e with eq_refl => fun x => x end.
 
 Section Defs.
   Context {A : Type}.

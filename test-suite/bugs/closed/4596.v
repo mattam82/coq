@@ -10,5 +10,6 @@ Goal forall (S : Type) (b b0 : S -> nat -> bool) (str : S) (p : nat)
     T (b str0 m)) ->
   T (b str p).
 Proof.
-intros ???????? H0.
-rewrite H0.
+  intros ???????? H0.
+rewrite H0. 
+Show Proof.

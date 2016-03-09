@@ -40,6 +40,12 @@ type ('constr,'redexpr) strategy_ast =
 type rewrite_proof = 
   | RewPrf of constr * constr
   | RewCast of Constr.cast_kind
+  | RewEq of constr * types * constr * constr * constr * types * types
+  (** A predicate with one free variable P[x] and its type,
+      a proof of [t], [u], a proof of [t = u]
+      and its underlying relation [@eq] and [ty],
+      such that [rew_from] is convertible to P[t] and
+      [rew_to] is convertible to P[u] *)
 
 type evars = evar_map * Evar.Set.t (* goal evars, constraint evars *)
 
