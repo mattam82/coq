@@ -91,7 +91,7 @@ open Pre_env
 (* In Cfxe_t accumulators, we need to store [fcofixi] for testing         *)
 (* conversion of cofixpoints (which is intentional).                      *)
 
-type argument = ArgConstr of Constr.t | ArgUniv of Univ.Level.t
+type argument = ArgConstr of Constr.t | ArgUniv of Univ.Universe.t
 
 let empty_fv = { size= 0;  fv_rev = [] }
 
@@ -593,15 +593,15 @@ let rec compile_constr reloc c sz cont =
      let open Univ in begin
       let levels = Universe.levels u in
       let global_levels =
-	LSet.filter (fun x -> Level.var_index x = None) levels
+	LSet.filter (fun x -> LevelName.var_index x = None) levels
       in
       let local_levels =
-	List.map_filter (fun x -> Level.var_index x)
+	List.map_filter (fun x -> LevelName.var_index x)
 	  (LSet.elements levels)
       in
       (* We assume that [Universe.type0m] is a neutral element for [Universe.sup] *)
       let uglob =
-	LSet.fold (fun lvl u -> Universe.sup u (Universe.make lvl)) global_levels Universe.type0m
+	LSet.fold (fun lvl u -> Universe.sup u (Universe.make_name lvl)) global_levels Universe.type0m
       in
       if local_levels = [] then
 	compile_str_cst reloc (Bstrconst (Const_sorts (Type uglob))) sz cont
@@ -813,7 +813,7 @@ and compile_get_global reloc (kn,u) sz cont =
       compile_universe reloc () (Univ.Instance.to_array u) sz cont
 
 and compile_universe reloc uni sz cont =
-  match Univ.Level.var_index uni with
+  match Univ.Universe.var_index uni with
   | None -> Kconst (Const_univ_level uni) :: cont
   | Some idx -> pos_universe_var idx reloc sz :: cont
 

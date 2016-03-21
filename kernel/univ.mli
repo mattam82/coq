@@ -8,7 +8,7 @@
 
 (** Universes. *)
 
-module Level :
+module LevelName :
 sig
   type t
   (** Type of universe levels. A universe level is essentially a unique name
@@ -48,15 +48,52 @@ sig
   val var_index : t -> int option
 end
 
+module Level :
+sig
+  type t = LevelName.t * int
+  (** Type of universe level expressions: 
+      a level with a natural increment *)
+
+  val set : t
+  val prop : t
+  (** The set and prop universe levels. *)
+
+  val is_small : t -> bool
+  (** Is the universe set or prop? *)
+		       
+  val is_prop : t -> bool
+  val is_set : t -> bool
+  (** Is it specifically Prop or Set *)
+		       
+  val compare : t -> t -> int
+  (** Comparison function *)
+
+  val equal : t -> t -> bool
+  (** Equality function *)
+
+  val hash : t -> int
+
+  (* val make : Names.DirPath.t -> int -> t *)
+  (* (\** Create a new universe level from a unique identifier and an associated *)
+  (*     module path. *\) *)
+
+  val pr : t -> Pp.std_ppcmds
+  (** Pretty-printing *)
+
+  val to_string : t -> string
+  (** Debug printing *)
+end
+  
+type universe_level_name = LevelName.t
 type universe_level = Level.t
 (** Alias name. *)
 
 (** Sets of universe levels *)
 module LSet : 
 sig 
-  include CSig.SetS with type elt = universe_level
+  include CSig.SetS with type elt = universe_level_name
 	      
-  val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+  val pr : (LevelName.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
   (** Pretty-printing *)
 end
 
@@ -86,14 +123,19 @@ sig
   val make : Level.t -> t
   (** Create a universe representing the given level. *)
 
+  val make_name : LevelName.t -> t
+  (** Create a universe representing the given level. *)
+
   val pr : t -> Pp.std_ppcmds
   (** Pretty-printing *)
 
-  val pr_with : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+  val pr_with : (LevelName.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
 
   val is_level : t -> bool
   (** Test if the universe is a level or an algebraic universe. *)
 
+  val var_index : t -> int option
+                       
   val is_levels : t -> bool
   (** Test if the universe is a lub of levels or contains +n's. *)
 
@@ -119,8 +161,8 @@ sig
   val type1 : t 
   (** the universe of the type of Prop/Set *)
 
-  val exists : (Level.t * int -> bool) -> t -> bool
-  val for_all : (Level.t * int -> bool) -> t -> bool
+  val exists : (Level.t -> bool) -> t -> bool
+  val for_all : (Level.t -> bool) -> t -> bool
 end
 
 type universe = Universe.t
@@ -157,7 +199,7 @@ val univ_level_rem : universe_level -> universe -> universe -> universe
 (** {6 Constraints. } *)
 
 type constraint_type = Lt | Le | Eq
-type univ_constraint = universe_level * constraint_type * universe_level
+type univ_constraint = Level.t * constraint_type * Level.t
 
 module Constraint : sig
  include Set.S with type elt = univ_constraint
@@ -206,7 +248,7 @@ exception UniverseInconsistency of univ_inconsistency
 (** Polymorphic maps from universe levels to 'a *)
 module LMap : 
 sig
-  include CMap.ExtS with type key = universe_level and module Set := LSet
+  include CMap.ExtS with type key = universe_level_name and module Set := LSet
 
   val union : 'a t -> 'a t -> 'a t
   (** [union x y] favors the bindings in the first map. *)
@@ -226,18 +268,18 @@ type 'a universe_map = 'a LMap.t
 
 (** {6 Substitution} *)
 
-type universe_subst_fn = universe_level -> universe
-type universe_level_subst_fn = universe_level -> universe_level
+type universe_subst_fn = universe_level_name -> universe
+type universe_level_subst_fn = universe_level_name -> universe_level_name
 
 (** A full substitution, might involve algebraic universes *)
 type universe_subst = universe universe_map
-type universe_level_subst = universe_level universe_map
+type universe_level_subst = universe_level_name universe_map
 
-val level_subst_of : universe_subst_fn -> universe_level_subst_fn
+(* val level_subst_of : universe_subst_fn -> universe_level_subst_fn *)
 
 (** {6 Universe instances} *)
 
-module Instance : 
+module Abstraction : 
 sig
   type t
   (** A universe instance represents a vector of argument universes
@@ -246,8 +288,8 @@ sig
   val empty : t
   val is_empty : t -> bool
 
-  val of_array : Level.t array -> t
-  val to_array : t -> Level.t array
+  val of_array : LevelName.t array -> t
+  val to_array : t -> LevelName.t array
 
   val append : t -> t -> t
   (** To concatenate two instances, used for discharge *)
@@ -270,12 +312,54 @@ sig
   val subst_fn : universe_level_subst_fn -> t -> t
   (** Substitution by a level-to-level function. *)
 
-  val pr : (Level.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+  val pr : (LevelName.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
   (** Pretty-printing, no comments *)
 
   val levels : t -> LSet.t
   (** The set of levels in the instance *)
 
+end
+
+module Instance : 
+sig
+  type t
+  (** A universe instance represents a vector of argument universes
+      to a polymorphic definition (constant, inductive or constructor). *)
+
+  val empty : t
+  val is_empty : t -> bool
+
+  val of_array : Universe.t array -> t
+  val to_array : t -> Universe.t array
+
+  val append : t -> t -> t
+  (** To concatenate two instances, used for discharge *)
+
+  val equal : t -> t -> bool
+  (** Equality *)
+
+  val length : t -> int
+  (** Instance length *)
+
+  val hcons : t -> t
+  (** Hash-consing. *)
+
+  val hash : t -> int
+  (** Hash value *)
+
+  val share : t -> t * int
+  (** Simultaneous hash-consing and hash-value computation *)
+
+  val subst_fn : universe_level_subst_fn -> t -> t
+  (** Substitution by a level-to-level function. *)
+
+  val pr : (LevelName.t -> Pp.std_ppcmds) -> t -> Pp.std_ppcmds
+  (** Pretty-printing, no comments *)
+
+  val levels : t -> LSet.t
+  (** The set of levels in the instance *)
+
+  val map : (Universe.t -> Universe.t) -> t -> t
 end
 
 type universe_instance = Instance.t
@@ -295,15 +379,15 @@ module UContext :
 sig 
   type t
 
-  val make : Instance.t constrained -> t
+  val make : Abstraction.t constrained -> t
 
   val empty : t
   val is_empty : t -> bool
     
-  val instance : t -> Instance.t
+  val abstraction : t -> Abstraction.t
   val constraints : t -> constraints
 
-  val dest : t -> Instance.t * constraints
+  val dest : t -> Abstraction.t * constraints
 
   (** Keeps the order of the instances *)
   val union : t -> t -> t
@@ -324,8 +408,8 @@ sig
   val empty : t
   val is_empty : t -> bool
 
-  val singleton : universe_level -> t
-  val of_instance : Instance.t -> t
+  val singleton : universe_level_name -> t
+  val of_abstraction : Abstraction.t -> t
   val of_set : universe_set -> t
 
   val equal : t -> t -> bool
@@ -336,9 +420,9 @@ sig
       much smaller than the right one. *)
 
   val diff : t -> t -> t
-  val add_universe : universe_level -> t -> t
+  val add_universe : universe_level_name -> t -> t
   val add_constraints : constraints -> t -> t
-  val add_instance : Instance.t -> t -> t
+  val add_abstraction : Abstraction.t -> t -> t
 
   (** Arbitrary choice of linear order of the variables *)
   val to_context : t -> universe_context
@@ -362,6 +446,7 @@ val empty_level_subst : universe_level_subst
 val is_empty_level_subst : universe_level_subst -> bool
 
 (** Substitution of universes. *)
+val subst_univs_level_level_name : universe_level_subst -> universe_level_name -> universe_level_name
 val subst_univs_level_level : universe_level_subst -> universe_level -> universe_level
 val subst_univs_level_universe : universe_level_subst -> universe -> universe
 val subst_univs_level_constraints : universe_level_subst -> constraints -> constraints
@@ -377,27 +462,26 @@ val subst_univs_universe : universe_subst_fn -> universe -> universe
 val subst_univs_constraints : universe_subst_fn -> constraints -> constraints
 
 (** Substitution of instances *)
-val subst_instance_instance : universe_instance -> universe_instance -> universe_instance
+(* val subst_instance_instance : universe_instance -> universe_instance -> universe_instance *)
 val subst_instance_universe : universe_instance -> universe -> universe
 val subst_instance_constraints : universe_instance -> constraints -> constraints
 
-val make_instance_subst : universe_instance -> universe_level_subst
-val make_inverse_instance_subst : universe_instance -> universe_level_subst
+val make_abstraction_subst : Abstraction.t -> universe_level_subst
+val make_inverse_abstraction_subst : Abstraction.t -> universe_level_subst
 
 val abstract_universes : bool -> universe_context -> universe_level_subst * universe_context
 
 (** Get the instantiated graph. *)
 val instantiate_univ_context : universe_context -> universe_context
-
 val instantiate_univ_constraints : universe_instance -> universe_context -> constraints
 
 (** {6 Pretty-printing of universes. } *)
 
 val pr_constraint_type : constraint_type -> Pp.std_ppcmds
-val pr_constraints : (Level.t -> Pp.std_ppcmds) -> constraints -> Pp.std_ppcmds
-val pr_universe_context : (Level.t -> Pp.std_ppcmds) -> universe_context -> Pp.std_ppcmds
-val pr_universe_context_set : (Level.t -> Pp.std_ppcmds) -> universe_context_set -> Pp.std_ppcmds
-val explain_universe_inconsistency : (Level.t -> Pp.std_ppcmds) -> 
+val pr_constraints : (LevelName.t -> Pp.std_ppcmds) -> constraints -> Pp.std_ppcmds
+val pr_universe_context : (LevelName.t -> Pp.std_ppcmds) -> universe_context -> Pp.std_ppcmds
+val pr_universe_context_set : (LevelName.t -> Pp.std_ppcmds) -> universe_context_set -> Pp.std_ppcmds
+val explain_universe_inconsistency : (LevelName.t -> Pp.std_ppcmds) -> 
   univ_inconsistency -> Pp.std_ppcmds
 
 val pr_universe_level_subst : universe_level_subst -> Pp.std_ppcmds
@@ -414,8 +498,8 @@ val hcons_universe_context_set : universe_context_set -> universe_context_set
 (******)
 
 (* deprecated: use qualified names instead *)
-val compare_levels : universe_level -> universe_level -> int
-val eq_levels : universe_level -> universe_level -> bool
+val compare_levels : universe_level_name -> universe_level_name -> int
+val eq_levels : universe_level_name -> universe_level_name -> bool
 
 (** deprecated: Equality of formal universe expressions. *)
 val equal_universes : universe -> universe -> bool

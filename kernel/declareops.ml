@@ -40,7 +40,9 @@ let hcons_template_arity ar =
 
 let instantiate cb c =
   if cb.const_polymorphic then 
-    Vars.subst_instance_constr (Univ.UContext.instance cb.const_universes) c
+    Vars.subst_univs_level_constr
+      (Univ.make_abstraction_subst (Univ.UContext.abstraction cb.const_universes))
+      c
   else c
 
 let body_of_constant otab cb = match cb.const_body with
@@ -256,10 +258,10 @@ let subst_mind_body sub mib =
     mind_universes = mib.mind_universes;
     mind_private = mib.mind_private }
 
-let inductive_instance mib =
+let inductive_abstraction mib =
   if mib.mind_polymorphic then
-    Univ.UContext.instance mib.mind_universes
-  else Univ.Instance.empty
+    Univ.UContext.abstraction mib.mind_universes
+  else Univ.Abstraction.empty
 
 let inductive_context mib =
   if mib.mind_polymorphic then 

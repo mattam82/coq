@@ -45,16 +45,19 @@ let error_inconsistency o u v (p:explanation option) =
 
 open Universe
 
-module UMap = LMap
+module UMap = HMap.Make (Level)
+module LESet = UMap.Set
 
+type level = Level.t
+                        
 type status = NoMark | Visited | WeakVisited | ToMerge
 
 (* Comparison on this type is pointer equality *)
 type canonical_node =
-    { univ: Level.t;
+    { univ: level;
       ltle: bool UMap.t;  (* true: strict (lt) constraint.
                              false: weak  (le) constraint. *)
-      gtge: LSet.t;
+      gtge: LESet.t;
       rank : int;
       klvl: int;
       ilvl: int;
@@ -68,7 +71,7 @@ let big_rank = 1000000
 
 type univ_entry =
     Canonical of canonical_node
-  | Equiv of Level.t
+  | Equiv of level
 
 type universes =
   { entries : univ_entry UMap.t;
@@ -164,7 +167,7 @@ let safe_repr g u =
   with Not_found ->
     let can =
       { univ = u;
-        ltle = UMap.empty; gtge = LSet.empty;
+        ltle = UMap.empty; gtge = LESet.empty;
         rank = if Level.is_small u then big_rank else 0;
         klvl = 0; ilvl = 0;
         status = NoMark }
@@ -198,10 +201,10 @@ let check_universes_invariants g =
           let v = repr g v in
           assert (topo_compare u v = -1);
           if u.klvl = v.klvl then
-            assert (LSet.mem u.univ v.gtge ||
-                    LSet.exists (fun l -> u == repr g l) v.gtge))
+            assert (LESet.mem u.univ v.gtge ||
+                    LESet.exists (fun l -> u == repr g l) v.gtge))
         u.ltle;
-      LSet.iter (fun v ->
+      LESet.iter (fun v ->
         let v = repr g v in
         assert (v.klvl = u.klvl &&
             (UMap.mem u.univ v.ltle ||
@@ -228,10 +231,10 @@ let clean_ltle g ltle =
     ltle (ltle, false)
 
 let clean_gtge g gtge =
-  LSet.fold (fun u acc ->
+  LESet.fold (fun u acc ->
       let uu = (repr g u).univ in
       if Level.equal uu u then acc
-      else LSet.add uu (LSet.remove u (fst acc)), true)
+      else LESet.add uu (LESet.remove u (fst acc)), true)
     gtge (gtge, false)
 
 (* [get_ltle] and [get_gtge] return ltle and gtge arcs.
@@ -299,7 +302,7 @@ let rec backward_traverse to_revert b_traversed count g x =
     let to_revert = x.univ::to_revert in
     let gtge, x, g = get_gtge g x in
     let to_revert, b_traversed, count, g =
-      LSet.fold (fun y (to_revert, b_traversed, count, g) ->
+      LESet.fold (fun y (to_revert, b_traversed, count, g) ->
         backward_traverse to_revert b_traversed count g y)
         gtge (to_revert, b_traversed, count, g)
     in
@@ -311,8 +314,8 @@ let rec forward_traverse f_traversed g v_klvl x y =
   let y = repr g y in
   if y.klvl < v_klvl then begin
     let y = { y with klvl = v_klvl;
-                      gtge = if x == y then LSet.empty
-                            else LSet.singleton x.univ }
+                      gtge = if x == y then LESet.empty
+                            else LESet.singleton x.univ }
     in
     let g = change_node g y in
     let ltle, y, g = get_ltle g y in
@@ -324,7 +327,7 @@ let rec forward_traverse f_traversed g v_klvl x y =
     y.univ::f_traversed, g
     end else if y.klvl = v_klvl && x != y then
       let g = change_node g
-        { y with gtge = LSet.add x.univ y.gtge } in
+        { y with gtge = LESet.add x.univ y.gtge } in
       f_traversed, g
     else f_traversed, g
 
@@ -338,7 +341,7 @@ let rec find_to_merge to_revert g x v =
       begin x.status <- ToMerge; true, to_revert end
     else
       begin
-        let merge, to_revert = LSet.fold
+        let merge, to_revert = LESet.fold
           (fun y (merge, to_revert) ->
             let merge', to_revert = find_to_merge to_revert g y v in
             merge' || merge, to_revert) x.gtge (false, to_revert)
@@ -376,11 +379,11 @@ let get_new_edges g to_merge =
     ) to_merge_lvl ltle
   in
   let gtge =
-    UMap.fold (fun _ n acc -> LSet.union acc n.gtge)
-      to_merge_lvl LSet.empty
+    UMap.fold (fun _ n acc -> LESet.union acc n.gtge)
+      to_merge_lvl LESet.empty
   in
   let gtge, _ = clean_gtge g gtge in
-  let gtge = LSet.diff gtge (UMap.domain to_merge_lvl) in
+  let gtge = LESet.diff gtge (UMap.domain to_merge_lvl) in
   (ltle, gtge)
 
 
@@ -489,9 +492,9 @@ let insert_edge strict ucan vcan g =
           { (change_node g { u with ltle = UMap.add v.univ strict u.ltle })
             with n_edges = g.n_edges + 1 }
       in
-      if u.klvl <> v.klvl || LSet.mem u.univ v.gtge then g
+      if u.klvl <> v.klvl || LESet.mem u.univ v.gtge then g
       else
-        let v = { v with gtge = LSet.add u.univ v.gtge } in
+        let v = { v with gtge = LESet.add u.univ v.gtge } in
         change_node g v
   with
   | CycleDetected as e -> raise e
@@ -508,8 +511,8 @@ let add_universe vlev strict g =
     assert (g.index > min_int);
     let v = {
       univ = vlev;
-      ltle = LMap.empty;
-      gtge = LSet.empty;
+      ltle = UMap.empty;
+      gtge = LESet.empty;
       rank = 0;
       klvl = 0;
       ilvl = g.index;
@@ -640,8 +643,7 @@ let check_smaller g strict u v =
 type 'a check_function = universes -> 'a -> 'a -> bool
 
 let check_equal_expr g x y =
-  x == y || (let (u, n) = x and (v, m) = y in 
-               Int.equal n m && check_equal g u v)
+  x == y || (check_equal g x y)
 
 let check_eq_univs g l1 l2 =
   let f x1 x2 = check_equal_expr g x1 x2 in
@@ -652,13 +654,8 @@ let check_eq_univs g l1 l2 =
 let check_eq g u v =
   Universe.equal u v || check_eq_univs g u v
 
-let check_smaller_expr g (u,n) (v,m) =
-  let diff = n - m in
-    match diff with
-    | 0 -> check_smaller g false u v
-    | 1 -> check_smaller g true u v
-    | x when x < 0 -> check_smaller g false u v
-    | _ -> false
+let check_smaller_expr g u v =
+  check_smaller g false u v
 
 let exists_bigger g ul l =
   Universe.exists (fun ul' -> 
@@ -703,8 +700,8 @@ let enforce_univ_lt u v g =
 let empty_universes =
   let set_arc = Canonical {
     univ = Level.set;
-    ltle = LMap.empty;
-    gtge = LSet.empty;
+    ltle = UMap.empty;
+    gtge = LESet.empty;
     rank = big_rank;
     klvl = 0;
     ilvl = (-1);
@@ -712,14 +709,15 @@ let empty_universes =
   } in
   let prop_arc = Canonical {
     univ = Level.prop;
-    ltle = LMap.empty;
-    gtge = LSet.empty;
+    ltle = UMap.empty;
+    gtge = LESet.empty;
     rank = big_rank;
     klvl = 0;
     ilvl = 0;
     status = NoMark;
   } in
-  let entries = UMap.add Level.set set_arc (UMap.singleton Level.prop prop_arc) in
+  let entries = UMap.add Level.set set_arc
+                         (UMap.singleton Level.prop prop_arc) in
   let empty = { entries; index = (-2); n_nodes = 2; n_edges = 0 } in
   enforce_univ_lt Level.prop Level.set empty
 
@@ -823,7 +821,7 @@ let sort_universes g =
   let types = Array.init (max_lvl + 1) (function
     | 0 -> Level.prop
     | 1 -> Level.set
-    | n -> Level.make mp (n-2))
+    | n -> (LevelName.make mp (n-2),0))
   in
   let g = Array.fold_left (fun g u ->
     let g, u = safe_repr g u in
@@ -844,7 +842,8 @@ let check_eq_instances g t1 t2 =
   t1 == t2 ||
     (Int.equal (Array.length t1) (Array.length t2) &&
         let rec aux i =
-          (Int.equal i (Array.length t1)) || (check_eq_level g t1.(i) t2.(i) && aux (i + 1))
+          (Int.equal i (Array.length t1)) ||
+            (check_eq_univs g t1.(i) t2.(i) && aux (i + 1))
         in aux 0)
 
 (** Pretty-printing *)

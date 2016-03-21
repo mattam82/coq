@@ -231,7 +231,7 @@ let subst_univs_fn_puniverses fn =
 let subst_univs_fn_constr f c =
   let changed = ref false in
   let fu = Univ.subst_univs_universe f in
-  let fi = Univ.Instance.subst_fn (Univ.level_subst_of f) in
+  let fi = Univ.Instance.map fu in
   let rec aux t = 
     match kind t with
     | Sort (Sorts.Type u) -> 
@@ -270,7 +270,7 @@ let subst_univs_constr =
 let subst_univs_level_constr subst c =
   if Univ.is_empty_level_subst subst then c
   else 
-    let f = Univ.Instance.subst_fn (Univ.subst_univs_level_level subst) in
+    let f = Univ.Instance.subst_fn (Univ.subst_univs_level_level_name subst) in
     let changed = ref false in
     let rec aux t = 
       match kind t with
@@ -307,7 +307,7 @@ let subst_univs_level_context s =
 let subst_instance_constr subst c =
   if Univ.Instance.is_empty subst then c
   else
-    let f u = Univ.subst_instance_instance subst u in
+    let f u = Univ.Instance.map (Univ.subst_instance_universe subst) u in
     let changed = ref false in
     let rec aux t = 
       match kind t with

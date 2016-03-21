@@ -66,7 +66,7 @@ val subst_wf_paths : substitution -> wf_paths -> wf_paths
 
 val subst_mind_body : substitution -> mutual_inductive_body -> mutual_inductive_body
 
-val inductive_instance : mutual_inductive_body -> universe_instance
+val inductive_abstraction : mutual_inductive_body -> Univ.Abstraction.t
 val inductive_context : mutual_inductive_body -> universe_context
 
 (** {6 Hash-consing} *)
