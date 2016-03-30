@@ -190,8 +190,11 @@ let param_ccls params =
   let fold acc = function (LocalAssum (_, p)) ->
       (let c = strip_prod_assum p in
       match kind_of_term c with
-        | Sort (Type u) -> Univ.Universe.level u
-        | _ -> None) :: acc
+      | Sort (Type u) ->
+         (match Univ.Universe.level u with
+          | Some (l, 0) -> Some l
+          | _ -> None)
+      | _ -> None) :: acc
     | LocalDef _ -> acc
   in
   List.fold_left fold [] params
@@ -300,8 +303,8 @@ let typecheck_inductive env mie =
 		   declared level. *)
 	    if not is_natural then
 	      anomaly ~label:"check_inductive" 
-		(Pp.str"Incorrect universe " ++
-		   Universe.pr defu ++ Pp.str " declared for inductive type, inferred level is "
+		(Pp.str"Incorrect universe " ++ Universe.pr defu ++
+                   Pp.str " declared for inductive type, inferred level is "
 		 ++ Universe.pr infu)
 	in
 	  RegularArity (not is_natural,full_arity,defu)
@@ -321,7 +324,8 @@ let typecheck_inductive env mie =
 	      if not b then
 		anomaly ~label:"check_inductive" 
 		  (Pp.str"Incorrect universe " ++
-		     Universe.pr u ++ Pp.str " declared for inductive type, inferred level is "
+		     Universe.pr u ++
+                     Pp.str " declared for inductive type, inferred level is "
 		   ++ Universe.pr clev)
 	      else
 		TemplateArity (param_ccls params, infu)

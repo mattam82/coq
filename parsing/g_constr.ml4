@@ -127,7 +127,7 @@ let name_colon =
 let aliasvar = function CPatAlias (loc, _, id) -> Some (loc,Name id) | _ -> None
 
 GEXTEND Gram
-  GLOBAL: binder_constr lconstr constr operconstr sort global
+  GLOBAL: binder_constr lconstr constr operconstr sort universe global
   constr_pattern lconstr_pattern Constr.ident
   closed_binder open_binders binder binders binders_fixannot
   record_declaration typeclass_constraint pattern appl_arg;
@@ -150,12 +150,7 @@ GEXTEND Gram
     [ [ "Set"  -> GSet
       | "Prop" -> GProp
       | "Type" -> GType []
-      | "Type"; "@{"; u = universe; "}" -> GType (List.map (fun (loc,x) -> (loc, Id.to_string x)) u)
-      ] ]
-  ;
-  universe:
-    [ [ IDENT "max"; "("; ids = LIST1 identref SEP ","; ")" -> ids
-      | id = identref -> [id]
+      | "Type"; "@{"; u = maxuniverse; "}" -> GType u
       ] ]
   ;
   lconstr:
@@ -297,16 +292,36 @@ GEXTEND Gram
     [ [ "@{"; l = LIST1 inst SEP ";"; "}" -> l
       | -> [] ] ]
   ;
-  instance:
-    [ [ "@{"; l = LIST1 level; "}" -> Some l
-      | -> None ] ]
-  ;
-  level:
+  univlevel:
     [ [ "Set" -> GSet
       | "Prop" -> GProp
-      | "Type" -> GType None
-      | id = identref -> GType (Some (fst id, Id.to_string (snd id)))
+      | "Type" -> GType []
+      | id = identref; n = OPT [ "+"; n = natural -> n ] ->
+         GType [fst id, (Id.to_string (snd id), n)]
       ] ]
+  ;
+  maxuniverse:
+    [ [ ls = LIST1 [ id = identref; n = OPT natural ->
+                                        (fst id,(Id.to_string (snd id), n)) ] -> ls
+    ] ]
+  ;
+  univlevel2:
+    [ [ "Set" -> (!@loc, ("Set", None))
+      | "Prop" -> (!@loc, ("Prop", None))
+      | "Type" -> (!@loc, ("Type", None))
+      | id = identref; n = OPT natural ->
+         (fst id, (Id.to_string (snd id), n))
+      ] ]
+  ;
+  universe:
+    [ [ 
+        IDENT "max"; "("; ls = LIST1 univlevel2 SEP ","; ")" -> GType ls
+      | l = univlevel -> l
+    ] ]
+  ;
+  instance:
+    [ [ "@{"; l = LIST1 universe; "}" -> Some l
+      | -> None ] ]
   ;
   fix_constr:
     [ [ fx1=single_fix -> mk_single_fix fx1

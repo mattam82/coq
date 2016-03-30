@@ -48,11 +48,9 @@ type 'a glob_sort_gen =
   | GProp (** representation of [Prop] literal *)
   | GSet  (** representation of [Set] literal *)
   | GType of 'a (** representation of [Type] literal *)
-type sort_info = string Loc.located list
-type level_info = string Loc.located option
-
+type sort_info = (string * int option) Loc.located list
 type glob_sort = sort_info glob_sort_gen
-type glob_level = level_info glob_sort_gen
+type glob_instance = glob_sort list
 
 (** A synonym of [Evar.t], also defined in Term *)
 

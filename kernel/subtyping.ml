@@ -301,17 +301,19 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
 	if poly then 
 	  let ctx1 = Univ.instantiate_univ_context cb1.const_universes in
 	  let ctx2 = Univ.instantiate_univ_context cb2.const_universes in
-	  let inst1, ctx1 = Univ.UContext.dest ctx1 in
-	  let inst2, ctx2 = Univ.UContext.dest ctx2 in
+	  let abs1, ctx1 = Univ.UContext.dest ctx1 in
+	  let abs2, ctx2 = Univ.UContext.dest ctx2 in
+          let inst1 = Abstraction.instance abs1 and
+              inst2 = Abstraction.instance abs2 in
 	    if not (Univ.Instance.length inst1 == Univ.Instance.length inst2) then
 	      error IncompatibleInstances
 	    else 
-	      let cstrs = Univ.enforce_eq_instances inst1 inst2 cst in
+	      let cstrs = Univ.Constraint.enforce_eq_instances inst1 inst2 cst in
 	      let cstrs = Univ.Constraint.union cstrs ctx2 in
 		try 
 		  (* The environment with the expected universes plus equality 
 		     of the body instances with the expected instance *)
-		  let ctxi = Univ.Instance.append inst1 inst2 in
+		  let ctxi = Univ.Abstraction.append abs1 abs2 in
 		  let ctx = Univ.UContext.make (ctxi, cstrs) in
 		  let env = Environ.push_context ctx env in
 		  (* Check that the given definition does not add any constraint over

@@ -211,7 +211,7 @@ let safe_pr_constr t =
 let pr_universe_ctx sigma c =
   if !Detyping.print_universes && not (Univ.UContext.is_empty c) then
     fnl()++pr_in_comment (fun c -> v 0 
-      (Univ.pr_universe_context (Evd.pr_evd_level sigma) c)) c
+      (Univ.pr_universe_context (Evd.pr_evd_level_name sigma) c)) c
   else
     mt()
 
@@ -842,5 +842,5 @@ let pr_polymorphic b =
 
 let pr_universe_instance evd ctx =
   let inst = Univ.UContext.instance ctx in
-    str"@{" ++ Univ.Instance.pr (Evd.pr_evd_level evd) inst ++ str"}"
+    str"@{" ++ Univ.Instance.pr (Evd.pr_evd_level_name evd) inst ++ str"}"
 

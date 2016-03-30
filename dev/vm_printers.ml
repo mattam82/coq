@@ -79,7 +79,7 @@ and ppwhd whd =
   | Vatom_stk(a,s) ->
       open_hbox();ppatom a;close_box();
       print_string"@";ppstack s
-  | Vuniv_level lvl -> Pp.pp (Univ.Level.pr lvl)
+  | Vuniv_level lvl -> Pp.pp (Univ.Universe.pr lvl)
 
 and ppvblock b =
   open_hbox();

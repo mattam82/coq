@@ -216,12 +216,12 @@ let ppuniverse_opt_subst l = pp (Universes.pr_universe_opt_subst l)
 let ppuniverse_level_subst l = pp (Univ.pr_universe_level_subst l)
 let ppevar_universe_context l = pp (Evd.pr_evar_universe_context l)
 let ppconstraints_map c = pp (Universes.pr_constraints_map c)
-let ppconstraints c = pp (pr_constraints Level.pr c)
+let ppconstraints c = pp (pr_constraints LevelName.pr c)
 let ppuniverseconstraints c = pp (Universes.Constraints.pr c)
 let ppuniverse_context_future c = 
   let ctx = Future.force c in
     ppuniverse_context ctx
-let ppuniverses u = pp (UGraph.pr_universes Level.pr u)
+let ppuniverses u = pp (UGraph.pr_universes LevelName.pr u)
 let ppnamedcontextval e =
   pp (pr_named_context (Global.env ()) Evd.empty (named_context_of_val e))
 
@@ -297,9 +297,6 @@ let constr_display csr =
   and univ_display u =
     incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ pr_uni u ++ fnl ())
 
-  and level_display u =
-    incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ Level.pr u ++ fnl ())
-
   and sort_display = function
     | Prop(Pos) -> "Prop(Pos)"
     | Prop(Null) -> "Prop(Null)"
@@ -307,7 +304,7 @@ let constr_display csr =
 	"Type("^(string_of_int !cnt)^")"
 
   and universes_display l = 
-    Array.fold_right (fun x i -> level_display x; (string_of_int !cnt)^(if not(i="")
+    Array.fold_right (fun x i -> univ_display x; (string_of_int !cnt)^(if not(i="")
         then (" "^i) else "")) (Instance.to_array l) ""
 
   and name_display = function
@@ -418,7 +415,7 @@ let print_pure_constr csr =
   and box_display c = open_hovbox 1; term_display c; close_box()
 
   and universes_display u =
-    Array.iter (fun u -> print_space (); pp (Level.pr u)) (Instance.to_array u)
+    Array.iter (fun u -> print_space (); pp (pr_uni u)) (Instance.to_array u)
 
   and sort_display = function
     | Prop(Pos) -> print_string "Set"

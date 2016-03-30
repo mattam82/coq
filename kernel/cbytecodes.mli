@@ -31,7 +31,7 @@ type structured_constant =
   | Const_proj of Constant.t
   | Const_b0 of tag
   | Const_bn of tag * structured_constant array
-  | Const_univ_level of Univ.universe_level
+  | Const_univ of Univ.universe
   | Const_type of Univ.universe
 
 val pp_struct_const : structured_constant -> Pp.std_ppcmds

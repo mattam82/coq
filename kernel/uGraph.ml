@@ -130,19 +130,18 @@ let change_node g n =
           | _ -> assert false)
         g.entries }
 
-(* repr : universes -> Level.t -> canonical_node *)
-(* canonical representative : we follow the Equiv links *)
-let rec repr g u =
-  let a =
-    try UMap.find u g.entries
-    with Not_found -> anomaly ~label:"Univ.repr"
-        (str"Universe " ++ Level.pr u ++ str" undefined")
+let rec unsafe_repr g u =
+  let g, a =
+    try g, UMap.find u g.entries
+    with Not_found ->
+      anomaly ~label:"Univ.repr"
+              (str"Universe " ++ Level.pr u ++ str" undefined")
   in
   match a with
-    | Equiv v -> repr g v
+    | Equiv v -> unsafe_repr g v
     | Canonical arc -> arc
 
-let get_set_arc g = repr g Level.set
+let get_set_arc g = unsafe_repr g Level.set
 let is_set_arc u = Level.is_set u.univ
 let is_prop_arc u = Level.is_prop u.univ
 
@@ -150,13 +149,55 @@ exception AlreadyDeclared
 
 (* Reindexes the given universe, using the next available index. *)
 let use_index g u =
-  let u = repr g u in
+  let u = unsafe_repr g u in
   let g = change_node g { u with ilvl = g.index } in
   assert (g.index > min_int);
   { g with index = g.index - 1 }
 
+let rec next arc u g =
+  let hasnext =
+    UMap.fold (fun l strict acc ->
+        if strict then Some l
+        else acc) arc.ltle None
+  in
+  match hasnext with
+  | Some l ->
+     let entry = Equiv l in
+     { g with entries = UMap.add u entry g.entries }, entry
+  | None -> (* Build the higher universe node *)
+     let arc' = { arc with ltle = UMap.add u true arc.ltle } in
+     let node = { univ = u; ltle = UMap.empty; gtge = LESet.empty;
+                  rank = 0; klvl = arc.klvl + 1; ilvl = g.index;
+                  status = NoMark } in
+     let entry = Canonical node in
+     let entries = UMap.add u entry g.entries in
+     { entries = UMap.add arc.univ (Canonical arc') entries;
+       n_nodes = g.n_nodes + 1;
+       n_edges = g.n_edges + 1;
+       index = g.index - 1}, entry
+    
+(* repr : universes -> Level.t -> canonical_node *)
+(* canonical representative : we follow the Equiv links *)
+and repr g u =
+  let g, a =
+    try g, UMap.find u g.entries
+    with Not_found ->
+      let (l, n) = u in
+      if n == 0 then
+        anomaly ~label:"Univ.repr"
+                (str"Universe " ++ LevelName.pr l ++ str" undefined")
+      else begin
+          assert (n > 0);
+          let g, inf = repr g (l, pred n) in
+          next inf u g
+        end
+  in
+  match a with
+    | Equiv v -> repr g v
+    | Canonical arc -> g, arc
+
 (* [safe_repr] is like [repr] but if the graph doesn't contain the
-   searched universe, we add it. *)
+   searched universe, we add it. *)    
 let safe_repr g u =
   let rec safe_repr_rec entries u =
     match UMap.find u entries with
@@ -177,7 +218,7 @@ let safe_repr g u =
       n_nodes = g.n_nodes + 1 }
     in
     let g = use_index g u in
-    g, repr g u
+    repr g u
 
 (* Returns 1 if u is higher than v in topological order.
            -1        lower
@@ -198,17 +239,17 @@ let check_universes_invariants g =
     | Canonical u ->
       UMap.iter (fun v strict ->
           incr n_edges;
-          let v = repr g v in
+          let g, v = repr g v in
           assert (topo_compare u v = -1);
           if u.klvl = v.klvl then
             assert (LESet.mem u.univ v.gtge ||
-                    LESet.exists (fun l -> u == repr g l) v.gtge))
+                    LESet.exists (fun l -> u == unsafe_repr g l) v.gtge))
         u.ltle;
       LESet.iter (fun v ->
-        let v = repr g v in
+        let v = unsafe_repr g v in
         assert (v.klvl = u.klvl &&
             (UMap.mem u.univ v.ltle ||
-             UMap.exists (fun l _ -> u == repr g l) v.ltle))
+             UMap.exists (fun l _ -> u == unsafe_repr g l) v.ltle))
       ) u.gtge;
       assert (u.status = NoMark);
       assert (Level.equal l u.univ);
@@ -222,7 +263,7 @@ let check_universes_invariants g =
 
 let clean_ltle g ltle =
   UMap.fold (fun u strict acc ->
-      let uu = (repr g u).univ in
+      let uu = (unsafe_repr g u).univ in
       if Level.equal uu u then acc
       else (
         let acc = UMap.remove u (fst acc) in
@@ -232,7 +273,7 @@ let clean_ltle g ltle =
 
 let clean_gtge g gtge =
   LESet.fold (fun u acc ->
-      let uu = (repr g u).univ in
+      let uu = (unsafe_repr g u).univ in
       if Level.equal uu u then acc
       else LESet.add uu (LESet.remove u (fst acc)), true)
     gtge (gtge, false)
@@ -291,7 +332,7 @@ let get_delta g =
         (float_of_int g.n_nodes ** (2./.3.)))
 
 let rec backward_traverse to_revert b_traversed count g x =
-  let x = repr g x in
+  let g, x = repr g x in
   let count = count - 1 in
   if count < 0 then begin
     revert_graph to_revert g;
@@ -311,7 +352,7 @@ let rec backward_traverse to_revert b_traversed count g x =
   else to_revert, b_traversed, count, g
 
 let rec forward_traverse f_traversed g v_klvl x y =
-  let y = repr g y in
+  let g, y = repr g y in
   if y.klvl < v_klvl then begin
     let y = { y with klvl = v_klvl;
                       gtge = if x == y then LESet.empty
@@ -332,7 +373,7 @@ let rec forward_traverse f_traversed g v_klvl x y =
     else f_traversed, g
 
 let rec find_to_merge to_revert g x v =
-  let x = repr g x in
+  let x = unsafe_repr g x in
   match x.status with
   | Visited -> false, to_revert   | ToMerge -> true, to_revert
   | NoMark ->
@@ -397,11 +438,11 @@ let reorder g u v =
     try
       let to_revert, b_traversed, _, g = backward_traverse [] [] delta g u in
       revert_graph to_revert g;
-      let v_klvl = (repr g u).klvl in
+      let v_klvl = (unsafe_repr g u).klvl in
       b_traversed, v_klvl, g
     with AbortBackward g ->
       (* Backward search was too long, use the next k-level. *)
-      let v_klvl = (repr g u).klvl + 1 in
+      let v_klvl = (unsafe_repr g u).klvl + 1 in
       [], v_klvl, g
   in
   let f_traversed, g =
@@ -409,19 +450,19 @@ let reorder g u v =
         the paper, we do not test whether v_klvl = u.klvl nor we assign
         v_klvl to v.klvl. Indeed, the first call to forward_traverse
         will do all that. *)
-    forward_traverse [] g v_klvl (repr g v) v
+    forward_traverse [] g v_klvl (unsafe_repr g v) v
   in
 
   (* STEP 4: merge nodes if needed. *)
   let to_merge, b_reindex, f_reindex =
-    if (repr g u).klvl = v_klvl then
+    if (unsafe_repr g u).klvl = v_klvl then
       begin
         let merge, to_revert = find_to_merge [] g u v in
         let r =
           if merge then
             List.filter (fun u -> u.status = ToMerge) to_revert,
-            List.filter (fun u -> (repr g u).status <> ToMerge) b_traversed,
-            List.filter (fun u -> (repr g u).status <> ToMerge) f_traversed
+            List.filter (fun u -> (unsafe_repr g u).status <> ToMerge) b_traversed,
+            List.filter (fun u -> (unsafe_repr g u).status <> ToMerge) f_traversed
           else [], b_traversed, f_traversed
         in
         List.iter (fun u -> u.status <- NoMark) to_revert;
@@ -478,8 +519,8 @@ let insert_edge strict ucan vcan g =
     let g = if topo_compare ucan vcan <= 0 then g else reorder g u v in
 
     (* STEP 6: insert the new edge in the graph. *)
-    let u = repr g u in
-    let v = repr g v in
+    let u = unsafe_repr g u in
+    let v = unsafe_repr g v in
     if u == v then
       if strict then raise CycleDetected else g
     else
@@ -504,6 +545,7 @@ let insert_edge strict ucan vcan g =
     raise e
 
 let add_universe vlev strict g =
+  let vlev = vlev, 0 in
   try
     let _arcv = UMap.find vlev g.entries in
       raise AlreadyDeclared
@@ -520,13 +562,16 @@ let add_universe vlev strict g =
     }
     in
     let entries = UMap.add vlev (Canonical v) g.entries in
-    let g = { entries; index = g.index - 1; n_nodes = g.n_nodes + 1; n_edges = g.n_edges } in
-    insert_edge strict (get_set_arc g) v g
+    let g =
+      { entries; index = g.index - 1; n_nodes = g.n_nodes + 1; n_edges = g.n_edges }
+    in
+    let g, bound = if strict then repr g (LevelName.set, 1) else g, get_set_arc g in
+    insert_edge false bound v g
 
 exception Found_explanation of explanation
 
 let get_explanation strict u v g =
-  let v = repr g v in
+  let v = unsafe_repr g v in
   let visited_strict = ref UMap.empty in
   let rec traverse strict u =
     if u == v then
@@ -542,7 +587,7 @@ let get_explanation strict u v g =
         visited_strict := UMap.add u.univ strict !visited_strict;
         try
           UMap.iter (fun u' strictu' ->
-            match traverse (strict && not strictu') (repr g u') with
+            match traverse (strict && not strictu') (unsafe_repr g u') with
             | None -> ()
             | Some exp ->
               let typ = if strictu' then Lt else Le in
@@ -552,7 +597,7 @@ let get_explanation strict u v g =
         with Found_explanation exp -> Some exp
       end
   in
-  let u = repr g u in
+  let u = unsafe_repr g u in
   if u == v then [(Eq, make v.univ)]
   else match traverse strict u with Some exp -> exp | None -> assert false
 
@@ -588,7 +633,7 @@ let search_path strict u v g =
             let next_todo =
               UMap.fold (fun u strictu next_todo ->
                 let strict = not strictu && strict in
-                let u = repr g u in
+                let u = unsafe_repr g u in
                 if u == v && not strict then raise (Found to_revert)
                 else if topo_compare u v = 1 then next_todo
                 else (u, strict)::next_todo)
@@ -612,14 +657,14 @@ let search_path strict u v g =
       raise e
 
 (** Uncomment to debug the cycle detection algorithm. *)
-(*let insert_edge strict ucan vcan g =
+let insert_edge strict ucan vcan g =
   check_universes_invariants g;
   let g = insert_edge strict ucan vcan g in
   check_universes_invariants g;
-  let ucan = repr g ucan.univ in
-  let vcan = repr g vcan.univ in
+  let ucan = unsafe_repr g ucan.univ in
+  let vcan = unsafe_repr g vcan.univ in
   assert (search_path strict ucan vcan g);
-  g*)
+  g
 
 (** First, checks on universe levels *)
 
@@ -630,7 +675,8 @@ let check_equal g u v =
 let check_eq_level g u v = u == v || check_equal g u v
 
 let check_smaller g strict u v =
-  let arcu = repr g u and arcv = repr g v in
+  let g, arcu = repr g u in
+  let g, arcv = repr g v in
   if strict then
     search_path true arcu arcv g
   else
@@ -672,8 +718,8 @@ let check_leq g u v =
 (* enforce_univ_eq g u v will force u=v if possible, will fail otherwise *)
 
 let rec enforce_univ_eq u v g =
-  let ucan = repr g u in
-  let vcan = repr g v in
+  let g,ucan = repr g u in
+  let g,vcan = repr g v in
   if topo_compare ucan vcan = 1 then enforce_univ_eq v u g
   else
     let g = insert_edge false ucan vcan g in  (* Cannot fail *)
@@ -683,16 +729,16 @@ let rec enforce_univ_eq u v g =
 
 (* enforce_univ_leq g u v will force u<=v if possible, will fail otherwise *)
 let enforce_univ_leq u v g =
-  let ucan = repr g u in
-  let vcan = repr g v in
+  let g,ucan = repr g u in
+  let g,vcan = repr g v in
   try insert_edge false ucan vcan g
   with CycleDetected ->
     error_inconsistency Le u v (get_explanation true v u g)
 
 (* enforce_univ_lt u v will force u<v if possible, will fail otherwise *)
 let enforce_univ_lt u v g =
-  let ucan = repr g u in
-  let vcan = repr g v in
+  let g,ucan = repr g u in
+  let g,vcan = repr g v in
   try insert_edge true ucan vcan g
   with CycleDetected ->
     error_inconsistency Lt u v (get_explanation false v u g)
@@ -756,7 +802,7 @@ let normalize_universes g =
     { g with
       entries = UMap.map (fun entry ->
         match entry with
-        | Equiv u -> Equiv ((repr g u).univ)
+        | Equiv u -> Equiv ((unsafe_repr g u).univ)
         | Canonical ucan -> Canonical { ucan with rank = 1 })
         g.entries }
   in
@@ -811,7 +857,7 @@ let sort_universes g =
       let lvl = UMap.find can.univ lowest_levels in
       UMap.fold (fun u' strict lowest_levels ->
         let cost = if strict then 1 else 0 in
-        let u' = (repr g u').univ in
+        let u' = (unsafe_repr g u').univ in
         UMap.modify u' (fun _ lvl0 -> max lvl0 (lvl+cost)) lowest_levels)
        can.ltle lowest_levels)
      lowest_levels cans
@@ -846,24 +892,33 @@ let check_eq_instances g t1 t2 =
             (check_eq_univs g t1.(i) t2.(i) && aux (i + 1))
         in aux 0)
 
+let lower_universes g l =
+  let arc = unsafe_repr g l in
+  arc.gtge
+    
 (** Pretty-printing *)
 
 let pr_arc prl = function
   | _, Canonical {univ=u; ltle} ->
-    if UMap.is_empty ltle then mt ()
-    else
-      prl u ++ str " " ++
-      v 0
-        (pr_sequence (fun (v, strict) ->
-          (if strict then str "< " else str "<= ") ++ prl v)
-           (UMap.bindings ltle)) ++
+     let ltle = UMap.bindings ltle in
+     let ltle = List.filter (fun (v, strict) ->
+                    not (strict && Level.equal v (Level.succ u))) ltle in
+     if List.is_empty ltle then mt ()
+     else
+       let nostrict = List.for_all (fun (x, strict) -> not strict) ltle && snd u > 0 in
+       let u = if nostrict then (fst u, snd u - 1) else u in
+       prl u ++ str " " ++
+         v 0
+           (pr_sequence (fun (v, strict) ->
+               (if nostrict || strict then str "< " else str "<= ") ++
+                 prl v) ltle) ++
       fnl ()
   | u, Equiv v ->
       prl u  ++ str " = " ++ prl v ++ fnl ()
 
 let pr_universes prl g =
   let graph = UMap.fold (fun u a l -> (u,a)::l) g.entries [] in
-  prlist (pr_arc prl) graph
+  prlist (pr_arc (Univ.Level.pr_with prl)) graph
 
 (* Dumping constraints to a file *)
 

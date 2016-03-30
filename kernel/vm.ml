@@ -160,7 +160,7 @@ type whd =
   | Vconstr_const of int
   | Vconstr_block of vblock
   | Vatom_stk of atom * stack
-  | Vuniv_level of Univ.universe_level
+  | Vuniv_level of Univ.universe
 
 (************************************************)
 (* Abstract machine *****************************)
@@ -214,7 +214,7 @@ let apply_varray vf varray =
 (* Destructors ***********************************)
 (*************************************************)
 
-let uni_lvl_val (v : values) : Univ.universe_level =
+let uni_lvl_val (v : values) : Univ.universe =
     let whd = Obj.magic v in
     match whd with
     | Vuniv_level lvl -> lvl
@@ -247,7 +247,7 @@ let rec whd_accu a stk =
      | [Zapp args] ->
 	let u = ref (Obj.obj (Obj.field at 0)) in
 	for i = 0 to nargs args - 1 do
-	  u := Univ.Universe.sup !u (Univ.Universe.make (uni_lvl_val (arg args i)))
+	  u := Univ.Universe.sup !u (uni_lvl_val (arg args i))
 	done;
 	Vsort (Type !u)
      | _ -> assert false
@@ -335,7 +335,7 @@ let rec obj_of_str_const str =
 	Obj.set_field res i (obj_of_str_const args.(i))
       done;
       res
-  | Const_univ_level l -> Obj.repr (Vuniv_level l)
+  | Const_univ l -> Obj.repr (Vuniv_level l)
   | Const_type u -> obj_of_atom (Atype u)
 
 let val_of_obj o = ((Obj.obj o) : values)

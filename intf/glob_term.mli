@@ -31,7 +31,7 @@ type cases_pattern =
 
 (** Representation of an internalized (or in other words globalized) term. *)
 type glob_constr =
-  | GRef of (Loc.t * global_reference * glob_level list option)
+  | GRef of (Loc.t * global_reference * glob_sort list option)
       (** An identifier that represents a reference to an object defined
           either in the (global) environment or in the (local) context. *)
   | GVar of (Loc.t * Id.t)

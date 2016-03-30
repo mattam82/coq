@@ -42,7 +42,7 @@ val universes_of_constant :
     the context is empty. *)
 
 val universes_of_polymorphic_constant :
-  Opaqueproof.opaquetab -> constant_body -> Univ.universe_context
+  constant_body -> Univ.universe_context
 
 val is_opaque : constant_body -> bool
 
@@ -66,8 +66,11 @@ val subst_wf_paths : substitution -> wf_paths -> wf_paths
 
 val subst_mind_body : substitution -> mutual_inductive_body -> mutual_inductive_body
 
-val inductive_abstraction : mutual_inductive_body -> Univ.Abstraction.t
+(** Returns universe information for polymorphic inductives
+  and empty values otherwise *)
 val inductive_context : mutual_inductive_body -> universe_context
+val inductive_abstraction : mutual_inductive_body -> Univ.Abstraction.t
+val inductive_instance : mutual_inductive_body -> Univ.Instance.t
 
 (** {6 Hash-consing} *)
 

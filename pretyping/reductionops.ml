@@ -314,7 +314,7 @@ struct
       | Cst_const (c, u) ->
 	if Univ.Instance.is_empty u then Constant.print c
 	else str"(" ++ Constant.print c ++ str ", " ++ 
-	  Univ.Instance.pr Univ.Level.pr u ++ str")"
+	  Univ.Instance.pr Univ.LevelName.pr u ++ str")"
       | Cst_proj p ->
 	str".(" ++ Constant.print (Projection.constant p) ++ str")"
 
@@ -690,10 +690,11 @@ let magicaly_constant_of_fixbody env reference bd = function
       | Some t ->
         let b, csts = Universes.eq_constr_universes t bd in
     	let subst = Universes.Constraints.fold (fun (l,d,r) acc ->
-    	  Univ.LMap.add (Option.get (Universe.level l)) (Option.get (Universe.level r)) acc)
+    	                Univ.LMap.add (Option.get (Universe.level_name l))
+                                      (Option.get (Universe.level_name r)) acc)
     	  csts Univ.LMap.empty
     	in
-    	let inst = Instance.subst_fn (fun u -> Univ.LMap.find u subst) u in
+    	let inst = Instance.level_subst_fn (fun u -> Univ.LMap.find u subst) u in
           if b then mkConstU (cst,inst) else bd
     with
     | Not_found -> bd

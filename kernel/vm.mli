@@ -46,7 +46,7 @@ type whd =
   | Vconstr_const of int
   | Vconstr_block of vblock
   | Vatom_stk of atom * stack
-  | Vuniv_level of Univ.universe_level
+  | Vuniv_level of Univ.universe
 
 (** For debugging purposes only *)
 
@@ -66,7 +66,7 @@ external val_of_annot_switch : annot_switch -> values = "%identity"
 (** Destructors *)
 
 val whd_val : values -> whd
-val uni_lvl_val : values -> Univ.universe_level
+val uni_lvl_val : values -> Univ.universe
 
 (** Arguments *)
 

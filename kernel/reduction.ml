@@ -584,12 +584,12 @@ let checked_universes =
 let infer_eq (univs, cstrs as cuniv) u u' =
   if UGraph.check_eq univs u u' then cuniv
   else
-    univs, (Univ.enforce_eq u u' cstrs)
+    univs, (Univ.Constraint.enforce_eq u u' cstrs)
 
 let infer_leq (univs, cstrs as cuniv) u u' =
   if UGraph.check_leq univs u u' then cuniv
   else
-    let cstrs' = Univ.enforce_leq u u' cstrs in
+    let cstrs' = Univ.Constraint.enforce_leq u u' cstrs in
       univs, cstrs'
 
 let infer_cmp_universes env pb s0 s1 univs =
@@ -614,7 +614,7 @@ let infer_cmp_universes env pb s0 s1 univs =
         else univs
 
 let infer_convert_instances ~flex u u' (univs,cstrs) =
-  (univs, Univ.enforce_eq_instances u u' cstrs)
+  (univs, Univ.Constraint.enforce_eq_instances u u' cstrs)
 
 let inferred_universes : (UGraph.t * Univ.Constraint.t) universe_compare = 
   { compare = infer_cmp_universes;

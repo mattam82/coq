@@ -92,4 +92,5 @@ val exists_name : Id.t -> bool
 (** Global universe names and constraints *)
 
 val do_universe : polymorphic -> Id.t Loc.located list -> unit
-val do_constraint : polymorphic -> (Id.t Loc.located * Univ.constraint_type * Id.t Loc.located) list -> unit
+val do_constraint : polymorphic ->
+  (Misctypes.glob_sort * Univ.constraint_type * Misctypes.glob_sort) list -> unit

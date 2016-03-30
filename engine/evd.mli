@@ -491,8 +491,8 @@ val evar_universe_context_of_binders :
 val make_evar_universe_context : env -> (Id.t located) list option -> evar_universe_context
 val restrict_universe_context : evar_map -> Univ.universe_set -> evar_map							   
 (** Raises Not_found if not a name for a universe in this map. *)
-val universe_of_name : evar_map -> string -> Univ.universe_level
-val add_universe_name : evar_map -> string -> Univ.universe_level -> evar_map
+val universe_of_name : evar_map -> string -> Univ.universe_level_name
+val add_universe_name : evar_map -> string -> Univ.universe_level_name -> evar_map
 
 val add_constraints_context : evar_universe_context -> 
   Univ.constraints -> evar_universe_context
@@ -507,13 +507,13 @@ val normalize_evar_universe_context : evar_universe_context ->
 val new_univ_level_variable : ?loc:Loc.t -> ?name:string -> ?predicative:bool -> rigid -> evar_map -> evar_map * Univ.universe_level
 val new_univ_variable : ?loc:Loc.t -> ?name:string -> ?predicative:bool -> rigid -> evar_map -> evar_map * Univ.universe
 val new_sort_variable : ?loc:Loc.t -> ?name:string -> ?predicative:bool -> rigid -> evar_map -> evar_map * sorts
-val add_global_univ : evar_map -> Univ.Level.t -> evar_map
+val add_global_univ : evar_map -> Univ.universe_level_name -> evar_map
 											   
-val make_flexible_variable : evar_map -> bool -> Univ.universe_level -> evar_map
-val is_sort_variable : evar_map -> sorts -> Univ.universe_level option 
+val make_flexible_variable : evar_map -> bool -> Univ.universe_level_name -> evar_map
+val is_sort_variable : evar_map -> sorts -> Univ.universe_level_name option 
 (** [is_sort_variable evm s] returns [Some u] or [None] if [s] is 
     not a local sort variable declared in [evm] *)
-val is_flexible_level : evar_map -> Univ.Level.t -> bool
+val is_flexible_level : evar_map -> Univ.universe_level_name -> bool
 
 (* val normalize_universe_level : evar_map -> Univ.universe_level -> Univ.universe_level *)
 val normalize_universe : evar_map -> Univ.universe -> Univ.universe
@@ -533,7 +533,7 @@ val check_leq : evar_map -> Univ.universe -> Univ.universe -> bool
 val evar_universe_context : evar_map -> evar_universe_context
 val universe_context_set : evar_map -> Univ.universe_context_set
 val universe_context : ?names:(Id.t located) list -> evar_map ->
-		       (Id.t * Univ.Level.t) list * Univ.universe_context
+		       (Id.t * Univ.universe_level_name) list * Univ.universe_context
 val universe_subst : evar_map -> Universes.universe_opt_subst
 val universes : evar_map -> UGraph.t
 
@@ -608,7 +608,7 @@ val pr_evar_map_filter : ?with_univs:bool -> (Evar.t -> evar_info -> bool) ->
   evar_map -> Pp.std_ppcmds
 val pr_metaset : Metaset.t -> Pp.std_ppcmds
 val pr_evar_universe_context : evar_universe_context -> Pp.std_ppcmds
-val pr_evd_level : evar_map -> Univ.Level.t -> Pp.std_ppcmds
+val pr_evd_level_name : evar_map -> Univ.universe_level_name -> Pp.std_ppcmds
 
 (** {5 Deprecated functions} *)
 

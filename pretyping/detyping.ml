@@ -419,8 +419,9 @@ let detype_sort sigma = function
   | Prop Pos -> GSet
   | Type u ->
     GType
-      (if !print_universes
-       then [dl, Pp.string_of_ppcmds (Univ.Universe.pr_with (Evd.pr_evd_level sigma) u)]
+      (if !print_universes (* FIXME *)
+       then [dl, (Pp.string_of_ppcmds
+                   (Univ.Universe.pr_with (Evd.pr_evd_level_name sigma) u),None)]
        else [])
 
 type binder_kind = BProd | BLambda | BLetIn
@@ -432,11 +433,22 @@ let detype_anonymous = ref (fun loc n -> anomaly ~label:"detype" (Pp.str "index 
 let set_detype_anonymous f = detype_anonymous := f
 
 let detype_level sigma l =
-  GType (Some (dl, Pp.string_of_ppcmds (Evd.pr_evd_level sigma l)))
+  GType (Some (dl, (Pp.string_of_ppcmds
+                     (Univ.Universe.pr_with (Evd.pr_evd_level_name sigma) l), None)))
+
+let detype_universe sigma u =
+  if Univ.Universe.is_type0m u then GProp
+  else if Univ.Universe.is_type0 u then GSet
+  else
+    let ls = Univ.Universe.levels u in
+    let prlevel (l,n) =
+      dl, (Pp.string_of_ppcmds (Evd.pr_evd_level_name sigma l), Some n)
+    in GType (List.map prlevel ls)
 
 let detype_instance sigma l = 
   if Univ.Instance.is_empty l then None
-  else Some (List.map (detype_level sigma) (Array.to_list (Univ.Instance.to_array l)))
+  else Some (List.map (detype_universe sigma)
+                      (Array.to_list (Univ.Instance.to_array l)))
 
 let rec detype flags avoid env sigma t =
   match kind_of_term (collapse_appl t) with

@@ -46,7 +46,7 @@ val get_meta : symbols -> int -> metavariable
 
 val get_evar : symbols -> int -> existential
 
-val get_level : symbols -> int -> Univ.Level.t
+val get_univ : symbols -> int -> Univ.Universe.t
 
 val get_symbols : unit -> symbols
 

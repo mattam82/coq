@@ -116,18 +116,18 @@ let typeclass_univ_instance (cl,u') =
     let u = 
       match cl.cl_impl with
       | ConstRef c -> 
-        let cb = Global.lookup_constant c in
-	  if cb.const_polymorphic then Univ.UContext.instance cb.const_universes
-	  else Univ.Instance.empty
+         let cb = Global.lookup_constant c in
+         Declareops.universes_of_polymorphic_constant cb
       | IndRef c ->
          let mib,oib = Global.lookup_inductive c in
-	  if mib.mind_polymorphic then Univ.UContext.instance mib.mind_universes
-	  else Univ.Instance.empty
-      | _ -> Univ.Instance.empty
-    in Array.fold_left2 (fun subst u u' -> Univ.LMap.add u u' subst) 
-      Univ.LMap.empty (Univ.Instance.to_array u) (Univ.Instance.to_array u')
+         Declareops.inductive_context mib
+      | _ -> Univ.UContext.empty
+    in
+    let u = Univ.UContext.abstraction u in
+    Array.fold_left2 (fun subst u u' -> Univ.LMap.add u u' subst) 
+      Univ.LMap.empty (Univ.Abstraction.to_array u) (Univ.Instance.to_array u')
   in
-  let subst_ctx = Context.Rel.map (subst_univs_level_constr subst) in
+  let subst_ctx = Context.Rel.map (subst_univs_constr subst) in
     { cl with cl_context = fst cl.cl_context, subst_ctx (snd cl.cl_context);
       cl_props = subst_ctx cl.cl_props}, u'
 

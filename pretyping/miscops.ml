@@ -30,7 +30,8 @@ let smartmap_cast_type f c =
 let glob_sort_eq g1 g2 = match g1, g2 with
 | GProp, GProp -> true
 | GSet, GSet -> true
-| GType l1, GType l2 -> List.equal (fun x y -> CString.equal (snd x) (snd y)) l1 l2
+| GType l1, GType l2 -> List.equal (fun (_,(x,x')) (_,(y,y')) ->
+                           CString.equal x y && Option.equal Int.equal x' y') l1 l2
 | _ -> false
 
 let intro_pattern_naming_eq nam1 nam2 = match nam1, nam2 with

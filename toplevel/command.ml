@@ -411,7 +411,7 @@ let make_conclusion_flexible evdref ty poly =
     let _, concl = destArity ty in
       match concl with
       | Type u -> 
-        (match Univ.universe_level u with
+        (match Univ.Universe.level_name u with
         | Some u -> 
 	  evdref := Evd.make_flexible_variable !evdref true u
 	| None -> ())
@@ -461,7 +461,7 @@ let extract_level env evd min tys =
   in sup_list min sorts
 
 let is_flexible_sort evd u =
-  match Univ.Universe.level u with
+  match Univ.Universe.level_name u with
   | Some l -> Evd.is_flexible_level evd l
   | None -> false
 

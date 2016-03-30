@@ -22,7 +22,7 @@ open Pfedit
 
 val do_universe : polymorphic -> Id.t Loc.located list -> unit
 val do_constraint : polymorphic ->
-  (Id.t Loc.located * Univ.constraint_type * Id.t Loc.located) list -> unit
+  (Misctypes.glob_sort * Univ.constraint_type * Misctypes.glob_sort) list -> unit
 
 (** {6 Hooks for Pcoq} *)
 

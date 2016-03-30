@@ -860,7 +860,7 @@ let normalize_universe evd =
 
 let normalize_universe_instance evd l =
   let vars = ref (UState.subst evd.universes) in
-  let normalize = Univ.level_subst_of (Universes.normalize_univ_variable_opt_subst vars) in
+  let normalize = Universes.normalize_univ_variable_opt_subst vars in
     Univ.Instance.subst_fn normalize l
 
 let normalize_sort evars s =
@@ -888,10 +888,10 @@ let has_lub evd u1 u2 =
     (Universes.Constraints.singleton (u1,Universes.ULub,u2))
 
 let set_eq_level d u1 u2 =
-  add_constraints d (Univ.enforce_eq_level u1 u2 Univ.Constraint.empty)
+  add_constraints d (Univ.Constraint.enforce_eq_level u1 u2 Univ.Constraint.empty)
 
 let set_leq_level d u1 u2 =
-  add_constraints d (Univ.enforce_leq_level u1 u2 Univ.Constraint.empty)
+  add_constraints d (Univ.Constraint.enforce_leq_level u1 u2 Univ.Constraint.empty)
 
 let set_eq_instances ?(flex=false) d u1 u2 =
   add_universe_constraints d
@@ -1378,7 +1378,7 @@ let evar_dependency_closure n sigma =
 let has_no_evar sigma =
   EvMap.is_empty sigma.defn_evars && EvMap.is_empty sigma.undf_evars
 
-let pr_evd_level evd = pr_uctx_level evd.universes
+let pr_evd_level_name evd = pr_uctx_level evd.universes
 
 let pr_evar_universe_context ctx =
   let prl = pr_uctx_level ctx in

@@ -167,9 +167,7 @@ let type_of_global_unsafe r =
   | VarRef id -> Environ.named_type id env
   | ConstRef c -> 
      let cb = Environ.lookup_constant c env in 
-     let univs =
-       Declareops.universes_of_polymorphic_constant
-         (Environ.opaque_tables env) cb in
+     let univs = Declareops.universes_of_polymorphic_constant cb in
      let ty = Typeops.type_of_constant_type env cb.Declarations.const_type in
        Vars.subst_instance_constr (Univ.UContext.instance univs) ty
   | IndRef ind ->
@@ -191,9 +189,7 @@ let type_of_global_in_context env r =
   | VarRef id -> Environ.named_type id env, Univ.UContext.empty
   | ConstRef c -> 
      let cb = Environ.lookup_constant c env in 
-     let univs =
-       Declareops.universes_of_polymorphic_constant
-         (Environ.opaque_tables env) cb in
+     let univs = Declareops.universes_of_polymorphic_constant cb in
        Typeops.type_of_constant_type env cb.Declarations.const_type, univs
   | IndRef ind ->
      let (mib, oib as specif) = Inductive.lookup_mind_specif env ind in
@@ -216,8 +212,7 @@ let universes_of_global env r =
     | VarRef id -> Univ.UContext.empty
     | ConstRef c -> 
       let cb = Environ.lookup_constant c env in 
-	Declareops.universes_of_polymorphic_constant
-          (Environ.opaque_tables env) cb
+	Declareops.universes_of_polymorphic_constant cb
     | IndRef ind ->
       let (mib, oib) = Inductive.lookup_mind_specif env ind in
 	Univ.instantiate_univ_context mib.mind_universes 

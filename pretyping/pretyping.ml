@@ -120,7 +120,8 @@ let _ =
 	    optwrite = (:=) Universes.set_minimization })
 						  
 (** Miscellaneous interpretation functions *)
-let interp_universe_level_name evd (loc,s) =
+let interp_universe_level_name evd (loc,(s,n)) =
+  let incr = match n with None -> 0 | Some n -> assert(n >= 0); n in
   let names, _ = Universes.global_universe_names () in
     if CString.string_contains s "." then
       match List.rev (CString.split '.' s) with
@@ -128,44 +129,46 @@ let interp_universe_level_name evd (loc,s) =
       | n :: dp -> 
 	 let num = int_of_string n in
 	 let dp = DirPath.make (List.map Id.of_string dp) in
-	 let level = Univ.Level.make dp num in
+	 let level = Univ.LevelName.make dp num in
 	 let evd =
 	   try Evd.add_global_univ evd level
 	   with UGraph.AlreadyDeclared -> evd
-	 in evd, level
+	 in evd, Univ.Universe.make (level, incr)
     else 
       try
 	let level = Evd.universe_of_name evd s in
-	evd, level
+	evd, Univ.Universe.make (level, incr)
       with Not_found ->
 	try 
 	  let id = try Id.of_string s with _ -> raise Not_found in
-	  evd, Idmap.find id names
+	  evd, Univ.Universe.make (Idmap.find id names, incr)
 	with Not_found -> 
 	  if not (is_strict_universe_declarations ()) then
-  	    new_univ_level_variable ~loc ~name:s univ_rigid evd
+  	    let evd, u = new_univ_variable ~loc ~name:s univ_rigid evd in
+            evd, Univ.Universe.addn incr u
 	  else user_err_loc (loc, "interp_universe_level_name",
 			     Pp.(str "Undeclared universe: " ++ str s))
 
-let interp_universe ?loc evd = function
-  | [] -> let evd, l = new_univ_level_variable ?loc univ_rigid evd in
-	    evd, Univ.Universe.make l
+let interp_universe_expr ?loc evd = function
+  | [] -> new_univ_variable ?loc univ_rigid evd
   | l ->
     List.fold_left (fun (evd, u) l -> 
       let evd', l = interp_universe_level_name evd l in
-	(evd', Univ.sup u (Univ.Universe.make l)))
+	(evd', Univ.sup u l))
     (evd, Univ.Universe.type0m) l
-
-let interp_universe_level loc evd = function
-  | None -> new_univ_level_variable ~loc univ_rigid evd
-  | Some (loc,s) -> interp_universe_level_name evd (loc,s)
 
 let interp_sort ?loc evd = function
   | GProp -> evd, Prop Null
   | GSet -> evd, Prop Pos
   | GType n -> 
-    let evd, u = interp_universe ?loc evd n in
+    let evd, u = interp_universe_expr ?loc evd n in
       evd, Type u
+
+let interp_universe loc evd l =
+  match l with
+  | GProp -> evd, Univ.Universe.type0m
+  | GSet -> evd, Univ.Universe.type0
+  | GType s -> interp_universe_expr ~loc evd s
 
 let interp_elimination_sort = function
   | GProp -> InProp
@@ -385,12 +388,6 @@ let evar_kind_of_term sigma c =
 (*************************************************************************)
 (* Main pretyping function                                               *)
 
-let interp_universe_level_name loc evd l =
-  match l with
-  | GProp -> evd, Univ.Level.prop
-  | GSet -> evd, Univ.Level.set
-  | GType s -> interp_universe_level loc evd s
-
 let pretype_global loc rigid env evd gr us = 
   let evd, instance = 
     match us with
@@ -404,10 +401,10 @@ let pretype_global loc rigid env evd gr us =
 		       str "Universe instance should have length " ++ int len)
        else
 	 let evd, l' = List.fold_left (fun (evd, univs) l -> 
-	    let evd, l = interp_universe_level_name loc evd l in
+	    let evd, l = interp_universe loc evd l in
 	      (evd, l :: univs)) (evd, []) l
 	 in
-	 if List.exists (fun l -> Univ.Level.is_prop l) l' then
+	 if List.exists (fun l -> Univ.Universe.equal Univ.Universe.type0m l) l' then
 	   user_err_loc (loc, "pretype",
 		 str "Universe instances cannot contain Prop, polymorphic" ++
 		   str " universe instances must be greater or equal to Set.");
@@ -432,7 +429,7 @@ let pretype_ref loc evdref env ref us =
       make_judge c ty
 
 let judge_of_Type loc evd s =
-  let evd, s = interp_universe ~loc evd s in
+  let evd, s = interp_universe_expr ~loc evd s in
   let judge = 
     { uj_val = mkSort (Type s); uj_type = mkSort (Type (Univ.super s)) }
   in

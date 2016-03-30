@@ -80,11 +80,14 @@ let refresh_polymorphic_type_of_inductive (_,mip) =
 
 let process_inductive (sechyps,abs_ctx) modlist mib =
   let nparams = mib.mind_nparams in
-  let subst, univs = 
-    if mib.mind_polymorphic then 
-      let inst = Univ.UContext.instance mib.mind_universes in
-      let cstrs = Univ.UContext.constraints mib.mind_universes in
-	inst, Univ.UContext.make (inst, Univ.subst_instance_constraints inst cstrs)
+  let subst, univs =
+    let univs = mib.mind_universes in
+    if mib.mind_polymorphic then
+      let abs = Univ.UContext.abstraction univs in
+      let inst = Univ.UContext.instance univs in
+      let cstrs = Univ.UContext.constraints univs in
+      let cstrs' = Univ.subst_instance_constraints inst cstrs in
+      inst, Univ.UContext.make (abs, cstrs')
     else Univ.Instance.empty, mib.mind_universes
   in
   let inds =

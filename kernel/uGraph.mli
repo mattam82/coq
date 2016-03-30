@@ -33,7 +33,7 @@ val sort_universes : universes -> universes
 
 exception AlreadyDeclared
 
-val add_universe : universe_level -> bool -> universes -> universes
+val add_universe : universe_level_name -> bool -> universes -> universes
 
 (** {6 ... } *)
 (** Merge of constraints in a universes graph.
@@ -41,12 +41,12 @@ val add_universe : universe_level -> bool -> universes -> universes
   universes graph. It raises the exception [UniverseInconsistency] if the
   constraints are not satisfiable. *)
 
-val enforce_constraint : univ_constraint -> universes -> universes
+val enforce_constraint : Level.t univ_constraint -> universes -> universes
 val merge_constraints : constraints -> universes -> universes
 
 val constraints_of_universes : universes -> constraints
 
-val check_constraint  : universes -> univ_constraint -> bool
+val check_constraint  : universes -> Level.t univ_constraint -> bool
 val check_constraints : constraints -> universes -> bool
 
 val check_eq_instances : Instance.t check_function
@@ -54,8 +54,13 @@ val check_eq_instances : Instance.t check_function
 
 (** {6 Pretty-printing of universes. } *)
 
-val pr_universes : (Level.t -> Pp.std_ppcmds) -> universes -> Pp.std_ppcmds
+val pr_universes : (LevelName.t -> Pp.std_ppcmds) -> universes -> Pp.std_ppcmds
 
+module LESet : sig
+  include CSig.SetS with type elt = universe_level
+end
+val lower_universes : universes -> Level.t -> LESet.t
+                                                                 
 (** {6 Dumping to a file } *)
 
 val dump_universes :

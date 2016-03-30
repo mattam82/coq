@@ -37,7 +37,7 @@ type structured_constant =
   | Const_proj of Constant.t
   | Const_b0 of tag
   | Const_bn of tag * structured_constant array
-  | Const_univ_level of Univ.universe_level
+  | Const_univ of Univ.universe
   | Const_type of Univ.universe
 
 type reloc_table = (tag * int) array
@@ -179,7 +179,7 @@ let rec pp_struct_const = function
   | Const_b0 i -> int i
   | Const_bn (i,t) ->
      int i ++ surround (prvect_with_sep pr_comma pp_struct_const t)
-  | Const_univ_level l -> Univ.Level.pr l
+  | Const_univ l -> Univ.Universe.pr l
   | Const_type u -> str "Type@{" ++ Univ.pr_uni u ++ str "}"
 
 let pp_lbl lbl = str "L" ++ int lbl

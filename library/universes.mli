@@ -19,26 +19,26 @@ val is_set_minimization : unit -> bool
 
 (** Global universe name <-> level mapping *)
 type universe_names = 
-  Univ.universe_level Idmap.t * Id.t Univ.LMap.t
+  Univ.universe_level_name Idmap.t * Id.t Univ.LMap.t
 
 val global_universe_names : unit -> universe_names
 val set_global_universe_names : universe_names -> unit
 
-val pr_with_global_universes : Level.t -> Pp.std_ppcmds
+val pr_with_global_universes : LevelName.t -> Pp.std_ppcmds
 
 (** Local universe name <-> level mapping *)
 
-type universe_binders = (Id.t * Univ.universe_level) list
+type universe_binders = (Id.t * LevelName.t) list
 					   
 val register_universe_binders : Globnames.global_reference -> universe_binders -> unit
 val universe_binders_of_global : Globnames.global_reference -> universe_binders
 
 (** The global universe counter *)
-val set_remote_new_univ_level : universe_level RemoteCounter.installer
+val set_remote_new_univ_level : LevelName.t RemoteCounter.installer
 
 (** Side-effecting functions creating new universe levels. *)
 
-val new_univ_level : Names.dir_path -> universe_level
+val new_univ_level : Names.dir_path -> universe_level_name
 val new_univ : Names.dir_path -> universe
 val new_Type : Names.dir_path -> types
 val new_Type_sort : Names.dir_path -> sorts
@@ -155,7 +155,7 @@ val extend_context : 'a in_universe_context_set -> universe_context_set ->
     (a global one if there is one) and transitively saturate
     the constraints w.r.t to the equalities. *)
 
-module UF : Unionfind.PartitionSig with type elt = universe_level
+module UF : Unionfind.PartitionSig with type elt = universe_level_name
 
 type universe_opt_subst = universe option universe_map
 
@@ -172,15 +172,15 @@ val normalize_univ_variables : universe_opt_subst ->
   universe_opt_subst * universe_set * universe_set * universe_subst
 
 val normalize_univ_variable : 
-  find:(universe_level -> universe) ->
-  update:(universe_level -> universe -> universe) ->
-  universe_level -> universe
+  find:(universe_level_name -> universe) ->
+  update:(universe_level_name -> universe -> universe) ->
+  universe_subst_fn
 
 val normalize_univ_variable_opt_subst : universe_opt_subst ref ->
-  (universe_level -> universe)
+  (universe_level_name -> universe)
 
 val normalize_univ_variable_subst : universe_subst ref ->
-  (universe_level -> universe)
+  (universe_level_name -> universe)
 
 val normalize_universe_opt_subst : universe_opt_subst ref ->
   (universe -> universe)
@@ -223,8 +223,6 @@ val nf_evars_and_universes_opt_subst : (existential -> constr option) ->
 
 val universes_of_constr : constr -> universe_set
 val restrict_universe_context : universe_context_set -> universe_set -> universe_context_set
-val simplify_universe_context : universe_context_set -> 
-  universe_context_set * universe_level_subst
 
 val refresh_constraints : UGraph.t -> universe_context_set -> universe_context_set * UGraph.t
 
@@ -238,8 +236,9 @@ type constraints_map = (Univ.constraint_type * Univ.LMap.key) list Univ.LMap.t
 
 val pr_constraints_map : constraints_map -> Pp.std_ppcmds
 
-val choose_canonical : universe_set -> (Level.t -> bool) (* flexibles *) -> universe_set -> universe_set -> 
-  universe_level * (universe_set * universe_set * universe_set)
+val choose_canonical : universe_set -> (universe_level_name -> bool) (* flexibles *) ->
+                       universe_set -> universe_set -> 
+  universe_level_name * (universe_set * universe_set * universe_set)
     
 val compute_lbound : (constraint_type * Univ.universe) list -> universe option
 

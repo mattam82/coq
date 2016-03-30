@@ -151,7 +151,7 @@ type symbol =
   | SymbInd of inductive
   | SymbMeta of metavariable
   | SymbEvar of existential
-  | SymbLevel of Univ.Level.t
+  | SymbUniv of Univ.universe
 
 let dummy_symb = SymbValue (dummy_value ())
 
@@ -166,7 +166,7 @@ let eq_symbol sy1 sy2 =
   | SymbMeta m1, SymbMeta m2 -> Int.equal m1 m2
   | SymbEvar (evk1,args1), SymbEvar (evk2,args2) ->
      Evar.equal evk1 evk2 && Array.for_all2 eq_constr args1 args2
-  | SymbLevel l1, SymbLevel l2 -> Univ.Level.equal l1 l2
+  | SymbUniv l1, SymbUniv l2 -> Univ.Universe.equal l1 l2
   | _, _ -> false
 
 let hash_symbol symb =
@@ -182,7 +182,7 @@ let hash_symbol symb =
      let evh = Evar.hash evk in
      let hl = Array.fold_left (fun h t -> combine h (Constr.hash t)) evh args in
      combinesmall 8 hl
-  | SymbLevel l -> combinesmall 9 (Univ.Level.hash l)
+  | SymbUniv l -> combinesmall 9 (Univ.Universe.hash l)
 
 module HashedTypeSymbol = struct
   type t = symbol
@@ -240,9 +240,9 @@ let get_evar tbl i =
     | SymbEvar ev -> ev
     | _ -> anomaly (Pp.str "get_evar failed")
 
-let get_level tbl i =
+let get_univ tbl i =
   match tbl.(i) with
-    | SymbLevel u -> u
+    | SymbUniv u -> u
     | _ -> anomaly (Pp.str "get_level failed")
 
 let push_symbol x =
@@ -1023,11 +1023,11 @@ let compile_prim decl cond paux =
 
 let ml_of_instance instance u =
   let ml_of_level l =
-    match Univ.Level.var_index l with
+    match Univ.Universe.var_index l with
     | Some i ->
        let univ = MLapp(MLprimitive MLmagic, [|MLlocal (Option.get instance)|]) in
        mkMLapp (MLprimitive MLarrayget) [|univ; MLint i|]
-    | None -> let i = push_symbol (SymbLevel l) in get_level_code i
+    | None -> let i = push_symbol (SymbUniv l) in get_level_code i
   in
   let u = Univ.Instance.to_array u in
   if Array.is_empty u then [||]
@@ -1856,10 +1856,8 @@ and compile_named env sigma univ auxdefs id =
 let compile_constant env sigma prefix ~interactive con cb =
   match cb.const_proj with
   | None ->
-     let u =
-       if cb.const_polymorphic then Univ.UContext.instance cb.const_universes
-       else Univ.Instance.empty
-     in
+     let uctx = Declareops.universes_of_polymorphic_constant cb in
+     let u = Univ.UContext.instance uctx in
     begin match cb.const_body with
     | Def t ->
       let t = Mod_subst.force_constr t in

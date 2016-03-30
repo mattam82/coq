@@ -97,11 +97,13 @@ let rec check_with_def env struc (idl,(c,ctx)) mp equiv =
 	  let cus, ccst = Univ.UContext.dest uctx in
 	  let newus, cst = Univ.UContext.dest ctx in
 	  let () =
-	    if not (Univ.Instance.length cus == Univ.Instance.length newus) then
+	    if not (Univ.Abstraction.length cus == Univ.Abstraction.length newus) then
 	      error_incorrect_with_constraint lab
 	  in
-	  let inst = Univ.Instance.append cus newus in
-	  let csti = Univ.enforce_eq_instances cus newus cst in
+	  let inst = Univ.Abstraction.append cus newus in
+          let inst1 = Univ.Abstraction.instance cus and
+              inst2 = Univ.Abstraction.instance newus in
+	  let csti = Univ.Constraint.enforce_eq_instances inst1 inst2 cst in
 	  let csta = Univ.Constraint.union csti ccst in
 	  let env' = Environ.push_context ~strict:false (Univ.UContext.make (inst, csta)) env in
 	  let () = if not (UGraph.check_constraints cst (Environ.universes env')) then
@@ -111,12 +113,12 @@ let rec check_with_def env struc (idl,(c,ctx)) mp equiv =
 	    | Undef _ | OpaqueDef _ ->
 	      let j = Typeops.infer env' c in
 	      let typ = Typeops.type_of_constant_type env' cb.const_type in
-	      let typ = Vars.subst_instance_constr cus typ in
+	      let typ = Vars.subst_instance_constr inst1 typ in
 	      let cst' = Reduction.infer_conv_leq env' (Environ.universes env')
 						j.uj_type typ in
 	      cst'
 	    | Def cs ->
-	       let c' = Vars.subst_instance_constr cus (Mod_subst.force_constr cs) in
+	       let c' = Vars.subst_instance_constr inst1 (Mod_subst.force_constr cs) in
 	       let cst' = Reduction.infer_conv env' (Environ.universes env') c c' in
 	        cst'
 	  in

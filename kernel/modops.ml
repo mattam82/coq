@@ -327,12 +327,12 @@ let strengthen_const mp_from l cb resolver =
   |_ ->
     let kn = KerName.make2 mp_from l in
     let con = constant_of_delta_kn resolver kn in
-    let u = 
-      if cb.const_polymorphic then
-	let u = Univ.UContext.instance cb.const_universes in
-	let s = Univ.make_instance_subst u in
-	  Univ.subst_univs_level_instance s u
-      else Univ.Instance.empty
+    let uctx = universes_of_polymorphic_constant cb in
+    let u =
+      let i = Univ.UContext.abstraction uctx in
+      let s = Univ.make_abstraction_subst i in
+      let abs = Univ.subst_univs_level_abstraction s i in
+      Univ.Abstraction.instance abs
     in
       { cb with
 	const_body = Def (Mod_subst.from_val (mkConstU (con,u)));

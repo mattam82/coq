@@ -136,10 +136,13 @@ end) = struct
 
   let pr_sep_com sep f c = pr_with_comments (constr_loc c) (sep() ++ f c)
 
+  let pr_level (_,(x,n)) =
+    str x ++ pr_opt_no_spc (fun x -> if Int.equal x 0 then mt() else str"+" ++ int x) n
+
   let pr_univ l =
     match l with
-      | [_,x] -> str x
-      | l -> str"max(" ++ prlist_with_sep (fun () -> str",") (fun x -> str (snd x)) l ++ str")"
+      | [x] -> pr_level x
+      | l -> str"max(" ++ prlist_with_sep (fun () -> str",") pr_level l ++ str")"
 
   let pr_univ_annot pr x = str "@{" ++ pr x ++ str "}"
 
@@ -165,18 +168,14 @@ end) = struct
   let pr_qualid = pr_qualid
   let pr_patvar = pr_id
 
-  let pr_glob_sort_instance = function
-    | GProp ->
-      tag_type (str "Prop")
-    | GSet ->
-      tag_type (str "Set")
-    | GType u ->
-      (match u with
-        | Some (_,u) -> str u
-        | None -> tag_type (str "Type"))
+  let pr_univ = function
+    | GProp -> tag_type (str "Prop")
+    | GSet -> tag_type (str "Set")
+    | GType [] -> tag_type (str "Type")
+    | GType u -> pr_univ u
 
   let pr_universe_instance l =
-    pr_opt_no_spc (pr_univ_annot (prlist_with_sep spc pr_glob_sort_instance)) l
+    pr_opt_no_spc (pr_univ_annot (prlist_with_sep spc pr_univ)) l
 
   let pr_reference = function
   | Qualid (_, qid) -> pr_qualid qid

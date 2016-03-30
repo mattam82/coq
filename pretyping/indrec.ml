@@ -120,7 +120,8 @@ let mis_make_case_com dep env sigma (ind, u as pind) (mib,mip as specif) kind =
       mkLambda_string "f" t
 	(add_branch (push_rel (LocalAssum (Anonymous, t)) env) (k+1))
   in
-  let Sigma (s, sigma, p) = Sigma.fresh_sort_in_family ~rigid:Evd.univ_flexible_alg env sigma kind in
+  let Sigma (s, sigma, p) =
+    Sigma.fresh_sort_in_family ~rigid:Evd.univ_rigid env sigma kind in
   let typP = make_arity env' dep indf s in
   let c = 
     it_mkLambda_or_LetIn_name env
@@ -451,7 +452,7 @@ let mis_make_indrec env sigma listdepkind mib u =
       | ((indi,u),_,_,dep,kinds)::rest ->
 	  let indf = make_ind_family ((indi,u), Context.Rel.to_extended_list i lnamesparrec) in
 	  let s = 
-	    Evarutil.evd_comb1 (Evd.fresh_sort_in_family ~rigid:Evd.univ_flexible_alg env) 
+	    Evarutil.evd_comb1 (Evd.fresh_sort_in_family ~rigid:Evd.univ_rigid env) 
 	      evdref kinds 
 	  in
 	  let typP = make_arity env dep indf s in

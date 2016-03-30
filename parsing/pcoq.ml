@@ -316,6 +316,7 @@ module Constr =
     let ident = make_gen_entry uconstr (rawwit wit_ident) "ident"
     let global = make_gen_entry uconstr (rawwit wit_ref) "global"
     let sort = make_gen_entry uconstr (rawwit wit_sort) "sort"
+    let universe = Gram.entry_create "constr:universe"
     let pattern = Gram.entry_create "constr:pattern"
     let constr_pattern = gec_constr "constr_pattern"
     let lconstr_pattern = gec_constr "lconstr_pattern"

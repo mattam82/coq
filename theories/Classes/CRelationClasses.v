@@ -34,14 +34,15 @@ Definition iffT (A B : Type) := ((A -> B) * (B -> A))%type.
 (** We allow to unfold the [crelation] definition while doing morphism search. *)
 
 Section Defs.
-  Context {A : Type}.
+  Universe i.
+  Context {A : Type@{i}}.
 
   (** We rebind crelational properties in separate classes to be able to overload each proof. *)
 
   Class Reflexive (R : crelation A) :=
     reflexivity : forall x : A, R x x.
 
-  Definition complement (R : crelation A) : crelation A := 
+  Definition complement@{j} (R : crelation@{i j} A) : crelation@{i j} A := 
     fun x y => R x y -> False.
 
   (** Opaque for proof-search. *)
@@ -330,7 +331,8 @@ Section Binary.
    morphism for equivalence (see Morphisms).  It is also sufficient to
    show that [R] is antisymmetric w.r.t. [eqA] *)
 
-  Global Instance partial_order_antisym `(PartialOrder eqA R) : ! Antisymmetric A eqA R.
+  Global Instance partial_order_antisym `(PartialOrder eqA R) :
+    ! Antisymmetric A eqA R.
   Proof with auto.
     reduce_goal.
     apply H. firstorder.
@@ -355,5 +357,3 @@ Hint Extern 3 (PartialOrder (flip _)) => class_apply PartialOrder_inverse : type
 (* Qed. *)
 
 Typeclasses Opaque relation_equivalence.
-
-

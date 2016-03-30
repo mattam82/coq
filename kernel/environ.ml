@@ -190,8 +190,9 @@ let push_constraints_to_env (_,univs) env =
 let add_universes strict ctx g =
   let g = Array.fold_left
 	    (* Be lenient, module typing reintroduces universes and constraints due to includes *)
-	    (fun g v -> try UGraph.add_universe v strict g with UGraph.AlreadyDeclared -> g)
-	    g (Univ.Instance.to_array (Univ.UContext.instance ctx))
+	    (fun g v -> try UGraph.add_universe v strict g
+                     with UGraph.AlreadyDeclared -> g)
+	    g (Univ.Abstraction.to_array (Univ.UContext.abstraction ctx))
   in
     UGraph.merge_constraints (Univ.UContext.constraints ctx) g
 			   
@@ -200,7 +201,8 @@ let push_context ?(strict=false) ctx env =
 
 let add_universes_set strict ctx g =
   let g = Univ.LSet.fold
-	    (fun v g -> try UGraph.add_universe v strict g with UGraph.AlreadyDeclared -> g)
+	    (fun v g -> try UGraph.add_universe v strict g
+                     with UGraph.AlreadyDeclared -> g)
 	    (Univ.ContextSet.levels ctx) g
   in UGraph.merge_constraints (Univ.ContextSet.constraints ctx) g
 

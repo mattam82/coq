@@ -434,7 +434,7 @@ let assumption_message id =
 (** Global universe names, in a different summary *)
 
 (* Discharged or not *)
-type universe_decl = polymorphic * (Id.t * Univ.universe_level) list
+type universe_decl = polymorphic * (Id.t * Univ.universe_level_name) list
 
 let cache_universes (p, l) =
   let glob = Universes.global_universe_names () in
@@ -483,16 +483,17 @@ let input_constraints : constraint_decl -> Libobject.obj =
       classify_function = (fun a -> Keep a) }
 
 let do_constraint poly l =
-  let u_of_id =
-    let names, _ = Universes.global_universe_names () in
-      fun (loc, id) ->
-	try Idmap.find id names
-	with Not_found ->
-	  user_err_loc (loc, "Constraint", str "Undeclared universe " ++ pr_id id)
+  let open Univ in
+  let u_of_id l =
+    let _, s = Pretyping.interp_sort (Evd.from_env (Global.env ())) l in
+    Sorts.univ_of_sort s
   in
-  let constraints = List.fold_left (fun acc (l, d, r) ->
-    let lu = u_of_id l and ru = u_of_id r in
-      Univ.Constraint.add (lu, d, ru) acc)
-    Univ.Constraint.empty l
+  let constraints =
+    List.fold_left (fun acc (l, d, r) ->
+        let lu = u_of_id l and ru = u_of_id r in
+        match d with Lt -> Constraint.enforce_leq (Univ.super lu) ru acc
+                   | Eq -> Constraint.enforce_eq lu ru acc
+                   | Le -> Constraint.enforce_leq lu ru acc)
+    Constraint.empty l
   in
     Lib.add_anonymous_leaf (input_constraints (poly, constraints))

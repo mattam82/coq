@@ -145,7 +145,7 @@ let cons_subst u su subst =
 (* if it is presents and returns the substitution unchanged if not.*)
 let remember_subst u subst =
   try
-    let su = Universe.make u in
+    let su = Universe.make_name u in
     Univ.LMap.add u (Univ.sup (Univ.LMap.find u subst) su) subst
   with Not_found -> subst
 
@@ -594,8 +594,8 @@ let rec ienv_decompose_prod (env,_ as ienv) n c =
      | _ -> assert false
 
 let lambda_implicit_lift n a =
-  let level = Level.make (DirPath.make [Id.of_string "implicit"]) 0 in
-  let implicit_sort = mkType (Universe.make level) in
+  let level = LevelName.make (DirPath.make [Id.of_string "implicit"]) 0 in
+  let implicit_sort = mkType (Universe.make_name level) in
   let lambda_implicit a = mkLambda (Anonymous, implicit_sort, a) in
   iterate lambda_implicit n (lift n a)
 

@@ -546,6 +546,7 @@ let rec instantiate_universes env evdref scl is = function
       d :: instantiate_universes env evdref scl is (sign, exp)
   | (LocalAssum (na,ty))::sign, Some l::exp ->
       let ctx,_ = Reduction.dest_arity env ty in
+      let l = Level.make l in
       let u = Univ.Universe.make l in
       let s =
 	(* Does the sort of parameter [u] appear in (or equal)

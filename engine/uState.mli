@@ -9,6 +9,7 @@
 (** Universe unification states *)
 
 open Names
+open Univ
 
 exception UniversesDiffer
 
@@ -66,10 +67,10 @@ val add_universe_constraints : t -> Universes.universe_constraints -> t
 
 (** {5 Names} *)
 
-val add_universe_name : t -> string -> Univ.Level.t -> t
+val add_universe_name : t -> string -> Univ.LevelName.t -> t
 (** Associate a human-readable name to a local variable. *)
 
-val universe_of_name : t -> string -> Univ.Level.t
+val universe_of_name : t -> string -> Univ.LevelName.t
 (** Retrieve the universe associated to the name. *)
 
 (** {5 Unification} *)
@@ -89,10 +90,10 @@ val merge_subst : t -> Universes.universe_opt_subst -> t
 val emit_side_effects : Safe_typing.private_constants -> t -> t
 
 val new_univ_variable : ?loc:Loc.t -> rigid -> string option -> t -> t * Univ.Level.t
-val add_global_univ : t -> Univ.Level.t -> t
-val make_flexible_variable : t -> bool -> Univ.Level.t -> t
+val add_global_univ : t -> Univ.LevelName.t -> t
+val make_flexible_variable : t -> bool -> Univ.LevelName.t -> t
 
-val is_sort_variable : t -> Sorts.t -> Univ.Level.t option
+val is_sort_variable : t -> Sorts.t -> LevelName.t option
 
 val normalize_variables : t -> Univ.universe_subst * t
 
@@ -108,10 +109,11 @@ val normalize : t -> t
 
 (** {5 TODO: Document me} *)
 
-val universe_context : ?names:(Id.t Loc.located) list -> t -> (Id.t * Univ.Level.t) list * Univ.universe_context
+val universe_context : ?names:(Id.t Loc.located) list -> t ->
+                       (Id.t * LevelName.t) list * universe_context
 
 val update_sigma_env : t -> Environ.env -> t
 
 (** {5 Pretty-printing} *)
 
-val pr_uctx_level : t -> Univ.Level.t -> Pp.std_ppcmds
+val pr_uctx_level : t -> LevelName.t -> Pp.std_ppcmds

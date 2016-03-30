@@ -78,7 +78,8 @@ let show_universes () =
   let sigma = gls.Evd.sigma in
   let ctx = Evd.universe_context_set (Evd.nf_constraints sigma) in
     msg_notice (Evd.pr_evar_universe_context (Evd.evar_universe_context sigma));
-    msg_notice (str"Normalized constraints: " ++ Univ.pr_universe_context_set (Evd.pr_evd_level sigma) ctx)
+    msg_notice (str"Normalized constraints: " ++ Univ.pr_universe_context_set
+                                                   (Evd.pr_evd_level_name sigma) ctx)
 
 let show_prooftree () =
   (* Spiwack: proof tree is currently not working *)
@@ -1623,7 +1624,8 @@ let vernac_print = function
        else str"There may remain asynchronous universe constraints"
      in
      begin match dst with
-     | None -> msg_notice (UGraph.pr_universes Universes.pr_with_global_universes univ ++ pr_remaining)
+     | None -> msg_notice (UGraph.pr_universes
+                            Universes.pr_with_global_universes univ ++ pr_remaining)
      | Some s -> dump_universes_gen univ s
      end
   | PrintHint r -> msg_notice (Hints.pr_hint_ref (smart_global r))

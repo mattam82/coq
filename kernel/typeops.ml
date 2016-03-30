@@ -124,7 +124,12 @@ let check_hyps_inclusion env c sign =
 
 let extract_level env p =
   let _,c = dest_prod_assum env p in
-  match kind_of_term c with Sort (Type u) -> Univ.Universe.level u | _ -> None
+  match kind_of_term c with
+  | Sort (Type u) ->
+     (match Univ.Universe.level u with
+      | Some (l, 0) -> Some l
+      | _ -> None)
+  | _ -> None
 
 let extract_context_levels env l =
   let fold l = function

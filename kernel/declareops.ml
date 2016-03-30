@@ -41,7 +41,8 @@ let hcons_template_arity ar =
 let instantiate cb c =
   if cb.const_polymorphic then 
     Vars.subst_univs_level_constr
-      (Univ.make_abstraction_subst (Univ.UContext.abstraction cb.const_universes))
+      (Univ.make_inverse_abstraction_subst
+         (Univ.UContext.abstraction cb.const_universes))
       c
   else c
 
@@ -74,9 +75,9 @@ let universes_of_constant otab cb =
       let uctxs = Univ.ContextSet.of_context cb.const_universes in
       Univ.ContextSet.to_context (Univ.ContextSet.union body_uctxs uctxs) 
 
-let universes_of_polymorphic_constant otab cb = 
+let universes_of_polymorphic_constant cb = 
   if cb.const_polymorphic then 
-    let univs = universes_of_constant otab cb in
+    let univs = cb.const_universes in
       Univ.instantiate_univ_context univs
   else Univ.UContext.empty
 
@@ -258,15 +259,18 @@ let subst_mind_body sub mib =
     mind_universes = mib.mind_universes;
     mind_private = mib.mind_private }
 
+let inductive_context mib =
+  if mib.mind_polymorphic then 
+    Univ.instantiate_univ_context mib.mind_universes 
+  else Univ.UContext.empty
+
 let inductive_abstraction mib =
   if mib.mind_polymorphic then
     Univ.UContext.abstraction mib.mind_universes
   else Univ.Abstraction.empty
 
-let inductive_context mib =
-  if mib.mind_polymorphic then 
-    Univ.instantiate_univ_context mib.mind_universes 
-  else Univ.UContext.empty
+let inductive_instance mib =
+  Univ.Abstraction.instance (inductive_abstraction mib)
 
 (** {6 Hash-consing of inductive declarations } *)
 

@@ -590,7 +590,7 @@ let eq_constr_univs_infer univs m n =
 	let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
 	if UGraph.check_eq univs u1 u2 then true
 	else
-	  (cstrs := Univ.enforce_eq u1 u2 !cstrs;
+	  (cstrs := Univ.Constraint.enforce_eq u1 u2 !cstrs;
 	   true)
     in
     let rec eq_constr' m n = 
@@ -609,7 +609,7 @@ let leq_constr_univs_infer univs m n =
       else
 	let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
 	if UGraph.check_eq univs u1 u2 then true
-	else (cstrs := Univ.enforce_eq u1 u2 !cstrs;
+	else (cstrs := Univ.Constraint.enforce_eq u1 u2 !cstrs;
 	      true)
     in
     let leq_sorts s1 s2 = 
@@ -618,7 +618,7 @@ let leq_constr_univs_infer univs m n =
 	let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
 	if UGraph.check_leq univs u1 u2 then true
 	else
-	  (cstrs := Univ.enforce_leq u1 u2 !cstrs; 
+	  (cstrs := Univ.Constraint.enforce_leq u1 u2 !cstrs; 
 	   true)
     in
     let rec eq_constr' m n = 
