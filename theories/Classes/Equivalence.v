@@ -49,16 +49,19 @@ Infix "=~=" := pequiv (at level 70, no associativity) : equiv_scope.
 
 (** Shortcuts to make proof search easier. *)
 
-Program Instance equiv_reflexive `(sa : Equivalence A) : Reflexive equiv.
+Definition equiv_reflexive `(sa : Equivalence A) : Reflexive equiv := _.
 
-Program Instance equiv_symmetric `(sa : Equivalence A) : Symmetric equiv.
+Definition equiv_symmetric `(sa : Equivalence A) : Symmetric equiv := _.
 
-Program Instance equiv_transitive `(sa : Equivalence A) : Transitive equiv.
+Lemma equiv_transitive `(sa : Equivalence A) : Transitive equiv.
+Proof.
+  intros x y z Hxy Hyz.
+  now transitivity y.
+Qed.
 
-  Next Obligation.
-  Proof. intros A R sa x y z Hxy Hyz.
-         now transitivity y.
-  Qed.
+Hint Extern 3 (Reflexive equiv) => apply @equiv_reflexive : typeclass_instances.
+Hint Extern 3 (Symmetric equiv) => apply @equiv_symmetric : typeclass_instances.
+Hint Extern 3 (Transitive equiv) => apply @equiv_transitive : typeclass_instances.
 
 (** Use the [substitute] command which substitutes an equivalence in every hypothesis. *)
 
@@ -123,17 +126,17 @@ Section Respecting.
 
 End Respecting.
 
-(** The default equivalence on function spaces, with higher-priority than [eq]. *)
+(** The default equivalence on function spaces, with lower precedence than [eq]. *)
 
 Instance pointwise_reflexive {A} `(reflb : Reflexive B eqB) :
-  Reflexive (pointwise_relation A eqB) | 9.
+  Reflexive (pointwise_relation A eqB) | 11.
 Proof. firstorder. Qed.
 Instance pointwise_symmetric {A} `(symb : Symmetric B eqB) :
-  Symmetric (pointwise_relation A eqB) | 9.
+  Symmetric (pointwise_relation A eqB) | 11.
 Proof. firstorder. Qed.
 Instance pointwise_transitive {A} `(transb : Transitive B eqB) :
-  Transitive (pointwise_relation A eqB) | 9.
+  Transitive (pointwise_relation A eqB) | 11.
 Proof. firstorder. Qed.
 Instance pointwise_equivalence {A} `(eqb : Equivalence B eqB) :
-  Equivalence (pointwise_relation A eqB) | 9.
+  Equivalence (pointwise_relation A eqB) | 11.
 Proof. split; apply _. Qed.
