@@ -720,10 +720,35 @@ let is_eq_abs t =
   | Var id -> Id.equal eq_abs_id id
   | _ -> false
 
+	 
+let keyed_unify env evd kop = 
+  if not (Unification.is_keyed_unification ()) then fun cl -> true
+  else 
+    match kop with 
+    | None -> fun _ -> true
+    | Some kop ->
+      fun cl ->
+	let kc = Keys.constr_key cl in
+	  match kc with
+	  | None -> false
+	  | Some kc -> Keys.equiv_keys kop kc
+
+(* let unify op cl = *)
+(*   let kop = Keys.constr_key op in *)
+(*   if keyed_unify env evd kop cl then *)
+(*   let f1, l1 = decompose_app_vect op in *)
+(*   let f2, l2 = decompose_app_vect cl in *)
+(*     Unification.w_unify ~flags env sigma CONV f1 f2w_typed_unify_array env evd flags f1 l1 f2 l2,cl *)
+(*   else w_typed_unify env evd CONV flags op cl,cl *)
+					      
 (* Matching/unifying the rewriting rule against [t] *)
 let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) by t =
   try
     let left = if l2r then c1 else c2 in
+    (* let () = Printf.printf "unify_eqn %s with %s\n" *)
+    (* 			   (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma left)) *)
+    (* 			   (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) *)
+    (* in *)
     let sigma = Unification.w_unify ~flags env sigma CONV left t in
     let sigma = Typeclasses.resolve_typeclasses ~filter:(no_constraints cstrs)
       ~fail:true env sigma in
@@ -898,7 +923,7 @@ let apply_rule unify loccs : int pure_strategy =
 	match unif with
 	| None -> (occ, Fail)
         | Some rew ->
-	  let occ = succ occ in
+	   let occ = succ occ in
 	    if not (is_occ occ) then (occ, Fail)
 	    else if Termops.eq_constr (fst rew.rew_evars) t rew.rew_to then (occ, Identity)
 	    else
@@ -907,19 +932,6 @@ let apply_rule unify loccs : int pure_strategy =
               (occ, res)
     }
 
-let apply_lemma l2r flags oc by loccs : strategy = { strategy =
-  fun ({ state = () ; env ; term1 = t ; evars = (sigma, cstrs) } as input) ->
-    let sigma, c = oc sigma in
-    let sigma, hypinfo = decompose_applied_relation env sigma c in
-    let { c1; c2; car; rel; prf; sort; holes } = hypinfo in
-    let rew = (car, rel, prf, c1, c2, holes, sort) in
-    let evars = (sigma, cstrs) in
-    let unify env evars t = unify_eqn rew l2r flags env evars by t in
-    let _, res = (apply_rule unify loccs).strategy { input with
-						     state = 0 ;
-						     evars } in
-    (), res
-						   }
 
 let e_app_poly env evars f args =
   let evars', c = app_poly_nocheck env !evars f args in
@@ -1427,7 +1439,7 @@ module Strategies =
       fix (fun s' -> seq (choice (progress (all_subterms s')) s) (try_ s'))
 
     let td (s : 'a pure_strategy) : 'a pure_strategy =
-      fix (fun s' -> seq (choice s (progress (all_subterms s'))) (try_ s'))
+      fix (fun s' -> seq (progress (choice s (all_subterms s'))) (try_ s'))
 
     let innermost (s : 'a pure_strategy) : 'a pure_strategy =
       fix (fun ins -> choice (one_subterm ins) s)
@@ -1435,9 +1447,9 @@ module Strategies =
     let outermost (s : 'a pure_strategy) : 'a pure_strategy =
       fix (fun out -> choice s (one_subterm out))
 
-    let lemmas cs : 'a pure_strategy =
+    let lemmas f cs : 'a pure_strategy =
       List.fold_left (fun tac (l,l2r,by) ->
-	choice tac (apply_lemma l2r rewrite_unif_flags l by AllOccurrences))
+	choice tac (f true l2r rewrite_unif_flags (fun env -> l) by AllOccurrences))
 	fail cs
 
     let inj_open hint = (); fun sigma ->
@@ -1445,20 +1457,20 @@ module Strategies =
       let sigma = Evd.merge_universe_context sigma ctx in
       (sigma, (EConstr.of_constr hint.Autorewrite.rew_lemma, NoBindings))
 
-    let old_hints (db : string) : 'a pure_strategy =
+    let old_hints f (db : string) : 'a pure_strategy =
       let rules = Autorewrite.find_rewrites db in
-	lemmas
+	lemmas f
 	  (List.map (fun hint -> (inj_open hint, hint.Autorewrite.rew_l2r,
 				  hint.Autorewrite.rew_tac)) rules)
 
-    let hints (db : string) : 'a pure_strategy = { strategy =
+    let hints f (db : string) : 'a pure_strategy = { strategy =
       fun ({ term1 = t } as input) ->
       let t = EConstr.Unsafe.to_constr t in
       let rules = Autorewrite.find_matches db t in
       let lemma hint = (inj_open hint, hint.Autorewrite.rew_l2r,
 			hint.Autorewrite.rew_tac) in
       let lems = List.map lemma rules in
-      (lemmas lems).strategy input
+      (lemmas f lems).strategy input
 						 }
 
     let reduce (r : Redexpr.red_expr) : 'a pure_strategy = { strategy =
@@ -1492,7 +1504,28 @@ module Strategies =
 	  with e when CErrors.noncritical e -> state, Fail
 					 }
 
+    let pattern_of_constr_pattern pat : 'a pure_strategy =
+      { strategy =
+	fun { state; env; term1 = t; ty1 = ty; evars } ->
+	try let _map = Constr_matching.matches env (fst evars) pat t in
+	    state, Identity
+	with Constr_matching.PatternMatchingFailure -> state, Fail }
 
+    let pattern_of_constr env sigma c : 'a pure_strategy =
+      let pat = Patternops.pattern_of_constr env sigma c in
+      { strategy =
+	fun { state; env; term1 = t; ty1 = ty; evars } ->
+	try let _map = Constr_matching.matches env (fst evars) pat t in
+	    (* let () = Printf.printf "pattern matched: %s and %s\n" *)
+	    (* 		     (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat)) *)
+	    (* 		     (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) in *)
+	    state, Identity
+	with Constr_matching.PatternMatchingFailure -> state, Fail }
+
+    let pattern p : 'a pure_strategy =
+      let sigma, env = Lemmas.get_current_context () in
+      let sigma, c = Pretyping.understand_tcc env sigma p in
+      pattern_of_constr env sigma c
 end
 
 (** The strategy for a single rewrite, dealing with occurrences. *)
@@ -1732,13 +1765,91 @@ let cl_rewrite_clause l left2right occs clause =
 let cl_rewrite_clause_strat strat clause =
   cl_rewrite_clause_strat false strat clause
 
-let apply_glob_constr c l2r occs = (); fun ({ state = () ; env = env } as input) ->
-  let c sigma =
+let apply_lemma_ai inferpat l2r flags oc by loccs : strategy = { strategy =
+  fun ({ state = () ; env ; term1 = t ; evars = (sigma, cstrs) } as input) ->
+    let sigma, c = oc env sigma in
+    let sigma, hypinfo = decompose_applied_relation env sigma c in
+    let { c1; c2; car; rel; prf; sort; holes } = hypinfo in
+    let rew = (car, rel, prf, c1, c2, holes, sort) in
+    let evars = (sigma, cstrs) in
+    let unify env evars t = unify_eqn rew l2r flags env evars by t in
+    let strat = apply_rule unify loccs in
+    let ipat =
+      if inferpat then
+        Strategies.pattern_of_constr env sigma (if l2r then c1 else c2)
+      else Strategies.id
+    in
+    let _, res = (Strategies.seq ipat strat).strategy { input with
+						      state = 0 ;
+						      evars }
+    in (), res  }
+
+let apply_lemma_aofi inferpat l2r flags oc by loccs : strategy =
+  let state = ref None in
+  let get_rew env sigma =
+    match !state with
+    | Some (r, pat) ->
+       sigma, r, pat
+    | None ->
+       let sigma, c = oc env sigma in
+       (* let () = Printf.printf "apply_lemma_aofi: %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma (fst c))) in *)
+       let sigma, hypinfo = decompose_applied_relation env sigma c in
+       let { c1; c2; car; rel; prf; sort; holes } = hypinfo in
+       let pat =
+	 if inferpat then
+	   let pat = Patternops.pattern_of_constr env sigma (if l2r then c1 else c2) in
+	   (* let () = Printf.printf "inferred pattern: %s\n" *)
+	   (* 			  (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat)) in *)
+	   Strategies.pattern_of_constr_pattern pat
+	 else Strategies.id
+       in
+       let rew = (car, rel, prf, c1, c2, holes, sort) in
+       sigma, rew, pat
+  in
+  { strategy =
+  fun ({ state = () ; env ; term1 = t ; evars = (sigma, cstrs) } as input) ->
+    let sigma, rew, pat = get_rew env sigma in
+    let evars = (sigma, cstrs) in
+    let unify env evars t =
+      match unify_eqn rew l2r flags env evars by t with
+      | Some info ->
+	 (match !state with
+	 | None ->
+	    let rel, prf = match info.rew_prf with
+	    | RewPrf (rel, prf) -> rel, prf
+	    | RewCast ck -> assert false
+	    | RewEq (p, pty, t, u, prf, rel, car) -> mkApp (rel, [| car |]), prf
+	    in
+	    let (_, _, _, _ , _, holes, sort) = rew in
+	    let from, to_ =
+	      if l2r then info.rew_from, info.rew_to
+	      else info.rew_to, info.rew_from
+	    in
+	    state := Some ((info.rew_car, rel, prf, from, to_, holes, sort), pat);
+	    Some info
+	 | Some r -> Some info)
+      | None -> None
+    in
+    let strat = apply_rule unify loccs in
+    let _, res = (Strategies.seq pat strat).strategy { input with
+						      state = 0 ;
+						      evars }
+    in (), res }
+
+let apply_lemma ai =
+  if ai then apply_lemma_ai else apply_lemma_aofi
+
+let apply_hint_lemma ai =
+  if ai then apply_lemma_ai false else apply_lemma_aofi false
+
+let apply_glob_constr c l2r ai inferpat occs =
+  let c env sigma =
     let (sigma, c) = Pretyping.understand_tcc env sigma c in
     (sigma, (c, NoBindings))
   in
   let flags = general_rewrite_unif_flags () in
-  (apply_lemma l2r flags c None occs).strategy input
+  let instrat = apply_lemma ai inferpat l2r flags c None occs in
+  instrat
 
 let interp_glob_constr_list env =
   let make c = (); fun sigma ->
@@ -1761,7 +1872,8 @@ type ('constr,'redexpr) strategy_ast =
   | StratUnary of unary_strategy * ('constr,'redexpr) strategy_ast
   | StratBinary of binary_strategy
     * ('constr,'redexpr) strategy_ast * ('constr,'redexpr) strategy_ast
-  | StratConstr of 'constr * bool
+  | StratConstr of 'constr * bool * bool * bool
+  | StratPattern of 'constr
   | StratTerms of 'constr list
   | StratHints of bool * string
   | StratEval of 'redexpr
@@ -1771,7 +1883,8 @@ let rec map_strategy (f : 'a -> 'a2) (g : 'b -> 'b2) : ('a,'b) strategy_ast -> (
   | StratId | StratFail | StratRefl as s -> s
   | StratUnary (s, str) -> StratUnary (s, map_strategy f g str)
   | StratBinary (s, str, str') -> StratBinary (s, map_strategy f g str, map_strategy f g str')
-  | StratConstr (c, b) -> StratConstr (f c, b)
+  | StratConstr (c, b, b', b'') -> StratConstr (f c, b, b', b'')
+  | StratPattern p -> StratPattern (f p)
   | StratTerms l -> StratTerms (List.map f l)
   | StratHints (b, id) -> StratHints (b, id)
   | StratEval r -> StratEval (g r)
@@ -1836,13 +1949,14 @@ let rec strategy_of_ast = function
       | Compose -> Strategies.seq
       | Choice -> Strategies.choice
     in f' s' t'
-  | StratConstr (c, b) -> { strategy = apply_glob_constr (fst c) b AllOccurrences }
-  | StratHints (old, id) -> if old then Strategies.old_hints id else Strategies.hints id
+  | StratConstr (c, b, b', b'') -> apply_glob_constr (fst c) b b' b'' AllOccurrences
+  | StratPattern p -> Strategies.pattern (fst p)
+  | StratHints (old, id) -> if old then Strategies.old_hints apply_hint_lemma id
+			    else Strategies.hints apply_hint_lemma id
   | StratTerms l -> { strategy =
     (fun ({ state = () ; env } as input) ->
      let l' = interp_glob_constr_list env (List.map fst l) in
-     (Strategies.lemmas l').strategy input)
-		    }
+     (Strategies.lemmas apply_hint_lemma l').strategy input) }
   | StratEval r -> { strategy =
     (fun ({ state = () ; env ; evars } as input) ->
      let (sigma,r_interp) = Tacinterp.interp_redexp env (goalevars evars) r in

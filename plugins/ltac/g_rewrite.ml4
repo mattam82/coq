@@ -56,6 +56,28 @@ ARGUMENT EXTEND glob_constr_with_bindings
    [ constr_with_bindings(bl) ] -> [ bl ]
 END
 
+open Genarg
+
+let pr_all_or_first _prc _prlc _prt = function
+  | false -> Pp.str "fi:"
+  | true -> Pp.str ""
+
+ARGUMENT EXTEND all_or_first TYPED AS bool PRINTED BY pr_all_or_first
+| [ "fi:" ] -> [ false ]
+| [ "ai:" ] -> [ true ]
+| [ ] -> [ true ]
+END
+
+let pr_infer_pat _prc _prlc _prt = function
+  | true -> Pp.str "ipat:"
+  | false -> Pp.str ""
+
+ARGUMENT EXTEND infer_pat TYPED AS bool PRINTED BY pr_infer_pat
+| [ "ipat:" ] -> [ true ]
+| [ ] -> [ false ]
+END
+
+
 type raw_strategy = (constr_expr, Tacexpr.raw_red_expr) strategy_ast
 type glob_strategy = (Tacexpr.glob_constr_and_expr, Tacexpr.raw_red_expr) strategy_ast
 
@@ -88,8 +110,8 @@ ARGUMENT EXTEND rewstrategy
     RAW_PRINTED BY pr_raw_strategy
     GLOB_PRINTED BY pr_glob_strategy
 
-    [ glob(c) ] -> [ StratConstr (c, true) ]
-  | [ "<-" constr(c) ] -> [ StratConstr (c, false) ]
+    [ orient(o) all_or_first(fi) infer_pat(ip) constr(c) ] ->
+						 [ StratConstr (c, o, fi, ip) ]
   | [ "subterms" rewstrategy(h) ] -> [ StratUnary (Subterms, h) ]
   | [ "subterm" rewstrategy(h) ] -> [ StratUnary (Subterm, h) ]
   | [ "innermost" rewstrategy(h) ] -> [ StratUnary(Innermost, h) ]
@@ -99,6 +121,7 @@ ARGUMENT EXTEND rewstrategy
   | [ "id" ] -> [ StratId ]
   | [ "fail" ] -> [ StratFail ]
   | [ "refl" ] -> [ StratRefl ]
+  | [ "pattern" constr_pattern(c) ] -> [ StratPattern (c) ]
   | [ "progress" rewstrategy(h) ] -> [ StratUnary (Progress, h) ]
   | [ "try" rewstrategy(h) ] -> [ StratUnary (Try, h) ]
   | [ "any" rewstrategy(h) ] -> [ StratUnary (Any, h) ]

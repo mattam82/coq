@@ -1,5 +1,91 @@
 Require Import RelationClasses Setoid. 
 
+
+(** Patterns *)
+Module Patterns.
+Require Import ZArith.
+
+Local Open Scope Z.
+Lemma addrC (x y : Z) : x + y = y + x.
+Proof. Admitted.
+
+Infix "a - b" := (a + -b) (at level 80).
+Lemma addNKr x y : x + (- x + y) = y.
+Proof. Admitted.
+
+Ltac rewstrat c :=
+  rewrite_strat topdown (fi:c).
+
+Lemma example1 a b c :
+  a + (b * c - a) + a = b * c + a.
+Proof.
+  rewrite_strat topdown fi:addrC.
+  change (a + (a + (b * c - a)) = b * c + a).
+  rewrite_strat topdown <- fi: addrC.
+  change (a + (b * c - a) + a = b * c + a).
+  rewrite_strat topdown (pattern (_ - a); fi:addrC).
+  change (a + (-a + b * c) + a = b * c + a).
+  now rewrite_strat topdown fi:addNKr.
+Qed.
+
+
+Require Import List Program.Basics.
+Lemma map_comp {A B C} (f : A -> B) (g : B -> C) (l : list A) : map (compose g f) l = map g (map f l).
+Proof. Admitted.
+
+Axiom iota : nat -> nat -> list nat.
+
+Definition graph (f : nat -> nat) n := map f (iota 0 n).
+
+Lemma example2 f g n : graph (compose f g) n = graph g (S n).
+Proof.
+  Fail rewrite map_comp.
+  rewrite_strat topdown (pattern (graph _ n); fi:map_comp).
+  change (map f (map g (iota 0 n)) = graph g (S n)).
+Admitted.
+
+Lemma example2' f g n : graph (compose f g) n = graph g (S n).
+Proof.
+  Fail rewrite map_comp.
+  rewrite_strat topdown fi:map_comp. (* No pattern, using full conversion *)
+  change (map f (map g (iota 0 n)) = graph g (S n)).
+Admitted.
+
+Close Scope Z.
+Local Open Scope nat.
+
+Lemma addnA n m p : n + (m + p) = (n + m) + p.
+Admitted.
+Require Import Arith.
+Lemma example3 n m : n + 2 * m = m + (m + n).
+Proof.
+  rewrite addnA. (* No conversion *)
+  Undo.
+  rewrite_strat topdown fi:addnA. (* With conversion, find n + (m + (m + 0)) *)
+  Undo.
+  rewrite_strat topdown fi:ipat:addnA. (* With pattern matching guard m + m + n *)
+  change (n + 2 * m = m + m + n).
+  now rewrite Nat.add_comm, !Nat.mul_succ_l.
+Qed.
+
+Import Nat.
+
+Fail Eval compute in pow 2 100.
+
+Lemma examplehuge x : pow 2 100 + x * (1 - 1) = 0.
+Proof.
+  rewrite <- mult_n_O. Undo.
+Set Keyed Unification.
+  rewrite <- mult_n_O.
+Undo.
+Fail Timeout 1 rewrite_strat topdown (<- fi:mult_n_O).
+rewrite_strat topdown (pattern (_ * _); <- fi:mult_n_O).
+(* With pattern matching guard (_ * _) *)
+change (Init.Nat.add (pow 2 100) 0 = 0).
+(* Fast due to inferred pattern guard *)
+rewrite_strat topdown (<- fi:ipat:plus_n_O).
+Admitted.
+
 Variable X : Set.
 
 Goal forall x y : nat, forall P : nat -> nat, x = y -> P x = P y.
@@ -98,6 +184,3 @@ Proof.
   Time rewrite_strat topdown (hints rew). (* 0.38 *)
   reflexivity.
 Time Qed. (* 0.06 s *)
-
-Set Printing All.
-Set Printing Depth 100000.

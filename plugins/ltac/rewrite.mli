@@ -31,7 +31,10 @@ type ('constr,'redexpr) strategy_ast =
   | StratUnary of unary_strategy * ('constr,'redexpr) strategy_ast
   | StratBinary of binary_strategy 
     * ('constr,'redexpr) strategy_ast * ('constr,'redexpr) strategy_ast
-  | StratConstr of 'constr * bool
+  | StratConstr of 'constr * bool (* direction *) * bool
+  (* all instances (true) or all occurrences of the first instance (false, rewrite like) *)
+		   * bool (* Infer pattern from left-hand-side *)
+  | StratPattern of 'constr
   | StratTerms of 'constr list
   | StratHints of bool * string
   | StratEval of 'redexpr 
