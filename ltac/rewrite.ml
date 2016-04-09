@@ -294,7 +294,7 @@ end) = struct
       match kind_of_term c with
       | App (f, [| a; b; relb |]) when Globnames.is_global (pointwise_relation_ref ()) f ->
 	decomp_pointwise (pred n) relb
-      | App (f, [| a; rela; b; relb |]) when Globnames.is_global (respectful_ref ()) f ->
+      | App (f, [| a; b; rela; relb |]) when Globnames.is_global (respectful_ref ()) f ->
 	decomp_pointwise (pred n) relb
       | App (f, [| a; b; arelb |]) when Globnames.is_global (forall_relation_ref ()) f ->
 	decomp_pointwise (pred n) (Reductionops.beta_applist (arelb, [mkRel 1]))
@@ -305,7 +305,7 @@ end) = struct
       (match kind_of_term rel with
       | App (f, [| a; b; relb |]) when Globnames.is_global (pointwise_relation_ref ()) f ->
 	apply_pointwise env evd relb (mkApp(prf, [| arg |])) args
-      | App (f, [| a; rela; b; relb |]) when Globnames.is_global (respectful_ref ()) f ->
+      | App (f, [| a; b; rela; relb |]) when Globnames.is_global (respectful_ref ()) f ->
 	 let evd, aprf = proper_proof env evd a rela arg in
 	 let prf' = mkApp (prf, [| arg; arg; aprf |]) in
 	 apply_pointwise env evd relb prf' args
@@ -342,7 +342,7 @@ end) = struct
 	    let b' = lift (-1) b in
 	    let evars, rty = start evars env ty None in
 	    let evars, rb = aux evars env b' (pred n) in
-	      app_poly env evars respectful [| ty; rty; b'; rb |]
+	      app_poly env evars respectful [| ty; b'; rty; rb |]
 	  else
 	    let evars, rb = aux evars (Environ.push_rel (LocalAssum (na, ty)) env) b (pred n) in
 	      app_poly env evars forall_relation
@@ -682,6 +682,9 @@ type rewrite_result_info = {
   rew_prf : rewrite_proof ;
   (** A proof of rew_from == rew_to *)
   rew_evars : evars;
+  (** The updated map of evars *)
+  rew_decls : Context.Named.t
+  (** A new set of declarations (for [set]) *)
 }
 
 type rewrite_result =
@@ -732,24 +735,27 @@ let is_eq_abs t =
 
 	 
 let keyed_unify env evd kop = 
-  if not (Unification.is_keyed_unification ()) then fun cl -> true
-  else 
-    match kop with 
-    | None -> fun _ -> true
-    | Some kop ->
-      fun cl ->
-	let kc = Keys.constr_key cl in
-	  match kc with
-	  | None -> false
-	  | Some kc -> Keys.equiv_keys kop kc
+  match kop with 
+  | None -> fun _ -> true
+  | Some kop ->
+     fun cl ->
+       let kc = Keys.constr_key cl in
+       match kc with
+       | None -> false
+       | Some kc -> Keys.equiv_keys kop kc
 
-(* let unify op cl = *)
-(*   let kop = Keys.constr_key op in *)
-(*   if keyed_unify env evd kop cl then *)
-(*   let f1, l1 = decompose_app_vect op in *)
-(*   let f2, l2 = decompose_app_vect cl in *)
-(*     Unification.w_unify ~flags env sigma CONV f1 f2w_typed_unify_array env evd flags f1 l1 f2 l2,cl *)
-(*   else w_typed_unify env evd CONV flags op cl,cl *)
+let unify flags env sigma l r =
+  let kop = Keys.constr_key l in
+  if Unification.is_keyed_unification () then
+    if keyed_unify env sigma kop r then
+      let f1, l1 = decompose_app_vect l in
+      let f2, l2 = decompose_app_vect r in
+      let f1, l1, f2, l2 = adjust_app_array_size f1 l1 f2 l2 in
+      let sigma = Unification.w_unify ~flags env sigma CONV f1 f2 in
+      Array.fold_left2 (fun sigma -> Unification.w_unify ~flags env sigma CONV) sigma l1 l2
+    else raise Reduction.NotConvertible
+  else
+    Unification.w_unify ~flags env sigma CONV l r
 					      
 (* Matching/unifying the rewriting rule against [t] *)
 let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) by t =
@@ -759,7 +765,7 @@ let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) 
     (* 			   (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma left)) *)
     (* 			   (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) *)
     (* in *)
-    let sigma = Unification.w_unify ~flags env sigma CONV left t in
+    let sigma = unify flags env sigma left t in
     let sigma = Typeclasses.resolve_typeclasses ~filter:(no_constraints cstrs)
       ~fail:true env sigma in
     let evd = solve_remaining_by env sigma holes by in
@@ -776,7 +782,7 @@ let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) 
       if is_global (Lazy.force Coqlib.coq_eq_ref) hd then
         RewEq (mkVar eq_abs_id, rew_car, c1, c2, prf, hd, List.hd args)
       else RewPrf (rel, prf) in
-    let rew = { rew_evars; rew_prf; rew_car; rew_from = c1; rew_to = c2; } in
+    let rew = { rew_evars; rew_prf; rew_car; rew_from = c1; rew_to = c2; rew_decls = []} in
     let rew = if l2r then rew else symmetry env sort rew in
     Some rew
   with
@@ -793,7 +799,7 @@ let unify_abs (car, rel, prf, c1, c2) l2r sort env (sigma, cstrs) t =
     let sigma = Unification.w_unify ~flags:rewrite_unif_flags env sigma CONV left t in
     let rew_evars = sigma, cstrs in
     let rew_prf = RewPrf (rel, prf) in
-    let rew = { rew_car = car; rew_from = c1; rew_to = c2; rew_prf; rew_evars; } in
+    let rew = { rew_car = car; rew_from = c1; rew_to = c2; rew_prf; rew_evars; rew_decls = [] } in
     let rew = if l2r then rew else symmetry env sort rew in
     Some rew
   with
@@ -840,7 +846,7 @@ let resolve_subrelation env avoid car rel sort prf rel' res =
 	rew_prf = RewPrf (rel', appsub);
 	rew_evars = evars }
 
-let resolve_morphism env avoid oldt m args args' (b,cstr) evars =
+let resolve_morphism env envprf avoid oldt m args args' (b,cstr) evars =
   let evars, morph_instance, proj, sigargs, m', args, args' =
     let first = match (Array.findi (fun _ b -> not (Option.is_empty b)) args') with
     | Some i -> i
@@ -888,7 +894,7 @@ let resolve_morphism env avoid oldt m args args' (b,cstr) evars =
 	      | None ->
 		  let evars, proof =
 		    (if b then PropGlobal.proper_proof else TypeGlobal.proper_proof)
-		      env evars carrier relation x in
+		      (Environ.push_rel_context (snd envprf) env) evars carrier relation x in
 		    [ proof ; x ; x ] @ acc, subst, evars, sigargs, x :: typeargs'
 	      | Some r ->
 		  [ snd (get_rew_prf r); r.rew_to; x ] @ acc, subst, evars,
@@ -935,6 +941,28 @@ let apply_rule unify loccs : int pure_strategy =
               (occ, res)
     }
 
+let set_rule unify n loccs : int pure_strategy =
+  let (nowhere_except_in,occs) = convert_occs loccs in
+  let is_occ occ =
+    if nowhere_except_in
+    then List.mem occ occs
+    else not (List.mem occ occs)
+  in
+  { strategy = fun { state = occ; env ; envprf ; unfresh ;
+		     term1 = t ; ty1 = ty ; cstr ; evars } ->
+      let unif =
+	if isEvar t then None else unify (push_rel_context (snd envprf) env) evars t in
+	match unif with
+	| None -> (occ, Fail)
+        | Some rew ->
+	   let occ = succ occ in
+	    if not (is_occ occ) then (occ, Fail)
+	    else
+              let decl = Context.Named.Declaration.LocalDef (n, rew.rew_from, ty) in
+	      let res = { rew with rew_car = ty; rew_to = mkVar n; rew_prf = RewCast DEFAULTcast;
+                                   rew_decls = [decl] } in
+              (occ, Success res)
+    }
 
 let e_app_poly env evars f args =
   let evars', c = app_poly_nocheck env !evars f args in
@@ -959,7 +987,8 @@ let make_leibniz_proof env c ty r =
        RewPrf (rel, prf)
   in
     { rew_car = ty; rew_evars = !evars;
-      rew_from = subst1 r.rew_from c; rew_to = subst1 r.rew_to c; rew_prf = prf }
+      rew_from = subst1 r.rew_from c; rew_to = subst1 r.rew_to c; rew_prf = prf;
+      rew_decls = []}
 
 let reset_env env =
   let env' = Global.env_of_context (Environ.named_context_val env) in
@@ -1031,18 +1060,18 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
     (* Printf.printf "subterm on %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context (snd envprf) env) (goalevars evars) t)); *)
     (* Printf.printf "rel_context: %s\n" (Pp.string_of_ppcmds (Printer.pr_rel_context env (goalevars evars) (snd envprf))); *)
     match kind_of_term t with
-    | Rel n -> 
-       if n <= List.length (snd envprf) then
-       let decl = Context.Rel.lookup (n - 2) (snd envprf) in
-       let relty =
-	 match kind_of_term (Context.Rel.Declaration.get_type decl) with
-	 | App (f, [| _; _ |] ) -> f
-	 | _ -> assert false
-       in
-       let prf = RewPrf (lift (n - 2) relty, mkRel (n - 2)) in
-       state, Success { rew_from = mkRel n; rew_to = mkRel (n - 1);
-			rew_prf = prf; rew_car = ty; rew_evars = evars }
-       else state, Fail
+    (* | Rel n ->  *)
+    (*    if n <= List.length (snd envprf) then *)
+    (*      let decl = Context.Rel.lookup (n - 2) (snd envprf) in *)
+    (*      let relty = *)
+    (*        match kind_of_term (Context.Rel.Declaration.get_type decl) with *)
+    (*        | App (f, [| _; _ |] ) -> f *)
+    (*        | _ -> assert false *)
+    (*      in *)
+    (*      let prf = RewPrf (lift (n - 2) relty, mkRel (n - 2)) in *)
+    (*      state, Success { rew_from = mkRel n; rew_to = mkRel (n - 1); *)
+    (*     		  rew_prf = prf; rew_car = ty; rew_evars = evars } *)
+    (*    else state, Fail *)
 	    
     | App (m, args) ->
 	  let rewrite_args state success =
@@ -1097,14 +1126,14 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 		  | None -> Identity
 		  | Some (RewPrf _) ->
 		     let evars', prf, car, rel, c1, c2 =
-		       resolve_morphism env unfresh t m args args' (prop, cstr') evars'
+		       resolve_morphism env envprf unfresh t m args args' (prop, cstr') evars'
 		     in       
 		     (* Printf.printf "app: %s c1: %s\n" *)
 		     (* 		   (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context (snd envprf) env) (goalevars evars) (mkApp (m, args)))) *)
 		     (* 		   (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context (snd envprf) env) (goalevars evars) c1)); *)
 		     let res = { rew_car = ty; rew_from = c1;
 				 rew_to = c2; rew_prf = RewPrf (rel, prf);
-				 rew_evars = evars' }
+				 rew_evars = evars'; rew_decls = [] }
 		     in Success res
 		  | Some r ->
 		     let args'' = Array.map2
@@ -1134,7 +1163,7 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 		    in
 		    let res = { rew_car = ty; rew_from = t;
 				rew_to = mkApp (m, args''); rew_prf;
-				rew_evars = evars' }
+				rew_evars = evars'; rew_decls = [] }
 		    in Success res)
 	    in state, res
 	  in
@@ -1169,7 +1198,7 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 		    let res =
 		      { rew_car = Reductionops.hnf_prod_appvect env (goalevars evars) r.rew_car args;
 			rew_from = mkApp(r.rew_from, args); rew_to = mkApp(r.rew_to, args);
-			rew_prf = prf; rew_evars = evars }
+			rew_prf = prf; rew_evars = evars; rew_decls = [] }
 		    in
 		    let res =
 		      match prf with
@@ -1243,63 +1272,93 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
       (* 	    | _ -> b') *)
 
       | Lambda (n, t, b) when flags.under_lambdas ->
-         let n' = name_app (fun id -> Tactics.fresh_id_in_env unfresh id env) n in
-	 let unfresh = try out_name n' :: unfresh with _ -> unfresh in
-         let n'' = name_app (fun id -> Tactics.fresh_id_in_env unfresh id env) n in
-	 let unfresh = try out_name n'' :: unfresh with _ -> unfresh in
-         let open Context.Rel.Declaration in
-	 let rel, relprf = envprf in
-	 let rel' = LocalAssum (n', t) :: rel in
-	 let relctx = [LocalAssum (n'', lift 1 t); LocalAssum (n', t)] in
-	 let evars, relt = new_relation_evar prop env evars t in
-	 let relty = mkApp (relt, [|mkRel 2; mkRel 1|]) in
-	 let relname = Name (Id.of_string "R") in
-	 let relctx = LocalAssum (relname, relty) :: relctx in
-	 let relprf' = relctx @ relprf in
-	 let envprf' = rel', relprf' in
-	 let b = lift 2 b in
-	 let bty = get_type_of env envprf' evars b in
-	 let unlift = if prop then PropGlobal.unlift_cstr else TypeGlobal.unlift_cstr in
-	 let state, b' = s.strategy { state ; env ; envprf = envprf'; unfresh ;
-				      term1 = b ; ty1 = bty ;
-				      cstr = (prop, unlift env evars cstr) ;
-				      evars } in
-	 let res =
-	  match b' with
-	  | Success r ->
-	     let r = match r.rew_prf with
-	     | RewPrf _
-	     | RewEq _ ->
-		let (rel, prf) = get_rew_prf r in
-		let is_pointwise = noccurn 1 prf in
-		let evars =
-		  if is_pointwise then
-		    let ev = destEvar relt in
-		    (Evd.remove (goalevars r.rew_evars) (fst ev),
-		     Evar.Set.remove (fst ev) (cstrevars r.rew_evars))
-		  else r.rew_evars
-		in
-		let point =
-		  if prop then PropGlobal.pointwise_or_dep_relation is_pointwise
-		  else TypeGlobal.pointwise_or_dep_relation is_pointwise
-		in
-		let evars, rel = point env evars n' t relt r.rew_car rel in
-		let prf = if is_pointwise then mkLambda (n, t, substl [mkProp; mkProp] prf)
-			  else it_mkLambda_or_LetIn prf relctx
-		in
-		{ r with rew_prf = RewPrf (rel, prf); rew_evars = evars }
-	      | x -> r
-	     in
-	     (* Printf.printf "rel_context: %s\n" (Pp.string_of_ppcmds (Printer.pr_rel_context env (goalevars evars) relprf')); *)
+        let n' = name_app (fun id -> Tactics.fresh_id_in_env unfresh id env) n in
+        let open Context.Rel.Declaration in
+	let env' = Environ.push_rel (LocalAssum (n', t)) env in
+	let bty = Retyping.get_type_of env' (goalevars evars) b in
+	let unlift = if prop then PropGlobal.unlift_cstr else TypeGlobal.unlift_cstr in
+	let state, b' = s.strategy { state ; env = env' ; envprf; unfresh ;
+				     term1 = b ; ty1 = bty ;
+				     cstr = (prop, unlift env evars cstr) ;
+				     evars } in
+        let res = 	  match b' with
+ 	  | Success r ->
+ 	     let r = match r.rew_prf with
+ 	     | RewPrf _
+ 	     | RewEq _ ->
+ 		let (rel, prf) = get_rew_prf r in
+		let point = if prop then PropGlobal.pointwise_or_dep_relation true else
+		    TypeGlobal.pointwise_or_dep_relation true
+ 		in
+		let evars, rel = point env r.rew_evars n' t rel(*FIXME*) r.rew_car rel in
+		let prf = mkLambda (n', t, prf) in
+		  { r with rew_prf = RewPrf (rel, prf); rew_evars = evars }
+ 	      | x -> r
+	    in
+ 	      Success { r with
+ 		rew_car = mkProd (n, t, r.rew_car);
+		rew_from = mkLambda(n, t, r.rew_from);
+		rew_to = mkLambda (n, t, r.rew_to) }
+ 	  | Fail | Identity -> b'
+ 	in state, res
+                                
+        (*  let n' = name_app (fun id -> Tactics.fresh_id_in_env unfresh id env) n in *)
+	(*  let unfresh = try out_name n' :: unfresh with _ -> unfresh in *)
+        (*  let n'' = name_app (fun id -> Tactics.fresh_id_in_env unfresh id env) n in *)
+	(*  let unfresh = try out_name n'' :: unfresh with _ -> unfresh in *)
+        (*  let open Context.Rel.Declaration in *)
+	(*  let rel, relprf = envprf in *)
+	(*  let rel' = LocalAssum (n', t) :: rel in *)
+	(*  let relctx = [LocalAssum (n'', lift 1 t); LocalAssum (n', t)] in *)
+	(*  let evars, relt = new_relation_evar prop env evars t in *)
+	(*  let relty = mkApp (relt, [|mkRel 2; mkRel 1|]) in *)
+	(*  let relname = Name (Id.of_string "R") in *)
+	(*  let relctx = LocalAssum (relname, relty) :: relctx in *)
+	(*  let relprf' = relctx @ relprf in *)
+	(*  let envprf' = rel', relprf' in *)
+	(*  let b = lift 2 b in *)
+	(*  let bty = get_type_of env envprf' evars b in *)
+	(*  let unlift = if prop then PropGlobal.unlift_cstr else TypeGlobal.unlift_cstr in *)
+	(*  let state, b' = s.strategy { state ; env ; envprf = envprf'; unfresh ; *)
+	(* 			      term1 = b ; ty1 = bty ; *)
+	(* 			      cstr = (prop, unlift env evars cstr) ; *)
+	(* 			      evars } in *)
+	(*  let res = *)
+	(*   match b' with *)
+	(*   | Success r -> *)
+	(*      let r = match r.rew_prf with *)
+	(*      | RewPrf _ *)
+	(*      | RewEq _ -> *)
+	(* 	let (rel, prf) = get_rew_prf r in *)
+	(* 	let is_pointwise = noccurn 1 prf in *)
+	(* 	let evars = *)
+	(* 	  if is_pointwise then *)
+	(* 	    let ev = destEvar relt in *)
+	(* 	    (Evd.remove (goalevars r.rew_evars) (fst ev), *)
+	(* 	     Evar.Set.remove (fst ev) (cstrevars r.rew_evars)) *)
+	(* 	  else r.rew_evars *)
+	(* 	in *)
+	(* 	let point = *)
+	(* 	  if prop then PropGlobal.pointwise_or_dep_relation is_pointwise *)
+	(* 	  else TypeGlobal.pointwise_or_dep_relation is_pointwise *)
+	(* 	in *)
+	(* 	let evars, rel = point env evars n' t relt r.rew_car rel in *)
+	(* 	let prf = if is_pointwise then mkLambda (n, t, substl [mkProp; mkProp] prf) *)
+	(* 		  else it_mkLambda_or_LetIn prf relctx *)
+	(* 	in *)
+	(* 	{ r with rew_prf = RewPrf (rel, prf); rew_evars = evars } *)
+	(*       | x -> r *)
+	(*      in *)
+	(*      (\* Printf.printf "rel_context: %s\n" (Pp.string_of_ppcmds (Printer.pr_rel_context env (goalevars evars) relprf')); *\) *)
 
-	     (* Printf.printf "rew_from: %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context relprf' env) (goalevars evars) r.rew_from)); *)
-	     (* Printf.printf "rew_to: %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context relprf' env) (goalevars evars) r.rew_to)); *)
-	      Success { r with
-		rew_car = mkProd (n, t, r.rew_car);
-		rew_from = mkLambda(n, t, substl [mkRel 1; mkRel 1] r.rew_from);
-		rew_to = mkLambda (n, t, substl [mkRel 1; mkRel 1] r.rew_to) }
-	  | Fail | Identity -> b'
-	in state, res
+	(*      (\* Printf.printf "rew_from: %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context relprf' env) (goalevars evars) r.rew_from)); *\) *)
+	(*      (\* Printf.printf "rew_to: %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context relprf' env) (goalevars evars) r.rew_to)); *\) *)
+	(*       Success { r with *)
+	(* 	rew_car = mkProd (n, t, r.rew_car); *)
+	(* 	rew_from = mkLambda(n, t, substl [mkRel 1; mkRel 1] r.rew_from); *)
+	(* 	rew_to = mkLambda (n, t, substl [mkRel 1; mkRel 1] r.rew_to) } *)
+	(*   | Fail | Identity -> b' *)
+	(* in state, res *)
 
       | Case (ci, p, c, brs) ->
 	let cty = get_type_of env envprf evars c in
@@ -1445,7 +1504,8 @@ module Strategies =
 	    new_cstr_evar evars env mty
 	in
 	let res = Success { rew_car = ty; rew_from = t; rew_to = t;
-			       rew_prf = RewPrf (rel, proof); rew_evars = evars }
+			    rew_prf = RewPrf (rel, proof); rew_evars = evars;
+                            rew_decls = []}
 	in state, res
       }
 
@@ -1495,7 +1555,7 @@ module Strategies =
       fix (fun s' -> seq (choice (progress (all_subterms s')) s) (try_ s'))
 
     let td (s : 'a pure_strategy) : 'a pure_strategy =
-      fix (fun s' -> seq (progress (choice s (all_subterms s'))) (try_ s'))
+      fix (fun s' -> seq (choice s (progress (all_subterms s'))) (try_ s'))
 
     let innermost (s : 'a pure_strategy) : 'a pure_strategy =
       fix (fun ins -> choice (one_subterm ins) s)
@@ -1503,6 +1563,9 @@ module Strategies =
     let outermost (s : 'a pure_strategy) : 'a pure_strategy =
       fix (fun out -> choice s (one_subterm out))
 
+    let inorder (s : 'a pure_strategy) : 'a pure_strategy =
+      fix (fun ord -> choice s (all_subterms (try_ ord)))
+          
     let lemmas f cs : 'a pure_strategy =
       List.fold_left (fun tac (l,l2r,by) ->
 	choice tac (f true l2r rewrite_unif_flags (fun env -> l) by AllOccurrences))
@@ -1539,8 +1602,8 @@ module Strategies =
 	    else
 	      state, Success { rew_car = ty; rew_from = t; rew_to = t';
 			       rew_prf = RewCast ckind;
-			       rew_evars = evars', cstrevars evars }
-							   }
+			       rew_evars = evars', cstrevars evars;
+                               rew_decls = []} }
 
     let fold_glob c : 'a pure_strategy = { strategy =
       fun { state ; env ; term1 = t ; ty1 = ty ; cstr ; evars } ->
@@ -1555,28 +1618,40 @@ module Strategies =
 	    let sigma = Unification.w_unify env sigma CONV ~flags:(Unification.elim_flags ()) unfolded t in
 	    let c' = Evarutil.nf_evar sigma c in
 	      state, Success { rew_car = ty; rew_from = t; rew_to = c';
-				  rew_prf = RewCast DEFAULTcast;
-				  rew_evars = (sigma, snd evars) }
+			       rew_prf = RewCast DEFAULTcast;
+			       rew_evars = (sigma, snd evars);
+                               rew_decls = []}
 	  with e when Errors.noncritical e -> state, Fail
 					 }
-
-    let pattern_of_constr_pattern pat : 'a pure_strategy =
+                                          
+    let pattern_of_constr_pattern pat hd : 'a pure_strategy =
       { strategy =
 	fun { state; env; term1 = t; ty1 = ty; evars } ->
+        let sigma = fst evars in
+        let () = Printf.printf "pattern matching: %s and %s\n"
+	    		     (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat))
+	    		     (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) in
 	try let _map = Constr_matching.matches env (fst evars) pat t in
 	    state, Identity
-	with Constr_matching.PatternMatchingFailure -> state, Fail }
+	with Constr_matching.PatternMatchingFailure ->
+          try (* Check for canonical structure solution *)
+            match hd with
+            | None -> state, Fail
+            | Some gr ->
+               let cspat, _, _ = Recordops.cs_pattern_of_constr t in
+               let _ = Recordops.lookup_canonical_conversion (gr, cspat) in
+               state, Identity
+          with Not_found -> state, Fail }
 
     let pattern_of_constr env sigma c : 'a pure_strategy =
       let pat = Patternops.pattern_of_constr env sigma c in
-      { strategy =
-	fun { state; env; term1 = t; ty1 = ty; evars } ->
-	try let _map = Constr_matching.matches env (fst evars) pat t in
-	    (* let () = Printf.printf "pattern matched: %s and %s\n" *)
-	    (* 		     (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat)) *)
-	    (* 		     (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) in *)
-	    state, Identity
-	with Constr_matching.PatternMatchingFailure -> state, Fail }
+      let globhead =
+        try
+          let gr = global_of_constr (fst (destApp c)) in
+          let _ = Recordops.find_projection gr in
+          Some gr
+        with Not_found -> None
+      in pattern_of_constr_pattern pat globhead
 
     let pattern p : 'a pure_strategy =
       let sigma, env = Lemmas.get_current_context () in
@@ -1850,10 +1925,8 @@ let apply_lemma_aofi inferpat l2r flags oc by loccs : strategy =
        let { c1; c2; car; rel; prf; sort; holes } = hypinfo in
        let pat =
 	 if inferpat then
-	   let pat = Patternops.pattern_of_constr env sigma (if l2r then c1 else c2) in
-	   (* let () = Printf.printf "inferred pattern: %s\n" *)
-	   (* 			  (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat)) in *)
-	   Strategies.pattern_of_constr_pattern pat
+           let term = if l2r then c1 else c2 in
+	   Strategies.pattern_of_constr env sigma term
 	 else Strategies.id
        in
        let rew = (car, rel, prf, c1, c2, holes, sort) in
@@ -1895,16 +1968,24 @@ let apply_lemma ai =
 let apply_hint_lemma ai =
   if ai then apply_lemma_ai false else apply_lemma_aofi false
 
-let apply_glob_constr c l2r ai inferpat occs =
+let apply_glob_constr is c l2r ai inferpat occs =
   let c env sigma =
-    let (sigma, c) = Pretyping.understand_tcc env sigma c in
-    (sigma, (c, NoBindings))
+    Tacinterp.interp_open_constr_with_bindings is env sigma c
   in
   let flags = general_rewrite_unif_flags () in
   let instrat = apply_lemma ai inferpat l2r flags c None occs in
   instrat
 
-let interp_glob_constr_list env =
+let set_glob_constr is n c occs =
+  let c env sigma =
+    Tacinterp.interp_open_constr_with_bindings is env sigma c
+  in
+  let flags = general_rewrite_unif_flags () in
+  (* TODO *)
+  let instrat = apply_lemma true true true flags c None occs in
+  instrat
+    
+let interp_glob_constr_list is env =
   let make c = (); fun sigma ->
     let sigma, c = Pretyping.understand_tcc env sigma c in
     (sigma, (c, NoBindings))
@@ -1914,7 +1995,7 @@ let interp_glob_constr_list env =
 (* Syntax for rewriting with strategies *)
 
 type unary_strategy =
-    Subterms | Subterm | Innermost | Outermost
+    Subterms | Subterm | Innermost | Outermost | InOrder
   | Bottomup | Topdown | Progress | Try | Many | Repeat
 
 type binary_strategy =
@@ -1928,6 +2009,7 @@ type ('constr,'redexpr) strategy_ast =
   | StratConstr of 'constr * bool * bool * bool
   | StratPattern of 'constr
   | StratTerms of 'constr list
+  | StratSet of Id.t * 'constr
   | StratHints of bool * string
   | StratEval of 'redexpr
   | StratFold of 'constr
@@ -1939,16 +2021,17 @@ let rec map_strategy (f : 'a -> 'a2) (g : 'b -> 'b2) : ('a,'b) strategy_ast -> (
   | StratConstr (c, b, b', b'') -> StratConstr (f c, b, b', b'')
   | StratPattern p -> StratPattern (f p)
   | StratTerms l -> StratTerms (List.map f l)
+  | StratSet (id, c) -> StratSet (id, f c)
   | StratHints (b, id) -> StratHints (b, id)
   | StratEval r -> StratEval (g r)
   | StratFold c -> StratFold (f c)
 
-let rec strategy_of_ast = function
+let rec strategy_of_ast is = function
   | StratId -> Strategies.id
   | StratFail -> Strategies.fail
   | StratRefl -> Strategies.refl
   | StratUnary (f, s) ->
-    let s' = strategy_of_ast s in
+    let s' = strategy_of_ast is s in
     let f' = match f with
       | Subterms -> all_subterms
       | Subterm -> one_subterm
@@ -1956,32 +2039,35 @@ let rec strategy_of_ast = function
       | Outermost -> Strategies.outermost
       | Bottomup -> Strategies.bu
       | Topdown -> Strategies.td
+      | InOrder -> Strategies.inorder
       | Progress -> Strategies.progress
       | Try -> Strategies.try_
       | Many -> Strategies.many
       | Repeat -> Strategies.repeat
     in f' s'
   | StratBinary (f, s, t) ->
-    let s' = strategy_of_ast s in
-    let t' = strategy_of_ast t in
+    let s' = strategy_of_ast is s in
+    let t' = strategy_of_ast is t in
     let f' = match f with
       | Compose -> Strategies.seq
       | Choice -> Strategies.choice
     in f' s' t'
-  | StratConstr (c, b, b', b'') -> apply_glob_constr (fst c) b b' b'' AllOccurrences
-  | StratPattern p -> Strategies.pattern (fst p)
+  | StratConstr (c, b, b', b'') ->
+     apply_glob_constr is c b b' b'' AllOccurrences
+  | StratPattern p -> Strategies.pattern (fst (fst p))
+  | StratSet (id, p) -> set_glob_constr is id p AllOccurrences
   | StratHints (old, id) -> if old then Strategies.old_hints apply_hint_lemma id
 			    else Strategies.hints apply_hint_lemma id
   | StratTerms l -> { strategy =
     (fun ({ state = () ; env } as input) ->
-     let l' = interp_glob_constr_list env (List.map fst l) in
+     let l' = interp_glob_constr_list is env (List.map (fun x -> fst (fst x)) l) in
      (Strategies.lemmas apply_hint_lemma l').strategy input) }
   | StratEval r -> { strategy =
     (fun ({ state = () ; env ; evars } as input) ->
      let (sigma,r_interp) = Tacinterp.interp_redexp env (goalevars evars) r in
      (Strategies.reduce r_interp).strategy { input with
 					     evars = (sigma,cstrevars evars) }) }
-  | StratFold c -> Strategies.fold_glob (fst c)
+  | StratFold c -> Strategies.fold_glob (fst (fst c))
 
 
 (* By default the strategy for "rewrite_db" is top-down *)

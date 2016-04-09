@@ -75,13 +75,14 @@ ARGUMENT EXTEND infer_pat TYPED AS bool PRINTED BY pr_infer_pat
 END
 
 
-type raw_strategy = (constr_expr, Tacexpr.raw_red_expr) strategy_ast
-type glob_strategy = (Tacexpr.glob_constr_and_expr, Tacexpr.raw_red_expr) strategy_ast
+type raw_strategy = (constr_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
+type glob_strategy = (Tacexpr.glob_constr_and_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
 
 let interp_strategy ist gl s = 
   let sigma = project gl in
-    sigma, strategy_of_ast s
-let glob_strategy ist s = map_strategy (Tacintern.intern_constr ist) (fun c -> c) s
+    sigma, strategy_of_ast ist s
+let glob_strategy ist s = map_strategy (Tacintern.intern_constr_with_bindings ist)
+                                       (fun c -> c) s
 let subst_strategy s str = str
 
 let pr_strategy _ _ _ (s : strategy) = Pp.str "<strategy>"
@@ -98,7 +99,7 @@ ARGUMENT EXTEND rewstrategy
     RAW_PRINTED BY pr_raw_strategy
     GLOB_PRINTED BY pr_glob_strategy
 
-    [ orient(o) all_or_first(fi) infer_pat(ip) constr(c) ] ->
+    [ orient(o) all_or_first(fi) infer_pat(ip) glob_constr_with_bindings(c) ] ->
 						 [ StratConstr (c, o, fi, ip) ]
   | [ "subterms" rewstrategy(h) ] -> [ StratUnary (Subterms, h) ]
   | [ "subterm" rewstrategy(h) ] -> [ StratUnary (Subterm, h) ]
@@ -106,10 +107,12 @@ ARGUMENT EXTEND rewstrategy
   | [ "outermost" rewstrategy(h) ] -> [ StratUnary(Outermost, h) ]
   | [ "bottomup" rewstrategy(h) ] -> [ StratUnary(Bottomup, h) ]
   | [ "topdown" rewstrategy(h) ] -> [ StratUnary(Topdown, h) ]
+  | [ "inorder" rewstrategy(h) ] -> [ StratUnary(InOrder, h) ]
   | [ "id" ] -> [ StratId ]
   | [ "fail" ] -> [ StratFail ]
   | [ "refl" ] -> [ StratRefl ]
-  | [ "pattern" constr_pattern(c) ] -> [ StratPattern (c) ]
+  | [ "set" ident(id) glob_constr_with_bindings(c) ] -> [ StratSet (id, c) ]
+  | [ "pattern" glob_constr_with_bindings(c) ] -> [ StratPattern (c) ]
   | [ "progress" rewstrategy(h) ] -> [ StratUnary (Progress, h) ]
   | [ "try" rewstrategy(h) ] -> [ StratUnary (Try, h) ]
   | [ "many" rewstrategy(h) ] -> [ StratUnary (Many, h) ]
@@ -119,15 +122,17 @@ ARGUMENT EXTEND rewstrategy
   | [ "choice" rewstrategy(h) rewstrategy(h') ] -> [ StratBinary (Choice, h, h') ]
   | [ "old_hints" preident(h) ] -> [ StratHints (true, h) ]
   | [ "hints" preident(h) ] -> [ StratHints (false, h) ]
-  | [ "terms" constr_list(h) ] -> [ StratTerms h ]
+  | [ "terms" glob_constr_with_bindings_list(h) ] -> [ StratTerms h ]
   | [ "eval" red_expr(r) ] -> [ StratEval r ]
-  | [ "fold" constr(c) ] -> [ StratFold c ]
+  | [ "fold" glob_constr_with_bindings(c) ] -> [ StratFold c ]
 END
 
 (* By default the strategy for "rewrite_db" is top-down *)
 
 let db_strat db = StratUnary (Topdown, StratHints (false, db))
-let cl_rewrite_clause_db db = cl_rewrite_clause_strat (strategy_of_ast (db_strat db))
+let cl_rewrite_clause_db db =
+  cl_rewrite_clause_strat
+    (strategy_of_ast (Tacinterp.default_ist ()) (db_strat db))
 
 let cl_rewrite_clause_db = 
   if Flags.profile then
