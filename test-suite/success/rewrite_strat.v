@@ -13,19 +13,19 @@ Infix "a - b" := (a + -b) (at level 80).
 Lemma addNKr x y : x + (- x + y) = y.
 Proof. Admitted.
 
-Ltac rewstrat c :=
-  rewrite_strat topdown (fi:c).
+Ltac rew c :=
+  rewrite_strat inorder (fi:ipat:c).
 
 Lemma example1 a b c :
   a + (b * c - a) + a = b * c + a.
 Proof.
-  rewrite_strat topdown fi:addrC.
+  rewrite_strat inorder fi:addrC.
   change (a + (a + (b * c - a)) = b * c + a).
-  rewrite_strat topdown <- fi: addrC.
+  rewrite_strat inorder <- fi: addrC.
   change (a + (b * c - a) + a = b * c + a).
-  rewrite_strat topdown (pattern (_ - a); fi:addrC).
+  rewrite_strat inorder (pattern (_ - a); fi:addrC).
   change (a + (-a + b * c) + a = b * c + a).
-  now rewrite_strat topdown fi:addNKr.
+  now rew addNKr.
 Qed.
 
 
@@ -40,37 +40,73 @@ Definition graph (f : nat -> nat) n := map f (iota 0 n).
 Lemma example2 f g n : graph (compose f g) n = graph g (S n).
 Proof.
   Fail rewrite map_comp.
-  rewrite_strat topdown (pattern (graph _ n); fi:map_comp).
+  Time rewrite_strat inorder (pattern (graph _ n); fi:map_comp). (* 0.006 *)
   change (map f (map g (iota 0 n)) = graph g (S n)).
 Admitted.
 
 Lemma example2' f g n : graph (compose f g) n = graph g (S n).
 Proof.
   Fail rewrite map_comp.
-  rewrite_strat topdown fi:map_comp. (* No pattern, using full conversion *)
+  Time rewrite_strat topdown fi:map_comp. (* 0.026 No pattern, using full conversion *)
+  Undo.
+  Time rewrite_strat inorder fi:map_comp. (* 0.012 No pattern, using full conversion *)
   change (map f (map g (iota 0 n)) = graph g (S n)).
 Admitted.
 
-Close Scope Z.
+(* Close Scope Z. *)
 Local Open Scope nat.
 
 Lemma addnA n m p : n + (m + p) = (n + m) + p.
 Admitted.
 Require Import Arith.
+
 Lemma example3 n m : n + 2 * m = m + (m + n).
 Proof.
   rewrite addnA. (* No conversion *)
   Undo.
-  rewrite_strat topdown fi:addnA. (* With conversion, find n + (m + (m + 0)) *)
+  Time rewrite_strat topdown fi:addnA. (* 0.029 With conversion, find n + (m + (m + 0)) *)
   Undo.
-  rewrite_strat topdown fi:ipat:addnA. (* With pattern matching guard m + m + n *)
+  Time rewrite_strat inorder fi:addnA. (* 0.009 With conversion, find n + (m + (m + 0)) *)
+  Undo.
+  Time rewrite_strat inorder fi:ipat:addnA. (* 0.008 With pattern matching guard m + m + n *)
   change (n + 2 * m = m + m + n).
   now rewrite Nat.add_comm, !Nat.mul_succ_l.
 Qed.
 
 Import Nat.
 
-Fail Eval compute in pow 2 100.
+Example allinsts m : 1 + m = 1 + (0 + m).
+Proof.
+  Time rew add_1_l.
+  easy.
+Defined.
+
+Structure Monoid :=
+  { A : Type;
+    monop : A -> A -> A; mon_unit : A; monunitl : forall x, monop mon_unit x = x }.
+
+Canonical Structure monoid_nat : Monoid :=
+  {| monop := add; mon_unit := 0; monunitl := add_0_l |}.
+
+Lemma montest n : 0 + n = n.
+Proof.
+  (* Fail rewrite monunitl. *)
+  rewrite_strat inorder (fi:ipat:monunitl).
+  easy.
+Qed.
+
+(* Should it work in a two-way fashion? 
+  Currently only when no patterns are given.
+*)
+Lemma montest' (n : nat) : monop _ (mon_unit _) n = n.
+Proof.
+  (* Fail rewrite monunitl. *)
+  rewrite_strat inorder (fi:add_0_l).
+  easy.
+Qed.
+
+
+(* Fail Eval compute in pow 2 100. *)
 
 Lemma examplehuge x : pow 2 100 + x * (1 - 1) = 0.
 Proof.
@@ -78,12 +114,14 @@ Proof.
 Set Keyed Unification.
   rewrite <- mult_n_O.
 Undo.
-Fail Timeout 1 rewrite_strat topdown (<- fi:mult_n_O).
-rewrite_strat topdown (pattern (_ * _); <- fi:mult_n_O).
-(* With pattern matching guard (_ * _) *)
+Fail Timeout 1 rewrite_strat inorder (<- fi:mult_n_O).
+Time rewrite_strat topdown (pattern (_ * _); <- fi:mult_n_O). (* 0.08 *)
+Undo.
+Time rewrite_strat inorder (pattern (_ * _); <- fi:mult_n_O).
+(* 0.033 With pattern matching guard (_ * _) *)
 change (Init.Nat.add (pow 2 100) 0 = 0).
 (* Fast due to inferred pattern guard *)
-rewrite_strat topdown (<- fi:ipat:plus_n_O).
+rewrite_strat inorder (<- fi:ipat:plus_n_O).
 Admitted.
 
 Variable X : Set.
@@ -181,6 +219,6 @@ Qed.
 Goal forall x, h 10 x = f x.
 Proof. 
   intros.
-  Time rewrite_strat topdown (hints rew). (* 0.38 *)
+  Time rewrite_strat topdown (hints rew). (* 0.38 *) 
   reflexivity.
 Time Qed. (* 0.06 s *)

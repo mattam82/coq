@@ -20,7 +20,7 @@ open Tacinterp
 (** TODO: document and clean me! *)
 
 type unary_strategy = 
-    Subterms | Subterm | Innermost | Outermost
+    Subterms | Subterm | Innermost | Outermost | InOrder
   | Bottomup | Topdown | Progress | Try | Many | Repeat
 
 type binary_strategy = 
@@ -36,6 +36,7 @@ type ('constr,'redexpr) strategy_ast =
 		   * bool (* Infer pattern from left-hand-side *)
   | StratPattern of 'constr
   | StratTerms of 'constr list
+  | StratSet of Id.t * 'constr
   | StratHints of bool * string
   | StratEval of 'redexpr 
   | StratFold of 'constr
@@ -58,6 +59,7 @@ type rewrite_result_info = {
   rew_to : constr;
   rew_prf : rewrite_proof;
   rew_evars : evars;
+  rew_decls : Context.Named.t
 }
 
 type rewrite_result =
@@ -67,7 +69,8 @@ type rewrite_result =
 
 type strategy
 
-val strategy_of_ast : (glob_constr_and_expr, raw_red_expr) strategy_ast -> strategy
+val strategy_of_ast : interp_sign ->
+                      (glob_constr_and_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast -> strategy
 
 val map_strategy : ('a -> 'b) -> ('c -> 'd) ->
   ('a, 'c) strategy_ast -> ('b, 'd) strategy_ast
