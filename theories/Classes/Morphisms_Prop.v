@@ -15,7 +15,7 @@
 Require Import Coq.Classes.Morphisms.
 Require Import Coq.Program.Basics.
 Require Import Coq.Program.Tactics.
-
+Require Import Relation_Definitions.
 Local Obligation Tactic := try solve [simpl_relation | firstorder auto].
 
 (** Standard instances for [not], [iff] and [impl]. *)
@@ -65,7 +65,7 @@ Proof.
   split. intros [x fx]. exists x. now rewrite <- eqfg.
   intros [x fx]; exists x; now rewrite eqfg.
 Qed.
-
+  
 Program Instance all_iff_morphism {A : Type} :
   Proper (pointwise_relation A iff ==> iff) (@all A).
 
@@ -106,9 +106,8 @@ Proof.
 Qed.
 
 (** Equivalent relations are simultaneously well-founded or not *)
-
 Instance well_founded_morphism {A : Type} :
  Proper (relation_equivalence ==> iff) (@well_founded A).
 Proof.
- unfold well_founded. solve_proper.
+  unfold well_founded. solve_proper.
 Qed.
