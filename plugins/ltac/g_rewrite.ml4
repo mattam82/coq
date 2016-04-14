@@ -124,7 +124,7 @@ ARGUMENT EXTEND rewstrategy
   | [ "pattern" constr_pattern(c) ] -> [ StratPattern (c) ]
   | [ "progress" rewstrategy(h) ] -> [ StratUnary (Progress, h) ]
   | [ "try" rewstrategy(h) ] -> [ StratUnary (Try, h) ]
-  | [ "any" rewstrategy(h) ] -> [ StratUnary (Any, h) ]
+  | [ "many" rewstrategy(h) ] -> [ StratUnary (Many, h) ]
   | [ "repeat" rewstrategy(h) ] -> [ StratUnary (Repeat, h) ]
   | [ rewstrategy(h) ";" rewstrategy(h') ] -> [ StratBinary (Compose, h, h') ]
   | [ "(" rewstrategy(h) ")" ] -> [ h ]

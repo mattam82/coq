@@ -21,7 +21,7 @@ open Tacinterp
 
 type unary_strategy = 
     Subterms | Subterm | Innermost | Outermost
-  | Bottomup | Topdown | Progress | Try | Any | Repeat
+  | Bottomup | Topdown | Progress | Try | Many | Repeat
 
 type binary_strategy = 
   | Compose | Choice

@@ -1429,11 +1429,11 @@ module Strategies =
       let rec aux input = (f { strategy = fun input -> check_interrupt aux input }).strategy input in
       { strategy = aux }
 
-    let any (s : 'a pure_strategy) : 'a pure_strategy =
+    let repeat (s : 'a pure_strategy) : 'a pure_strategy =
       fix (fun any -> try_ (seq s any))
 
-    let repeat (s : 'a pure_strategy) : 'a pure_strategy =
-      seq s (any s)
+    let many (s : 'a pure_strategy) : 'a pure_strategy =
+      seq s (repeat s)
 
     let bu (s : 'a pure_strategy) : 'a pure_strategy =
       fix (fun s' -> seq (choice (progress (all_subterms s')) s) (try_ s'))
@@ -1862,7 +1862,7 @@ let interp_glob_constr_list env =
 
 type unary_strategy =
     Subterms | Subterm | Innermost | Outermost
-  | Bottomup | Topdown | Progress | Try | Any | Repeat
+  | Bottomup | Topdown | Progress | Try | Many | Repeat
 
 type binary_strategy =
   | Compose | Choice
@@ -1939,7 +1939,7 @@ let rec strategy_of_ast = function
       | Topdown -> Strategies.td
       | Progress -> Strategies.progress
       | Try -> Strategies.try_
-      | Any -> Strategies.any
+      | Many -> Strategies.many
       | Repeat -> Strategies.repeat
     in f' s'
   | StratBinary (f, s, t) ->
