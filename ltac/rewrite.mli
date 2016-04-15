@@ -52,8 +52,12 @@ type rewrite_proof =
 
 type evars = evar_map * Evar.Set.t (* goal evars, constraint evars *)
 
+type relation_carrier =
+  | Homogeneous of constr
+  | Heterogeneous of constr * constr
+
 type rewrite_result_info = {
-  rew_car : constr;
+  rew_car : relation_carrier;
   rew_from : constr;
   rew_to : constr;
   rew_prf : rewrite_proof;
@@ -104,7 +108,7 @@ val get_symmetric_proof : env -> evar_map -> constr -> constr -> evar_map * cons
 val get_transitive_proof : env -> evar_map -> constr -> constr -> evar_map * constr
 
 val default_morphism :
-  (types * constr option) option list * (types * types option) option ->
+  (relation_carrier * constr option) option list * (types * types option) option ->
   constr -> constr * constr
 
 val setoid_symmetry : unit Proofview.tactic

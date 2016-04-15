@@ -111,12 +111,34 @@ Qed.
 Lemma examplehuge x : pow 2 100 + x * (1 - 1) = 0.
 Proof.
   rewrite <- mult_n_O. Undo.
-Set Keyed Unification.
   rewrite <- mult_n_O.
 Undo.
 Fail Timeout 1 rewrite_strat inorder (<- fi:mult_n_O).
 Time rewrite_strat topdown (pattern (_ * _); <- fi:mult_n_O). (* 0.08 *)
 Undo.
+Time rewrite_strat inorder (pattern (_ * _); <- fi:mult_n_O).
+(* 0.033 With pattern matching guard (_ * _) *)
+change (Init.Nat.add (pow 2 100) 0 = 0).
+(* Fast due to inferred pattern guard *)
+rewrite_strat inorder (<- fi:ipat:plus_n_O).
+Admitted.
+
+Set Keyed Unification.
+Lemma examplehugekeyed x : pow 2 100 + x * (1 - 1) = 0.
+Proof.
+  rewrite <- mult_n_O. Undo.
+  (* Does not timeout, because even if no pattern, the head pow does not match * *)
+  rewrite_strat inorder (<- fi:mult_n_O).
+  Undo.
+  convert_concl_no_check (pow 2 100 * 0 + (x * (1 - 1)) = 0).
+  (* Here however it fails as the secone multiplication is unified with (pow 2 100 * 0) *)
+  Fail Timeout 1 rewrite_strat inorder (<- fi:mult_n_O).
+  
+  Fail Timeout 1 rewrite_strat topdown (pattern (_ * _); <- fi:mult_n_O). (* 0.08 *)
+  (* Why not succeed immediately ? *)
+  Fail Timeout 1 Time rewrite_strat inorder (pattern (_ * 0); <- fi:mult_n_O). (* 0.08 *)
+Undo.
+  convert_concl_no_check (pow 2 100 + (x * (1 - 1)) = 0).
 Time rewrite_strat inorder (pattern (_ * _); <- fi:mult_n_O).
 (* 0.033 With pattern matching guard (_ * _) *)
 change (Init.Nat.add (pow 2 100) 0 = 0).
