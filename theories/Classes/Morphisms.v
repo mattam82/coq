@@ -36,6 +36,14 @@ Section Proper.
   Class Proper (R : relation A) (m : A) : Prop :=
     proper_prf : R m m.
 
+  Class Related {A' : Type} (R : A -> A' -> Prop) (m : A) (m' : A') : Prop :=
+    related_prf : R m m'.
+
+  Class RelatedProxy {A' : Type} (R : A -> A' -> Prop) (m : A) (m' : A') : Prop :=
+    related_proxy : R m m'.
+  
+  Global Instance proper_related R m : Proper R m -> Related R m m := fun x => x.
+
   (** Every element in the carrier of a reflexive relation is a morphism
    for this relation.  We use a proxy class for this case which is used
    internally to discharge reflexivity constraints.  The [Reflexive]
@@ -143,6 +151,17 @@ Ltac f_equiv :=
   | _ => idtac
  end.
 
+Definition hrel A B := A -> B -> Prop.
+
+Definition forall_relationh A B (P : A -> Type) (Q : B -> Type)
+             (Rarg : hrel A B)
+             (sig : forall a b, Rarg a b -> hrel (P a) (Q b)) :
+  hrel (forall x : A, P x) (forall x : B, Q x) :=
+    fun f g => forall a b r, sig a b r (f a) (g b).
+
+Definition hsubrelation (A : Type) (B : Type) : hrel A B -> hrel A B -> Prop :=
+  fun R R' => forall (x : A) (y : B), R x y -> R' x y.
+
 Section Relations.
   Let U := Type.
   Context {A B : U} (P : A -> U).
@@ -156,7 +175,7 @@ Section Relations.
   Definition forall_relation 
              (sig : forall a, relation (P a)) : relation (forall x, P x) :=
     fun f g => forall a, sig a (f a) (g a).
-
+    
   (** Non-dependent pointwise lifting *)
   Definition pointwise_relation (R : relation B) : relation (A -> B) :=
     fun f g => forall a, R (f a) (g a).
