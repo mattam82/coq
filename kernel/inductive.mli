@@ -34,7 +34,16 @@ type mind_specif = mutual_inductive_body * one_inductive_body
 val lookup_mind_specif : env -> inductive -> mind_specif
 
 (** {6 Functions to build standard types related to inductive } *)
+
+(* Substitution of all inductives in the block *)
 val ind_subst : MutInd.t -> mutual_inductive_body -> Instance.t -> constr list
+
+(** Substitution for inductives up to i (not included).
+  Used to substitute in arities of inductive-inductive types. *)
+val ind_ind_subst : pinductive -> constr list
+
+val constructor_subst : inductive -> mutual_inductive_body -> Instance.t ->
+  int -> constr list
 
 val inductive_paramdecls : mutual_inductive_body puniverses -> Constr.rel_context
 
@@ -47,16 +56,16 @@ val make_param_univs : Environ.env -> constr array -> param_univs
 (** The constr array is the types of the arguments to a template
     polymorphic inductive. *)
 
-val constrained_type_of_inductive : mind_specif puniverses -> types constrained
+val constrained_type_of_inductive : mind_specif -> pinductive -> types constrained
 val constrained_type_of_inductive_knowing_parameters :
-  mind_specif puniverses -> param_univs -> types constrained
+  mind_specif -> pinductive -> param_univs -> types constrained
 
 val relevance_of_inductive : env -> inductive -> Sorts.relevance
 
-val type_of_inductive : mind_specif puniverses -> types
+val type_of_inductive : mind_specif -> pinductive -> types
 
 val type_of_inductive_knowing_parameters :
-  ?polyprop:bool -> mind_specif puniverses -> param_univs -> types
+  ?polyprop:bool -> mind_specif -> pinductive -> param_univs -> types
 
 val elim_sort : mind_specif -> Sorts.family
 
@@ -65,17 +74,19 @@ val is_primitive_record : mind_specif -> bool
 
 (** Return type as quoted by the user *)
 
-val constrained_type_of_constructor : pconstructor -> mind_specif -> types constrained
-val type_of_constructor : pconstructor -> mind_specif -> types
+val constrained_type_of_constructor : mind_specif -> pconstructor ->  types constrained
+val type_of_constructor : mind_specif -> pconstructor -> types
 
 (** Return constructor types in normal form *)
-val arities_of_constructors : pinductive -> mind_specif -> types array
+
+val arity_of_constructor : mind_specif -> pconstructor -> types
+val arities_of_constructors : mind_specif -> pinductive -> types array
 
 (** Return constructor types in user form *)
-val type_of_constructors : pinductive -> mind_specif -> types array
+val type_of_constructors : mind_specif -> pinductive -> types array
 
 (** Transforms inductive specification into types (in nf) *)
-val arities_of_specif : MutInd.t puniverses -> mind_specif -> types array
+val arities_of_specif : mind_specif -> pinductive -> types array
 
 val inductive_params : mind_specif -> int
 
@@ -107,9 +118,7 @@ val type_case_branches :
   env -> pinductive * constr list -> unsafe_judgment -> constr
     -> types array * types
 
-val build_branches_type :
-  pinductive -> mutual_inductive_body * one_inductive_body ->
-    constr list -> constr -> types array
+val build_branches_type : mind_specif -> pinductive -> constr list -> constr -> types array
 
 (** Return the arity of an inductive type *)
 val mind_arity : one_inductive_body -> Constr.rel_context * Sorts.family
@@ -131,6 +140,7 @@ val is_primitive_positive_container : env -> Constant.t -> bool
 
 (** When [chk] is false, the guard condition is not actually
     checked. *)
+val check_one_fix : env -> fixpoint -> int -> unit
 val check_fix : env -> fixpoint -> unit
 val check_cofix : env -> cofixpoint -> unit
 
@@ -168,4 +178,4 @@ val subterm_specif : guard_env -> stack_element list -> constr -> subterm_spec
 
 val lambda_implicit_lift : int -> constr -> constr
 
-val abstract_mind_lc : int -> Int.t -> (rel_context * constr) array -> constr array
+val abstract_mind_lc : int -> Int.t -> constr array -> constr array

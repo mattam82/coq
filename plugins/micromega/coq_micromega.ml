@@ -272,7 +272,7 @@ let coq_FF = lazy (constr_of_ref "micromega.GFormula.FF")
 let coq_AND = lazy (constr_of_ref "micromega.GFormula.AND")
 let coq_OR = lazy (constr_of_ref "micromega.GFormula.OR")
 let coq_NOT = lazy (constr_of_ref "micromega.GFormula.NOT")
-let coq_Atom = lazy (constr_of_ref "micromega.GFormula.A")
+let coq_Atom = lazy (constr_of_ref "micromega.GFormula.At")
 let coq_X = lazy (constr_of_ref "micromega.GFormula.X")
 let coq_IMPL = lazy (constr_of_ref "micromega.GFormula.IMPL")
 let coq_IFF = lazy (constr_of_ref "micromega.GFormula.IFF")
@@ -1749,9 +1749,9 @@ let formula_hyps_concl hyps concl =
  *)
 
 let rec fold_trace f accu = function
-| Micromega.Null -> accu
-| Micromega.Merge (t1, t2) -> fold_trace f (fold_trace f accu t1) t2
-| Micromega.Push (x, t) -> fold_trace f (f accu x) t
+  | Micromega.Null -> accu
+  | Micromega.Merge (t1, t2) -> fold_trace f (fold_trace f accu t1) t2
+  | Micromega.Push (x, t) -> fold_trace f (f accu x) t
 
 let micromega_tauto pre_process cnf spec prover env
     (polys1 : (Names.Id.t * 'cst formula) list) (polys2 : 'cst formula) gl =
@@ -1779,9 +1779,7 @@ let micromega_tauto pre_process cnf spec prover env
               (p.hyps prf) TagSet.empty
           in
           TagSet.union s tags)
-        (fold_trace
-           (fun s (i, _) -> TagSet.add i s)
-           TagSet.empty cnf_ff_tags)
+        (fold_trace (fun s (i, _) -> TagSet.add i s) TagSet.empty cnf_ff_tags)
         (List.combine cnf_ff res)
     in
     let ff' = abstract_formula deps ff in

@@ -42,7 +42,7 @@ let inductive_type_knowing_parameters env sigma (ind,u) jl =
       let s = Reductionops.sort_of_arity env sigma j.uj_type in
       Sorts.univ_of_sort (EConstr.ESorts.kind sigma s)) jl
   in
-  Inductive.type_of_inductive_knowing_parameters (mspec,u) paramstyp
+  Inductive.type_of_inductive_knowing_parameters mspec (ind,u) paramstyp
 
 let type_judgment env sigma j =
   match EConstr.kind sigma (whd_all env sigma j.uj_type) with
@@ -159,7 +159,7 @@ let type_case_branches env sigma (ind,largs) pj c =
   let p = pj.uj_val in
   let params = List.map EConstr.Unsafe.to_constr params in
   let sigma, ps = is_correct_arity env sigma c pj ind specif params in
-  let lc = build_branches_type ind specif params (EConstr.to_constr ~abort_on_undefined_evars:false sigma p) in
+  let lc = build_branches_type specif ind params (EConstr.to_constr ~abort_on_undefined_evars:false sigma p) in
   let lc = Array.map EConstr.of_constr lc in
   let n = (snd specif).Declarations.mind_nrealdecls in
   let ty = whd_betaiota env sigma (lambda_applist_assum sigma (n+1) p (realargs@[c])) in
@@ -180,16 +180,18 @@ let judge_of_case env sigma case ci pj iv cj lfj =
            uj_type = rslty }
 
 let check_type_fixpoint ?loc env sigma lna lar vdefj =
+  let open Context.Rel.Declaration in
   let lt = Array.length vdefj in
   assert (Int.equal (Array.length lar) lt);
-  Array.fold_left2_i (fun i sigma defj ar ->
-      match Evarconv.unify_leq_delay env sigma defj.uj_type (lift lt ar) with
-      | sigma -> sigma
+  let sigma, _ =
+    Array.fold_left2_i (fun i (sigma, env) defj ar ->
+      match Evarconv.unify_leq_delay env sigma defj.uj_type (lift (lt - i) ar) with
+      | sigma -> (sigma, push_rel (LocalAssum (lna.(i), lar.(i))) env)
       | exception Evarconv.UnableToUnify _ ->
         error_ill_typed_rec_body ?loc env sigma
           i lna vdefj lar)
-    sigma vdefj lar
-
+      (sigma, env) vdefj lar
+  in sigma
 
 (* FIXME: might depend on the level of actual parameters!*)
 let check_allowed_sort env sigma ind c p =
@@ -302,7 +304,7 @@ let type_of_inductive env sigma (ind,u) =
   let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
   let () = check_hyps_inclusion env sigma (GR.IndRef ind) mib.mind_hyps in
   let u = EInstance.kind sigma u in
-  let ty, csts = Inductive.constrained_type_of_inductive (specif,u) in
+  let ty, csts = Inductive.constrained_type_of_inductive specif (ind,u) in
   let sigma = Evd.add_constraints sigma csts in
   sigma, (EConstr.of_constr (rename_type ty (GR.IndRef ind)))
 
@@ -311,7 +313,7 @@ let type_of_constructor env sigma ((ind,_ as ctor),u) =
   let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
   let () = check_hyps_inclusion env sigma (GR.IndRef ind) mib.mind_hyps in
   let u = EInstance.kind sigma u in
-  let ty, csts = Inductive.constrained_type_of_constructor (ctor,u) specif in
+  let ty, csts = Inductive.constrained_type_of_constructor specif (ctor,u) in
   let sigma = Evd.add_constraints sigma csts in
   sigma, (EConstr.of_constr (rename_type ty (GR.ConstructRef ctor)))
 
@@ -337,6 +339,16 @@ let judge_of_array env sigma u tj defj tyj =
       (mkApp (arr, [|tyj.utj_val|]))
   in
   sigma, j
+
+(* TODO move *)
+let push_rec_defs indices (names, lar, vdef as recdef) env =
+  let len = Array.length names in
+  let ctx = match indices with
+  | Some vn ->
+    Array.map2_i (fun i na ty -> LocalDef (na, mkFix ((vn, len - i), recdef), ty)) names lar
+  | None ->
+    Array.map2_i (fun i na ty -> LocalDef (na, mkCoFix (len - i, recdef), ty)) names lar
+  in push_rel_context (Array.to_list ctx) env
 
 (* cstr must be in n.f. w.r.t. evars and execute returns a judgement
    where both the term and type are in n.f. *)
@@ -389,13 +401,13 @@ let rec execute env sigma cstr =
         judge_of_case env sigma case ci pj iv cj lfj
 
     | Fix ((vn,i as vni),recdef) ->
-        let sigma, (_,tys,_ as recdef') = execute_recdef env sigma recdef in
+        let sigma, (_,tys,_ as recdef') = execute_recdef env sigma (Some vn) recdef in
         let fix = (vni,recdef') in
         check_fix env sigma fix;
         sigma, make_judge (mkFix fix) tys.(i)
 
     | CoFix (i,recdef) ->
-        let sigma, (_,tys,_ as recdef') = execute_recdef env sigma recdef in
+        let sigma, (_,tys,_ as recdef') = execute_recdef env sigma None recdef in
         let cofix = (i,recdef') in
         check_cofix env sigma cofix;
         sigma, make_judge (mkCoFix cofix) tys.(i)
@@ -471,13 +483,18 @@ let rec execute env sigma cstr =
       let sigma, tj = execute_array env sigma t in
       judge_of_array env sigma (EInstance.kind sigma u) tj defj tyj
 
-and execute_recdef env sigma (names,lar,vdef) =
-  let sigma, larj = execute_array env sigma lar in
-  let sigma, lara = Array.fold_left_map (assumption_of_judgment env) sigma larj in
-  let env1 = push_rec_types (names,lara,vdef) env in
-  let sigma, vdefj = execute_array env1 sigma vdef in
+and execute_recdef env sigma indices (names,lar,vdef) =
+  let (fixenv, sigma), lara =
+    Array.fold_left2_map (fun (env, sigma) na t ->
+      let sigma, tj = execute env sigma t in
+      let sigma, ar = assumption_of_judgment env sigma tj in
+      (push_rel (LocalAssum (na, ar)) env, sigma), ar)
+    (env, sigma) names lar
+  in
+  let envdefs = push_rec_defs indices (names, lara, vdef) env in
+  let sigma, vdefj = execute_array envdefs sigma vdef in
   let vdefv = Array.map j_val vdefj in
-  let sigma = check_type_fixpoint env1 sigma names lara vdefj in
+  let sigma = check_type_fixpoint env sigma names lara vdefj in
   sigma, (names,lara,vdefv)
 
 and execute_array env = Array.fold_left_map (execute env)

@@ -26,27 +26,27 @@ open Context.Rel.Declaration
 (* The following three functions are similar to the ones defined in
    Inductive, but they expect an env *)
 
-let type_of_inductive env (ind,u) =
+let type_of_inductive env (ind,u as pind) =
  let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
  Typeops.check_hyps_inclusion env (GlobRef.IndRef ind) mib.mind_hyps;
- Inductive.type_of_inductive (specif,u)
+ Inductive.type_of_inductive specif pind
 
 (* Return type as quoted by the user *)
 let type_of_constructor env (cstr,u) =
  let (mib,_ as specif) =
    Inductive.lookup_mind_specif env (inductive_of_constructor cstr) in
  Typeops.check_hyps_inclusion env (GlobRef.ConstructRef cstr) mib.mind_hyps;
- Inductive.type_of_constructor (cstr,u) specif
+ Inductive.type_of_constructor specif (cstr,u)
 
 (* Return constructor types in user form *)
 let type_of_constructors env (ind,u as indu) =
  let specif = Inductive.lookup_mind_specif env ind in
-  Inductive.type_of_constructors indu specif
+  Inductive.type_of_constructors specif indu
 
 (* Return constructor types in normal form *)
 let arities_of_constructors env (ind,u as indu) =
  let specif = Inductive.lookup_mind_specif env ind in
-  Inductive.arities_of_constructors indu specif
+  Inductive.arities_of_constructors specif indu
 
 (* [inductive_family] = [inductive_instance] applied to global parameters *)
 type inductive_family = pinductive * constr list
@@ -104,13 +104,7 @@ let mis_is_recursive (ind,mib,mip) =
     mip.mind_recargs
 
 let mis_nf_constructor_type ((ind,u),mib,mip) j =
-  let specif = mip.mind_nf_lc
-  and ntypes = mib.mind_ntypes
-  and nconstr = Array.length mip.mind_consnames in
-  let make_Ik k = mkIndU (((fst ind),ntypes-k-1),u) in
-  if j > nconstr then user_err Pp.(str "Not enough constructors in the type.");
-  let (ctx, cty) = specif.(j - 1) in
-  substl (List.init ntypes make_Ik) (subst_instance_constr u (Term.it_mkProd_or_LetIn cty ctx))
+  Inductive.arity_of_constructor (mib,mip) ((ind,j),u)
 
 (* Number of constructors *)
 
@@ -240,7 +234,8 @@ let inductive_paramdecls_env env (ind,u) = inductive_paramdecls env (ind,u)
 
 let inductive_alldecls env (ind,u) =
   let (mib,mip) = Inductive.lookup_mind_specif env ind in
-    Vars.subst_instance_context u mip.mind_arity_ctxt
+  substl_rel_context (Inductive.ind_ind_subst (ind,u))
+    (Vars.subst_instance_context u mip.mind_arity_ctxt)
 
 let inductive_alldecls_env env (ind,u) = inductive_alldecls env (ind,u)
 [@@ocaml.deprecated "Alias for Inductiveops.inductive_alldecls"]
@@ -322,7 +317,7 @@ let instantiate_params t params sign =
   substl subst t
 
 let get_constructor ((ind,u as indu),mib,mip,params) j =
-  assert (j <= Array.length mip.mind_consnames);
+  assert (j > 0 && j <= Array.length mip.mind_consnames);
   let typi = mis_nf_constructor_type (indu,mib,mip) j in
   let ctx = Vars.subst_instance_context u mib.mind_params_ctxt in
   let typi = instantiate_params typi params ctx in
@@ -418,7 +413,9 @@ let get_arity env ((ind,u),params) =
     end in
   let parsign = Vars.subst_instance_context u parsign in
   let arproperlength = List.length mip.mind_arity_ctxt - List.length parsign in
-  let arsign,_ = List.chop arproperlength mip.mind_arity_ctxt in
+  let mind_arity_ctxt = substl_rel_context (Inductive.ind_ind_subst (ind,u))
+    mip.mind_arity_ctxt in
+  let arsign,_ = List.chop arproperlength mind_arity_ctxt in
   let subst = subst_of_rel_context_instance parsign params in
   let arsign = Vars.subst_instance_context u arsign in
   (substl_rel_context subst arsign, Inductive.inductive_sort_family mip)
@@ -658,7 +655,7 @@ let type_case_branches_with_names env sigma indspec p c =
   let (mib,mip as specif) = Inductive.lookup_mind_specif env (fst ind) in
   let nparams = mib.mind_nparams in
   let (params,realargs) = List.chop nparams args in
-  let lbrty = Inductive.build_branches_type ind specif params p in
+  let lbrty = Inductive.build_branches_type specif ind params p in
   let lbrty = Array.map EConstr.of_constr lbrty in
   (* Build case type *)
   let conclty = lambda_appvect_assum (mip.mind_nrealdecls+1) p (Array.of_list (realargs@[c])) in

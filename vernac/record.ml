@@ -82,7 +82,7 @@ let interp_fields_evars env sigma ~ninds ~nparams impls_env nots l =
   in
   let _, _, sigma = Context.Rel.fold_outside ~init:(env,0,sigma) (fun f (env,k,sigma) ->
       let sigma = RelDecl.fold_constr (fun c sigma ->
-          ComInductive.maybe_unify_params_in env sigma ~ninds ~nparams ~binders:k c)
+          ComInductive.maybe_unify_params_in env sigma ~ninds ~nparams ~ncstrs:0 ~binders:k c)
           f sigma
       in
       EConstr.push_rel f env, k+1, sigma)
@@ -575,7 +575,11 @@ let declare_structure ~cumulative finite ~ubind ~univs ~variances paramimpls par
     { mind_entry_typename = id;
       mind_entry_arity = arity;
       mind_entry_consnames = [idbuild];
-      mind_entry_lc = [type_constructor] }
+      (* The kernel supports inductive-inductive types where constructors
+        can refer to previous ones in the block. We do not currently allow
+        such dependencies for mutual records, so we simply lift the constructor's
+        types over the previous constructors types. *)
+      mind_entry_lc = [Vars.liftn i (succ nparams) type_constructor] }
   in
   let blocks = List.mapi mk_block record_data in
   let template = List.for_all (check_template ~template ~univs ~poly ~params) record_data in
@@ -767,7 +771,7 @@ let add_inductive_class env sigma ind =
     let ctx = oneind.mind_arity_ctxt in
     let univs = Declareops.inductive_polymorphic_context mind in
     let inst = Univ.make_abstract_instance univs in
-    let ty = Inductive.type_of_inductive ((mind, oneind), inst) in
+    let ty = Inductive.type_of_inductive (mind, oneind) (ind, inst) in
     let r = oneind.mind_relevance in
       { cl_univs = univs;
         cl_impl = GlobRef.IndRef ind;

@@ -135,7 +135,9 @@ let is_recursive mie =
   match mie.mind_entry_inds with
   | [ind] ->
       let nparams = List.length mie.mind_entry_params in
-      List.exists (fun t -> is_recursive_constructor (nparams+1) t) ind.mind_entry_lc
+      snd (List.fold_left
+        (fun (lift, isrec) t -> (succ lift, isrec || is_recursive_constructor lift t))
+        (nparams+1, false) ind.mind_entry_lc)
   | _ -> false
 
 let warn_non_primitive_record =
