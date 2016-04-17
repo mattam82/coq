@@ -82,6 +82,10 @@ sig
   (** [smartmap f a] behaves as [map f a] but returns [a] instead of a copy when
       [f x == x] for all [x] in [a]. *)
 
+  val smartmapi : (int -> 'a -> 'a) -> 'a array -> 'a array
+  (** [smartmapi f a] behaves as [mapi f a] but returns [a] instead of a copy when
+      [f x == x] for all [x] in [a]. *)
+
   val smartfoldmap : ('r -> 'a -> 'r * 'a) -> 'r -> 'a array -> 'r * 'a array
   (** Same as [smartmap] but threads an additional state left-to-right. *)
 
@@ -89,6 +93,8 @@ sig
   val map2_i : (int -> 'a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
   val map3 :
     ('a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
+  val map3_i :
+    (int -> 'a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
 
   val map_left : ('a -> 'b) -> 'a array -> 'b array
   (** As [map] but guaranteed to be left-to-right. *)
@@ -100,6 +106,10 @@ sig
   val fold_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
   val fold_map2' :
     ('a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
+  val fold_map2_i :
+    (int -> 'a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
+  val fold_map3 :
+    ('a -> 'b -> 'c -> 'd -> 'e * 'd) -> 'a array -> 'b array -> 'c array -> 'd -> 'e array * 'd
 
   val distinct : 'a array -> bool
   (** Return [true] if every element of the array is unique (for default 

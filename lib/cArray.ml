@@ -46,17 +46,24 @@ sig
   val map_of_list : ('a -> 'b) -> 'a list -> 'b array
   val chop : int -> 'a array -> 'a array * 'a array
   val smartmap : ('a -> 'a) -> 'a array -> 'a array
+  val smartmapi : (int -> 'a -> 'a) -> 'a array -> 'a array
   val smartfoldmap : ('r -> 'a -> 'r * 'a) -> 'r -> 'a array -> 'r * 'a array
   val map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
   val map2_i : (int -> 'a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
   val map3 :
     ('a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
+  val map3_i :
+    (int -> 'a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
   val map_left : ('a -> 'b) -> 'a array -> 'b array
   val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
   val fold_map' : ('a -> 'c -> 'b * 'c) -> 'a array -> 'c -> 'b array * 'c
   val fold_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
   val fold_map2' :
     ('a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
+  val fold_map2_i :
+    (int -> 'a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
+  val fold_map3 :
+    ('a -> 'b -> 'c -> 'd -> 'e * 'd) -> 'a array -> 'b array -> 'c array -> 'd -> 'e array * 'd
   val distinct : 'a array -> bool
   val rev_of_list : 'a list -> 'a array
   val rev_to_list : 'a array -> 'a list
@@ -310,14 +317,14 @@ let chop n v =
    The while loop looks for the first such an element.
    If found, we break here and the new array is produced,
    but f is not re-applied to elements that are already checked *)
-let smartmap f (ar : 'a array) =
+let smartmapi f (ar : 'a array) =
   let len = Array.length ar in
   let i = ref 0 in
   let break = ref true in
   let temp = ref None in
   while !break && (!i < len) do
     let v = Array.unsafe_get ar !i in
-    let v' = f v in
+    let v' = f !i v in
     if v == v' then incr i
     else begin
       break := false;
@@ -332,12 +339,16 @@ let smartmap f (ar : 'a array) =
     incr i;
     while !i < len do
       let v = Array.unsafe_get ar !i in
-      let v' = f v in
+      let v' = f !i v in
       if v != v' then Array.unsafe_set ans !i v';
       incr i
     done;
     ans
   end else ar
+
+let smartmap f (ar : 'a array) =
+  let fi x = f in
+  smartmapi fi ar
 
 (** Same as [smartmap] but threads a state meanwhile *)
 let smartfoldmap f accu (ar : 'a array) =
@@ -416,6 +427,22 @@ let map3 f v1 v2 v3 =
     res
   end
 
+let map3_i f v1 v2 v3 =
+  let len1 = Array.length v1 in
+  let () =
+    if len1 <> Array.length v2 || len1 <> Array.length v3
+    then invalid_arg "Array.map3"
+  in
+  if Int.equal len1 0 then
+    [| |]
+  else begin
+    let res = Array.make len1 (f 0 (uget v1 0) (uget v2 0) (uget v3 0)) in
+    for i = 1 to pred len1 do
+      Array.unsafe_set res i (f i (uget v1 i) (uget v2 i) (uget v3 i))
+    done;
+    res
+  end
+
 let map_left f a = (* Ocaml does not guarantee Array.map is LR *)
   let l = Array.length a in (* (even if so), then we rewrite it *)
   if Int.equal l 0 then [||] else begin
@@ -458,6 +485,19 @@ let fold_map2' f v1 v2 e =
   in
   (v',!e')
 
+let fold_map2_i f v1 v2 e =
+  let e' = ref e in
+  let v' =
+    map2_i (fun i x1 x2 -> let (y,e) = f i x1 x2 !e' in e' := e; y) v1 v2
+  in
+  (v',!e')
+
+let fold_map3 f v1 v2 v3 e =
+  let e' = ref e in
+  let v' =
+    map3 (fun x1 x2 x3 -> let (y,e) = f x1 x2 x3 !e' in e' := e; y) v1 v2 v3
+  in
+  (v',!e')
 
 let distinct v =
   let visited = Hashtbl.create 23 in
