@@ -61,6 +61,9 @@ sig
   val fold_left2_map : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b array -> 'c array -> 'a * 'd array
   val fold_left2_map_i : (int -> 'a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b array -> 'c array -> 'a * 'd array
   val fold_right2_map : ('a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
+  val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
+  val fold_left_map3 :
+    ('a -> 'b -> 'c -> 'd -> 'e * 'd) -> 'a array -> 'b array -> 'c array -> 'd -> 'e array * 'd
   val distinct : 'a array -> bool
   val rev_of_list : 'a list -> 'a array
   val rev_to_list : 'a array -> 'a list
@@ -386,10 +389,16 @@ let map_left f a = (* Ocaml does not guarantee Array.map is LR *)
     r
   end
 
-let iter2_i f v1 v2 =
+let iter2 f v1 v2 =
   let len1 = Array.length v1 in
   let len2 = Array.length v2 in
   let () = if not (Int.equal len2 len1) then invalid_arg "Array.iter2" in
+  for i = 0 to len1 - 1 do f (uget v1 i) (uget v2 i) done
+
+let iter2_i f v1 v2 =
+  let len1 = Array.length v1 in
+  let len2 = Array.length v2 in
+  let () = if not (Int.equal len2 len1) then invalid_arg "Array.iter2_i" in
   for i = 0 to len1 - 1 do f i (uget v1 i) (uget v2 i) done
 
 let map_right f a =
@@ -439,6 +448,11 @@ let fold_left2_map_i f e v1 v2 =
   let e' = ref e in
   let v' = map2_i (fun idx x1 x2 -> let (e,y) = f idx !e' x1 x2 in e' := e; y) v1 v2 in
   (!e',v')
+
+let fold_left_map3 f v1 v2 v3 e =
+  let e' = ref e in
+  let v' = map3 (fun x1 x2 x3 -> let (y,e) = f x1 x2 x3 !e' in e' := e; y) v1 v2 v3 in
+  (v',!e')
 
 let distinct v =
   let visited = Hashtbl.create 23 in
