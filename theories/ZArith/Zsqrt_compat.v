@@ -45,7 +45,8 @@ Inductive sqrt_data (n:Z) : Set :=
   c_sqrt : forall s r:Z, n = s * s + r -> 0 <= r <= 2 * s -> sqrt_data n.
 
 Definition sqrtrempos : forall p:positive, sqrt_data (Zpos p).
-  refine
+  (* MS: FIXME Evd.define of fix ... *)
+  unshelve refine
     (fix sqrtrempos (p:positive) : sqrt_data (Zpos p) :=
       match p return sqrt_data (Zpos p) with
 	| xH => c_sqrt 1 1 0 _ _

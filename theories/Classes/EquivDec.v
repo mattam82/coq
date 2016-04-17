@@ -128,7 +128,7 @@ Program Instance bool_function_eqdec `(EqDec A eq) : ! EqDec (bool -> A) eq :=
 
 Require Import List.
 
-Program Instance list_eqdec `(eqa : EqDec A eq) : ! EqDec (list A) eq :=
+Instance list_eqdec `(eqa : EqDec A eq) : ! EqDec (list A) eq :=
   { equiv_dec :=
     fix aux (x y : list A) :=
     match x, y with
@@ -139,8 +139,7 @@ Program Instance list_eqdec `(eqa : EqDec A eq) : ! EqDec (list A) eq :=
           else in_right
       | _, _ => in_right
     end }.
-
-  Next Obligation. destruct y ; unfold not in *; eauto. Defined.
-
-  Solve Obligations with unfold equiv, complement in * ; 
+Proof.
+  all:clear aux;unfold equiv, complement in * ;
     program_simpl ; intuition (discriminate || eauto).
+Defined.
