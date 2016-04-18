@@ -23,7 +23,7 @@ Set Implicit Arguments.
   | TT   : BFormula A
   | FF   : BFormula A
   | X : Prop -> BFormula A
-  | A : A -> BFormula A
+  | At : A -> BFormula A
   | Cj  : BFormula A -> BFormula A -> BFormula A
   | D   : BFormula A-> BFormula A -> BFormula A
   | N  : BFormula A -> BFormula A
@@ -33,7 +33,7 @@ Set Implicit Arguments.
     match f with
       | TT _ => True
       | FF _ => False
-      | A a =>  ev a
+      | At a =>  ev a
       | X _ p => p
       | Cj e1 e2 => (eval_f  ev e1) /\ (eval_f ev e2)
       | D e1 e2  => (eval_f  ev e1) \/ (eval_f  ev e2)
@@ -57,7 +57,7 @@ Set Implicit Arguments.
       | TT _ => TT _
       | FF _ => FF _
       | X _ p => X _ p
-      | A a => A (fct a)
+      | At a => At (fct a)
       | Cj f1 f2 => Cj (map_bformula fct f1) (map_bformula fct f2)
       | D f1 f2 => D (map_bformula fct f1) (map_bformula fct f2)
       | N f     => N (map_bformula fct f)
@@ -175,7 +175,7 @@ Set Implicit Arguments.
         | TT _ => if pol then tt else ff
         | FF _ => if pol then ff else tt
         | X _ p => if pol then ff else ff (* This is not complete - cannot negate any proposition *)
-        | A x => if pol then normalise x else negate x
+        | At x => if pol then normalise x else negate x
         | N e  => xcnf (negb pol) e
         | Cj e1 e2 =>
           (if pol then and_cnf else or_cnf) (xcnf pol e1) (xcnf pol e2)
