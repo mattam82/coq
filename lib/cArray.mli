@@ -102,8 +102,10 @@ sig
   val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
   (** Iter on two arrays. Raise [Invalid_argument "Array.iter2"] if sizes differ. *)
 
+  (* MS: TODO: specify order *)
   val fold_map' : ('a -> 'c -> 'b * 'c) -> 'a array -> 'c -> 'b array * 'c
   val fold_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
+  val fold_left_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
   val fold_map2' :
     ('a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
   val fold_map2_i :
