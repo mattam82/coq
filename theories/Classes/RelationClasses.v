@@ -26,6 +26,9 @@ Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 Definition eq_rew (A : Type) (P : A -> Type) (x y : A) (e : x = y) : P y -> P x :=
   match e with eq_refl => fun x => x end.
 
+Definition eq_rew_inv (A : Type) (P : A -> Type) (x y : A) (e : y = x) : P y -> P x :=
+  match e with eq_refl => fun x => x end.
+
 Section Defs.
   Context {A : Type}.
 
