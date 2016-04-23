@@ -78,11 +78,13 @@ val map_strategy : ('a -> 'b) -> ('c -> 'd) ->
 val pr_strategy : ('a -> Pp.t) -> ('b -> Pp.t) ->
   ('a, 'b) strategy_ast -> Pp.t
 
+type debug_flag = bool
+
 (** Entry point for user-level "rewrite_strat" *)
-val cl_rewrite_clause_strat : strategy -> Id.t option -> unit Proofview.tactic
+val cl_rewrite_clause_strat : debug_flag -> strategy -> Id.t option -> unit Proofview.tactic
 
 (** Entry point for user-level "setoid_rewrite" *)
-val cl_rewrite_clause :
+val cl_rewrite_clause : debug_flag ->
   interp_sign * (glob_constr_and_expr * glob_constr_and_expr bindings) ->
   bool -> Locus.occurrences -> Id.t option -> unit Proofview.tactic
 

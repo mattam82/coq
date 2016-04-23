@@ -1620,7 +1620,7 @@ exception RewriteFailure of Pp.t
 
 type result = (evar_map * constr option * types) option option
 
-let cl_rewrite_clause_aux ?(abs=None) strat env avoid sigma concl is_hyp : result =
+let cl_rewrite_clause_aux ?(abs=None) debug strat env avoid sigma concl is_hyp : result =
   let sigma, sort = Typing.sort_of env sigma concl in
   let evdref = ref sigma in
   let evars = (!evdref, Evar.Set.empty) in
@@ -1641,18 +1641,23 @@ let cl_rewrite_clause_aux ?(abs=None) strat env avoid sigma concl is_hyp : resul
     | Identity -> Some None
     | Success res ->
       let (_, cstrs) = res.rew_evars in
-      let evars' = solve_constraints env res.rew_evars in
+      let evars' =
+        if debug then fst res.rew_evars
+        else solve_constraints env res.rew_evars
+      in
       let newt = Reductionops.nf_evar evars' res.rew_to in
       let evars = (* Keep only original evars (potentially instantiated) and goal evars,
 		     the rest has been defined and substituted already. *)
-	Evar.Set.fold 
-	  (fun ev acc -> 
-	   if not (Evd.is_defined acc ev) then 
-	     user_err ~hdr:"rewrite"
-                          (str "Unsolved constraint remaining: " ++ spc () ++
-			   Termops.pr_evar_info (Evd.find acc ev))
-	   else Evd.remove acc ev) 
-          cstrs evars'
+        if not debug then
+          Evar.Set.fold
+            (fun ev acc ->
+              if not (Evd.is_defined acc ev) then
+                user_err ~hdr:"rewrite"
+                  (str "Unsolved constraint remaining: " ++ spc () ++
+                   Termops.pr_evar_info (Evd.find acc ev))
+              else Evd.remove acc ev)
+            cstrs evars'
+        else evars'
       in
       let evars, res = match res.rew_prf with
         | RewCast c -> evars, None
@@ -1714,7 +1719,7 @@ let assert_replacing id newt tac =
 let newfail n s =
   Proofview.tclZERO (Refiner.FailError (n, lazy s))
 
-let cl_rewrite_clause_newtac ?abs ?origsigma ~progress strat clause =
+let cl_rewrite_clause_newtac ?abs ?origsigma debug ~progress strat clause =
   let open Proofview.Notations in
   (** For compatibility *)
   let beta = Tactics.reduct_in_concl (Reductionops.nf_betaiota, DEFAULTcast) in
@@ -1774,7 +1779,7 @@ let cl_rewrite_clause_newtac ?abs ?origsigma ~progress strat clause =
     in
     try
       let res =
-        cl_rewrite_clause_aux ?abs strat env Id.Set.empty sigma ty clause
+        cl_rewrite_clause_aux ?abs debug strat env Id.Set.empty sigma ty clause
       in
       let sigma = match origsigma with None -> sigma | Some sigma -> sigma in
       treat sigma res <*>
@@ -1789,11 +1794,11 @@ let tactic_init_setoid () =
   try init_setoid (); Proofview.tclUNIT ()
   with e when CErrors.noncritical e -> Tacticals.New.tclFAIL 0 (str"Setoid library not loaded")
 
-let cl_rewrite_clause_strat progress strat clause =
+let cl_rewrite_clause_strat debug progress strat clause =
   tactic_init_setoid () <*>
   (if progress then Proofview.tclPROGRESS else fun x -> x)
    (Proofview.tclOR
-      (cl_rewrite_clause_newtac ~progress strat clause)
+      (cl_rewrite_clause_newtac debug ~progress strat clause)
       (fun (e, info) -> match e with
        | RewriteFailure e ->
 	 tclZEROMSG (str"setoid rewrite failed: " ++ e)
@@ -1801,14 +1806,16 @@ let cl_rewrite_clause_strat progress strat clause =
 	  tclFAIL n (str"setoid rewrite failed: " ++ Lazy.force pp)
        | e -> Proofview.tclZERO ~info e))
 
+type debug_flag = bool
+
 (** Setoid rewriting when called with "setoid_rewrite" *)
-let cl_rewrite_clause l left2right occs clause =
+let cl_rewrite_clause debug l left2right occs clause =
   let strat = rewrite_with left2right (general_rewrite_unif_flags ()) l occs in
-    cl_rewrite_clause_strat true strat clause
+    cl_rewrite_clause_strat debug true strat clause
 
 (** Setoid rewriting when called with "rewrite_strat" *)
-let cl_rewrite_clause_strat strat clause =
-  cl_rewrite_clause_strat false strat clause
+let cl_rewrite_clause_strat debug strat clause =
+  cl_rewrite_clause_strat debug false strat clause
 
 let apply_lemma_ai inferpat l2r flags oc by loccs : strategy = { strategy =
   fun ({ state = () ; env ; term1 = t ; evars = (sigma, cstrs) } as input) ->
@@ -2363,12 +2370,17 @@ let general_s_rewrite cl l2r occs (c,l) ~new_goals =
       (tclPROGRESS
 	(tclTHEN
            (Proofview.Unsafe.tclEVARS evd)
-	    (cl_rewrite_clause_newtac ~progress:true ~abs:(Some abs) ~origsigma strat cl)))
+	    (cl_rewrite_clause_newtac ~progress:true ~abs:(Some abs) ~origsigma false strat cl)))
     (fun (e, info) -> match e with
     | RewriteFailure e ->
       tclFAIL 0 (str"setoid rewrite failed: " ++ e)
     | e -> Proofview.tclZERO ~info e)
   end
+
+let general_s_rewrite_clause x =
+  match x with
+    | None -> general_s_rewrite None
+    | Some id -> general_s_rewrite (Some id)
 
 let _ = Hook.set Equality.general_setoid_rewrite_clause general_s_rewrite
 
