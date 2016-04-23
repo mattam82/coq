@@ -74,6 +74,15 @@ ARGUMENT EXTEND infer_pat TYPED AS bool PRINTED BY pr_infer_pat
 | [ ] -> [ false ]
 END
 
+let pr_debug_flag _prc _prlc _prt = function
+  | true -> Pp.str "debug"
+  | false -> Pp.str ""
+
+ARGUMENT EXTEND debug_flag TYPED AS bool PRINTED BY pr_debug_flag
+| [ "debug" ] -> [ true ]
+| [ ] -> [ false ]
+END
+
 
 type raw_strategy = (constr_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
 type glob_strategy = (Tacexpr.glob_constr_and_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
@@ -131,7 +140,7 @@ END
 
 let db_strat db = StratUnary (Topdown, StratHints (false, db))
 let cl_rewrite_clause_db db =
-  cl_rewrite_clause_strat
+  cl_rewrite_clause_strat false
     (strategy_of_ast (Tacinterp.default_ist ()) (db_strat db))
 
 let cl_rewrite_clause_db = 
@@ -141,8 +150,8 @@ let cl_rewrite_clause_db =
   else cl_rewrite_clause_db
 
 TACTIC EXTEND rewrite_strat
-| [ "rewrite_strat" rewstrategy(s) "in" hyp(id) ] -> [ Proofview.V82.tactic (cl_rewrite_clause_strat s (Some id)) ]
-| [ "rewrite_strat" rewstrategy(s) ] -> [ Proofview.V82.tactic (cl_rewrite_clause_strat s None) ]
+| [ "rewrite_strat" debug_flag(d) rewstrategy(s) "in" hyp(id) ] -> [ Proofview.V82.tactic (cl_rewrite_clause_strat d s (Some id)) ]
+| [ "rewrite_strat" debug_flag(d) rewstrategy(s) ] -> [ Proofview.V82.tactic (cl_rewrite_clause_strat d s None) ]
 | [ "rewrite_db" preident(db) "in" hyp(id) ] -> [ Proofview.V82.tactic (cl_rewrite_clause_db db (Some id)) ]
 | [ "rewrite_db" preident(db) ] -> [ Proofview.V82.tactic (cl_rewrite_clause_db db None) ]
 END
@@ -153,7 +162,7 @@ let clsubstitute o c =
       (fun cl ->
         match cl with
           | Some id when is_tac id -> tclIDTAC
-          | _ -> cl_rewrite_clause c o AllOccurrences cl)
+          | _ -> cl_rewrite_clause false c o AllOccurrences cl)
 
 TACTIC EXTEND substitute
 | [ "substitute" orient(o) glob_constr_with_bindings(c) ] -> [ Proofview.V82.tactic (clsubstitute o c) ]
@@ -163,16 +172,18 @@ END
 (* Compatibility with old Setoids *)
 
 TACTIC EXTEND setoid_rewrite
-   [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) ]
-   -> [ Proofview.V82.tactic (cl_rewrite_clause c o AllOccurrences None) ]
- | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "in" hyp(id) ] ->
-      [ Proofview.V82.tactic (cl_rewrite_clause c o AllOccurrences (Some id))]
- | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) ] ->
-      [ Proofview.V82.tactic (cl_rewrite_clause c o (occurrences_of occ) None)]
- | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) "in" hyp(id)] ->
-      [ Proofview.V82.tactic (cl_rewrite_clause c o (occurrences_of occ) (Some id))]
- | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "in" hyp(id) "at" occurrences(occ)] ->
-      [ Proofview.V82.tactic (cl_rewrite_clause c o (occurrences_of occ) (Some id))]
+   [ "setoid_rewrite" debug_flag(d) orient(o) glob_constr_with_bindings(c) ]
+   -> [ Proofview.V82.tactic (cl_rewrite_clause d c o AllOccurrences None) ]
+ | [ "setoid_rewrite" debug_flag(d) orient(o) glob_constr_with_bindings(c) ]
+   -> [ Proofview.V82.tactic (cl_rewrite_clause d c o AllOccurrences None) ]
+ | [ "setoid_rewrite" debug_flag(d) orient(o) glob_constr_with_bindings(c) "in" hyp(id) ] ->
+      [ Proofview.V82.tactic (cl_rewrite_clause d c o AllOccurrences (Some id))]
+ | [ "setoid_rewrite" debug_flag(d) orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) ] ->
+      [ Proofview.V82.tactic (cl_rewrite_clause d c o (occurrences_of occ) None)]
+ | [ "setoid_rewrite" debug_flag(d) orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) "in" hyp(id)] ->
+      [ Proofview.V82.tactic (cl_rewrite_clause d c o (occurrences_of occ) (Some id))]
+ | [ "setoid_rewrite" debug_flag(d) orient(o) glob_constr_with_bindings(c) "in" hyp(id) "at" occurrences(occ)] ->
+      [ Proofview.V82.tactic (cl_rewrite_clause d c o (occurrences_of occ) (Some id))]
 END
 
 VERNAC COMMAND EXTEND AddRelation CLASSIFIED AS SIDEFF
