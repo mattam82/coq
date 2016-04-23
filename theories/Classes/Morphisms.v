@@ -252,10 +252,10 @@ Hint Extern 5 (@Proper _ ?H _) => proper_subrelation : typeclass_instances.
 
 (** Essential subrelation instances for [iff], [impl] and [pointwise_relation]. *)
 
-Instance iff_impl_subrelation : subrelation iff impl | 2.
+Instance iff_impl_subrelation : subrelation iff impl | 4.
 Proof. firstorder. Qed.
 
-Instance iff_flip_impl_subrelation : subrelation iff (flip impl) | 2.
+Instance iff_flip_impl_subrelation : subrelation iff (flip impl) | 4.
 Proof. firstorder. Qed.
 
 (** We use an extern hint to help unification. *)
