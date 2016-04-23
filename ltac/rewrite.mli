@@ -77,11 +77,13 @@ val strategy_of_ast : interp_sign -> (glob_constr_and_expr Misctypes.with_bindin
 val map_strategy : ('a -> 'b) -> ('c -> 'd) ->
   ('a, 'c) strategy_ast -> ('b, 'd) strategy_ast
 
+type debug_flag = bool
+
 (** Entry point for user-level "rewrite_strat" *)
-val cl_rewrite_clause_strat : strategy -> Id.t option -> tactic
+val cl_rewrite_clause_strat : debug_flag -> strategy -> Id.t option -> tactic
 
 (** Entry point for user-level "setoid_rewrite" *)
-val cl_rewrite_clause :
+val cl_rewrite_clause : debug_flag ->
   interp_sign * (glob_constr_and_expr * glob_constr_and_expr bindings) ->
   bool -> Locus.occurrences -> Id.t option -> tactic
 
