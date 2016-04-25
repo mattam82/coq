@@ -36,6 +36,9 @@ Section Proper.
   Class Proper (R : crelation A) (m : A) :=
     proper_prf : R m m.
 
+  Class Related {A' : Type} (R : A -> A' -> Type) (m : A) (m' : A') : Type :=
+    related_prf : R m m'.
+
   (** Every element in the carrier of a reflexive relation is a morphism
    for this relation.  We use a proxy class for this case which is used
    internally to discharge reflexivity constraints.  The [Reflexive]
