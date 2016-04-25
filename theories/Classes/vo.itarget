@@ -13,3 +13,7 @@ RelationPairs.vo
 CRelationClasses.vo
 CMorphisms.vo
 CEquivalence.vo
+CRespectful.vo
+Respectful.vo
+StandardInstances.vo
+Transfer.vo
