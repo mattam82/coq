@@ -67,7 +67,7 @@ let evars_to_goals p evm =
 open Auto
 
 let e_give_exact flags c gl = 
-  let t1 = (pf_type_of gl c) in
+  let t1 = (pf_get_type_of gl c) in
     tclTHEN (Clenvtac.unify ~flags t1) (exact_no_check c) gl
 
 open Unification
@@ -122,7 +122,7 @@ let unify_resolve flags (c,clenv) gls =
 let clenv_of_prods nprods (c, clenv) gls =
   if nprods = 0 then Some clenv
   else 
-    let ty = pf_type_of gls c in
+    let ty = pf_get_type_of gls c in
     let diff = nb_prod ty - nprods in
       if diff >= 0 then
 	Some (mk_clenv_from_n gls (Some diff) (c,ty))
@@ -829,7 +829,7 @@ END
 TACTIC EXTEND autoapply
   [ "autoapply" constr(c) "using" preident(i) ] -> [ fun gl ->
     let flags = flags_of_state (Auto.Hint_db.transparent_state (Auto.searchtable_map i)) in
-    let cty = pf_type_of gl c in
+    let cty = pf_get_type_of gl c in
     let ce = mk_clenv_from gl (c,cty) in
       unify_e_resolve flags (c,ce) gl ]
 END
