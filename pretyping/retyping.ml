@@ -53,7 +53,7 @@ let sort_of_atomic_type env sigma ft args =
 let type_of_var env id =
   try let (_,_,ty) = lookup_named id env in ty
   with Not_found ->
-    anomaly ("type_of: variable "^(string_of_id id)^" unbound")
+    Type_errors.error_unbound_var env id
 
 let retype ?(polyprop=true) sigma =
   let rec type_of env cstr=
