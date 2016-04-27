@@ -120,10 +120,10 @@ Section Respecting.
 
 End Respecting.
 
-(** The default equivalence on function spaces, with higher-priority than [eq]. *)
+(** The default equivalence on function spaces, with lower priority than [eq]. *)
 
 Program Instance pointwise_equivalence {A} `(eqb : Equivalence B eqB) :
-  Equivalence (pointwise_relation A eqB) | 9.
+  Equivalence (pointwise_relation A eqB) | 11.
 
   Next Obligation.
   Proof.

@@ -228,6 +228,8 @@ type hypinfo = {
 let goalevars evars = fst evars
 let cstrevars evars = snd evars
 
+let get_type_of env evars c = Retyping.get_type_of env (goalevars evars) c
+
 let evd_convertible env evd x y =
   try ignore(Evarconv.the_conv_x env x y evd); true
   with e when Errors.noncritical e -> false
@@ -240,7 +242,7 @@ let rec decompose_app_rel env evd t =
 	  mkApp (f, fargs), args
       else 
 	let (f', args) = decompose_app_rel env evd args.(0) in
-	let ty = Typing.type_of env evd args.(0) in
+	let ty = Retyping.get_type_of env evd args.(0) in
 	let f'' = mkLambda (Name (id_of_string "x"), ty,
 	  mkLambda (Name (id_of_string "y"), lift 1 ty,
 	    mkApp (lift 2 f, [| mkApp (lift 2 f', [| mkRel 2; mkRel 1 |]) |])))
@@ -251,14 +253,13 @@ let rec decompose_app_rel env evd t =
 (*   let env' = reset_with_named_context nc env in *)
 
 let decompose_applied_relation env sigma flags orig (c,l) left2right =
-  let c' = c in
-  let ctype = Typing.type_of env sigma c' in
+  let ctype = Retyping.get_type_of env sigma c in
   let find_rel ty =
-    let eqclause = Clenv.make_clenv_binding_env_apply env sigma None (c',ty) l in
+    let eqclause = Clenv.make_clenv_binding_env_apply env sigma None (c,ty) l in
     let (equiv, args) = decompose_app_rel env eqclause.evd (Clenv.clenv_type eqclause) in
     let c1 = args.(0) and c2 = args.(1) in 
     let ty1, ty2 =
-      Typing.type_of env eqclause.evd c1, Typing.type_of env eqclause.evd c2
+      Retyping.get_type_of env eqclause.evd c1, Retyping.get_type_of env eqclause.evd c2
     in
       if not (evd_convertible env eqclause.evd ty1 ty2) then None
       else
@@ -377,8 +378,8 @@ let unify_eqn env sigma hypinfo t =
 	  let c1 = nf c1 and c2 = nf c2
 	  and car = nf car and rel = nf rel
 	  and prf = nf (Clenv.clenv_value env') in
-	  let ty1 = Typing.type_of env'.env env'.evd c1
-	  and ty2 = Typing.type_of env'.env env'.evd c2
+	  let ty1 = Retyping.get_type_of env'.env env'.evd c1
+	  and ty2 = Retyping.get_type_of env'.env env'.evd c2
 	  in
 	    if convertible env env'.evd ty1 ty2 then (
 	      if occur_meta_or_existential prf then
@@ -592,7 +593,7 @@ let resolve_morphism env avoid oldt m ?(fnewt=fun x -> x) args args' cstr evars 
     let morphargs, morphobjs = array_chop first args in
     let morphargs', morphobjs' = array_chop first args' in
     let appm = mkApp(m, morphargs) in
-    let appmtype = Typing.type_of env (goalevars evars) appm in
+    let appmtype = get_type_of env evars appm in
     let cstrs = List.map (Option.map (fun r -> r.rew_car, get_opt_rew_rel r.rew_prf)) (Array.to_list morphobjs') in
       (* Desired signature *)
     let evars, appmtype', signature, sigargs = 
@@ -755,7 +756,7 @@ let subterm all flags (s : strategy) : strategy =
 		(fun (acc, evars, progress) arg ->
 		  if progress <> None && not all then (None :: acc, evars, progress)
 		  else
-		    let res = s env avoid arg (Typing.type_of env (goalevars evars) arg) None evars in
+		    let res = s env avoid arg (get_type_of env evars arg) None evars in
 		      match res with
 		      | Some None -> (None :: acc, evars, if progress = None then Some false else progress)
 		      | Some (Some r) -> (Some r :: acc, r.rew_evars, Some true)
@@ -791,7 +792,7 @@ let subterm all flags (s : strategy) : strategy =
 	  in
 	    if flags.on_morphisms then
 	      let evarsref = ref (snd evars) in
-	      let mty = Typing.type_of env (goalevars evars) m in
+	      let mty = get_type_of env evars m in
 	      let cstr', m, mty, argsl, args = 
 		let argsl = Array.to_list args in
 		  match lift_cstr env (goalevars evars) evarsref argsl m mty None with
@@ -824,7 +825,7 @@ let subterm all flags (s : strategy) : strategy =
 	      
       | Prod (n, x, b) when noccurn 1 b ->
 	  let b = subst1 mkProp b in
-	  let tx = Typing.type_of env (goalevars evars) x and tb = Typing.type_of env (goalevars evars) b in
+	  let tx = get_type_of env evars x and tb = get_type_of env evars b in
 	  let mor, unfold = arrow_morphism tx tb x b in
 	  let res = aux env avoid mor ty cstr evars in
 	    (match res with
@@ -860,7 +861,7 @@ let subterm all flags (s : strategy) : strategy =
       | Lambda (n, t, b) when flags.under_lambdas ->
 	  let n' = name_app (fun id -> Tactics.fresh_id_in_env avoid id env) n in
 	  let env' = Environ.push_rel (n', None, t) env in
-	  let b' = s env' avoid b (Typing.type_of env' (goalevars evars) b) (unlift_cstr env (goalevars evars) cstr) evars in
+	  let b' = s env' avoid b (get_type_of env' evars b) (unlift_cstr env (goalevars evars) cstr) evars in
 	    (match b' with
 	    | Some (Some r) ->
 		let prf = match r.rew_prf with
@@ -878,7 +879,7 @@ let subterm all flags (s : strategy) : strategy =
 	    | _ -> b')
 
       | Case (ci, p, c, brs) ->
-	  let cty = Typing.type_of env (goalevars evars) c in
+	  let cty = get_type_of env evars c in
 	  let cstr' = Some (mkApp (Lazy.force coq_eq, [| cty |])) in
 	  let c' = s env avoid c cty cstr' evars in
 	  let res = 
@@ -1104,9 +1105,7 @@ let rewrite_with flags c left2right loccs : strategy =
 
 let apply_strategy (s : strategy) env avoid concl cstr evars =
   let res =
-    s env avoid
- concl (Typing.type_of env (goalevars evars) concl)
-      (Option.map snd cstr) evars
+    s env avoid concl (get_type_of env evars concl) (Option.map snd cstr) evars
   in
     match res with
     | None -> None
@@ -1980,7 +1979,7 @@ let setoid_proof gl ty fn fallback =
     try
       let rel, args = decompose_app_rel env (project gl) (pf_concl gl) in
       let evm = project gl in
-      let car = pi3 (List.hd (fst (Reduction.dest_prod env (Typing.type_of env evm rel)))) in
+      let car = pi3 (List.hd (fst (Reduction.dest_prod env (Retyping.get_type_of env evm rel)))) in
 	fn env evm car rel gl
     with e when Errors.noncritical e ->
       try fallback gl
