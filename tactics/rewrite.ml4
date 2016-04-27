@@ -1182,8 +1182,9 @@ let cl_rewrite_clause_aux ?(abs=None) strat env avoid sigma concl is_hyp : resul
     | Some None -> Some None
     | None -> None
 		   
-let rewrite_refine (evd,c) = 
-  Tacmach.refine c
+let rewrite_refine c =
+  (* We assume the proof term is well-typed *)
+  Tacmach.refine_no_check c
 
 let cl_rewrite_clause_tac ?abs strat meta clause gl =
   let evartac evd = Refiner.tclEVARS evd in
@@ -1196,14 +1197,14 @@ let cl_rewrite_clause_tac ?abs strat meta clause gl =
 	let tac = 
 	  match clause, p with
 	  | Some id, Some p ->
-	      cut_replacing id newt (Tacmach.refine p)
+	      cut_replacing id newt (rewrite_refine p)
 	  | Some id, None -> 
 	      change_in_hyp None newt (id, InHypTypeOnly)
 	  | None, Some p ->
 	      let name = next_name_away_with_default "H" Anonymous (pf_ids_of_hyps gl) in
 		tclTHENLAST
 		  (Tacmach.internal_cut_no_check false name newt)
-		  (tclTHEN (Tactics.revert [name]) (Tacmach.refine p))
+		  (tclTHEN (Tactics.revert [name]) (rewrite_refine p))
 	  | None, None -> change_in_concl None newt
 	in tclTHEN (evartac undef) tac
   in
