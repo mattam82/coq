@@ -67,7 +67,7 @@ let clenv_pose_dependent_evars with_evars clenv =
       (RefinerError (UnresolvedBindings (List.map (meta_name clenv.evd) dep_mvs)));
   clenv_pose_metas_as_evars clenv dep_mvs
 
-let clenv_refine with_evars ?(with_classes=true) clenv gls =
+let clenv_refine ?(unsafe=false) with_evars ?(with_classes=true) clenv gls =
   let clenv = clenv_pose_dependent_evars with_evars clenv in
   let evd' =
     if with_classes then
@@ -76,9 +76,10 @@ let clenv_refine with_evars ?(with_classes=true) clenv gls =
     else clenv.evd
   in
   let clenv = { clenv with evd = evd' } in
+  let ref = if unsafe then refine_no_check else refine in
   tclTHEN
     (tclEVARS evd')
-    (refine (clenv_cast_meta clenv (clenv_value clenv)))
+    (ref (clenv_cast_meta clenv (clenv_value clenv)))
     gls
 
 open Unification

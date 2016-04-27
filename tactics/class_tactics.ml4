@@ -110,12 +110,14 @@ END
 let unify_e_resolve flags (c,clenv) gls =
   let clenv' = connect_clenv gls clenv in
   let clenv' = clenv_unique_resolver ~flags clenv' gls in
-    Clenvtac.clenv_refine true ~with_classes:false clenv' gls
+  (* We trust unification to return a well-typed substution *)
+    Clenvtac.clenv_refine ~unsafe:true true ~with_classes:false clenv' gls
 
 let unify_resolve flags (c,clenv) gls =
   let clenv' = connect_clenv gls clenv in
   let clenv' = clenv_unique_resolver ~flags clenv' gls in
-    Clenvtac.clenv_refine false ~with_classes:false clenv' gls
+  (* We trust unification to return a well-typed substution *)
+    Clenvtac.clenv_refine ~unsafe:true false ~with_classes:false clenv' gls
 
 let clenv_of_prods nprods (c, clenv) gls =
   if nprods = 0 then Some clenv
