@@ -358,7 +358,7 @@ induction does not go through, so we need to use strong
 Lemma lt_exists_pred_strong :
   forall z n m, z < m -> m <= n -> exists k, m == S k /\ z <= k.
 Proof.
-intro z; nzinduct n z.
+intro z. nzinduct n z.
 order.
 intro n; split; intros IH m H1 H2.
 apply le_succ_r in H2. destruct H2 as [H2 | H2].

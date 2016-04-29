@@ -42,7 +42,7 @@ Section Proper.
   Class RelatedProxy {A' : Type} (R : A -> A' -> Prop) (m : A) (m' : A') : Prop :=
     related_proxy : R m m'.
   
-  Global Instance proper_related R m : Proper R m -> Related R m m := fun x => x.
+  Global Instance proper_related R m : Proper R m -> Related R m m | 1000 := fun x => x.
 
   (** Every element in the carrier of a reflexive relation is a morphism
    for this relation.  We use a proxy class for this case which is used
@@ -73,14 +73,14 @@ Section Proper.
   (A B : Type)
   (C : A -> Type) (D : B -> Type)
   (R : A -> B -> Prop)
-  (R' : forall (x : A) (y : B), C x -> D y -> Prop) :
+  (R' : forall (x : A) (y : B), R x y -> C x -> D y -> Prop) :
     (forall x : A, C x) -> (forall x : B, D x) -> Prop :=
-    fun f g => forall x y, R x y -> R' x y (f x) (g y).
-
+    fun f g => forall x y (H : R x y), R' x y H (f x) (g y).
+  
   (** The non-dependent version is an instance where we forget dependencies. *)
   
   Definition respectful (R : relation A) (R' : relation B) : relation (A -> B) :=
-    Eval compute in @respectful_hetero A A (fun _ => B) (fun _ => B) R (fun _ _ => R').
+    Eval compute in @respectful_hetero A A (fun _ => B) (fun _ => B) R (fun _ _ _ => R').
 
 End Proper.
 
@@ -96,6 +96,8 @@ Hint Extern 2 (ProperProxy ?R _) =>
 (** Notations reminiscent of the old syntax for declaring morphisms. *)
 Delimit Scope signature_scope with signature.
 
+Arguments respectful_hetero {_ _ _ _ _} R'%signature _ _.
+
 Module ProperNotations.
 
   Notation " R ++> R' " := (@respectful _ _ (R%signature) (R'%signature))
@@ -106,6 +108,19 @@ Module ProperNotations.
 
   Notation " R --> R' " := (@respectful _ _ (flip (R%signature)) (R'%signature))
     (right associativity, at level 55) : signature_scope.
+
+  Notation "∀  α : R v1 v2 , S" :=
+    (respectful_hetero (R := R) (fun v1 v2 α => S))
+      (at level 200, α ident, R at level 7, v1 ident, v2 ident, right associativity)
+    : signature_scope.
+  
+  Notation "∀  α : R , S" := (respectful_hetero (R := R) (fun _ _ α => S))
+    (at level 200, α ident, R at level 7, right associativity)
+    : signature_scope.
+
+  Notation "∀  α , R" := (respectful_hetero (fun _ _ α => R))
+    (at level 200, α ident, right associativity)
+    : signature_scope.
 
 End ProperNotations.
 
@@ -557,6 +572,24 @@ Hint Extern 4 (@Proper _ _ _) => partial_application_tactic
 Hint Extern 7 (@Proper _ _ _) => proper_reflexive 
   : typeclass_instances.
 
+
+Lemma related_app A (R : relation A) B (S : relation B) f f' a a' :
+  Related (R ==> S)%signature f f' -> Related R a a' ->
+  Related S (f a) (f' a').
+Proof. intros H; intros H'. apply H. apply H'. Defined.
+
+Hint Extern 1 (Related ?S (?f ?a) (?f' ?a')) =>
+  once match goal with
+  | [ H : Related ?R ?a ?a' |- _ ] => eapply (@related_app _ R _ S f f' a a'); [|apply H]
+  | _ => eapply (@related_app _ _ _ S f f' a a')
+  end : typeclass_instances.
+
+Hint Extern 0 (Related _ _ _) =>
+match goal with
+  |- let _ := _ in _ => let hyp := fresh in intros hyp
+end : typeclass_instances.
+
+
 (** Special-purpose class to do normalization of signatures w.r.t. flip. *)
 
 Section Normalize.
@@ -571,7 +604,7 @@ Section Normalize.
   Lemma proper_normalizes_proper `(Normalizes R0 R1, Proper A R1 m) : Proper R0 m.
   Proof.
     red in H, H0.
-    rewrite H.
+    rewrite H. 
     assumption.
   Qed.
 
@@ -586,6 +619,7 @@ Lemma flip_arrow {A : Type} {B : Type}
       `(NA : Normalizes A R (flip R'''), NB : Normalizes B R' (flip R'')) :
   Normalizes (A -> B) (R ==> R') (flip (R''' ==> R'')%signature).
 Proof. 
+  (* FIXME should be a rewrite *)
   unfold Normalizes in *. intros.
   unfold relation_equivalence in *. 
   unfold predicate_equivalence in *. simpl in *.

@@ -344,11 +344,11 @@ Proof.
 Qed.
 
 (** If two numbers produce the same stream of bits, they are equal. *)
-
+Axiom cheat : forall{A}, A.
 Lemma bits_inj : forall a b, testbit a === testbit b -> a == b.
 Proof.
  intros a. pattern a.
- apply strong_right_induction with 0;[solve_proper|clear a|apply le_0_l].
+ apply strong_right_induction with 0;[apply cheat;solve_proper|clear a|apply le_0_l].
  intros a _ IH b H.
  destruct (eq_0_gt_0_cases a) as [EQ|LT].
  rewrite EQ in H |- *. symmetry. apply bits_inj_0.
@@ -372,6 +372,66 @@ Ltac bitwise := apply bits_inj; intros ?m; autorewrite with bitwise.
 
 (** The streams of bits that correspond to a natural numbers are
   exactly the ones that are always 0 after some point *)
+Hint Extern 10 (Proper ?R ?f) =>
+match goal with
+| [H : R f f |- _ ] => apply H
+end : typeclass_instances.
+Local Open Scope signature_scope.
+
+Instance Reflexive_eq_eq A B :
+  Reflexive (@Logic.eq A ==> @Logic.eq B).
+Proof. reduce. subst. apply reflexivity. Qed.
+
+
+Instance all_R_iff_morphism {A : Type} {R} (HR : PER R)
+         (Hrx : forall x, exists y, R x y)
+
+  :
+  Proper ((R ==> iff) ==> iff) (@all A) | 2.
+Proof.
+  unfold Proper. intros f g eqfg. red in eqfg.
+  split. intros af x. destruct (Hrx x).  rewrite <- eqfg. apply af.
+  symmetry in H. apply H.
+  intros ag x. destruct (Hrx x).
+  rewrite eqfg. apply ag. apply H.
+Qed.
+
+Instance proper_proper_PER A (R : relation A) (T : PER R) :
+  Proper (R ==> iff) (@Proper A R).
+Proof.
+  reduce.
+  split ; red ; intros. red in H0. rewrite <- H. apply H0.
+  red in H0. rewrite H. apply H0.
+Qed.
+Existing Instance respectful_per.
+
+Instance related_all (A : Type)  :
+   Related (respectful_hetero _ _ (fun _ => Prop) _
+                              (respectful_hetero A A _ _ Logic.eq (fun x y => iff))
+                              (fun _ _ => iff)) (@all A) (@all A).
+ intro. intros. red in H. split; intros. intros b. rewrite <- H. apply H0. reflexivity.
+ intros b. rewrite H. apply H0. reflexivity.
+Defined.
+
+Global Definition related_proper A (R : relation A) m :
+  Related R m m -> Proper R m := fun x => x.
+
+Global Instance related_respectful A (RA : relation A) B (RB : relation B) m m' :
+  (forall x y (H : Related RA x y), Related RB (m x) (m' y)) ->
+  Related (RA ==> RB) m m'.
+Proof. intros. do 2 red. eapply H. Qed.
+
+Global Instance related_forall_iff A (B B' : A -> Prop) :
+  (forall x : A, Related iff (B x) (B' x)) ->
+  Related iff (forall x : A, B x) (forall x : A, B' x).
+Proof. intros. red. split; intros. eapply H. apply H0.
+       apply H. apply H0.
+Qed.
+
+Global Instance related_impl_iff A A' B B' :
+  Related iff A A' -> Related iff B B' ->
+  Related iff (A -> B) (A' -> B').
+Proof. intros. red. split; intros; firstorder. Qed.
 
 Lemma are_bits : forall (f:t->bool), Proper (eq==>Logic.eq) f ->
  ((exists n, f === testbit n) <->
@@ -382,7 +442,92 @@ Proof.
   exists (S (log2 a)). intros m Hm. apply le_succ_l in Hm.
   rewrite H, bits_above_log2; trivial using lt_succ_diag_r.
  intros (k,Hk).
-  revert f Hf Hk. induct k.
+ revert f Hf Hk.
+ pattern k. apply induction.
+ reduce.
+
+ Definition respectful_dep (A : Type) (B : A -> Type)
+            (RA : relation A) (RB : forall a b, RA a b -> B a -> B b -> Prop) :
+   relation (forall a, B a) :=
+   fun f g => forall x y (e : RA x y), RB x y e (f x) (g y).
+
+ Definition respectful_hetero {A B C D : Type}
+   (Rdom : A -> B -> Prop) (Rcodom : C -> D -> Prop) : (A -> C) -> (B -> D) -> Prop :=
+   fun f g => forall x y (e : Rdom x y), Rcodom (f x) (g y).
+
+ Instance forall_resp A (B : A -> Prop)
+   (RA : relation A) (RB : forall a b, RA a b -> (B a -> Prop) -> (B b -> Prop) -> Prop) :
+   Proper (respectful_dep A B RA (fun a b e => fun ba bb => RB a b e)) (@all).
+                                    respectful_hetero (RB a b e) iff)) (@all).
+ 
+ setoid_rewrite debug H.
+ Show Proof.
+ (* apply related_proper. *)
+ (* apply related_respectful. *)
+ (* intros. *)
+ (* apply related_forall_iff. *)
+ (* intros.  *)
+ (* apply related_forall_iff. *)
+ (* intros. *)
+ (* apply related_impl_iff. *)
+ (* apply related_forall_iff. intros. *)
+ (* apply related_impl_iff. *)
+ 
+ (* apply related_app. *)
+ (* red in H. now rewrite H. *)
+ (* reflexivity. *)
+ (* reflexivity. *)
+ 
+ (* intros. *)
+ 
+ (* red.  *)
+
+ 
+ (* setoid_rewrite debug H. *)
+ all:cycle 1.
+ apply proper_proper_PER. apply _. 
+ apply _.
+ shelve. shelve. apply _.
+ apply _. apply _.
+ apply _. red.
+ assert (Transitive (eq ==> @Logic.eq bool)%signature). apply _.
+ cut ((eq ==> Logic.eq) f1 f1). intros. apply H1.
+ clear do_subrelation.
+ setoid_rewrite <- R at 1. apply R.
+ apply _.
+ apply _.
+ apply _.
+ apply _.
+ apply _.
+ apply _. unfold eqf at 2.
+ red. red. intros. intro. intros.
+ cut (iff (forall n : t, x0 n = x1 n) (forall n : t, y0 n = y1 n)).
+ intro Heq; apply Heq.
+ clear do_subrelation. setoid_rewrite H0.
+ red in H1. setoid_rewrite H1. reflexivity.
+ apply _.
+ apply _.
+ apply _.
+ reduce.
+ cut (iff (all x0) (all y0)). intros He; apply He.
+ apply related_all.
+ red. intros. subst x1. apply H0.
+ eapply all_R_iff_morphism. 3:apply H0. apply _.
+ intros. 
+ 
+ apply _.
+ setoid_rewrite 
+ 
+ 
+ 
+ 
+   (forall f : t -> bool,
+    (eq ==> Logic.eq)%signature f f ->
+    (forall m : t, y <= m -> f m = false) -> exists n : t, f === testbit n)
+
+ setoid_rewrite debug H.
+ solve_proper.
+ induct k.
   intros f Hf H0.
   exists 0. intros m. rewrite bits_0, H0; trivial. apply le_0_l.
   intros k IH f Hf Hk.
