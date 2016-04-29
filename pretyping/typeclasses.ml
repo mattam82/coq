@@ -161,6 +161,7 @@ let rec is_class_type evd c =
   let c, args = decompose_app c in
     match kind_of_term c with
     | Prod (_, _, t) -> is_class_type evd t
+    | LetIn (_, _, _, t) -> is_class_type evd t
     | Evar (e, _) when Evd.is_defined evd e ->
       is_class_type evd (Evarutil.whd_head_evar evd c)
     | _ -> is_class_constr c

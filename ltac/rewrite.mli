@@ -40,9 +40,17 @@ type ('constr,'redexpr) strategy_ast =
   | StratEval of 'redexpr 
   | StratFold of 'constr
 
-type rewrite_proof = 
+type evars = evar_map * Evar.Set.t (* goal evars, constraint evars *)
+
+type relation_carrier =
+  | Homogeneous of constr
+  | Heterogeneous of constr * constr
+
+type rewrite_proof =
   | RewPrf of constr * constr
+  (** A Relation (R : rew_car -> rew_car -> Prop) and a proof of R rew_from rew_to *)
   | RewCast of cast_kind
+  (** A proof of convertibility (with casts) *)
   | RewEq of constr * types * constr * constr * constr * types * types
   (** A predicate with one free variable P[x] and its type,
       a proof of [t], [u], a proof of [t = u]
@@ -50,19 +58,21 @@ type rewrite_proof =
       such that [rew_from] is convertible to P[t] and
       [rew_to] is convertible to P[u] *)
 
-type evars = evar_map * Evar.Set.t (* goal evars, constraint evars *)
-
-type relation_carrier =
-  | Homogeneous of constr
-  | Heterogeneous of constr * constr
-
 type rewrite_result_info = {
   rew_car : relation_carrier;
-  rew_from : constr;
-  rew_to : constr;
-  rew_prf : rewrite_proof;
+  (** Two types, for heterogeneous relations *)
+  rew_from : constr ;
+  (** A term of type rew_car_from *)
+  rew_to : constr ;
+  (** A term of type rew_car_to *)
+  rew_prf : rewrite_proof ;
+  (** A proof of rew_from == rew_to *)
   rew_evars : evars;
-  rew_decls : Context.Named.t
+  (** The updated map of evars *)
+  rew_decls : Context.Named.t;
+  (** A new set of declarations (for [set]) *)
+  rew_local : bool;
+  (** Is the successful rewrite only a rewrite of local hypotheses *)
 }
 
 type rewrite_result =

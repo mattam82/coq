@@ -29,6 +29,9 @@ Definition eq_rew (A : Type) (P : A -> Type) (x y : A) (e : x = y) : P y -> P x 
 Definition eq_rew_inv (A : Type) (P : A -> Type) (x y : A) (e : y = x) : P y -> P x :=
   match e with eq_refl => fun x => x end.
 
+Definition full_relation (A : Type) (B : Type) : A -> B -> Prop :=
+  fun x y => True.
+
 Section Defs.
   Context {A : Type}.
 

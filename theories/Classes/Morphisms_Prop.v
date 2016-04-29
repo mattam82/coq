@@ -18,6 +18,14 @@ Require Import Coq.Program.Tactics.
 Require Import Relation_Definitions.
 Local Obligation Tactic := try solve [simpl_relation | firstorder auto].
 
+Instance respectul_pointwise_subrelation A B (R : relation B) :
+  subrelation (@eq A ==> R)%signature (pointwise_relation A R).
+Proof. reduce. apply H. reflexivity. Qed.
+
+Instance pointwise_subrelation_respectful A B (R : relation B) :
+  subrelation (pointwise_relation A R) (@eq A ==> R)%signature.
+Proof. reduce. subst x0. eapply H. Qed.
+
 (** Standard instances for [not], [iff] and [impl]. *)
 
 (** Logical negation. *)
@@ -65,7 +73,31 @@ Proof.
   split. intros [x fx]. exists x. now rewrite <- eqfg.
   intros [x fx]; exists x; now rewrite eqfg.
 Qed.
-  
+
+Instance ex_R_iff_morphism {A : Type} {R} (HR : Reflexive R) :
+  Proper ((R ==> iff) ==> iff) (@ex A) | 2.
+Proof.
+  unfold Proper. intros f g eqfg. red in eqfg.
+  split. intros [x fx]. exists x. rewrite <- eqfg. apply fx. reflexivity.
+  intros [x fx]; exists x; rewrite eqfg. apply fx. reflexivity.
+Qed.
+
+Instance all_R_iff_morphism {A : Type} {R} (HR : Reflexive R) :
+  Proper ((R ==> iff) ==> iff) (@all A) | 2.
+Proof.
+  unfold Proper. intros f g eqfg. red in eqfg.
+  split. intros af x. rewrite <- eqfg. apply af. reflexivity.
+  intros ag x; rewrite eqfg. apply ag. reflexivity.
+Qed.
+
+Instance all_hetero_R_iff_morphism {A : Type} {R} (HR : Reflexive R) :
+  Proper ((∀ _ : R _ _, iff) ==> iff) (@all A) | 2.
+Proof.
+  unfold Proper. intros f g eqfg. red in eqfg.
+  split. intros af x. rewrite <- eqfg. apply af. reflexivity.
+  intros ag x; rewrite eqfg. apply ag. reflexivity.
+Qed.
+
 Program Instance all_iff_morphism {A : Type} :
   Proper (pointwise_relation A iff ==> iff) (@all A).
 
@@ -108,6 +140,9 @@ Qed.
 (** Equivalent relations are simultaneously well-founded or not *)
 Instance well_founded_morphism {A : Type} :
  Proper (relation_equivalence ==> iff) (@well_founded A).
-Proof.
-  unfold well_founded. solve_proper.
+Proof. 
+  unfold well_founded.
+
+  red. intros. red. intros. setoid_rewrite debug H.
+  solve_proper.
 Qed.
