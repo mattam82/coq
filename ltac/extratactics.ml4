@@ -362,11 +362,10 @@ END
 (**********************************************************************)
 (* Refine                                                             *)
 
-let refine_tac ist simple c =
+let refine_tac ist simple flags c =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
     let concl = Proofview.Goal.concl gl in
     let env = Proofview.Goal.env gl in
-    let flags = Pretyping.all_no_fail_flags in
     let expected_type = Pretyping.OfType concl in
     let c = Pretyping.type_uconstr ~flags ~expected_type ist c in
     let update = { run = fun sigma -> c.delayed env sigma } in
@@ -378,11 +377,21 @@ let refine_tac ist simple c =
   end }
 
 TACTIC EXTEND refine
-| [ "refine" uconstr(c) ] -> [ refine_tac ist false c ]
+| [ "refine" uconstr(c) ] -> [
+    let flags = Pretyping.all_no_fail_flags in
+    refine_tac ist false flags c ]
 END
 
 TACTIC EXTEND simple_refine
-| [ "simple" "refine" uconstr(c) ] -> [ refine_tac ist true c ]
+| [ "simple" "refine" uconstr(c) ] -> [
+    let flags = Pretyping.all_no_fail_flags in
+    refine_tac ist true flags c ]
+END
+
+TACTIC EXTEND simple_refine_notc
+| [ "simple" "refine" "noclass" uconstr(c) ] -> [
+    let flags = Pretyping.no_classes_no_fail_inference_flags in
+    refine_tac ist true flags c ]
 END
 
 (**********************************************************************)
