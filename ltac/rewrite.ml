@@ -74,7 +74,25 @@ type rewrite_result_info = {
 let map_carrier f = function
   | Homogeneous c -> Homogeneous (f c)
   | Heterogeneous (c, c') -> Heterogeneous (f c, f c')
-       
+
+let subst_proof subst prf =
+  match prf with
+  | RewCast _ -> prf
+  | RewPrf (c, c') -> RewPrf (substl subst c, substl subst c')
+  | RewEq (x, y, z, w, a, b, c) ->
+     RewEq (substl subst x, substl subst y, substl subst z,
+            substl subst w, substl subst a, substl subst b,
+            substl subst c)
+                        
+let subst_rewrite_result subst r =
+  { rew_from = substl subst r.rew_from;
+    rew_to = substl subst r.rew_to;
+    rew_car = map_carrier (substl subst) r.rew_car;
+    rew_prf = subst_proof subst r.rew_prf;
+    rew_evars = r.rew_evars;
+    rew_decls = r.rew_decls;
+    rew_local = r.rew_local }
+
 (** Typeclass-based generalized rewriting. *)
 
 (** Constants used by the tactic. *)
@@ -128,6 +146,9 @@ let impl = find_global ["Program"; "Basics"] "impl"
 
 let goalevars evars = fst evars
 let cstrevars evars = snd evars
+
+let nf_zeta =
+  Reductionops.clos_norm_flags (Closure.RedFlags.mkflags [Closure.RedFlags.fZETA])
 
 let get_type_of_env env evars arg =
   Retyping.get_type_of env (goalevars evars) arg
@@ -357,9 +378,9 @@ end) = struct
          (evars, rel), get_type_of_env env evars rel
     in
     let rec aux env evars m m' ty ty' l =
-      Printf.printf "build_signature: aux %s %s\n%!"
-                    (string_of_constr_env env evars ty)
-                    (string_of_constr_env env evars ty');
+      (* Printf.printf "build_signature: aux %s %s\n%!" *)
+      (*               (string_of_constr_env env evars ty) *)
+      (*               (string_of_constr_env env evars ty'); *)
 
       let t = Reductionops.whd_betadeltaiota env (goalevars evars) ty in
       let t' = Reductionops.whd_betadeltaiota env (goalevars evars) ty' in
@@ -439,75 +460,80 @@ end) = struct
                   (string_of_constr_env env evars arg);
     res
 
-
-  let build_apprel evars env m mty args args'
-                   (finalcstr : (types * types option) option) =
-    let rec aux i env evars m m' hyps ty ty' =
-      Printf.printf "build_apprel: aux %s %s %s %s\n%!"
-                    (string_of_constr_env env evars m)
-                    (string_of_constr_env env evars m')
-                    (string_of_constr_env env evars ty)
-                    (string_of_constr_env env evars ty');
-      if i = Array.length args then
-	let ty = Reductionops.nf_betaiota (fst evars) ty in
-	let ty' = Reductionops.nf_betaiota (fst evars) ty' in
-        let car = (Heterogeneous (ty, ty')) in
-	let evars, rel =
-          match finalcstr with
-	  | None | Some (_, None) ->
-             mk_relation_carrier_evar env evars car
-	  | Some (t, Some rel) -> evars, rel
-        in
-        let evars, goal = mk_related env evars car rel m m' in
-        let final = it_mkProd_or_LetIn (lift (List.length hyps) goal) hyps in
-        let () = Printf.printf "build_signature finished: %s\n%!"
-                               (string_of_constr_env env evars goal) in
-        let env' =
-          let dosub, appsub = do_subrelation, apply_subrelation in
-          let id =
-            Tactics.fresh_id_in_env [] (Id.of_string "do_subrelation") env
-          in
-	  Environ.push_named
-	    (LocalDef (id,
-	               snd (app_poly env evars dosub [||]),
-	               snd (app_poly_nocheck env evars appsub [||])))
-	    env
-        in
-        let evars, prf = new_cstr_evar env' evars final in
-        evars, prf, car, rel, m, m'
-      else 
-        let t = Reductionops.whd_betadeltaiota env (goalevars evars) ty in
-        let t' = Reductionops.whd_betadeltaiota env (goalevars evars) ty' in
-	let (na, ty, b), (na', ty', b') = destProd t, destProd t' in
-        let b = Reductionops.nf_betaiota (goalevars evars) b in
-        let b' = Reductionops.nf_betaiota (goalevars evars) b' in
-	let ty = Reductionops.nf_betaiota (goalevars evars) ty in
-	let ty' = Reductionops.nf_betaiota (goalevars evars) ty' in
-        let car =
-          if eq_constr ty ty' then Homogeneous ty else Heterogeneous (ty, ty') in
-        let evars, from, to_, hyps =
-          match args'.(i) with
-          | Some r ->
-             let rel, prf = get_rew_prf r in
-             let evars, rel' = mk_related env evars car rel r.rew_from r.rew_to in
-             let hyps = LocalDef (Anonymous, prf, rel') :: hyps in
-             Printf.printf "build_signature arg: %s %s\n%!"
-                           (string_of_constr_env env evars prf)
-                           (string_of_constr_env env evars rel)
-             ;
-             evars, r.rew_from, r.rew_to, hyps
-          | None -> evars, args.(i), args.(i), hyps
-             (* let evars, rel = mk_relation_carrier_evar env evars car in *)
-             (* let evars, prf = related_proof env evars car rel args.(i) in *)
-             (* evars, args.(i), args.(i), car, (mkApp (rel, [| args.(i); args.(i) |]), prf) *)
-        in
-        aux (succ i) env evars (mkApp (m, [|from|])) (mkApp (m', [|to_|]))
-            hyps (subst1 from b) (subst1 to_ b')
-    in
-    Printf.printf "build_signature: %s\n%!" (string_of_constr_env env evars m);
-    let (evars, prf, car, rel, from, to_ as res) = aux 0 env evars m m [] mty mty in
-    Printf.printf "build_signature gives: %s\n%!" (string_of_constr_env env evars prf);
-    res
+  (* let build_apprel evars env m mty args args' *)
+  (*                  (finalcstr : (types * types option) option) = *)
+  (*   let rec aux i env evars m m' ty ty' = *)
+  (*     Printf.printf "build_apprel: aux %s %s %s %s\n%!" *)
+  (*                   (string_of_constr_env env evars m) *)
+  (*                   (string_of_constr_env env evars m') *)
+  (*                   (string_of_constr_env env evars ty) *)
+  (*                   (string_of_constr_env env evars ty'); *)
+  (*     if i = Array.length args then *)
+  (*       let ty = Reductionops.nf_betaiota (fst evars) ty in *)
+  (*       let ty' = Reductionops.nf_betaiota (fst evars) ty' in *)
+  (*       let car = (Heterogeneous (ty, ty')) in *)
+  (*       let car' = map_carrier (lift len) car in *)
+  (*       let evars, rel = *)
+  (*         match finalcstr with *)
+  (*         | None | Some (_, None) -> *)
+  (*            mk_relation_carrier_evar env' evars car' *)
+  (*         | Some (t, Some rel) -> evars, lift len rel *)
+  (*       in *)
+  (*       let evars, goal = mk_related env' evars car' rel (lift len m) (lift len m') in *)
+  (*       let () = Printf.printf "build_signature finished: %s\n%!" *)
+  (*                              (string_of_constr_env env' evars goal) in *)
+  (*       let env' = *)
+  (*         let dosub, appsub = do_subrelation, apply_subrelation in *)
+  (*         let id = *)
+  (*           Tactics.fresh_id_in_env [] (Id.of_string "do_subrelation") env' *)
+  (*         in *)
+  (*         Environ.push_named *)
+  (*           (LocalDef (id, *)
+  (*                      snd (app_poly env' evars dosub [||]), *)
+  (*                      snd (app_poly_nocheck env' evars appsub [||]))) *)
+  (*           env' *)
+  (*       in *)
+  (*       let evars, prf = new_cstr_evar env' evars goal in *)
+  (*       evars, it_mkLambda_or_LetIn prf hyps, car, *)
+  (*       nf_zeta env (goalevars evars) (it_mkLambda_or_LetIn rel hyps), m, m' *)
+  (*     else  *)
+  (*       let t = Reductionops.whd_betadeltaiota env (goalevars evars) ty in *)
+  (*       let t' = Reductionops.whd_betadeltaiota env (goalevars evars) ty' in *)
+  (*       let (na, ty, b), (na', ty', b') = destProd t, destProd t' in *)
+  (*       let b = Reductionops.nf_betaiota (goalevars evars) b in *)
+  (*       let b' = Reductionops.nf_betaiota (goalevars evars) b' in *)
+  (*       let ty = Reductionops.nf_betaiota (goalevars evars) ty in *)
+  (*       let ty' = Reductionops.nf_betaiota (goalevars evars) ty' in *)
+  (*       let _car = *)
+  (*         if eq_constr ty ty' then Homogeneous ty else Heterogeneous (ty, ty') in *)
+  (*       let evars, from, to_, hyps = *)
+  (*         match args'.(i) with *)
+  (*         | Some r -> *)
+  (*            (\* let rel, prf = get_rew_prf r in *\) *)
+  (*            (\* let evars, rel' = *\) *)
+  (*            (\*   mk_related env evars r.rew_car rel r.rew_from r.rew_to in *\) *)
+  (*            (\* let len = List.length hyps in *\) *)
+  (*            (\* let hyps = LocalDef (Anonymous, lift len prf, lift len rel') :: hyps in *\) *)
+  (*            (\* Printf.printf "build_signature arg: %s -> %s car: %s prf: %s rel: %s\n%!" *\) *)
+  (*            (\*               (string_of_constr_env env evars r.rew_from) *\) *)
+  (*            (\*               (string_of_constr_env env evars r.rew_to) *\) *)
+  (*            (\*               (string_of_constr_env env evars (get_rew_car r.rew_car)) *\) *)
+  (*            (\*               (string_of_constr_env env evars prf) *\) *)
+  (*            (\*               (string_of_constr_env env evars rel) *\) *)
+  (*            (\* ; *\) *)
+  (*            evars, r.rew_from, r.rew_to, hyps *)
+  (*         | None -> evars, args.(i), args.(i), hyps *)
+  (*            (\* let evars, rel = mk_relation_carrier_evar env evars car in *\) *)
+  (*            (\* let evars, prf = related_proof env evars car rel args.(i) in *\) *)
+  (*            (\* evars, args.(i), args.(i), car, (mkApp (rel, [| args.(i); args.(i) |]), prf) *\) *)
+  (*       in *)
+  (*       aux (succ i) env evars (mkApp (m, [|from|])) (mkApp (m', [|to_|])) *)
+  (*           hyps (subst1 from b) (subst1 to_ b') *)
+  (*   in *)
+  (*   Printf.printf "build_signature: %s\n%!" (string_of_constr_env env evars m); *)
+  (*   let (evars, prf, car, rel, from, to_ as res) = aux 0 env evars m m [] mty mty in *)
+  (*   Printf.printf "build_signature gives: %s\n%!" (string_of_constr_env env evars prf); *)
+  (*   res *)
       
   (** Folding/unfolding of the tactic constants. *)
 
@@ -522,8 +548,8 @@ end) = struct
     | App (id, [| a; b |]) (* when eq_constr id (Lazy.force coq_all) *) ->
       (match kind_of_term b with
       | Lambda (n, ty, b) -> mkProd (n, ty, b)
-      | _ -> assert false)
-    | _ -> assert false
+      | _ -> t)
+    | _ -> t
 
   let unfold_forall t =
     match kind_of_term t with
@@ -570,6 +596,8 @@ end) = struct
 	apply_pointwise env evd rel (mkApp (prf, [| arg |])) args
       | Evar f ->
          let concl = Evd.evar_concl (Evd.find (fst evd) (fst f)) in
+         if !Flags.debug then
+           Printf.printf "apply_pointwise on evar %s\n" (Pp.string_of_ppcmds (Printer.pr_constr_env env (goalevars evd) concl));
          let a, b =
            match kind_of_term concl with
            | App (rel, [| ty |]) ->
@@ -811,6 +839,8 @@ let decompose_applied_relation env sigma (c,l) =
       | None -> Heterogeneous (ty1, ty2)
       | Some sigma -> Homogeneous ty1
     in
+    if !Flags.debug then Printf.printf "decompose_applied_relation: car:  %s\n"
+                                       (string_of_constr_env env (sigma,Evar.Set.empty) ty1);
     Some (sigma, { prf=value;
                    car=car; rel = equiv; sort = Sorts.is_prop sort;
                    c1=c1; c2=c2; holes })
@@ -1018,7 +1048,8 @@ let unify flags env sigma l r =
     Unification.w_unify ~flags env sigma CONV l r
                         
 (* Matching/unifying the rewriting rule against [t] *)
-let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) by t =
+let unify_eqn (car, rel, prf, c1, c2, holes, sort)
+              l2r flags env (sigma, cstrs) by t =
   try
     let left = if l2r then c1 else c2 in
     let () =
@@ -1052,8 +1083,9 @@ let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) 
   | e when Class_tactics.catchable e -> None
   | Reduction.NotConvertible -> None
 
-let unify_abs (car, rel, prf, c1, c2) l2r sort env (sigma, cstrs) t =
+let unify_abs (car, rel, prf, c1, c2) l2r sort env envprf (sigma, cstrs) t =
   try
+    let env = push_rel_context envprf env in
     let left = if l2r then c1 else c2 in
     (* The pattern is already instantiated, so the next w_unify is
        basically an eq_constr, except when preexisting evars occur in
@@ -1061,7 +1093,7 @@ let unify_abs (car, rel, prf, c1, c2) l2r sort env (sigma, cstrs) t =
        solved this evars *)
     let sigma = Unification.w_unify ~flags:rewrite_unif_flags env sigma CONV left t in
     let rew_evars = sigma, cstrs in
-    let rew_prf = RewPrf (rel, prf) in
+    let rew_prf = RewPrf (rel, lift (List.length envprf) prf) in
     let rew = { rew_car = car; rew_from = c1; rew_to = c2; rew_prf; rew_evars;
                 rew_decls = []; rew_local = false } in
     let rew = if l2r then rew else symmetry env sort rew in
@@ -1177,18 +1209,18 @@ let resolve_subrelation env avoid car rel sort prf rel' res =
 (*       | _ -> assert(false) *)
 
 
-let resolve_morphism env envprf avoid oldt m args args' (b,cstr) evars =
-  let first = match (Array.findi (fun _ b -> not (Option.is_empty b)) args') with
-    | Some i -> i
-    | None -> invalid_arg "resolve_morphism" in
-  let morphargs, morphobjs = Array.chop first args in
-  let morphargs', morphobjs' = Array.chop first args' in
-  let appm = mkApp(m, morphargs) in
-  let env = Environ.push_rel_context envprf env in
-  let appmtype = Typing.unsafe_type_of env (goalevars evars) appm in
-    if b then PropGlobal.build_apprel evars env appm appmtype
-                                      morphobjs morphobjs' cstr
-    else TypeGlobal.build_apprel evars env appm appmtype morphobjs morphobjs' cstr
+(* let resolve_morphism env envprf avoid oldt m args args' (b,cstr) evars = *)
+(*   let first = match (Array.findi (fun _ b -> not (Option.is_empty b)) args') with *)
+(*     | Some i -> i *)
+(*     | None -> invalid_arg "resolve_morphism" in *)
+(*   let morphargs, morphobjs = Array.chop first args in *)
+(*   let morphargs', morphobjs' = Array.chop first args' in *)
+(*   let appm = mkApp(m, morphargs) in *)
+(*   let env = Environ.push_rel_context envprf env in *)
+(*   let appmtype = Typing.unsafe_type_of env (goalevars evars) appm in *)
+(*     if b then PropGlobal.build_apprel evars env appm appmtype *)
+(*                                       morphobjs morphobjs' cstr *)
+(*     else TypeGlobal.build_apprel evars env appm appmtype morphobjs morphobjs' cstr *)
   
       
 let coerce env avoid cstr res =
@@ -1208,7 +1240,7 @@ let apply_rule unify loccs : int pure_strategy =
   { strategy = fun { state = occ; env ; envprf ; unfresh ;
 		   carrier = ty ; term1 = t ; term2 = t'; cstr ; evars } ->
       let unif =
-	if isEvar t then None else unify (push_rel_context envprf env) evars t in
+	if isEvar t then None else unify env envprf evars t in
 	match unif with
 	| None -> (occ, Fail)
         | Some rew ->
@@ -1216,11 +1248,7 @@ let apply_rule unify loccs : int pure_strategy =
 	    if not (is_occ occ) then (occ, Fail)
 	    else if eq_constr t rew.rew_to then (occ, Identity)
 	    else
-	      let res = { rew with rew_car =
-                                     match rew.rew_car with
-                                     | Homogeneous _ -> ty
-                                     | _ -> rew.rew_car } in
-	      let res = Success (coerce env unfresh cstr res) in
+	      let res = Success (coerce env unfresh cstr rew) in
               (occ, res)
     }
 
@@ -1336,6 +1364,14 @@ let new_hrelation_evar prop env evd ty =
   let f = if prop then PropGlobal.new_hrelation_evar
           else TypeGlobal.new_hrelation_evar in
   f env evd ty
+
+let mk_related prop =
+  if prop then PropGlobal.mk_related
+          else TypeGlobal.mk_related
+
+let mk_relation_carrier_evar prop =
+  if prop then PropGlobal.mk_relation_carrier_evar
+          else TypeGlobal.mk_relation_carrier_evar
     
 let is_rew_prf = function RewPrf _ -> true | _ -> false
 let is_rew_eq = function RewEq _ -> true | _ -> false
@@ -1601,200 +1637,481 @@ let decompose_app_evar env evars m ty args term =
 let make_carrier t t' =
   if eq_constr t t' then Homogeneous t
   else Heterogeneous (t, t')
-                                       
+
 let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
-  let rec aux { state ; env ; envprf; unfresh ;
+  let rec aux { state ; env ; envprf; unfresh;
 		term1 = t ; term2; carrier ; cstr = (prop, cstr) ; evars } =
     let cstr' = Option.map (fun c -> ((*FIXME*) get_rew_car carrier, Some c)) cstr in
     if !Flags.debug then
       (Printf.printf "subterm on %s\n%!" (Pp.string_of_ppcmds (Printer.pr_constr_env (Environ.push_rel_context envprf env) (goalevars evars) t));
        Printf.printf "rel_context: %s\n%!" (Pp.string_of_ppcmds (Printer.pr_rel_context env (goalevars evars) envprf)));
-    match kind_of_term t with
-    | Rel n ->
-       if n <= List.length envprf then
-         if n mod 3 == 0 then
-           let decl = Context.Rel.lookup (n - 2) envprf in
-           let relty = decompose_app_n 2 (Context.Rel.Declaration.get_type decl) in
-           let prf = RewPrf (lift (n - 2) relty, mkRel (n - 2)) in
-           state, Success { rew_from = mkRel n; rew_to = mkRel (n - 1);
-        		    rew_prf = prf; rew_car = carrier;
-                            rew_decls = []; rew_evars = evars; rew_local = true }
-         else state, Fail
-       else state, Fail
-	             
-    | App (m, args) ->
-       let mty = get_type_of env envprf evars m in
-       let rewrite_args state mty' success =
-         (* let evars, term2, ty2 = decompose_app_evar env evars m ty args term2 in *)
-	 let state, (args', evars', ty, ty', progress) =
-	   Array.fold_left
-	     (fun (state, (acc, evars, ty, ty', progress)) arg ->
-               let carrier, ty, ty' =
-                 let ty = Reductionops.whd_betadeltaiota env (goalevars evars) ty in
-                 let ty' = Reductionops.whd_betadeltaiota env (goalevars evars) ty' in
-                 match kind_of_term ty, kind_of_term ty' with
-                 | Prod (na, t, b), Prod (na', t', b') ->
-                    (* let evars, term2 = new_cstr_evar env evars t' in *)
-                    make_carrier t t', b, b'
-                 | _ -> assert false
-               in
-	       if not (Option.is_empty progress) && not all then
-		 state, (None :: acc, evars, subst1 arg ty, subst1 arg ty', progress)
-	       else
-		 let state, res = s.strategy { state ; env ; envprf ;
-					       unfresh ;
-					       term1 = arg ;
-                                               term2 = arg ;
-                                               carrier;
-					       cstr = (prop,None) ;
-					       evars = evars } in
-		 let res' =
-		   match res with
-		   | Identity ->
-		      let progress =
-                        if Option.is_empty progress then Some false else progress in
-		      (None :: acc, evars, subst1 arg ty, subst1 arg ty', progress)
-		   | Success r ->
-		      (Some r :: acc, r.rew_evars, subst1 r.rew_from ty,
-                       subst1 r.rew_to ty', Some true)
-		   | Fail -> (None :: acc, evars, subst1 arg ty, subst1 arg ty', progress)
-		 in state, res')
-	     (state, ([], evars, mty, mty', success)) args
-	 in
-	 let res =
-	   match progress with
-	   | None -> Fail
-	   | Some false -> Identity
-	   | Some true ->
-	      let args' = Array.of_list (List.rev args') in
-	      let rewrite_prf =
-		Array.fold_left
-		  (fun acc r ->
-		    match acc with
-		    | None ->
-                       (match r with
-                        | None -> acc
-                        | Some r -> Some (r.rew_local, r.rew_prf))
-		    | Some (local, (RewPrf _ as prf)) -> 
-                       (match r with
-                        | None -> acc
-                        | Some r -> Some (local && r.rew_local, prf))
-                    | Some (local, RewCast _) ->
-                       (match r with
-                        | None -> acc
-                        | Some r -> Some (local && r.rew_local, r.rew_prf))
-		    | Some (local, (RewEq (_, _, _, _, c, _, _) as prf)) ->
-		       (match r with
-			| None -> acc
-			| Some res ->
-			   (match res.rew_prf with
-			    | RewPrf _ as x -> Some (local && res.rew_local, x)
-			    | RewCast _ -> Some (local && res.rew_local, prf)
-			    | RewEq (_, _, _, _, c', _, _) ->
-			       if eq_constr c c' then acc
-			       else let c, rel = get_rew_prf res in
-                                    Some (local && res.rew_local, RewPrf (c, rel)))))
-		  None args'
+    let rel n =
+      if n <= List.length envprf then
+        try
+          let decl = Context.Rel.lookup (n - 2) envprf in
+          let relty = decompose_app_n 2 (Context.Rel.Declaration.get_type decl) in
+          let prf = RewPrf (lift (n - 2) relty, mkRel (n - 2)) in
+          state, Success { rew_from = mkRel n; rew_to = mkRel (n - 1);
+        		   rew_prf = prf; rew_car = carrier;
+                           rew_decls = []; rew_evars = evars; rew_local = true }
+        with e (* decompose_app failed *) -> state, Fail
+      else state, Fail
+    in
+    let app m args =
+      let mty = get_type_of env envprf evars m in
+      let rewrite_arg (state, (acc, evars, envprf, lifti, unfresh, appm, appm',
+                               ty, ty', progress))
+                      arg =
+        let env' = push_rel_context envprf env in
+        let na, carrier, ty, ty' =
+          let ty = Reductionops.whd_betadeltaiota env' (goalevars evars) ty in
+          let ty' = Reductionops.whd_betadeltaiota env' (goalevars evars) ty' in
+          match kind_of_term ty, kind_of_term ty' with
+          | Prod (na, t, b), Prod (na', t', b') ->
+             na, make_carrier t t', b, b'
+          | _ -> assert false
+        in
+	if not (Option.is_empty progress) && not all then
+	  state, (None :: acc, evars, envprf, lifti, unfresh,
+                  mkApp (appm, [| arg |]), mkApp (appm', [| arg |]),
+                  subst1 arg ty, subst1 arg ty', progress)
+	else
+          let arg' = lift (snd lifti) arg in
+	  let state, res = s.strategy { state ; env ; envprf ;
+					unfresh ;
+					term1 = arg' ;
+                                        term2 = arg' ;
+                                        carrier;
+					cstr = (prop,None) ;
+					evars = evars } in
+	  let res' =
+            let same progress =
+              let evars, arg2 =
+                match carrier with
+                | Homogeneous car -> evars, arg'
+                | Heterogeneous (car, car') ->
+                   new_cstr_evar env evars car'
+              in
+              (None :: acc, evars, envprf, lifti, unfresh,
+               mkApp (appm, [| arg' |]), mkApp (appm', [| arg2 |]),
+               subst1 arg' ty, subst1 arg' ty', progress)
+            in
+	    match res with
+	    | Fail -> same progress
+	    | Identity ->
+	       let progress =
+                 if Option.is_empty progress then Some false else progress in
+               same progress
+	    | Success r ->
+               let rel, prf = get_rew_prf r in
+               let evars, rel' =
+                 mk_related prop env r.rew_evars r.rew_car rel r.rew_from r.rew_to in
+               let name =
+                 let id = match na with Anonymous -> Id.of_string "H" | Name na -> na in
+                 Tactics.fresh_id_in_env unfresh (add_suffix id "_rew") env in
+               let unfresh = name :: unfresh in
+               let hyp = Context.Rel.Declaration.LocalDef (Name name, prf, rel') in
+               let envprf = hyp :: envprf in
+               let subst, lifti = lifti in
+               let subst = substl subst prf :: subst in
+               (* let r' = subst_rewrite_result subst r in *)
+	       (Some r :: acc, evars, envprf, (subst, succ lifti), unfresh,
+                lift 1 (mkApp (appm, [| r.rew_from |])),
+                lift 1 (mkApp (appm', [| r.rew_to |])),
+                lift 1 (subst1 r.rew_from ty), lift 1 (subst1 r.rew_to ty'), Some true)
+	  in state, res'
+      in
+      let args_progress args' =
+        Array.fold_left
+	  (fun acc r ->
+	    match acc with
+	    | None ->
+               (match r with
+                | None -> acc
+                | Some r -> Some (r.rew_local, r.rew_prf))
+	    | Some (local, (RewPrf _ as prf)) -> 
+               (match r with
+                | None -> acc
+                | Some r -> Some (local && r.rew_local, prf))
+            | Some (local, RewCast _) ->
+               (match r with
+                | None -> acc
+                | Some r -> Some (local && r.rew_local, r.rew_prf))
+	    | Some (local, (RewEq (_, _, _, _, c, _, _) as prf)) ->
+	       (match r with
+		| None -> acc
+		| Some res ->
+		   (match res.rew_prf with
+		    | RewPrf _ as x -> Some (local && res.rew_local, x)
+		    | RewCast _ -> Some (local && res.rew_local, prf)
+		    | RewEq (_, _, _, _, c', _, _) ->
+		       if eq_constr c c' then acc
+		       else let c, rel = get_rew_prf res in
+                            Some (local && res.rew_local, RewPrf (c, rel)))))
+	  None args'
+      in
+      let treat_args (args', evars', envprf', lifti, unfresh',
+                      appm, appm', ty, ty', progress) =
+	match progress with
+	| None -> Fail
+	| Some false -> Identity
+	| Some true ->
+	   let args' = Array.of_list (List.rev args') in
+	   match args_progress args' with
+	   | None -> Identity
+	   | Some (local, RewPrf _) ->
+	      (* Printf.printf "app: %s \n" (string_of_constr envprf env evars' (mkApp (m, args)));		                                                               *)  
+              let env' = push_rel_context envprf' env in
+              let appcar = make_carrier ty ty' in
+              let subst, lifti = lifti in
+	      let evars', prf, car, rel, c1, c2 =
+	        let evars, rel =
+                  match cstr' with
+	          | None | Some (_, None) ->
+                     mk_relation_carrier_evar prop env' evars' appcar
+	          | Some (t, Some rel) -> evars', lift lifti rel
+                in
+                let evars, goal = mk_related prop env' evars appcar rel appm appm' in
+                let () =
+                  if !Flags.debug then
+                    Printf.printf "build_signature finished: %s\n%!"
+                                  (string_of_constr_env env' evars goal) in
+                let env' =
+                  let dosub, appsub =
+	            if prop then PropGlobal.do_subrelation, PropGlobal.apply_subrelation
+	            else TypeGlobal.do_subrelation, TypeGlobal.apply_subrelation
+                  in
+                  let id =
+                    Tactics.fresh_id_in_env [] (Id.of_string "do_subrelation") env'
+                  in
+	          Environ.push_named
+	            (LocalDef (id,
+	                       snd (app_poly_sort prop env' evars dosub [||]),
+	                       snd (app_poly_nocheck env' evars appsub [||])))
+	            env'
+                in
+                let evars, prf = new_cstr_evar env' evars goal in
+                evars, substl subst prf, map_carrier (substl subst) appcar,
+                substl subst rel, substl subst appm, substl subst appm'
+	      in       
+	      if !Flags.debug then
+                Printf.printf "resolved proof: %s, car: %s, rel %s, from: %s to %s\n"
+                              (string_of_constr envprf env evars' prf)
+                              (string_of_constr envprf env evars' (get_rew_car car))
+                              (string_of_constr envprf env evars' rel)
+                              (string_of_constr envprf env evars' c1)
+                              (string_of_constr envprf env evars' c2)
+              ;
+	      let res = { rew_car = car; rew_from = c1;
+			  rew_to = c2; rew_prf = RewPrf (rel, prf);
+			  rew_evars = evars'; rew_decls = []; rew_local = local }
+	      in Success res
+	   | Some (local, r) ->
+	      (* Printf.printf "app: %s ty: %s \n" (string_of_constr envprf env evars' (mkApp (m, args))) (string_of_constr envprf env evars ty); *)
+	      let args'' = Array.map2
+			     (fun aorig anew ->
+			       match anew with None -> aorig
+					     | Some r -> r.rew_to) args args'
 	      in
-	      (match rewrite_prf with
-	       | None -> Identity
-	       | Some (local, RewPrf _) ->
-		  Printf.printf "app: %s \n" (string_of_constr envprf env evars' (mkApp (m, args)));
-		  let evars', prf, car, rel, c1, c2 =
-		    resolve_morphism env envprf unfresh t m args args' (prop, cstr') evars'
-		  in       
-		  Printf.printf "resolved proof: %s, car: %s, rel %s\n"
-                                (string_of_constr envprf env evars' prf)
-                                (string_of_constr envprf env evars' (get_rew_car car))
-                                (string_of_constr envprf env evars' rel);
-		  let res = { rew_car = car; rew_from = c1;
-			      rew_to = c2; rew_prf = RewPrf (rel, prf);
-			      rew_evars = evars'; rew_decls = []; rew_local = local }
-		  in Success res
-	       | Some (local, r) ->
-		  Printf.printf "app: %s ty: %s \n" (string_of_constr envprf env evars' (mkApp (m, args))) (string_of_constr envprf env evars ty);
-		  let args'' = Array.map2
-				 (fun aorig anew ->
-				   match anew with None -> aorig
-						 | Some r -> r.rew_to) args args'
-		  in
-		  let rew_prf =
-		    match r with
-		    | RewEq (_, _, t1, t2, c, rel, ty') ->
-		       let predargs = Array.map2
-		      			(fun orig anew ->
-		      			  match anew with
-		      			  | None -> orig
-		      			  | Some r ->
-		      			     match r.rew_prf with
-		      			     | RewEq (p, ty, _, _, c, rel, _) -> p
-		      			     | RewPrf _ -> assert false
-		      			     | RewCast _ -> r.rew_to)
-		      			args args'
-		       in
-  		       let pred = mkApp (m, predargs) in
-		       RewEq (pred, ty, t1, t2, c, rel, ty')
-		    | RewCast _ -> RewCast DEFAULTcast
-		    | _ -> assert false
-		  in
-                  let to_ = mkApp (m, args'') in
-		  let res = { rew_car = (* Equality case *) Homogeneous ty;
-                              rew_from = t;
-			      rew_to = to_; rew_prf;
-			      rew_evars = evars'; rew_decls = [];
-                              rew_local = local}
-		  in Success res)
-	 in state, res
-       in
-       if flags.on_morphisms then
-	 let evars, cstr', m, mty, argsl, args =
-	   let argsl = Array.to_list args in
-	   let lift = if prop then PropGlobal.lift_cstr else TypeGlobal.lift_cstr in
-	   match lift env evars argsl m mty None with
-	   | Some (evars, cstr', m, mty, args) ->
-	      evars, Some cstr', m, mty, args, Array.of_list args
-	   | None -> evars, None, m, mty, argsl, args
-	 in
-         (* let rew_evars, mty' = new_cstr_type_evar env evars in *)
-         (* let rew_evars, m' = new_cstr_evar env evars mty' in *)
-	 let state, m' = s.strategy { state ; env ; envprf; unfresh ;
-				      term1 = m ; carrier = Homogeneous mty;
-                                      term2 = m;
-				      cstr = (prop, cstr') ; evars } in
-	 match m' with
-	 | Fail -> rewrite_args state mty None (* Standard path, try rewrite on arguments *)
-	 | Identity -> rewrite_args state mty (Some false)
-	 | Success r ->
-	    (* We rewrote the function and get a proof of pointwise rel
+	      let rew_prf =
+		match r with
+		| RewEq (_, _, t1, t2, c, rel, ty') ->
+		   let predargs = Array.map2
+		      		    (fun orig anew ->
+		      		      match anew with
+		      		      | None -> orig
+		      		      | Some r ->
+		      			 match r.rew_prf with
+		      			 | RewEq (p, ty, _, _, c, rel, _) -> p
+		      			 | RewPrf _ -> assert false
+		      			 | RewCast _ -> r.rew_to)
+		      		    args args'
+		   in
+  		   let pred = mkApp (m, predargs) in
+		   RewEq (pred, ty, t1, t2, c, rel, ty')
+		| RewCast _ -> RewCast DEFAULTcast
+		| _ -> assert false
+	      in
+              let to_ = mkApp (m, args'') in
+	      let res = { rew_car = (* Equality case *) Homogeneous ty;
+                          rew_from = t;
+			  rew_to = to_; rew_prf;
+			  rew_evars = evars'; rew_decls = [];
+                          rew_local = local}
+	      in Success res
+      in
+      let rewrite_args state m' mty' success =
+        (* let evars, term2, ty2 = decompose_app_evar env evars m ty args term2 in *)
+	let state, argsres =
+	  Array.fold_left rewrite_arg
+	                  (state, ([], evars, envprf, ([], 0), unfresh,
+                                   m, m', mty, mty', success))
+                          args
+	in
+        state, treat_args argsres
+      in
+      if flags.on_morphisms then
+	let evars, cstr', m, mty, argsl, args =
+	  let argsl = Array.to_list args in
+	  let lift = if prop then PropGlobal.lift_cstr else TypeGlobal.lift_cstr in
+	  match lift env evars argsl m mty None with
+	  | Some (evars, cstr', m, mty, args) ->
+	     evars, Some cstr', m, mty, args, Array.of_list args
+	  | None -> evars, None, m, mty, argsl, args
+	in
+        (* let rew_evars, mty' = new_cstr_type_evar env evars in *)
+        (* let rew_evars, m' = new_cstr_evar env evars mty' in *)
+	let state, m' = s.strategy { state ; env ; envprf; unfresh ;
+				     term1 = m ; carrier = Homogeneous mty;
+                                     term2 = m;
+				     cstr = (prop, cstr') ; evars } in
+	match m' with
+	| Fail -> rewrite_args state m mty None (* Standard path, try rewrite on arguments *)
+	| Identity -> rewrite_args state m mty (Some false)
+	| Success r ->
+	   (* We rewrote the function and get a proof of pointwise rel
                for the arguments. We just apply it. 
                TODO: might be a respectful proof, check *)
-	    let evars, prf = match r.rew_prf with
-	      | RewPrf (rel, prf) ->
-		 let app = if prop then PropGlobal.apply_pointwise
-			   else TypeGlobal.apply_pointwise
-		 in
-                 let env =
-                   (Environ.push_rel_context envprf env)
-                 in
-		 let evars, rel, prf = app env r.rew_evars rel prf argsl in
-		 evars, RewPrf (rel, prf)
-	      | x -> r.rew_evars, x
-	    in
-            let rew_car = get_rew_car r.rew_car in
-            let car' = Reductionops.hnf_prod_appvect env (goalevars evars) rew_car args in
-	    let res =
-	      { rew_car = Homogeneous car';
-		rew_from = mkApp(r.rew_from, args); rew_to = mkApp(r.rew_to, args);
-		rew_prf = prf; rew_evars = evars; rew_decls = [];
-                rew_local = r.rew_local }
-	    in
-	    let res =
-	      match prf with
-	      | RewPrf (rel, prf) ->
-		 Success (coerce env unfresh (prop,cstr) res)
-	      | _ -> Success res
-	    in state, res
-       else rewrite_args state mty None
+	   let evars, prf = match r.rew_prf with
+	     | RewPrf (rel, prf) ->
+		let app = if prop then PropGlobal.apply_pointwise
+			  else TypeGlobal.apply_pointwise
+		in
+                let env =
+                  (Environ.push_rel_context envprf env)
+                in
+		let evars, rel, prf = app env r.rew_evars rel prf argsl in
+		evars, RewPrf (rel, prf)
+	     | x -> r.rew_evars, x
+	   in
+           let rew_car = get_rew_car r.rew_car in
+           let car' = Reductionops.hnf_prod_appvect env (goalevars evars) rew_car args in
+	   let res =
+	     { rew_car = Homogeneous car';
+	       rew_from = mkApp(r.rew_from, args); rew_to = mkApp(r.rew_to, args);
+	       rew_prf = prf; rew_evars = evars; rew_decls = [];
+               rew_local = r.rew_local }
+	   in
+	   let res =
+	     match prf with
+	     | RewPrf (rel, prf) ->
+		Success (coerce env unfresh (prop,cstr) res)
+	     | _ -> Success res
+	   in state, res
+      else rewrite_args state m mty None
+    in
+    let prod n dom codom =
+      let pointwise = noccurn 1 codom in
+      let (evars', app), unfold =
+        if pointwise then
+          let codom = subst1 mkProp codom in
+          let tdom = get_type_of env envprf evars dom in
+          let tcodom = get_type_of env envprf evars codom in
+          let arr =
+            if eq_constr tdom mkProp then PropGlobal.arrow_morphism
+            else TypeGlobal.arrow_morphism
+          in arr env evars tdom tcodom dom codom
+        else
+          let lam = mkLambda (n, dom, codom) in
+	  if eq_constr (get_rew_car carrier) mkProp then
+	    let evars, app = app_poly_sort prop env evars coq_all [| dom; lam |] in
+            (evars, app), TypeGlobal.unfold_all
+	  else
+	    let forall =
+              if prop then PropGlobal.coq_forall else TypeGlobal.coq_forall in
+            let evars, app = app_poly_sort prop env evars forall [| dom; lam |] in
+            (evars, app), TypeGlobal.unfold_forall
+      in
+      let state, res = aux { state ; env ; envprf; unfresh ;
+			     term1 = app ; carrier;
+                             term2 = app ;
+			     cstr = (prop,cstr) ; evars = evars' } in
+      let res =
+	match res with
+	| Success r -> Success { r with rew_to = unfold r.rew_to }
+	| Fail | Identity -> res
+      in state, res
+    in
+    let lambda n t b =
+      let _pointwise = noccurn 1 b in
+      let prfenv = push_rel_context envprf env in
+      let evars, t', b' =
+        match carrier with
+        | Homogeneous car -> evars, t, b
+        | Heterogeneous (car, car') ->
+           let n', t', b' = destProd car' in
+           evars, t', b'
+      in
+      let n = match n with
+        | Anonymous -> Tactics.fresh_id_in_env unfresh (Id.of_string "H") prfenv
+        | Name id -> id
+      in
+      let unfresh = n :: unfresh in
+      let n' = Tactics.fresh_id_in_env unfresh n prfenv in
+      let unfresh = n' :: unfresh in
+      let n'' = Tactics.fresh_id_in_env unfresh n prfenv in
+      let unfresh = n'' :: unfresh in
+      let open Context.Rel.Declaration in
+      let relctx = [LocalAssum (Name n'', lift 1 t'); LocalAssum (Name n', t)] in
+      let evars, relt =
+        (* if noccurn 1 b then (\* Unused argument, relation does not matter *\) *)
+        (*   app_poly_check prfenv evars coq_full_relation [| t ; t' |] *)
+        (* else *) new_hrelation_evar prop prfenv evars t t' in
+      let relty = mkApp (lift 2 relt, [|mkRel 2; mkRel 1|]) in
+      let rname = Tactics.fresh_id_in_env unfresh (Id.of_string "R") env in
+      let unfresh = rname :: unfresh in
+      let relname = Name rname in
+      let relctx = LocalAssum (relname, relty) :: relctx in
+      let envprf' = relctx @ envprf in
+      let b = lift 2 b in
+      let b' = liftn 1 2 (lift 1 b) in
+      let bty = get_type_of env envprf' evars b in
+      let bty' = get_type_of env envprf' evars b' in
+      let carrier = make_carrier bty bty' in
+      let unlift = if prop then PropGlobal.unlift_cstr else TypeGlobal.unlift_cstr in
+
+      let rec guarded_rew =
+        { strategy = fun ({ state; term1; evars; env; envprf } as input) ->
+                     if !Flags.debug then
+                       (let env = Environ.push_rel_context envprf env in
+                        Printf.printf "guarded rewrite in %s for %s\n%!"
+                                      (Pp.string_of_ppcmds
+                                         (Printer.pr_constr_env env (goalevars evars)
+                                                                term1))
+                                      (Id.to_string n));
+                     let state, res = s.strategy input in
+                     match res with
+                     | Success r ->
+                        if not (noccurn 3 r.rew_to) then
+                          (transitivity state env envprf input.unfresh prop r
+                                        (subterm true flags guarded_rew))
+                        else state, res
+                     | _ -> state, res}
+      in
+      let input =
+        { state ; env ; envprf = envprf'; unfresh ;
+	  carrier ; term1 = b ; term2 = b'; 
+	  cstr = (prop, unlift env evars cstr) ; evars }
+      in
+      let state', b' = guarded_rew.strategy input in
+      match b' with
+      | Fail | Identity -> state', b'
+      | Success r when r.rew_local && Context.Rel.length envprf == 0 ->
+         (* If we only rewrote with the local proofs, ignore *)
+         state, Identity
+      | Success r ->
+         let rew_from = mkLambda(Name n, t, substl [mkRel 1; mkRel 1] r.rew_from) in
+         let rew_to = mkLambda(Name n, t', substl [mkRel 1; mkRel 1] r.rew_to) in
+         let rew_car = 
+           match r.rew_car with
+           | Homogeneous c ->
+              if eq_constr t t' then Homogeneous (mkProd (Name n, t, c))
+              else Heterogeneous (mkProd (Name n, t, c),
+                                  mkProd (Name n, t', c))
+           | Heterogeneous (c, c') -> Heterogeneous (mkProd (Name n, t, c),
+                                                    mkProd (Name n, t', c'))
+         in
+	 (match r.rew_prf with
+	  | RewPrf _
+	    | RewEq _ ->
+	     let (rel, prf) = get_rew_prf r in
+             let rel = it_mkLambda_or_LetIn rel relctx in
+	     let point =
+	       if prop then PropGlobal.pointwise_or_dep_relation false
+	       else TypeGlobal.pointwise_or_dep_relation false
+	     in
+	     let evars, rel =
+               point env r.rew_evars (Name n') t t' relt r.rew_car rel in
+             let env = Environ.push_rel_context envprf env in
+             let prf = it_mkLambda_or_LetIn prf relctx in
+             if !Flags.debug then
+               (Printf.printf "is_pointwise: old rew_to: %s\n%!"
+                              (Pp.string_of_ppcmds
+                                 (Printer.pr_constr_env env (goalevars evars)
+                                                        r.rew_to));
+                Printf.printf "is_pointwise: rew_prf: %s, rel : %s\n%!"
+                              (Pp.string_of_ppcmds
+                                 (Printer.pr_constr_env env (goalevars evars)
+                                                        prf))
+                              (string_of_constr_env env evars rel));
+	     state', Success { r with rew_from; rew_to; rew_car;
+                                      rew_prf = RewPrf (rel, prf);
+                                      rew_evars = evars }
+	  | x ->
+             state', Success { r with rew_car; rew_from; rew_to })
+    in
+    let case ci p c brs =
+      let cty = get_type_of env envprf evars c in
+      let evars', eqty = app_poly_sort prop env evars coq_eq [| cty |] in
+      let cstr' = Some eqty in
+      let ty = (get_rew_car carrier) in
+      (* let evars', term2 = new_cstr_evar env evars ty in *)
+      let state, c' = s.strategy { state ; env ; envprf; unfresh ;
+				   carrier = Homogeneous cty;
+                                   term1 = c ; term2 = c;
+				   cstr = (prop, cstr') ; evars = evars' } in
+      let state, res =
+	match c' with
+	| Success r ->
+	   let case = mkCase (ci, lift 1 p, mkRel 1, Array.map (lift 1) brs) in
+	   let res = make_leibniz_proof env case ty r in
+	   state, Success (coerce env unfresh (prop,cstr) res)
+	| Fail | Identity ->
+	   if Array.for_all (Int.equal 0) ci.ci_cstr_ndecls then
+	     let evars', eqty = app_poly_sort prop env evars coq_eq [| ty |] in
+	     let cstr = Some eqty in
+	     let state, found, brs' =
+               Array.fold_left
+		 (fun (state, found, acc) br ->
+		   if not (Option.is_empty found) then
+		     (state, found, fun x -> lift 1 br :: acc x)
+		   else
+		     let state, res = s.strategy { state ; env ; envprf; unfresh ;
+						   term1 = br ; term2 = br;
+                                                   carrier = Homogeneous ty ;
+						   cstr = (prop,cstr) ; evars } in
+		     match res with
+		     | Success r -> (state, Some r, fun x -> mkRel 1 :: acc x)
+		     | Fail | Identity -> (state, None, fun x -> lift 1 br :: acc x))
+		 (state, None, fun x -> []) brs
+	     in
+	     match found with
+	     | Some r ->
+		let ctxc = mkCase (ci, lift 1 p, lift 1 c, Array.of_list (List.rev (brs' c'))) in
+		state, Success (make_leibniz_proof env ctxc ty r)
+	     | None -> state, c'
+	   else
+	     match try Some (fold_match env (goalevars evars) t) with Not_found -> None with
+	     | None -> state, c'
+	     | Some (cst, _, t', eff (*FIXME*)) ->
+		let state, res = aux { state ; env ; envprf; unfresh ;
+				       carrier = Homogeneous ty ;
+                                       term1 = t' ; term2 = t';
+				       cstr = (prop,cstr) ; evars } in
+		let res =
+		  match res with
+		  | Success prf ->
+		     Success { prf with
+		               rew_from = t;
+		               rew_to = unfold_match env (goalevars evars) cst prf.rew_to }
+		  | x' -> c'
+		in state, res
+      in
+      let res =
+	match res with
+	| Success r ->
+	   Success (coerce env unfresh (prop,cstr) r)
+	| Fail | Identity -> res
+      in state, res
+    in
+    match kind_of_term t with
+    | Rel n -> rel n
+    | App (m, args) -> app m args
+    | Prod (n, dom, codom) -> prod n dom codom
+    | Lambda (n, t, b) when flags.under_lambdas -> lambda n t b              
+    | Case (ci, p, c, brs) -> case ci p c brs
+    | _ -> state, Fail
+  in { strategy = aux }
 
     (* | Prod (n, x, b) when  -> *)
     (*    let tx = get_type_of env envprf evars x in *)
@@ -1811,225 +2128,6 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
     (*      | Success r -> Success { r with rew_to = unfold r.rew_to } *)
     (*      | Fail | Identity -> res *)
     (*    in state, res *)
-
-    | Prod (n, dom, codom) ->
-       let _pointwise = noccurn 1 codom in
-       let lam = mkLambda (n, dom, codom) in
-       let evars', app, unfold =
-         (* if pointwise then *)
-         (*   let codom = subst1 mkProp codom in *)
-         (*   let tdom = get_type_of env envprf evars dom in *)
-         (*   let tcodom = get_type_of env envprf evars codom in *)
-         (*   let arr = *)
-         (*     if eq_constr ty mkProp then PropGlobal.arrow_morphism *)
-         (*     else TypeGlobal.arrow_morphism *)
-         (*   in arr env evars tdom tcodom dom codom *)
-         (* else *)
-         (* let evars, domev = new_cstr_type_evar env evars in *)
-         (* let evars, codomev = new_cstr_type_evar *)
-         (*                        (push_rel (Context.Rel.Declaration.LocalAssum (n, domev)) env) evars in *)
-         (* let lam' = mkLambda (n, domev, codom) in *)
-	   if eq_constr (get_rew_car carrier) mkProp then
-	     let evars, app = app_poly_sort prop env evars coq_all [| dom; lam |] in
-             (* let evars, app' = app_poly_sort prop env evars coq_all [| domev; lam' |] in *)
-             evars, app, TypeGlobal.unfold_all
-	   else
-	     let forall =
-               if prop then PropGlobal.coq_forall else TypeGlobal.coq_forall in
-             let evars, app = app_poly_sort prop env evars forall [| dom; lam |] in
-             (* let evars, app' = app_poly_sort prop env evars forall [| domev; lam' |] in *)
-             evars, app, TypeGlobal.unfold_forall
-       in
-       let state, res = aux { state ; env ; envprf; unfresh ;
-			      term1 = app ; carrier;
-                              term2 = app ;
-			      cstr = (prop,cstr) ; evars = evars' } in
-       let res =
-	 match res with
-	 | Success r -> Success { r with rew_to = unfold r.rew_to }
-	 | Fail | Identity -> res
-       in state, res
-
-    | Lambda (n, t, b) when flags.under_lambdas ->
-       let _pointwise = noccurn 1 b in
-       let prfenv = push_rel_context envprf env in
-       let evars, t', b' =
-         match carrier with
-         | Homogeneous car -> evars, t, b
-         | Heterogeneous (car, car') ->
-            let n', t', b' = destProd car' in
-            evars, t', b
-         (* | Lambda (n, t', b') -> evars, t', b' *)
-         (* | Evar ev -> *)
-         (*    let evd, lam = Evardefine.define_evar_as_lambda prfenv (fst evars) ev in *)
-         (*    let (n, t', b') = destLambda lam in *)
-         (*    ((evd, snd evars), t', b') *)
-         (* | _ -> assert false *)
-       in
-       let n = match n with
-         | Anonymous -> Tactics.fresh_id_in_env unfresh (Id.of_string "H") prfenv
-         | Name id -> id
-       in
-       let unfresh = n :: unfresh in
-       let n' = Tactics.fresh_id_in_env unfresh n prfenv in
-       let unfresh = n' :: unfresh in
-       let n'' = Tactics.fresh_id_in_env unfresh n prfenv in
-       let unfresh = n'' :: unfresh in
-       let open Context.Rel.Declaration in
-       let relprf = envprf in
-       let relctx = [LocalAssum (Name n'', lift 1 t'); LocalAssum (Name n', t)] in
-       let evars, relt =
-         (* if noccurn 1 b then (\* Unused argument, relation does not matter *\) *)
-         (*   app_poly_check prfenv evars coq_full_relation [| t ; t' |] *)
-         (* else *) new_hrelation_evar prop prfenv evars t t' in
-       let relty = mkApp (lift 2 relt, [|mkRel 2; mkRel 1|]) in
-       let rname = Tactics.fresh_id_in_env unfresh (Id.of_string "R") env in
-       let unfresh = rname :: unfresh in
-       let relname = Name rname in
-       let relctx = LocalAssum (relname, relty) :: relctx in
-       let relprf' = relctx @ relprf in
-       let envprf' = relprf' in
-       let b = lift 2 b in
-       let b' = liftn 1 2 (lift 1 b) in
-       let bty = get_type_of env envprf' evars b in
-       let bty' = get_type_of env envprf' evars b' in
-       let carrier = make_carrier bty bty' in
-       let unlift = if prop then PropGlobal.unlift_cstr else TypeGlobal.unlift_cstr in
-
-       let rec guarded_rew =
-         { strategy = fun ({ state; term1; evars; env; envprf } as input) ->
-                if !Flags.debug then
-                  (let env = Environ.push_rel_context envprf env in
-                  Printf.printf "guarded rewrite in %s for %s\n%!"
-                                (Pp.string_of_ppcmds
-                                   (Printer.pr_constr_env env (goalevars evars)
-                                                          term1))
-                                (Id.to_string n));
-                let state, res = s.strategy input in
-                match res with
-                | Success r ->
-                   if not (noccurn 3 r.rew_to) then
-                     (transitivity state env envprf input.unfresh prop r
-                                   (subterm true flags guarded_rew))
-                   else state, res
-                | _ -> state, res}
-       in
-       let input =
-         { state ; env ; envprf = envprf'; unfresh ;
-	   carrier ; term1 = b ; term2 = b'; 
-	   cstr = (prop, unlift env evars cstr) ; evars }
-       in
-       let state', b' = guarded_rew.strategy input in
-       begin
-	 match b' with
-	 | Success r ->
-            (* If we only rewrote with the local proofs, ignore *)
-            if r.rew_local && Context.Rel.length relprf == 0 then state, Identity else 
-            let rew_from = mkLambda(Name n, t, substl [mkRel 1; mkRel 1] r.rew_from) in
-            let rew_to = mkLambda(Name n, t', substl [mkRel 1; mkRel 1] r.rew_to) in
-            let rew_car = 
-              match r.rew_car with
-              | Homogeneous c -> map_carrier (fun t -> mkProd (Name n, t, c)) carrier
-              | Heterogeneous (c, c') -> Heterogeneous (mkProd (Name n, t, c),
-                                                       mkProd (Name n, t', c'))
-            in
-	    (match r.rew_prf with
-	     | RewPrf _
-	     | RewEq _ ->
-		let (rel, prf) = get_rew_prf r in
-                let rel = it_mkLambda_or_LetIn rel relctx in
-		let point =
-		  if prop then PropGlobal.pointwise_or_dep_relation false
-		  else TypeGlobal.pointwise_or_dep_relation false
-		in
-		let evars, rel =
-                  point env r.rew_evars (Name n') t t' relt r.rew_car rel in
-                let env = Environ.push_rel_context relprf' env in
-                if !Flags.debug then
-                  (Printf.printf "is_pointwise: old rew_to: %s\n%!"
-                                 (Pp.string_of_ppcmds
-                                    (Printer.pr_constr_env env (goalevars evars)
-                                                           r.rew_to));
-                   Printf.printf "is_pointwise: rew_prf: %s, rel : %s\n%!"
-                                 (Pp.string_of_ppcmds
-                                    (Printer.pr_constr_env env (goalevars evars)
-                                                           prf))
-                                 (string_of_constr_env env evars rel));
-                let prf = it_mkLambda_or_LetIn prf relctx in
-	        state', Success { r with rew_from; rew_to; rew_car;
-                                        rew_prf = RewPrf (rel, prf);
-                                        rew_evars = evars }
-	     | x ->
-                state', Success { r with rew_car; rew_from; rew_to })
-	 | Fail | Identity -> state', b'
-       end
-         
-    | Case (ci, p, c, brs) ->
-       let cty = get_type_of env envprf evars c in
-       let evars', eqty = app_poly_sort prop env evars coq_eq [| cty |] in
-       let cstr' = Some eqty in
-       let ty = (get_rew_car carrier) in
-       (* let evars', term2 = new_cstr_evar env evars ty in *)
-       let state, c' = s.strategy { state ; env ; envprf; unfresh ;
-				    carrier = Homogeneous cty;
-                                    term1 = c ; term2 = c;
-				    cstr = (prop, cstr') ; evars = evars' } in
-       let state, res =
-	 match c' with
-	 | Success r ->
-	    let case = mkCase (ci, lift 1 p, mkRel 1, Array.map (lift 1) brs) in
-	    let res = make_leibniz_proof env case ty r in
-	    state, Success (coerce env unfresh (prop,cstr) res)
-	 | Fail | Identity ->
-	    if Array.for_all (Int.equal 0) ci.ci_cstr_ndecls then
-	      let evars', eqty = app_poly_sort prop env evars coq_eq [| ty |] in
-	      let cstr = Some eqty in
-	      let state, found, brs' =
-                Array.fold_left
-		  (fun (state, found, acc) br ->
-		    if not (Option.is_empty found) then
-		      (state, found, fun x -> lift 1 br :: acc x)
-		    else
-		      let state, res = s.strategy { state ; env ; envprf; unfresh ;
-						    term1 = br ; term2 = br;
-                                                    carrier = Homogeneous ty ;
-						    cstr = (prop,cstr) ; evars } in
-		      match res with
-		      | Success r -> (state, Some r, fun x -> mkRel 1 :: acc x)
-		      | Fail | Identity -> (state, None, fun x -> lift 1 br :: acc x))
-		  (state, None, fun x -> []) brs
-	      in
-	      match found with
-	      | Some r ->
-		 let ctxc = mkCase (ci, lift 1 p, lift 1 c, Array.of_list (List.rev (brs' c'))) in
-		 state, Success (make_leibniz_proof env ctxc ty r)
-	      | None -> state, c'
-	    else
-	      match try Some (fold_match env (goalevars evars) t) with Not_found -> None with
-	      | None -> state, c'
-	      | Some (cst, _, t', eff (*FIXME*)) ->
-		 let state, res = aux { state ; env ; envprf; unfresh ;
-					carrier = Homogeneous ty ;
-                                        term1 = t' ; term2 = t';
-					cstr = (prop,cstr) ; evars } in
-		 let res =
-		   match res with
-		   | Success prf ->
-		      Success { prf with
-		                rew_from = t;
-		                rew_to = unfold_match env (goalevars evars) cst prf.rew_to }
-		   | x' -> c'
-		 in state, res
-       in
-       let res =
-	 match res with
-	 | Success r ->
-	    Success (coerce env unfresh (prop,cstr) r)
-	 | Fail | Identity -> res
-       in state, res
-    | _ -> state, Fail
-  in { strategy = aux }
-
        
                      (* let evars, rel = app_poly_check env r.rew_evars coq_eq [| t |] in *)
 		     (* let ev = destEvar relt in *)
@@ -2105,24 +2203,25 @@ let inorder (s : 'a pure_strategy) : 'a pure_strategy =
 
 let rewrite_with l2r flags c occs : strategy = { strategy =
   fun ({ state = () } as input) ->
-    let unify env evars t =
-      let (sigma, cstrs) = evars in
-      let ans =
-        try Some (refresh_hypinfo env sigma c)
-        with e when Class_tactics.catchable e -> None
-      in
-      match ans with
-      | None -> None
-      | Some (sigma, rew) ->
-        unify_eqn rew l2r flags env (sigma, cstrs) None t
+  let unify env envprf evars t =
+    let env = push_rel_context envprf env in
+    let (sigma, cstrs) = evars in
+    let ans =
+      try Some (refresh_hypinfo env sigma c)
+      with e when Class_tactics.catchable e -> None
     in
-    let app = apply_rule unify occs in
-    let strat =
-      Strategies.fix (fun aux ->
+    match ans with
+    | None -> None
+    | Some (sigma, rew) ->
+       unify_eqn rew l2r flags env (sigma, cstrs) None t
+  in
+  let app = apply_rule unify occs in
+  let strat =
+    Strategies.fix (fun aux ->
 	Strategies.choice app (subterm true default_flags aux))
-    in
-    let _, res = strat.strategy { input with state = 0 } in
-    ((), res)
+  in
+  let _, res = strat.strategy { input with state = 0 } in
+  ((), res)
 					       }
 
 let apply_strategy (s : strategy) env unfresh concl (prop, cstr) evars =
@@ -2138,9 +2237,6 @@ let solve_constraints env (evars,cstrs) =
   let filter = all_constraints cstrs in
     Typeclasses.resolve_typeclasses env ~filter ~split:false ~fail:true
       (Typeclasses.mark_resolvables ~filter evars)
-
-let nf_zeta =
-  Reductionops.clos_norm_flags (Closure.RedFlags.mkflags [Closure.RedFlags.fZETA])
 
 exception RewriteFailure of Pp.std_ppcmds
 
@@ -2309,7 +2405,8 @@ let cl_rewrite_clause_newtac ?abs ?origsigma debug ~progress strat clause =
       let sigma = match origsigma with None -> sigma | Some sigma -> sigma in
       treat sigma res <*>
       (** For compatibility *)
-      beta <*> opt_beta <*> Proofview.shelve_unifiable
+        beta <*> opt_beta <*>
+        (if not debug then Proofview.shelve_unifiable else Tacticals.New.tclIDTAC)
     with
     | PretypeError (env, evd, (UnsatisfiableConstraints _ as e)) ->
       raise (RewriteFailure (Himsg.explain_pretype_error env evd e))
@@ -2348,7 +2445,10 @@ let apply_lemma_ai inferpat l2r flags oc by loccs : strategy = { strategy =
     let { c1; c2; car; rel; prf; sort; holes } = hypinfo in
     let rew = (car, rel, prf, c1, c2, holes, sort) in
     let evars = (sigma, cstrs) in
-    let unify env evars t = unify_eqn rew l2r flags env evars by t in
+    let unify env envprf evars t =
+      let env = push_rel_context envprf env in
+      unify_eqn rew l2r flags env evars by t
+    in
     let strat = apply_rule unify loccs in
     let ipat =
       if inferpat then
@@ -2384,7 +2484,8 @@ let apply_lemma_aofi inferpat l2r flags oc by loccs : strategy =
   fun ({ state = () ; env ; term1 = t ; evars = (sigma, cstrs) } as input) ->
     let sigma, rew, pat = get_rew env sigma in
     let evars = (sigma, cstrs) in
-    let unify env evars t =
+    let unify env envprf evars t =
+      let env = push_rel_context envprf env in
       match unify_eqn rew l2r flags env evars by t with
       | Some info ->
 	 (match !state with
@@ -2807,7 +2908,7 @@ let unification_rewrite l2r c1 c2 sigma prf car rel but env =
   let prfty = nf (Retyping.get_type_of env sigma prf) in
   let sort = sort_of_rel env sigma but in
   let abs = prf, prfty in
-  let prf = mkRel 1 in
+  let prf = prf in (* FIXME changes the proof term *)
   let res = (car, rel, prf, c1, c2) in
   abs, sigma, res, Sorts.is_prop sort
 
@@ -2829,7 +2930,7 @@ let general_rewrite_flags = { under_lambdas = false; on_morphisms = true }
 (** Setoid rewriting when called with "rewrite" *)
 let general_s_rewrite cl l2r occs (c,l) ~new_goals gl =
   let abs, evd, res, sort = get_hyp gl (c,l) cl l2r in
-  let unify env evars t = unify_abs res l2r sort env evars t in
+  let unify env envprf evars t = unify_abs res l2r sort env envprf evars t in
   let app = apply_rule unify occs in
   let recstrat aux = Strategies.choice app (subterm true general_rewrite_flags aux) in
   let substrat = Strategies.fix recstrat in

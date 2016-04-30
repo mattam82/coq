@@ -58,7 +58,8 @@ Program Instance iff_iff_iff_impl_morphism : Proper (iff ==> iff ==> iff) impl.
 
 (** Morphisms for quantifiers *)
 
-Program Instance ex_iff_morphism {A : Type} : Proper (pointwise_relation A iff ==> iff) (@ex A).
+Program Instance ex_iff_morphism {A : Type} :
+  Proper (pointwise_relation A iff ==> iff) (@ex A).
 
 Program Instance ex_impl_morphism {A : Type} :
   Proper (pointwise_relation A impl ==> impl) (@ex A) | 1.
@@ -137,12 +138,118 @@ Proof.
  intros y Ryx. now apply WF', EQ.
 Qed.
 
+Definition related_proper {A} R (m : A) : Related R m m -> @Proper A R m :=
+  fun x => x.
+
+Ltac solve_related :=
+  match goal with
+  |- Proper _ _ => apply related_proper; typeclasses eauto
+  end.
+
+Import ProperNotations.
+Local Open Scope signature_scope.
+(* Instance related_forall {A : Type} (B : A -> Prop) (B' : A -> Prop) : *)
+(*   (forall x y, Related iff (B x) (B' y)) -> *)
+(*   Related iff (forall x : A, B x) (forall y : A, B' y). *)
+(* Proof. firstorder. Defined. *)
+
+Instance related_forall {A : Type} (B : A -> Prop) (B' : A -> Prop) R (S : Prop -> Prop -> Prop) :
+  Related (pointwise_relation A R) B B' ->
+  Proper (pointwise_relation A R ==> S) (@all A) ->
+  Related S (forall x : A, B x) (forall y : A, B' y).
+Proof. firstorder. Defined.
+
 (** Equivalent relations are simultaneously well-founded or not *)
 Instance well_founded_morphism {A : Type} :
  Proper (relation_equivalence ==> iff) (@well_founded A).
 Proof. 
   unfold well_founded.
+  solve_proper. (* solve_related. *)
+Qed.
 
-  red. intros. red. intros. setoid_rewrite debug H.
-  solve_proper.
+(* To sort *)
+
+Class IsEquiv {A B} (f : A -> B) :=
+  { inv : B -> A;
+    sect : forall x, f (inv x) = x;
+    retr : forall x, inv (f x) = x }.
+
+Hint Resolve sect retr.
+Require Import ProofIrrelevance.
+
+Lemma iff_related_proj1 {A B : Prop} (p : Related iff A B) : A -> B.
+  now destruct p. 
+Defined.
+
+Lemma iff_related_proj2 {A B : Prop} (p : Related iff A B) : B -> A.
+  now destruct p. 
+Defined.
+
+Instance is_equiv_prop {A B : Prop} (p : Related iff A B) : IsEquiv (iff_related_proj1 p).
+Proof.
+  refine {| inv := proj2 p |}; intros; apply proof_irrelevance.
+Defined.
+
+Definition IsEquiv_rel {A B} f {I : @IsEquiv A B f} : A -> B -> Prop :=
+  fun (p : A) (q : B) => f p = q /\ inv q = p.
+
+Import ProperNotations.
+Local Open Scope signature_scope.
+
+Instance equiv_all_iff A B f (I : @IsEquiv A B f) :
+  Related (∀ _ : (∀ _ : (IsEquiv_rel f) x y, iff) _ _, iff) (@all A) (@all B).
+Proof.
+  intros P P' rPP'.
+  red in rPP'.
+  unfold all; split; intros fall x. 
+  - rewrite <- rPP';[apply (fall (inv x))|split].
+    + apply sect.
+    + auto.
+  - rewrite rPP';[apply (fall (f x))|split].
+    + trivial.
+    + apply retr.
+Qed.
+Require Import Program.Basics.
+
+Class HasSection {A B} (f : A -> B) :=
+  { sinv : B -> A;
+    ssect : forall x, f (sinv x) = x }.
+
+Class HasRetraction {A B} (f : A -> B) :=
+  { rinv : B -> A;
+    rretr : forall x, rinv (f x) = x }.
+
+Instance equiv_has_section A B f (I : @IsEquiv A B f) : HasSection f :=
+  {| sinv := inv; ssect := sect |}.
+
+Instance equiv_has_retraction A B f (I : @IsEquiv A B f) : HasRetraction f :=
+  {| rinv := inv; rretr := retr |}.
+
+Definition HasSection_rel {A B} f {I : @HasSection A B f} : A -> B -> Prop :=
+  fun (p : A) (q : B) => f p = q /\ sinv q = p.
+
+Definition HasRetraction_rel {A B} f {I : @HasRetraction A B f} : A -> B -> Prop :=
+  fun (p : A) (q : B) => f p = q /\ rinv q = p.
+
+Instance equiv_all_impl A B f (I : @HasSection A B f) :
+  Related (∀ _ : (∀ _ : (HasSection_rel f) x y, impl) _ _, impl) (@all A) (@all B).
+Proof.
+  intros P P' rPP'.
+  red in rPP'.
+  unfold all; intros fall x. 
+  - rewrite <- rPP';[apply (fall (sinv x))|split].
+    + apply ssect.
+    + auto.
+Qed.
+
+Instance equiv_all_flip_impl A B f (I : @HasRetraction A B f) :
+  Related (∀ _ : (∀ _ : (HasRetraction_rel f) x y, flip impl) _ _, flip impl)
+          (@all A) (@all B).
+Proof.
+  intros P P' rPP'.
+  red in rPP'.
+  unfold all; intros fall x. 
+  - rewrite rPP';[apply (fall (f x))|split].
+    + trivial.
+    + apply rretr.
 Qed.
