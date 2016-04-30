@@ -21,6 +21,9 @@ Require Export Coq.Classes.RelationClasses.
 Generalizable Variables A eqA B C D R RA RB RC m f x y.
 Local Obligation Tactic := simpl_relation.
 
+Tactic Notation "refinetc" uconstr(u) :=
+  simple refine noclass u; shelve_unifiable.
+
 (** * Morphisms.
 
    We now turn to the definition of [Proper] and declare standard instances.
@@ -572,23 +575,104 @@ Hint Extern 4 (@Proper _ _ _) => partial_application_tactic
 Hint Extern 7 (@Proper _ _ _) => proper_reflexive 
   : typeclass_instances.
 
-
-Lemma related_app A (R : relation A) B (S : relation B) f f' a a' :
-  Related (R ==> S)%signature f f' -> Related R a a' ->
-  Related S (f a) (f' a').
-Proof. intros H; intros H'. apply H. apply H'. Defined.
-
-Hint Extern 1 (Related ?S (?f ?a) (?f' ?a')) =>
-  once match goal with
-  | [ H : Related ?R ?a ?a' |- _ ] => eapply (@related_app _ R _ S f f' a a'); [|apply H]
-  | _ => eapply (@related_app _ _ _ S f f' a a')
-  end : typeclass_instances.
+(** Related theory *)
 
 Hint Extern 0 (Related _ _ _) =>
 match goal with
   |- let _ := _ in _ => let hyp := fresh in intros hyp
 end : typeclass_instances.
 
+(** Applications *)
+
+Lemma related_app A (R : relation A) B (S : relation B) f f' a a' :
+  Related (R ==> S)%signature f f' -> Related R a a' ->
+  Related S (f a) (f' a').
+Proof. intros H; intros H'. apply H. apply H'. Defined.
+
+Lemma related_app_dep {A A'} (R : A -> A' -> Prop)
+      {B : A -> Type} {B' : A' -> Type} (S : forall x y, R x y -> B x -> B' y -> Prop)
+      (f : forall x : A, B x) (f' : forall x : A', B' x) a a' :
+  Related (∀ H : R a a', S a a' H)%signature f f' ->
+  forall H : Related R a a',
+    Related (S a a' H) (f a) (f' a').
+Proof. intros H; intros H'. apply H. Defined.
+
+Ltac related_app_tac :=
+   match goal with
+     |- Related ?S (?f ?a) (?f' _) =>
+     match goal with
+     | [ H : Related ?R a ?a' |- _ ] =>
+       refinetc (@related_app _ R _ S f f' a a' _ H) ||
+       refinetc (@related_app_dep _ _ R _ _ _ f f' a a' _ H)
+     | _ =>
+       refinetc (@related_app _ _ _ S f f' a _ _ _) ||
+       refinetc (@related_app_dep _ _ _ _ _ _ f f' a _ _ _)
+     end
+   end.
+
+Hint Extern 3 (Related _ (_ _) (_ _)) => related_app_tac : typeclass_instances.
+
+(** Abstractions *)
+
+Instance related_lambda {A A' : Type} (B : A -> Type) (B' : A' -> Type)
+         (b : forall x : A, B x) (b' : forall y : A', B' y)
+         (R : hrel A A') (S : forall x y (α : R x y), B x -> B' y -> Prop) :
+  (forall x y (α : Related R x y), Related (S x y α) (b x) (b' y)) ->
+  Related (∀ α : R x y, S x y α) (fun x => b x) (fun y => b' y).
+Proof. intros H f g. apply H. Defined.
+
+(** Subrelations *)
+
+Instance related_subrelation {A B} (R S : hrel A B) x y :
+  Related R x y -> hsubrelation _ _ R S -> Related S x y | 10.
+Proof. firstorder. Defined.
+Hint Cut [!*; related_subrelation;related_subrelation] : typeclass_instances.
+
+Local Open Scope signature_scope.
+Arguments hsubrelation {A B} _ _.
+Existing Class hsubrelation.
+
+Instance hsubrelation_respectful_hetero {A B} {C D} R R' S S' :
+  forall subRR' : hsubrelation R' R,
+    (forall x y (H : R' x y), hsubrelation (S x y (subRR' x y H)) (S' x y H)) ->
+    hsubrelation (@respectful_hetero A B C D R S)
+                 (∀ H : R' x y, S' x y H).
+Proof.
+  intros subRR' subSS' f g Sfg x y R'xy.
+  apply subSS'. apply Sfg.
+Defined.
+
+Lemma hsubrelation_refl {A B} (R : hrel A B) : hsubrelation R R.
+Proof. firstorder. Defined.
+
+Hint Extern 4 (hsubrelation _ _) =>
+  solve [ eapply hsubrelation_refl ] : typeclass_instances.
+
+Instance subrelation_hsubrelation A (R S : hrel A A) :
+  subrelation R S -> hsubrelation R S | 1000 := fun x => x.
+Instance hsubrelation_subrelation A (R S : hrel A A) :
+  hsubrelation R S -> subrelation R S | 1000 := fun x => x.
+Hint Cut [!*; subrelation_hsubrelation; hsubrelation_subrelation]
+  : typeclass_instances.
+Hint Cut [!*; hsubrelation_subrelation; subrelation_hsubrelation]
+  : typeclass_instances.
+
+Class NotArrow {A B : Type} (R : hrel A B).
+Hint Extern 0 (NotArrow ?R) =>
+  match R with
+  | @respectful_hetero _ _ _ _ _ _ => fail 1
+  | respectful _ _ => fail 1
+  | pointwise_relation _ _ _ => fail 1
+  | _ => split
+  end : typeclass_instances.
+
+Instance related_refl {A} (R : relation A)
+         (NA : NotArrow R) (** Prevents finding eq ==> eq to be reflexive! *)
+         (HR : Reflexive R) (m : A) :
+  Related R m m | 2.
+Proof. red. reflexivity. Defined.
+
+Hint Cut [!*; related_subrelation; related_refl] : typeclass_instances.
 
 (** Special-purpose class to do normalization of signatures w.r.t. flip. *)
 
