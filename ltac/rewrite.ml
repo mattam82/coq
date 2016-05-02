@@ -164,11 +164,15 @@ let string_of_constr envprf env evars c =
     (Printer.pr_constr_env (Environ.push_rel_context envprf env)
                            (goalevars evars) c)
 
-let new_cstr_evar env (evd,cstrs) t =
+let new_goal_evar env (evd,cstrs) t =
   let s = Typeclasses.set_resolvable Evd.Store.empty false in
   let evd = Sigma.Unsafe.of_evar_map evd in
   let Sigma (t, evd', _) = Evarutil.new_evar ~store:s env evd t in
   let evd' = Sigma.to_evar_map evd' in
+  (evd', cstrs), t
+
+let new_cstr_evar env (evd,cstrs) t =
+  let (evd', cstrs), t = new_goal_evar env (evd,cstrs) t in
   let ev, _ = destEvar t in
     (evd', Evar.Set.add ev cstrs), t
 
@@ -577,6 +581,8 @@ end) = struct
       | App (f, [| a; b; relb |]) when Globnames.is_global (pointwise_relation_ref ()) f ->
 	decomp_pointwise (pred n) relb
       | App (f, [| a; b; rela; relb |]) when Globnames.is_global (respectful_ref ()) f ->
+	decomp_pointwise (pred n) relb
+      | App (f, [| a; b; c; d; rela; relb |]) when Globnames.is_global (respectfulh_ref ()) f ->
 	decomp_pointwise (pred n) relb
       | App (f, [| a; b; arelb |]) when Globnames.is_global (forall_relation_ref ()) f ->
 	decomp_pointwise (pred n) (Reductionops.beta_applist (arelb, [mkRel 1]))
@@ -1636,6 +1642,10 @@ let make_carrier t t' =
   if eq_constr t t' then Homogeneous t
   else Heterogeneous (t, t')
 
+let is_homogeneous = function
+  | Homogeneous _ -> true
+  | Heterogeneous _ -> false
+                     
 let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
   let rec aux { state ; env ; envprf; unfresh;
 		term1 = t ; term2; carrier ; cstr = (prop, cstr) ; evars } =
@@ -1660,6 +1670,7 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
       let rewrite_arg (state, (acc, evars, envprf, lifti, unfresh, appm, appm',
                                ty, ty', progress))
                       arg =
+        let deprew, progress = progress in
         let env' = push_rel_context envprf env in
         let na, carrier, ty, ty' =
           let ty = Reductionops.whd_betadeltaiota env' (goalevars evars) ty in
@@ -1669,12 +1680,21 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
              na, make_carrier t t', b, b'
           | _ -> assert false
         in
+        let arg' = lift (snd lifti) arg in
+        let same progress =
+          let (evars, arg2), deprew =
+            match carrier with
+            | Homogeneous car -> (evars, arg'), deprew
+            | Heterogeneous (car, car') ->
+               new_goal_evar env evars car', true
+          in
+          (None :: acc, evars, envprf, lifti, unfresh,
+           mkApp (appm, [| arg' |]), mkApp (appm', [| arg2 |]),
+           subst1 arg' ty, subst1 arg2 ty', (deprew, progress))
+        in
 	if not (Option.is_empty progress) && not all then
-	  state, (None :: acc, evars, envprf, lifti, unfresh,
-                  mkApp (appm, [| arg |]), mkApp (appm', [| arg |]),
-                  subst1 arg ty, subst1 arg ty', progress)
+	  state, same progress
 	else
-          let arg' = lift (snd lifti) arg in
 	  let state, res = s.strategy { state ; env ; envprf ;
 					unfresh ;
 					term1 = arg' ;
@@ -1683,17 +1703,6 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 					cstr = (prop,None) ;
 					evars = evars } in
 	  let res' =
-            let same progress =
-              let evars, arg2 =
-                match carrier with
-                | Homogeneous car -> evars, arg'
-                | Heterogeneous (car, car') ->
-                   new_cstr_evar env evars car'
-              in
-              (None :: acc, evars, envprf, lifti, unfresh,
-               mkApp (appm, [| arg' |]), mkApp (appm', [| arg2 |]),
-               subst1 arg' ty, subst1 arg' ty', progress)
-            in
 	    match res with
 	    | Fail -> same progress
 	    | Identity ->
@@ -1701,22 +1710,28 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
                  if Option.is_empty progress then Some false else progress in
                same progress
 	    | Success r ->
-               let rel, prf = get_rew_prf r in
-               let evars, rel' =
-                 mk_related prop env r.rew_evars r.rew_car rel r.rew_from r.rew_to in
-               let name =
-                 let id = match na with Anonymous -> Id.of_string "H" | Name na -> na in
-                 Tactics.fresh_id_in_env unfresh (add_suffix id "_rew") env in
-               let unfresh = name :: unfresh in
-               let hyp = Context.Rel.Declaration.LocalDef (Name name, prf, rel') in
-               let envprf = hyp :: envprf in
-               let subst, lifti = lifti in
-               let subst = substl subst prf :: subst in
-               (* let r' = subst_rewrite_result subst r in *)
-	       (Some r :: acc, evars, envprf, (subst, succ lifti), unfresh,
-                lift 1 (mkApp (appm, [| r.rew_from |])),
-                lift 1 (mkApp (appm', [| r.rew_to |])),
-                lift 1 (subst1 r.rew_from ty), lift 1 (subst1 r.rew_to ty'), Some true)
+               (* if noccurn 1 ty && is_homogeneous carrier && not deprew then *)
+               (*   (\* Fast path: no dependency *\) *)
+               (*   (Some r :: acc, evars, envprf, lifti, unfresh, *)
+               (*    appm, appm', subst1 mkProp ty, subst1 mkProp ty', *)
+               (*    (deprew, Some true)) *)
+               (* else *)
+                 let rel, prf = get_rew_prf r in
+                 let evars, rel' =
+                   mk_related prop env r.rew_evars r.rew_car rel r.rew_from r.rew_to in
+                 let name =
+                   let id = match na with Anonymous -> Id.of_string "H" | Name na -> na in
+                   Tactics.fresh_id_in_env unfresh (add_suffix id "_rew") env in
+                 let unfresh = name :: unfresh in
+                 let hyp = Context.Rel.Declaration.LocalDef (Name name, prf, rel') in
+                 let envprf = hyp :: envprf in
+                 let subst, lifti = lifti in
+                 let subst = substl subst prf :: subst in
+	         (Some r :: acc, evars, envprf, (subst, succ lifti), unfresh,
+                  lift 1 (mkApp (appm, [| r.rew_from |])),
+                  lift 1 (mkApp (appm', [| r.rew_to |])),
+                  lift 1 (subst1 r.rew_from ty), lift 1 (subst1 r.rew_to ty'),
+                  (not (noccurn 1 ty) || deprew, Some true))
 	  in state, res'
       in
       let args_progress args' =
@@ -1749,16 +1764,18 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 	  None args'
       in
       let treat_args (args', evars', envprf', lifti, unfresh',
-                      appm, appm', ty, ty', progress) =
+                      appm, appm', ty, ty', (deprew, progress)) =
 	match progress with
 	| None -> Fail
 	| Some false -> Identity
 	| Some true ->
 	   let args' = Array.of_list (List.rev args') in
-	   match args_progress args' with
-	   | None -> Identity
-	   | Some (local, RewPrf _) ->
-	      (* Printf.printf "app: %s \n" (string_of_constr envprf env evars' (mkApp (m, args)));		                                                               *)  
+	   match args_progress args', deprew with
+	   | None, _ -> Identity
+	   | Some (local, RewPrf _), _
+           | Some (local, RewEq _), true ->
+	      Printf.printf "app: %s -> %s \n%!" (string_of_constr envprf env evars' appm)
+                            (string_of_constr envprf env evars' appm');  
               let env' = push_rel_context envprf' env in
               let appcar = make_carrier ty ty' in
               let subst, lifti = lifti in
@@ -1804,8 +1821,9 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 			  rew_to = c2; rew_prf = RewPrf (rel, prf);
 			  rew_evars = evars'; rew_decls = []; rew_local = local }
 	      in Success res
-	   | Some (local, r) ->
-	      (* Printf.printf "app: %s ty: %s \n" (string_of_constr envprf env evars' (mkApp (m, args))) (string_of_constr envprf env evars ty); *)
+	   | Some (local, r), _ ->
+	      if !Flags.debug then
+                Printf.printf "app: %s ty: %s \n" (string_of_constr envprf env evars' appm) (string_of_constr envprf env evars ty);
 	      let args'' = Array.map2
 			     (fun aorig anew ->
 			       match anew with None -> aorig
@@ -1843,7 +1861,7 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 	let state, argsres =
 	  Array.fold_left rewrite_arg
 	                  (state, ([], evars, envprf, ([], 0), unfresh,
-                                   m, m', mty, mty', success))
+                                   m, m', mty, mty', (false, success)))
                           args
 	in
         state, treat_args argsres
@@ -2297,6 +2315,7 @@ let cl_rewrite_clause_aux ?(abs=None) debug strat env avoid sigma concl is_hyp
               let ty = Evarutil.nf_evar evars' ty in
 		mkApp (mkLambda (Name (Id.of_string "lemma"), ty, p), [| t |])
 	  in
+          let term = if not debug then Tacred.simpl env evars' term else term in
 	  let proof = match is_hyp with
             | None -> term
             | Some id -> mkApp (term, [| mkVar id |])
@@ -2352,7 +2371,10 @@ let cl_rewrite_clause_newtac ?abs ?origsigma debug ~progress strat clause =
         let gls = List.rev (Evd.fold_undefined fold undef []) in
 	match clause, prf with
 	| Some id, Some p ->
-           let tac = Refine.refine ~unsafe:false { run = fun h -> Sigma (p, h, Sigma.refl) }
+           let tac = Refine.refine
+                       ~unsafe:false
+                       { run = fun h ->
+                               Sigma (p, h, Sigma.refl) }
 		     <*> Proofview.Unsafe.tclNEWGOALS gls in
             Proofview.Unsafe.tclEVARS undef <*>
 	    assert_replacing id newt tac
