@@ -343,9 +343,9 @@ let pf_filtered_hyps gls =
   Goal.V82.hyps gls.Evd.sigma (sig_it gls)
 
 let make_hints g st only_classes sign =
-  let paths, hintlist =
+  let hintlist =
     List.fold_left
-    (fun (paths, hints) hyp ->
+    (fun hints hyp ->
       let consider =
         let open Context.Named.Declaration in
 	try let t = Global.lookup_named (get_id hyp) |> get_type in
@@ -354,12 +354,11 @@ let make_hints g st only_classes sign =
 	with Not_found -> true
      in
       if consider then 
-	let path, hint =
-	  PathEmpty, pf_apply make_resolve_hyp g st (true,false,false) only_classes None hyp
-	in
-	  (PathOr (paths, path), hint @ hints)
-      else (paths, hints))
-    (PathEmpty, []) sign
+	let hint =
+	  pf_apply make_resolve_hyp g st (true,false,false) only_classes None hyp
+	in hint @ hints
+      else hints)
+    [] sign
   in Hint_db.add_list (pf_env g) (project g) hintlist (Hint_db.empty st true)
 
 let make_autogoal_hints =
