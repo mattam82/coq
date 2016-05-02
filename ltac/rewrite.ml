@@ -1776,8 +1776,9 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 	   | None, _ -> Identity
 	   | Some (local, RewPrf _), _
            | Some (local, RewEq _), true ->
-	      Printf.printf "app: %s -> %s \n%!" (string_of_constr envprf env evars' appm)
-                            (string_of_constr envprf env evars' appm');  
+	      if !Flags.debug then
+                Printf.printf "app: %s -> %s \n%!" (string_of_constr envprf env evars' appm)
+                              (string_of_constr envprf env evars' appm');  
               let env' = push_rel_context envprf' env in
               let appcar = make_carrier ty ty' in
               let subst, lifti = lifti in
