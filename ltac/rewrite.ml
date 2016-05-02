@@ -583,7 +583,8 @@ end) = struct
       | App (f, [| a; b; rela; relb |]) when Globnames.is_global (respectful_ref ()) f ->
 	decomp_pointwise (pred n) relb
       | App (f, [| a; b; c; d; rela; relb |]) when Globnames.is_global (respectfulh_ref ()) f ->
-	decomp_pointwise (pred n) relb
+         let _, relb = decompose_lam_n 3 relb in
+	 decomp_pointwise (pred n) relb
       | App (f, [| a; b; arelb |]) when Globnames.is_global (forall_relation_ref ()) f ->
 	decomp_pointwise (pred n) (Reductionops.beta_applist (arelb, [mkRel 1]))
       | _ -> invalid_arg "decomp_pointwise"
@@ -1958,7 +1959,8 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
         match carrier with
         | Homogeneous car -> evars, t, b
         | Heterogeneous (car, car') ->
-           let n', t', b' = destProd car' in
+           (* let n', t', b' = destLambda term2 in (\* FIXME can fail *\) *)
+           let n', t', b' = destProd car' in (* FIXME can fail *)
            evars, t', b'
       in
       let n = match n with
@@ -1972,11 +1974,21 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
       let unfresh = n'' :: unfresh in
       let open Context.Rel.Declaration in
       let relctx = [LocalAssum (Name n'', lift 1 t'); LocalAssum (Name n', t)] in
-      let evars, relt =
-        (* if noccurn 1 b then (\* Unused argument, relation does not matter *\) *)
-        (*   app_poly_check prfenv evars coq_full_relation [| t ; t' |] *)
-        (* else *) new_hrelation_evar prop prfenv evars t t' in
-      let relty = mkApp (lift 2 relt, [|mkRel 2; mkRel 1|]) in
+      let evars, relt, relty =
+        (* Make the relation typeable in env, if the type is not
+           too dependent *)
+        let len = List.length envprf in
+        let car = get_rew_car carrier in
+        let codom =
+          try pi3 (destProd car)
+          with e -> get_type_of env (LocalAssum (Name n, t) :: envprf) evars b in 
+        let env, lifti =
+          if noccur_between 1 (len + 1) codom then env, len + 2
+          else prfenv, 2
+        in
+        let evars, relt = new_hrelation_evar prop env evars t t' in
+        evars, relt, lift lifti relt in
+      let relty = mkApp (relty, [|mkRel 2; mkRel 1|]) in
       let rname = Tactics.fresh_id_in_env unfresh (Id.of_string "R") env in
       let unfresh = rname :: unfresh in
       let relname = Name rname in
@@ -1989,7 +2001,7 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
       let carrier = make_carrier bty bty' in
       let unlift = if prop then PropGlobal.unlift_cstr else TypeGlobal.unlift_cstr in
 
-      let rec guarded_rew =
+      let rec guarded_rew called =
         { strategy = fun ({ state; term1; evars; env; envprf } as input) ->
                      if !Flags.debug then
                        (let env = Environ.push_rel_context envprf env in
@@ -1998,21 +2010,16 @@ let rec subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
                                          (Printer.pr_constr_env env (goalevars evars)
                                                                 term1))
                                       (Id.to_string n));
-                     let state, res = s.strategy input in
-                     match res with
-                     | Success r ->
-                        if not (noccurn 3 r.rew_to) then
-                          (transitivity state env envprf input.unfresh prop r
-                                        (subterm true flags guarded_rew))
-                        else state, res
-                     | _ -> state, res}
+                     if called || not (noccurn 3 term1) then
+                       (subterm true flags (guarded_rew true)).strategy input
+                     else state, Identity}
       in
       let input =
         { state ; env ; envprf = envprf'; unfresh ;
 	  carrier ; term1 = b ; term2 = b'; 
 	  cstr = (prop, unlift env evars cstr) ; evars }
       in
-      let state', b' = guarded_rew.strategy input in
+      let state', b' = (Strategies.seq s (guarded_rew false)).strategy input in
       match b' with
       | Fail | Identity -> state', b'
       | Success r when r.rew_local && Context.Rel.length envprf == 0 ->
