@@ -394,6 +394,22 @@ TACTIC EXTEND simple_refine_notc
     refine_tac ist true flags c ]
 END
 
+let solve_constraints_tac ist =
+  Proofview.Goal.enter { enter = begin fun gl ->
+    let env = Proofview.Goal.env gl in
+    let evd = Proofview.Goal.sigma gl in
+    let evd = Sigma.to_evar_map evd in
+    let evd = Evarconv.consider_remaining_unif_problems env evd in
+    try Evarconv.check_problems_are_solved env evd;
+        Proofview.Unsafe.tclEVARS evd
+    with e -> Proofview.tclZERO e
+  end }
+
+TACTIC EXTEND solve_constraints
+| [ "resolve_constraints" ] -> [
+    solve_constraints_tac ist ]
+END
+
 (**********************************************************************)
 (* Inversion lemmas (Leminv)                                          *)
 
