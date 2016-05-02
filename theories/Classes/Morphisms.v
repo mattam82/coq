@@ -45,7 +45,14 @@ Section Proper.
   Class RelatedProxy {A' : Type} (R : A -> A' -> Prop) (m : A) (m' : A') : Prop :=
     related_proxy : R m m'.
   
-  Global Instance proper_related R m : Proper R m -> Related R m m | 1000 := fun x => x.
+  Global Instance proper_related R m : Proper R m -> Related R m m | 1 := fun x => x.
+
+  (* Global Instance related_proper R x : Related R x x -> Proper R x := fun x => x. *)
+  
+  (* Global Hint Cut [!* ; related_proper; !*; proper_related] *)
+  (*   : typeclass_instances. *)
+  (* Global Hint Cut [!* ; proper_related; !*; related_proper] *)
+  (*   : typeclass_instances. *)
 
   (** Every element in the carrier of a reflexive relation is a morphism
    for this relation.  We use a proxy class for this case which is used
@@ -60,14 +67,14 @@ Section Proper.
     proper_proxy : R m m.
 
   Lemma eq_proper_proxy (x : A) : ProperProxy (@eq A) x.
-  Proof. firstorder. Qed.
+  Proof. firstorder. Defined.
   
   Lemma reflexive_proper_proxy `(Reflexive A R) (x : A) : ProperProxy R x.
-  Proof. firstorder. Qed.
-
+  Proof. red. apply H. Defined.
+  
   Lemma proper_proper_proxy x `(Proper R x) : ProperProxy R x.
-  Proof. firstorder. Qed.
-
+  Proof. apply H. Defined.
+  
   (** Respectful morphisms. *)
   
   (** The fully dependent version, not used yet. *)
@@ -79,6 +86,13 @@ Section Proper.
   (R' : forall (x : A) (y : B), R x y -> C x -> D y -> Prop) :
     (forall x : A, C x) -> (forall x : B, D x) -> Prop :=
     fun f g => forall x y (H : R x y), R' x y H (f x) (g y).
+
+  Definition pointwise_relation_hetero
+             (A B : Type)
+             (C : A -> Type) (D : B -> Type)
+             (R : forall (x : A) (y : B), C x -> D y -> Prop) :
+    (forall x : A, C x) -> (forall x : B, D x) -> Prop :=
+    fun f g => forall x y, R x y (f x) (g y).
   
   (** The non-dependent version is an instance where we forget dependencies. *)
   
@@ -86,6 +100,11 @@ Section Proper.
     Eval compute in @respectful_hetero A A (fun _ => B) (fun _ => B) R (fun _ _ _ => R').
 
 End Proper.
+
+Arguments proper_related /. 
+Arguments eq_proper_proxy /.
+Arguments reflexive_proper_proxy /.
+Arguments proper_proper_proxy /.
 
 (** We favor the use of Leibniz equality or a declared reflexive relation 
   when resolving [ProperProxy], otherwise, if the relation is given (not an evar),
@@ -100,6 +119,7 @@ Hint Extern 2 (ProperProxy ?R _) =>
 Delimit Scope signature_scope with signature.
 
 Arguments respectful_hetero {_ _ _ _ _} R'%signature _ _.
+Arguments pointwise_relation_hetero {_ _ _ _} R%signature _ _.
 
 Module ProperNotations.
 
@@ -125,6 +145,10 @@ Module ProperNotations.
     (at level 200, α ident, right associativity)
     : signature_scope.
 
+  Notation "'λ'  v1 v2 , S " := (pointwise_relation_hetero (fun v1 v2 => S))
+    (at level 55, v1 ident, v2 ident, right associativity)
+    : signature_scope.
+  
 End ProperNotations.
 
 Arguments Proper {A}%type R%signature m.
@@ -171,14 +195,8 @@ Ltac f_equiv :=
 
 Definition hrel A B := A -> B -> Prop.
 
-Definition forall_relationh A B (P : A -> Type) (Q : B -> Type)
-             (Rarg : hrel A B)
-             (sig : forall a b, Rarg a b -> hrel (P a) (Q b)) :
-  hrel (forall x : A, P x) (forall x : B, Q x) :=
-    fun f g => forall a b r, sig a b r (f a) (g b).
-
-Definition hsubrelation (A : Type) (B : Type) : hrel A B -> hrel A B -> Prop :=
-  fun R R' => forall (x : A) (y : B), R x y -> R' x y.
+Class hsubrelation (A : Type) (B : Type) (R : hrel A B) (R' : hrel A B) : Prop :=
+  is_hsubrelation : forall (x : A) (y : B), R x y -> R' x y.
 
 Section Relations.
   Let U := Type.
@@ -211,13 +229,13 @@ Section Relations.
   
   Lemma subrelation_respectful `(subl : subrelation A RA' RA, subr : subrelation B RB RB') :
     subrelation (RA ==> RB) (RA' ==> RB').
-  Proof. unfold subrelation in *; firstorder. Qed.
-
+  Proof. unfold subrelation in *; firstorder. Defined.
+  
   (** And of course it is reflexive. *)
   
   Lemma subrelation_refl R : @subrelation A R R.
-  Proof. unfold subrelation; firstorder. Qed.
-
+  Proof. unfold subrelation; trivial. Defined.
+  
   (** [Proper] is itself a covariant morphism for [subrelation].
    We use an unconvertible premise to avoid looping.
    *)
@@ -227,7 +245,7 @@ Section Relations.
         `(sub : subrelation A R' R) : Proper R m.
   Proof.
     intros. apply sub. apply mor.
-  Qed.
+  Defined.
 
   Global Instance proper_subrelation_proper :
     Proper (subrelation ++> eq ==> impl) (@Proper A).
@@ -235,13 +253,18 @@ Section Relations.
 
   Global Instance pointwise_subrelation `(sub : subrelation B R R') :
     subrelation (pointwise_relation R) (pointwise_relation R') | 4.
-  Proof. reduce. unfold pointwise_relation in *. apply sub. apply H. Qed.
+  Proof. reduce. unfold pointwise_relation in *. apply sub. apply H. Defined.
   
   (** For dependent function types. *)
   Lemma forall_subrelation (R S : forall x : A, relation (P x)) :
     (forall a, subrelation (R a) (S a)) -> subrelation (forall_relation R) (forall_relation S).
   Proof. reduce. apply H. apply H0. Qed.
 End Relations.
+
+Arguments subrelation_respectful /.
+Arguments subrelation_refl /.
+Arguments subrelation_proper /.
+Arguments pointwise_subrelation /.
 
 Typeclasses Opaque respectful pointwise_relation forall_relation.
 Arguments forall_relation {A P}%type sig%signature _ _.
@@ -313,14 +336,10 @@ Section GenericInstances.
  
   (** The [flip] too, actually the [flip] instance is a bit more general. *)
 
-  Program Definition flip_proper
+  Definition flip_proper
           `(mor : Proper (A -> B -> C) (RA ==> RB ==> RC) f) :
-    Proper (RB ==> RA ==> RC) (flip f) := _.
-  
-  Next Obligation.
-  Proof.
-    apply mor ; auto.
-  Qed.
+    Proper (RB ==> RA ==> RC) (flip f). 
+  Proof. reduce. apply mor ; auto. Defined.
 
 
   (** Every Transitive relation gives rise to a binary morphism on [impl],
@@ -462,15 +481,14 @@ Section GenericInstances.
     split ; intros ; intuition.
   Qed.
 
-  
   (** Treating flip: can't make them direct instances as we
    need at least a [flip] present in the goal. *)
   
   Lemma flip1 `(subrelation A R' R) : subrelation (flip (flip R')) R.
-  Proof. firstorder. Qed.
+  Proof. firstorder. Defined.
   
   Lemma flip2 `(subrelation A R R') : subrelation R (flip (flip R')).
-  Proof. firstorder. Qed.
+  Proof. firstorder. Defined.
   
   (** That's if and only if *)
   
@@ -485,12 +503,17 @@ Section GenericInstances.
   only for immediately solving goals without variables. *)
   
   Lemma reflexive_proper `{Reflexive A R} (x : A) : Proper R x.
-  Proof. firstorder. Qed.
+  Proof. firstorder. Defined.
   
   Lemma proper_eq (x : A) : Proper (@eq A) x.
   Proof. intros. apply reflexive_proper. Qed.
   
 End GenericInstances.
+
+Arguments flip1 /.
+Arguments flip2 /.
+Arguments flip_proper /.
+Arguments reflexive_proper /.
 
 Class PartialApplication.
 
@@ -582,12 +605,19 @@ match goal with
   |- let _ := _ in _ => let hyp := fresh in intros hyp
 end : typeclass_instances.
 
+(* Instance proper_proxy_related_proxy A (R : relation A) m : *)
+(*   ProperProxy R m -> RelatedProxy R m m := fun x => x. *)
+
+(* Instance related_proxy_related A (R : relation A) m m' : *)
+(*   Related R m m' -> RelatedProxy R m m' := fun x => x. *)
+
 (** Applications *)
 
 Lemma related_app A (R : relation A) B (S : relation B) f f' a a' :
   Related (R ==> S)%signature f f' -> Related R a a' ->
   Related S (f a) (f' a').
 Proof. intros H; intros H'. apply H. apply H'. Defined.
+Arguments related_app /.
 
 Lemma related_app_dep {A A'} (R : A -> A' -> Prop)
       {B : A -> Type} {B' : A' -> Type} (S : forall x y, R x y -> B x -> B' y -> Prop)
@@ -596,19 +626,93 @@ Lemma related_app_dep {A A'} (R : A -> A' -> Prop)
   forall H : Related R a a',
     Related (S a a' H) (f a) (f' a').
 Proof. intros H; intros H'. apply H. Defined.
+Arguments related_app_dep /.
+
+Lemma related_app_nodep {A A'}
+      {B : A -> Type} {B' : A' -> Type} (S : forall x y, B x -> B' y -> Prop)
+      (f : forall x : A, B x) (f' : forall x : A', B' x) a a' :
+  Related (λ a a', S a a')%signature f f' ->
+  Related (S a a') (f a) (f' a').
+Proof. intros H'. apply H'. Defined.
+Arguments related_app_nodep /.
+
+Hint Extern 3 (Related (∀ _ : ?R x y, ?S) ?s _) =>
+  progress change (Proper (R ==> S) s) : typeclass_instances.
+
+Ltac is_indep ty :=
+  match ty with
+  | forall _ : _, ?B => idtac
+  end.
 
 Ltac related_app_tac :=
-   match goal with
-     |- Related ?S (?f ?a) (?f' _) =>
-     match goal with
-     | [ H : Related ?R a ?a' |- _ ] =>
-       refinetc (@related_app _ R _ S f f' a a' _ H) ||
-       refinetc (@related_app_dep _ _ R _ _ _ f f' a a' _ H)
-     | _ =>
-       refinetc (@related_app _ _ _ S f f' a _ _ _) ||
-       refinetc (@related_app_dep _ _ _ _ _ _ f f' a _ _ _)
-     end
-   end.
+  match goal with
+  | |- Related ?S (?f ?a) (?f' ?a') =>
+    lazymatch goal with
+    | [ H : Related ?R a a' |- _ ] =>
+      (* idtac "Found matching argument"; *)
+      let fty := type of f in
+      let fty' := type of f' in
+      tryif once (is_indep fty; unify fty fty')
+      then
+        (* idtac "Applying non-dependent congruence"; *)
+        once (refinetc (@related_app _ _ _ _ f f' a a' _ H); clear H)
+        (* idtac "Applied non-dependent congruence"; show_goal *)
+      else
+        (pattern a, a', H;
+         (* show_goal; *)
+         let pred :=
+             match goal with
+               |- (fun xa xa' H => Related (@?Q xa xa' H) _ _) _ _ _ => constr:(Q)
+             end
+         in
+        match pred with
+        | (fun xa xa' H => @?Q xa xa' H) =>
+          (* idtac "Found dependent predicate"; *)
+            cbv beta;
+            let newpred := constr:(fun xa xa' H => pred xa xa' H) in
+            refinetc (@related_app_dep _ _ R _ _ newpred f f' a a' _ H); cbv beta;
+            clear H
+                                                                                       
+        | (fun xa xa' _ => @?Q xa xa') => 
+          (* idtac "Found non-dependent predicate" Q; *)
+            refinetc (@related_app_nodep _ _ _ _ Q f f' a a' _); cbv beta
+        end)
+    | _ =>
+      let fty := type of f in
+      let fty' := type of f' in
+      tryif once (is_indep fty; unify fty fty') then
+        once (refinetc (@related_app _ _ _ _ f f' a a' _ _))
+      else
+        ((* idtac "No matching argument"; *)
+          pattern a, a';
+        (* show_goal; *)
+        let pred :=
+            match goal with
+              |- (fun xa xa' => Related (@?Q xa xa') _ _) _ _ => constr:(Q)
+            end
+        in simpl;
+          match pred with
+          | _ =>
+            (* idtac "applying nodep"; *)
+            refinetc (@related_app _ _ _ _ f f' a _ _ _) ||
+            refinetc (@related_app_nodep _ _ _ _ pred f f' a a' _); cbv beta
+        | (fun xa xa' => @?Q xa xa') =>
+          let tya := type of a in
+          let tya' := type of a' in
+          let id := fresh in 
+          evar(id : tya -> tya' -> Prop);
+          let newrel := constr:(fun xa xa' (H : id xa xa') => pred xa xa') in
+            (* cbv beta bug , no subst in evars! *) simpl;
+          (* show_goal; *)
+            (* idtac "newpred" newpred; *)
+          refinetc (@related_app_dep _ _ id _ _ newrel f f' a a' _ _); subst id;
+          cbv beta
+        end)
+    | _ =>
+      refinetc (@related_app _ _ _ S f f' a _ _ _) ||
+      refinetc (@related_app_dep _ _ _ _ _ _ f f' a _ _ _)
+    end
+  end.
 
 Hint Extern 3 (Related _ (_ _) (_ _)) => related_app_tac : typeclass_instances.
 
@@ -620,17 +724,29 @@ Instance related_lambda {A A' : Type} (B : A -> Type) (B' : A' -> Type)
   (forall x y (α : Related R x y), Related (S x y α) (b x) (b' y)) ->
   Related (∀ α : R x y, S x y α) (fun x => b x) (fun y => b' y).
 Proof. intros H f g. apply H. Defined.
+Arguments related_lambda /.
 
 (** Subrelations *)
 
 Instance related_subrelation {A B} (R S : hrel A B) x y :
   Related R x y -> hsubrelation _ _ R S -> Related S x y | 10.
 Proof. firstorder. Defined.
-Hint Cut [!*; related_subrelation;related_subrelation] : typeclass_instances.
+Hint Cut [!*; related_subrelation; related_subrelation] : typeclass_instances.
+Arguments related_subrelation /.
 
 Local Open Scope signature_scope.
 Arguments hsubrelation {A B} _ _.
-Existing Class hsubrelation.
+
+(* Instance hetero_subrel {A B} (R R' : A -> B -> Prop) {C D} (S S' : C -> D -> Prop) : *)
+(*   subrelation_h _ _ R' R -> subrelation_h _ _ S S' -> *)
+(*   subrelation_h _ _ (∀ _ : R, S) (∀ _ : R', S'). *)
+(* Proof. firstorder. Defined. *)
+
+Instance hsubrelation_resp {A} (R R' : A -> A -> Prop) {C} (S S' : C -> C -> Prop) :
+  hsubrelation R' R -> hsubrelation S S' ->
+  hsubrelation (∀ _ : R, S) (R' ==> S').
+Proof. firstorder. Defined.
+Arguments hsubrelation_resp /. 
 
 Instance hsubrelation_respectful_hetero {A B} {C D} R R' S S' :
   forall subRR' : hsubrelation R' R,
@@ -641,9 +757,11 @@ Proof.
   intros subRR' subSS' f g Sfg x y R'xy.
   apply subSS'. apply Sfg.
 Defined.
+Arguments hsubrelation_respectful_hetero /.
 
 Lemma hsubrelation_refl {A B} (R : hrel A B) : hsubrelation R R.
 Proof. firstorder. Defined.
+Arguments hsubrelation_refl /.
 
 Hint Extern 4 (hsubrelation _ _) =>
   solve [ eapply hsubrelation_refl ] : typeclass_instances.
@@ -652,10 +770,12 @@ Instance subrelation_hsubrelation A (R S : hrel A A) :
   subrelation R S -> hsubrelation R S | 1000 := fun x => x.
 Instance hsubrelation_subrelation A (R S : hrel A A) :
   hsubrelation R S -> subrelation R S | 1000 := fun x => x.
-Hint Cut [!*; subrelation_hsubrelation; hsubrelation_subrelation]
+Hint Cut [!*; subrelation_hsubrelation; !*; hsubrelation_subrelation]
   : typeclass_instances.
-Hint Cut [!*; hsubrelation_subrelation; subrelation_hsubrelation]
+Hint Cut [!*; hsubrelation_subrelation; !*; subrelation_hsubrelation]
   : typeclass_instances.
+Arguments subrelation_hsubrelation /.
+Arguments hsubrelation_subrelation /.
 
 Class NotArrow {A B : Type} (R : hrel A B).
 Hint Extern 0 (NotArrow ?R) =>
@@ -671,7 +791,7 @@ Instance related_refl {A} (R : relation A)
          (HR : Reflexive R) (m : A) :
   Related R m m | 2.
 Proof. red. reflexivity. Defined.
-
+Arguments related_refl /.
 Hint Cut [!*; related_subrelation; related_refl] : typeclass_instances.
 
 (** Special-purpose class to do normalization of signatures w.r.t. flip. *)
