@@ -530,8 +530,9 @@ let reduce_mind_case_use_function func env sigma mia =
 let match_eval_ref env constr = 
   match kind_of_term constr with
   | Const (sp, u) when is_evaluable env (EvalConstRef sp) ->
-      Some (EvalConst sp, u)
-  | Var id when is_evaluable env (EvalVarRef id) -> Some (EvalVar id, Univ.Instance.empty)
+     Some (EvalConst sp, u)
+  | Var id when is_evaluable env (EvalVarRef id) ->
+     Some (EvalVar id, Univ.Instance.empty)
   | Rel i -> Some (EvalRel i, Univ.Instance.empty)
   | Evar ev -> Some (EvalEvar ev, Univ.Instance.empty)
   | _ -> None
