@@ -640,7 +640,8 @@ Hint Extern 3 (Related (∀ _ : ?R x y, ?S) ?s _) =>
   progress change (Proper (R ==> S) s) : typeclass_instances.
 
 Ltac is_indep ty :=
-  match ty with
+  let hty := eval hnf in ty in
+  match hty with
   | forall _ : _, ?B => idtac
   end.
 
