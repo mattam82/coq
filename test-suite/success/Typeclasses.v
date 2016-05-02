@@ -130,3 +130,16 @@ Module IterativeDeepening.
   Qed.
 
 End IterativeDeepening.
+
+Module Cut.
+  Class A.
+  Class B.
+  Instance ba : B -> A | 0.
+  Instance ab : A -> B | 0.
+             
+  Hint Cut [!*; ab; !*; ba] : typeclass_instances.
+  Hint Cut [!*; ba; !*; ab] : typeclass_instances.
+  Set Typeclasses Debug.
+  Check (_ : A).
+  Check (_ : B).
+End Cut.  
