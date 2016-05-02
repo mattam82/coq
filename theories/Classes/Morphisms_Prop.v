@@ -175,6 +175,12 @@ Class IsEquiv {A B} (f : A -> B) :=
     retr : forall x, inv (f x) = x }.
 
 Hint Resolve sect retr.
+
+Instance is_equiv_id {A : Type} : IsEquiv (@id A).
+Proof.
+  refine {| inv := id |}; reflexivity. 
+Defined.
+
 Require Import ProofIrrelevance.
 
 Lemma iff_related_proj1 {A B : Prop} (p : Related iff A B) : A -> B.
@@ -253,3 +259,70 @@ Proof.
     + trivial.
     + apply rretr.
 Qed.
+
+Lemma eq_prop_related_proj1 {A B : Prop} (p : Related eq A B) : A -> B.
+  now destruct p. 
+Defined.
+
+Lemma eq_prop_related_proj2 {A B : Prop} (p : Related eq A B) : B -> A.
+  now destruct p. 
+Defined.
+
+Lemma eq_related_proj1 {A B : Type} (p : Related eq A B) : A -> B.
+  now destruct p. 
+Defined.
+
+Lemma eq_related_proj2 {A B : Type} (p : Related eq A B) : B -> A.
+  now destruct p. 
+Defined.
+
+Instance is_equiv_eq_type {A B : Type} (p : Related eq A B) :
+  IsEquiv (eq_related_proj1 p).
+Proof.
+  destruct p. simpl. apply is_equiv_id.
+Defined.
+
+Instance is_equiv_eq_prop_type {A B : Prop} (p : Related eq A B) :
+  IsEquiv (eq_prop_related_proj1 p).
+Proof.
+  destruct p. simpl. apply is_equiv_id.
+Defined.
+
+(*
+
+Instance full_subrelation_equivalence A : Equivalence (full_relation A A).
+Proof. firstorder. Defined.
+
+Instance full_subrelation_subrelation A R : subrelation R (full_relation A A).
+Proof. firstorder. Defined.
+
+Instance full_subrelation_pointwise A B (R S : relation B) :
+  subrelation S R ->
+  subrelation (full_relation A A ==> S) (pointwise_relation A R).
+Proof. firstorder. Defined.
+
+Instance all_hetero_R_eq_morphism {A : Type} {R} {HR : Reflexive R} :
+  Proper ((∀ _ : R _ _, @eq Prop) ==> iff) (@all A) | 2.
+Proof.
+  unfold Proper, all. intros f g eqfg. red in eqfg.
+  split. intros x y. now erewrite <- (eqfg y).
+  intros x y; now erewrite eqfg.
+Qed.
+
+Instance all_full_hetero_R_eq_morphism :
+    Proper (∀ α : eq A A', (∀ _ : (∀ _ : (full_relation A A') _ _, @eq Prop) _ _, iff)) (@all) | 2.
+Proof.
+  unfold Proper, all. intros A A' -> f g eqfg.
+  split. intros x' y'. red in eqfg. erewrite <- (eqfg y' y'). apply x'. red. exact I.
+  intros. red in eqfg. erewrite (eqfg x x). apply H. exact I.
+Qed.
+
+Instance all_partialapp (T : Type) :
+    Proper (∀ _ : (∀ _ : (full_relation T T) _ _, @eq Prop) _ _, iff) (@all T) | 2.
+Proof.
+  unfold Proper, all. intros f g eqfg.
+  split. intros x' y'. red in eqfg. erewrite <- (eqfg y' y'). apply x'. red. exact I.
+  intros. red in eqfg. erewrite (eqfg x x). apply H. exact I.
+Qed.
+
+*)
