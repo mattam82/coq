@@ -123,20 +123,6 @@ Qed.
 *)
 Require Import Morphisms.
 
-Instance proper_proxy_related_proxy A (R : relation A) m :
-  ProperProxy R m -> RelatedProxy R m m := fun x => x.
-
-Instance related_proxy_related A (R : relation A) m m' :
-  Related R m m' -> RelatedProxy R m m' := fun x => x.
-
-Instance proper_related A (R : relation A) m :
-  Proper R m -> Related R m m := fun x => x.
-
-Instance related_lam A (R : relation A) B (S : relation B) b b' :
-  (forall x y (H : R x y), Related S (b x) (b' y)) ->
-  Related (R ==> S)%signature (fun x : A => b x) (fun x : A => b' x).
-Proof. intros H; intros x y. apply H. Defined.
-
 Local Open Scope signature.
 
 (* Goal forall *)
@@ -150,147 +136,20 @@ Local Open Scope signature.
 (*   tauto. *)
 (* Qed. *)
 
-Instance full_subrelation_equivalence A : Equivalence (full_relation A A).
-Proof. firstorder. Defined.
-
-Instance full_subrelation_subrelation A R : subrelation R (full_relation A A).
-Proof. firstorder. Defined.
-
-Instance full_subrelation_pointwise A B (R S : relation B) :
-  subrelation S R ->
-  subrelation (full_relation A A ==> S) (pointwise_relation A R).
-Proof. firstorder. Defined.
-
-
-(* Instance full_subrelation_pointwise A B (R S : relation B) : *)
-(*   subrelation S R -> *)
-(*   subrelation (full_relation A A ==> S) (pointwise_relation A R). *)
-(* Proof. firstorder. Defined. *)
-
-
-(* Instance all_R_iff_morphism {A : Type} {R} (HR : Reflexive R) : *)
-(*   Proper ((R ==> iff) ==> iff) (@all A) | 2. *)
-(* Proof. *)
-(*   unfold Proper. intros f g eqfg. red in eqfg. *)
-(*   split. intros af x. rewrite <- eqfg. apply af. reflexivity. *)
-(*   intros ag x; rewrite eqfg. apply ag. reflexivity. *)
-(* Qed. *)
-
-Notation " R ===> S" := (respectful_hetero (R := full_relation _ _)
-                                           (fun x y (_ : R x y) => S))
-                         (at level 200, right associativity)
-                       : signature_scope.
-
-Instance all_hetero_R_eq_morphism {A : Type} {R} {HR : Reflexive R} :
-  Proper ((∀ _ : R _ _, @eq Prop) ==> iff) (@all A) | 2.
-Proof.
-  unfold Proper, all. intros f g eqfg. red in eqfg.
-  split. intros x y. now erewrite <- (eqfg y).
-  intros x y; now erewrite eqfg.
-Qed.
-
-Instance all_full_hetero_R_eq_morphism :
-    Proper (∀ α : eq A A', (∀ _ : (∀ _ : (full_relation A A') _ _, @eq Prop) _ _, iff)) (@all) | 2.
-Proof.
-  unfold Proper, all. intros A A' -> f g eqfg.
-  split. intros x' y'. red in eqfg. erewrite <- (eqfg y' y'). apply x'. red. exact I.
-  intros. red in eqfg. erewrite (eqfg x x). apply H. exact I.
-Qed.
-
-Instance all_partialapp (T : Type) :
-    Proper (∀ _ : (∀ _ : (full_relation T T) _ _, @eq Prop) _ _, iff) (@all T) | 2.
-Proof.
-  unfold Proper, all. intros f g eqfg.
-  split. intros x' y'. red in eqfg. erewrite <- (eqfg y' y'). apply x'. red. exact I.
-  intros. red in eqfg. erewrite (eqfg x x). apply H. exact I.
-Qed.
-
-(* Instance all_full_hetero_R_eq_morphism (R : relation Type) *)
-(*          (R' : forall A A', R A A' -> (A -> Prop) -> (A' -> Prop) -> Prop) *)
-(*          (* (R'' : forall A A' (e : R A A') -> forall P P', R' A A' e P P' ->  *) *)
-(*   : *)
-(*     Proper (∀ α : R A A', (∀ _ : (R' A A' α) _ _, iff)) (@all) | 2. *)
-(* Proof. *)
-(*   unfold Proper, all. intros f g eqfg. *)
-(*   intros x y Rxy.  *)
-(*   split. intros x' y'. now erewrite <- (eqfg y). *)
-(*   intros x y; now erewrite eqfg. *)
-(* Qed. *)
-
-Class subrelation_h (A : Type) (B : Type) (R S : hrel A B) :=
-  is_subrelation : hsubrelation R S. 
-
-Instance subrelation_h_subrelation A R S :
-  subrelation_h A A R S -> subrelation R S := fun x => x.
-
-Instance subrelation_subrelation_h A R S :
-  subrelation R S -> subrelation_h A A R S := fun x => x.
-
-Hint Cut [!* ; subrelation_h_subrelation; subrelation_subrelation_h]
-     : typeclass_instances.
-
-Hint Cut [!* ; subrelation_subrelation_h; subrelation_h_subrelation]
-     : typeclass_instances.
-
-Instance hetero_subrel {A B} (R R' : A -> B -> Prop) {C D} (S S' : C -> D -> Prop) :
-  subrelation_h _ _ R' R -> subrelation_h _ _ S S' ->
-  subrelation_h _ _ (∀ _ : R, S) (∀ _ : R', S').
-Proof. firstorder. Defined.
-
-Instance hetero_subrel_resp {A} (R R' : A -> A -> Prop) {C} (S S' : C -> C -> Prop) :
-  subrelation_h _ _ R' R -> subrelation_h _ _ S S' ->
-  subrelation_h _ _ (∀ _ : R, S) (R' ==> S').
-Proof. firstorder. Defined.
-
-(* Hint Extern 4 (subrelation_h _ _  (@respectful_hetero _ _ _ _ ?R ?S) *)
-(*                              (@respectful_hetero _ _ _ _ ?R' ?S')) => *)
-(*  apply (hetero_subrel R R' S S') : typeclass_instances. *)
-
-
 Axiom cheat : forall {A}, A.
-Set Typeclasses Debug.
-
-Instance related_proper A R x : @Proper A R x -> Related R x x := fun x => x.
-
-Hint Cut [!* ; related_proper; !*; proper_related]
-     : typeclass_instances.
-Hint Cut [!* ; proper_related; related_proper]
-     : typeclass_instances.
 
 Ltac related_proper :=
   match goal with
   |- Related ?R ?x ?x => change (Proper R x)
   end.
-
-Lemma related_app A (R : relation A) B (S : relation B) f f' a a' :
-  Related (R ==> S)%signature f f' -> Related R a a' ->
-  Related S (f a) (f' a').
-Proof. intros H; intros H'. apply H. apply H'. Defined.
-
-Hint Extern 1 (Related ?S (?f ?a) (?f' ?a')) =>
-  lazymatch goal with
-  | [ H : Related ?R ?a ?a' |- _ ] => eapply (@related_app _ R _ S f f' a a'); [|apply H]
-  | _ => eapply (@related_app _ _ _ S f f' a a')
-  end : typeclass_instances.
-
-Hint Extern 0 (Related _ _ _) =>
-match goal with
-  |- let _ := _ in _ => let hyp := fresh in intros hyp; pose proof do_subrelation
-end : typeclass_instances.
+Require Import Program.Tactics.
 
 Goal forall (x y : nat) (P : nat -> Prop) (e : x = y), P y -> True -> P x.
 Proof.
   intros x y P e H.
-  setoid_rewrite debug e. trivial.
-Defined.
-
-(* Definition respectful_hetero_dep *)
-(*   (A B : Type) *)
-(*   (C : A -> Type) (D : B -> Type) *)
-(*   (R : A -> B -> Prop) (ab : A -> B) *)
-(*   (R' : forall (x : A), R x ( x) -> C x -> D (f x) -> Prop) : *)
-(*     (forall x : A, C x) -> (forall x : B, D x) -> Prop := *)
-(*     fun f g => forall x (H : R x (f x)), R' x H (f x) (g (f x)). *)
+  setoid_rewrite debug e. trivial. 
+  (* FIXME *)
+  Abort.
 
 Ltac forward H :=
   match type of H with
@@ -320,64 +179,37 @@ Proof.
 Abort.
 Instance: Reflexive iff.
 red. intros. split; intros; trivial. Defined.
+Require Import Morphisms_Prop.
 
 Section dependent_eq.
 Variable P : nat -> Prop.
 Variable dependent : forall n, P n -> Prop.
 
-Require Import Morphisms_Prop.
-Instance all_eq_morphism :
-  Proper (forall_relation (fun A => (pointwise_relation A iff) ==> iff)) (@all) | 2.
-Proof.
-  unfold Proper, all. intros A f g eqfg. red in eqfg.
-  split. intros x y; now rewrite <- eqfg.
-  intros x y; now rewrite eqfg.
-Qed.
+Variable dependent_mor :
+  Proper (∀ H : eq n n', λ pn pn', flip impl) dependent.
+Set Typeclasses Modulo Eta.
 
-Lemma eq_prop_related_proj1 {A B : Prop} (p : Related eq A B) : A -> B.
-  now destruct p. 
-Defined.
-
-Lemma eq_prop_related_proj2 {A B : Prop} (p : Related eq A B) : B -> A.
-  now destruct p. 
-Defined.
-
-Lemma eq_related_proj1 {A B : Type} (p : Related eq A B) : A -> B.
-  now destruct p. 
-Defined.
-
-Lemma eq_related_proj2 {A B : Type} (p : Related eq A B) : B -> A.
-  now destruct p. 
-Defined.
-
-Instance is_equiv_id {A : Type} : IsEquiv (@id A).
-Proof.
-  refine {| inv := id |}; reflexivity. 
-Defined.
-
-Instance is_equiv_eq_type {A B : Type} (p : Related eq A B) :
-  IsEquiv (eq_related_proj1 p).
-Proof.
-  destruct p. simpl. apply is_equiv_id.
-Defined.
-
-Instance is_equiv_eq_prop_type {A B : Prop} (p : Related eq A B) :
-  IsEquiv (eq_prop_related_proj1 p).
-Proof.
-  destruct p. simpl. apply is_equiv_id.
-Defined.
 
 Goal forall (n n' : nat) (e : n = n') (H : forall (pn' : P n'), dependent n' pn')
        (pn : P n), dependent n pn.
 Proof.
   intros n n' e pn' d.
-  revert d.
+  assert(P n') by now setoid_rewrite <- e.
+  setoid_rewrite e.
+  apply (pn' H).
+Qed.
+
+Goal forall (n n' : nat) (e : n = n') (H : forall (pn' : P n'), dependent n' pn')
+       (pn : P n), dependent n pn.
+Proof.
+  intros n n' e pn' d. revert d.
   setoid_rewrite debug e. apply pn'.
-  shelve. shelve. related_app_tac.
-  related_app_tac. Focus 2.
-  related_app_tac. clear P_rew.
-  refine (@Morphisms_Prop.equiv_all_iff (P n) (P n') (@eq_prop_related_proj1 (P n) (P n') A_rew) _).
- Abort.
+  shelve. shelve. 
+  (* refine (HasRetraction_rel _). *)
+  clear H_rew.
+  apply _.
+  apply _.
+Qed.
 End dependent_eq.
 
 Section dependent_abs.
@@ -387,87 +219,41 @@ Section dependent_abs.
   Variable dependent : forall n, P n -> nat.
   Variable ProperP : Proper (eq ==> iff) P.
   Variable Heq : Equivalence eq.
-  Variable HR:Proper
-               (∀ R : eq n n',
-                   (∀ _ : (full_relation (P n) (P n')) x y, eq))
-               dependent.
+  Variable HR:Proper (∀ R : eq n n', λ _ _, eq) dependent.
 
   Goal forall (n n' : nat) (e : eq n n') 
          (pn : P n) (pn' : P n'), eq (dependent n pn) (dependent n' pn').
   Proof.
     intros n n' e pn pn'.
-    setoid_rewrite debug e.
-    intros. eapply reflexivity. shelve. apply HR. apply e. split.
-    apply _. 
+    setoid_rewrite e. apply reflexivity.
   Qed.
+End dependent_abs.
+
+Goal forall (x y : nat) (P Q : nat -> Prop) (e : x = y), P y -> Q x -> P x.
+Proof.
+  intros x y P Q e H.
+  setoid_rewrite e. trivial.
+Qed.
 
 
-(* Goal forall (x y : nat) (P Q : nat -> Prop) (e : x = y), P y -> Q x -> P x. *)
-(* Proof. *)
-(*   intros x y P Q e H. *)
-(*   set(prf:=fun p => eq_rew nat (fun __abs__ : nat => Q __abs__) y x (symmetry e) p). *)
-(*   assert(IsEquiv prf). *)
-(*   refine ({| inv := eq_rew nat (fun __abs__ : nat => Q __abs__) x y e |}). *)
-(*   intros. destruct e. reflexivity. *)
-(*   intros. destruct e. reflexivity. *)
-(*   evar (R : Q x -> Q y -> Prop). *)
-(*   assert (Related *)
-(*             (∀ _ : (∀ _ : ?R x y, iff) _ _, iff)  (@all (Q x)) (@all (Q y))). *)
-(*   refine (equiv_all_iff _ _ _ _). *)
-(*   specialize (H1 (fun _ => P x) (fun _ => P y)). *)
-(*   simpl in H1. unfold respectful_hetero in H1. *)
-(*   red in H1. *)
-(*   unfold all in H1. apply H1. *)
-(*   intros. rewrite e. reflexivity. *)
-(*   intros; apply H. *)
-(* Qed.  *)
-
-
-(* Goal forall (x y : nat) (P Q : nat -> Prop) (e : x = y), P y -> Q x -> P x. *)
-(* Proof. *)
-(*   intros x y P Q e H. *)
-(*   set(R:=fun (p : Q x) (q : Q y) => True). *)
-(*   assert (Related *)
-(*             (∀ _ : (∀ _ : R x y, iff) _ _, iff)  (@all (Q x)) (@all (Q y))). *)
-(*   clear. *)
-(*   reduce. red in H. *)
-(*   unfold all in *. split; intros.  *)
-(*   rewrite <- H. apply H0. unfold R. split.  *)
-(*   rewrite H. apply H0. red. split.  *)
-(*   specialize (H0 (fun _ => P x) (fun _ => P y)). simpl in H0. *)
-(*   unfold respectful_hetero in H0. *)
-(*   red in H0. *)
-(*   unfold all in H0. apply H0. *)
-(*   intros. rewrite e. reflexivity. *)
-(*   intros; apply H. *)
-(* Abort. *)
-
-(* Definition respectful_heteron *)
-(*   (A B : Type) *)
-(*   (C : A -> Type) (D : B -> Type) *)
-(*   (R : A -> B -> Prop) *)
-(*   (R' : forall (x : A) (y : B), C x -> D y -> Prop) : *)
-(*     (forall x : A, C x) -> (forall x : B, D x) -> Prop := *)
-(*     fun f g => forall x y (H : R x y), R' x y (f x) (g y). *)
-  
-(* Goal forall (x y : nat) (P Q : nat -> Prop) (e : x = y), P y -> Q x -> P x. *)
-(* Proof. *)
-(*   intros x y P Q e H. *)
-(*   set(R:=fun (p : Q x) (q : Q y) => True). *)
-(*   assert (Related *)
-(*             (∀ _ : (respectful_heteron _ _ _ _ (full_relation (Q x) (Q y)) (fun _ _ => iff)) _ _, iff)  (@all (Q x)) (@all (Q y))). *)
-(*   clear. *)
-(*   reduce. red in H. *)
-(*   unfold all in *. split; intros.  *)
-(*   rewrite <- H. apply H0. red. split.  *)
-(*   rewrite H. apply H0. red. split.  *)
-(*   specialize (H0 (fun _ => P x) (fun _ => P y)). simpl in H0. *)
-(*   unfold respectful_heteron in H0. *)
-(*   red in H0. *)
-(*   unfold all in H0. apply H0. *)
-(*   intros. rewrite e. reflexivity. *)
-(*   intros; apply H. *)
-(* Abort. *)
+Goal forall (x y : nat) (P Q : nat -> Prop) (e : x = y), P y -> Q x -> P x.
+Proof.
+  intros x y P Q e H.
+  set(R:=fun (p : Q x) (q : Q y) => True).
+  assert (Related
+            (∀ _ : (∀ _ : R x y, iff) _ _, iff)  (@all (Q x)) (@all (Q y))).
+  clear.
+  reduce. red in H.
+  unfold all in *. split; intros.
+  rewrite <- H. apply H0. unfold R. split.
+  rewrite H. apply H0. red. split.
+  specialize (H0 (fun _ => P x) (fun _ => P y)). simpl in H0.
+  unfold respectful_hetero in H0.
+  red in H0.
+  unfold all in H0. apply H0.
+  intros. rewrite e. reflexivity.
+  intros; apply H.
+Abort.
 
 (** Check proper refreshing of the lemma application for multiple 
    different instances in a single setoid rewrite. *)
@@ -480,10 +266,12 @@ Section mult.
   Context (anat : forall A, nat -> A).
 
 Goal forall x, (fold _ _ (fun x => ab A x) (add A x) = anat _ (fold _ _ (ab nat) (add _ x))). 
-Proof. intros.
-  setoid_rewrite fold_lemma. 
+Proof.
+  intros.
+  setoid_rewrite fold_lemma.
   change (fold A A (fun x0 : A => ab A x0) x = anat A (fold A nat (ab nat) x)).
-Abort.
+  (* Order of resolution can matter... due to fake dependencies *)
+Admitted.
 End mult.
 
 (** Real fold morphisms *)
@@ -539,20 +327,17 @@ Proof.
   transitivity (y x0).
   auto. auto.
 Qed.
+Goal True.
 
 Lemma fold_proper_test l : fold_right (fun x y => plus x y + 0) 0 l = 0.
 Proof.
   setoid_rewrite plus_comm at 1.
-  Show Proof.
-  change(fold_right (fun x y : nat => 0 + (x + y)) 0 l = 0).
+  admit.
 Abort.
-
 
 Lemma fold_proper_test' l : fold_right (fun x y => plus x y) 0 l = 0.
 Proof.
-  Set Typeclasses Debug.
   setoid_rewrite plus_comm.
-  Show Proof.
   change(fold_right (fun x y : nat => y + x) 0 l = 0).
 Abort.
 
