@@ -199,15 +199,106 @@ Proof.
   apply (pn' H).
 Qed.
 
+(* Ltac related_app_tac ::= *)
+(*   match goal with *)
+(*   | |- Related ?S (?f ?a) (?f' ?a') => *)
+(*     lazymatch goal with *)
+(*     | [ H := ?e : Related ?R a a' |- _ ] => *)
+(*       (* idtac "Found matching argument"; *) *)
+(*       let fty := type of f in *)
+(*       let fty' := type of f' in *)
+(*       tryif once (is_indep fty; unify fty fty') *)
+(*       then *)
+(*         (* idtac "Applying non-dependent congruence"; *) *)
+(*         once (refinetc (@related_app _ _ _ _ f f' a a' _ H); clear H) *)
+(*         (* idtac "Applied non-dependent congruence"; show_goal *) *)
+(*       else *)
+(*         (subst H; pattern a, a', e; *)
+(*          (* show_goal; *) *)
+(*          let pred := *)
+(*              match goal with *)
+(*                |- (fun xa xa' H => Related (@?Q xa xa' H) _ _) _ _ _ => constr:(Q) *)
+(*              end *)
+(*          in *)
+(*         match pred with *)
+(*         | (fun xa xa' H => @?Q xa xa' H) => *)
+(*           (* idtac "Found dependent predicate"; *) *)
+(*             cbv beta; *)
+(*             let newpred := constr:(fun xa xa' H => pred xa xa' H) in *)
+(*             refinetc (@related_app_dep _ _ R _ _ newpred f f' a a' _ e); cbv beta *)
+(*         | (fun xa xa' _ => @?Q xa xa') =>  *)
+(*           (* idtac "Found non-dependent predicate" Q; *) *)
+(*           refinetc (@related_app_nodep _ _ _ _ Q f f' a a' _); cbv beta *)
+            
+(*         end) *)
+(*       || (pattern a, a', H; *)
+(*          (* show_goal; *) *)
+(*          let pred := *)
+(*              match goal with *)
+(*                |- (fun xa xa' H => Related (@?Q xa xa' H) _ _) _ _ _ => constr:(Q) *)
+(*              end *)
+(*          in *)
+(*         match pred with *)
+(*         | (fun xa xa' H => @?Q xa xa' H) => *)
+(*           (* idtac "Found dependent predicate"; *) *)
+(*             cbv beta; *)
+(*             let newpred := constr:(fun xa xa' H => pred xa xa' H) in *)
+(*             refinetc (@related_app_dep _ _ R _ _ newpred f f' a a' _ H); cbv beta; *)
+(*             clear H *)
+                                                                                       
+(*         | (fun xa xa' _ => @?Q xa xa') =>  *)
+(*           (* idtac "Found non-dependent predicate" Q; *) *)
+(*             refinetc (@related_app_nodep _ _ _ _ Q f f' a a' _); cbv beta *)
+(*         end) *)
+
+(*     | _ => *)
+(*       let fty := type of f in *)
+(*       let fty' := type of f' in *)
+(*       tryif once (is_indep fty; unify fty fty') then *)
+(*         once (refinetc (@related_app _ _ _ _ f f' a a' _ _)) *)
+(*       else *)
+(*         ((* idtac "No matching argument"; *) *)
+(*           pattern a, a'; *)
+(*         (* show_goal; *) *)
+(*         let pred := *)
+(*             match goal with *)
+(*               |- (fun xa xa' => Related (@?Q xa xa') _ _) _ _ => constr:(Q) *)
+(*             end *)
+(*         in simpl; *)
+(*           match pred with *)
+(*           | _ => *)
+(*             (* idtac "applying nodep"; *) *)
+(*             refinetc (@related_app _ _ _ _ f f' a _ _ _) || *)
+(*             refinetc (@related_app_nodep _ _ _ _ pred f f' a a' _); cbv beta *)
+(*         | (fun xa xa' => @?Q xa xa') => *)
+(*           let tya := type of a in *)
+(*           let tya' := type of a' in *)
+(*           let id := fresh in  *)
+(*           evar(id : tya -> tya' -> Prop); *)
+(*           let newrel := constr:(fun xa xa' (H : id xa xa') => pred xa xa') in *)
+(*             (* cbv beta bug , no subst in evars! *) simpl; *)
+(*           (* show_goal; *) *)
+(*             (* idtac "newpred" newpred; *) *)
+(*           refinetc (@related_app_dep _ _ id _ _ newrel f f' a a' _ _); subst id; *)
+(*           cbv beta *)
+(*         end) *)
+(*     | _ => *)
+(*       refinetc (@related_app _ _ _ S f f' a _ _ _) || *)
+(*       refinetc (@related_app_dep _ _ _ _ _ _ f f' a _ _ _) *)
+(*     end *)
+(*   end. *)
+
+Variable dependent_mor' : forall (R : forall n n', eq n n' -> _),
+  Proper (∀ H : eq n n', ∀ _ : (R n n' H) pn pn', flip impl) dependent.
+Set Typeclasses Modulo Eta.
+
 Goal forall (n n' : nat) (e : n = n') (H : forall (pn' : P n'), dependent n' pn')
        (pn : P n), dependent n pn.
 Proof.
   intros n n' e pn' d. revert d.
-  setoid_rewrite debug e. apply pn'.
-  shelve. shelve. 
-  (* refine (HasRetraction_rel _). *)
-  clear H_rew.
-  apply _.
+  setoid_rewrite debug e. apply pn'. (* FIXME dependency issue *)
+  shelve. shelve.
+  clear H_rew. apply _.
   apply _.
 Qed.
 End dependent_eq.
@@ -350,12 +441,24 @@ Axiom unit : T.
 Axiom law : forall t, R (op t unit) t.
 Axiom lawcomm : forall t t', R (op t t') (op t' t).
 
+Instance transitive_resp {A} {B : Type} (R : relation A) (S : relation B) :
+  Reflexive R ->
+  Transitive S ->
+  Transitive (∀ _ : R _ _, S).
+Proof.
+  unfold respectful_hetero. reduce.
+  transitivity (y x0). apply H1. reflexivity.
+  apply H2. assumption.
+Defined.
+Arguments transitive_resp /.
+
 Lemma fold_proper_test' l :
   R (fold_right (fun x y => op x unit) unit l) unit.
 Proof.
-  setoid_rewrite lawcomm.
+  setoid_rewrite lawcomm at 1.
   change(R (fold_right (fun x _ : T => op unit x) unit l) unit).
-Abort.
+  admit.
+Admitted.
 
 Axiom Rfinish : forall l, R l unit.
 
@@ -397,7 +500,9 @@ Definition t := nat -> bool.
 Definition h (a b : t) := forall n, a n = b n.
 
 (* Instance subrelh : subrelation h (@eq nat ==> eq). *)
-(* Proof. intros x y H x' y' ->. apply H.  Qed. *)
+(* Proof.  *)
+(*   refine (pointwise_subrelation_respectful _ _ _). *)
+(* Defined. *)
 
 Goal forall a b, h a b -> a 0 = b 0.
 intros.
