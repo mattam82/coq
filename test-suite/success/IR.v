@@ -1,35 +1,41 @@
-Module Test.
-  Inductive foo : Type := Foo | Bar (f : foo) : F f = F f -> foo
-  fix F (f : foo) : foo := Foo.
-End Test.
+(* Inductive Pack A (R : A -> Type) := pack { *)
+(*   TX : A; *)
+(*   TR : R TX; *)
+(*                                      }. *)
+(* Definition Tel := *)
+(*   fix Tel (p n : nat) {struct p} : Type := *)
+(*     match p with *)
+(*       0 => unit *)
+(*     | S p => (unit * Tel p (S n))%type *)
+(*     end *)
+(*   with C (p n : nat) {struct n} : (* Tel p n -> *) Type := *)
+(*     match n with *)
+(*     | 0 => Tel p 0 *)
+(*     | S n => (* fun T : Tel p (S n) => *) C (S p) n  (* ((tt,T)) *) *)
+(*     end for Tel. *)
 
-Inductive Pack A (R : A -> Type) := pack {
-  TX : A;
-  TR : R TX;
-                                     }.
+(* Inductive Tel : nat -> nat -> Type := *)
+(* | Tel0 : forall n, Tel 0 n *)
+(* | TelS : forall p n (T : Tel p (S n)), C p n (π p n T) -> Tel (S p) n *)
 
-Fail Inductive Tel : nat -> nat -> Type :=
-| Tel0 : forall n, Tel 0 n
-| TelS : forall p n (T : Tel p (S n)), C p n (π p n T) -> Tel (S p) n
+(* fix C {p n : nat} {struct n} : Tel p n -> Type := *)
+(* match n with *)
+(* | 0 => fun T => eval T -> Type *)
+(* | S n => fun T => Pack (C (π T)) (fun A => @C (S p) n (TelS p n T A)) *)
+(* end *)
 
-fix C {p n : nat} {struct n} : Tel p n -> Type :=
-match n with
-| 0 => fun T => eval T -> Type
-| S n => fun T => Pack (C (π T)) (fun A => @C (S p) n (TelS p n T A))
-end
+(* fix π {p n : nat} (T : Tel p (S n)) : Tel p n := *)
+(* match T with *)
+(* | Tel0 (S n) => Tel0 n *)
+(* | TelS p (S n) T A => TelS p n (@π p (S n) T) _ *)
+(* end *)
 
-fix π {p n : nat} (T : Tel p (S n)) : Tel p n :=
-match T with
-| Tel0 (S n) => Tel0 n
-| TelS p (S n) T A => TelS p n (@π p (S n) T) _
-end
-
-fix eval {p : nat} (T : Tel p 0) : Type :=
-match T in Tel p n' return n' = 0 -> Type with
-| Tel0 _ => fun _ => unit
-| TelS p 0 T A => fun _ => Pack (@eval p (π T)) (fun x => A x)
-| TelS p n T A => fun H => _
-end eq_refl.
+(* fix eval {p : nat} (T : Tel p 0) : Type := *)
+(* match T in Tel p n' return n' = 0 -> Type with *)
+(* | Tel0 _ => fun _ => unit *)
+(* | TelS p 0 T A => fun _ => Pack (@eval p (π T)) (fun x => A x) *)
+(* | TelS p n T A => fun H => _ *)
+(* end eq_refl. *)
 Module SetUniv.
 
 Inductive U : Set :=

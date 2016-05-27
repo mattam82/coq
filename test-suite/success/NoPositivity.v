@@ -16,6 +16,6 @@ Definition haha (x : T) : A :=
   funny x x.
 
 Definition a : A := haha (C haha).
-Eval compute in a.
+Fail Timeout 1 Eval compute in a.
 End Test.
 

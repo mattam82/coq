@@ -548,9 +548,8 @@ let inductive_levels env evdref poly arities inds =
     if a = Prop Null then None
     else Some (univ_of_sort a)) destarities
   in
-  let cstrs_levels, min_levels, sizes = 
-    CList.split3
-      (List.map2 (fun ((_,tys,_)) (arity,(ctx,du)) -> 
+  let _, (cstrs_levels, min_levels, sizes) = 
+    List.fold_left2 (fun (env, (cstrs_levels, min_levels, sizes)) ((_,tys,_)) (arity,(ctx,du)) -> 
 	let len = List.length tys in
 	let minlev = Sorts.univ_of_sort du in
 	let minlev =
@@ -566,12 +565,14 @@ let inductive_levels env evdref poly arities inds =
 	  else minlev
 	in
 	let clev = extract_level !evdref minlev tys in
-	  (clev, minlev, len)) inds destarities)
+        let levels = (clev :: cstrs_levels, minlev :: min_levels, len :: sizes) in
+	(push_rel (LocalAssum (Anonymous, arity)) env, levels))
+        (env, ([], [], [])) inds destarities
   in
   (* Take the transitive closure of the system of constructors *)
   (* level constraints and remove the recursive dependencies *)
-  let levels' = Universes.solve_constraints_system (Array.of_list levels)
-    (Array.of_list cstrs_levels) (Array.of_list min_levels)
+  let levels' = Universes.solve_constraints_system (CArray.of_list levels)
+    (CArray.rev_of_list cstrs_levels) (CArray.rev_of_list min_levels)
   in
   let evd, arities =
     CList.fold_left3 (fun (evd, arities) cu (arity,(ctx,du)) len ->
