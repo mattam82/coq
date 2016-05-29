@@ -1,3 +1,4 @@
+
 Module TyElim.
 Unset Elimination Schemes.  
 Inductive Con : Set :=

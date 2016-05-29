@@ -803,17 +803,19 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   (* Names of parameters as arguments of the inductive type (defs removed) *)
   let assums = List.filter is_local_assum ctx_params in
   let params = List.map (RelDecl.get_name %> out_name) assums in
-
+  let nparams = List.length params in
   (* Interpret the arities *)
-  let interp_arity (env, i, decls, arities) ind =
+  let interp_arity (env, subst, i, decls, arities) ind =
     let t, poly, impls = interp_ind_arity env evdref ind in
     (* let tname = make_name make_mind ind.ind_name in *)
+    let t = substl subst t in
     let full = Term.it_mkProd_or_LetIn t ctx_params in
     let decl = LocalAssum(Name ind.ind_name, full) in
-    (push_rel decl env, succ i, full :: decls, (t, poly, impls) :: arities)
+    (push_rel decl env, mkRel (nparams + 1) :: List.map (lift 1) subst,
+     succ i, full :: decls, (t, poly, impls) :: arities)
   in
-  let (aritiesenv, _, fullarities, arities) =
-    List.fold_left interp_arity (env_params, 0, [], []) indl in
+  let (aritiesenv, _, _, fullarities, arities) =
+    List.fold_left interp_arity (env_params, [], 0, [], []) indl in
   let fullarities = List.rev fullarities in
   let arities = List.rev arities in
   let env_ar = push_types env0 indnames fullarities in

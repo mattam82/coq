@@ -36,46 +36,84 @@ let detype_param =
      I1..Ip:(B1 y1..yq)..(Bp y1..yq) |- ci : (y1..yq:C1..Cq)Ti[Ij:=(Ij y1..yq)]
 *)
 
-let abstract_constructors mind i lc =
+let find_index mcons i j l =
+  (* nbc before the current inductive - nbc for the referenced inductive
+    = constructors between the current inductive and the referenced one *)
+  (mcons.(i) - mcons.(j)) - (l - 1)
+      
+let abstract_constructors mind mcons nparams i cur c =
+  let rec aux k c =
+    let c', app = decompose_appvect c in
+    match kind_of_term c' with
+    | Construct (((ind, j), l), u) when eq_mind mind ind ->
+       let f =
+         if Int.equal j i then mkRel (k + (cur + 1) - l)
+         else mkRel (k + cur + find_index mcons i j l)
+       in mkApp (f, Array.map (aux k)
+                           (Array.sub app nparams (Array.length app - nparams)))
+    | Rel n ->
+       if n <= k then mkApp (c', Array.map (aux k) app)
+       else mkApp (mkRel (n + cur + mcons.(i)), Array.map (aux k) app)
+    | _ -> map_constr_with_binders succ aux k c
+  in aux 0 c
+
+let abstract_inductives mind nparams' i c =
   let rec aux k c =
     match kind_of_term c with
-    | Construct ((ind, i), u) when eq_mind mind (fst ind) -> mkRel (succ k + i)
+    | Ind ((ind, j), u) when eq_mind mind ind -> mkRel (k + (i - j))
+    | Rel n -> if n <= k then c else mkRel (n + i)
     | _ -> map_constr_with_binders succ aux k c
-  in aux 0 lc
-                
-let abstract_inductive mind hyps nparams inds =
-  let ntyp = List.length inds in
+  in aux nparams' c
+
+let mkNamedProd_wo_LetIn decl k c =
+  let open Context.Named.Declaration in
+  match decl with
+    | LocalAssum (id,t) ->  mkProd (Name id, t, substn_vars (k + 1) [id] c)
+    | LocalDef (id,b,t) -> substnl [b] k (substn_vars (k+1) [id] c)
+
+let it_mkNamedProd_wo_LetIn k b hyps =
+  List.fold_left (fun c d -> mkNamedProd_wo_LetIn d k c) b hyps
+                                  
+let abstract_inductive mind hyps nparams constrs inds =
+  let mind' = Globnames.pop_kn mind in
+  let ntyp = Array.length inds in
   let nhyp = Context.Named.length hyps in
   let args = Context.Named.to_instance mkVar (List.rev hyps) in
   let args = Array.of_list args in
   let subs = List.init ntyp (fun k -> lift nhyp (mkApp(mkRel (k+1),args))) in
-  let inds' =
-    List.map
-      (function (tname,arity,template,cnames,lc) ->
-        let lc' = List.map (substl subs) lc in
-	let lc'' = List.map (fun b -> Termops.it_mkNamedProd_wo_LetIn b hyps) lc' in
-	let arity' = Termops.it_mkNamedProd_wo_LetIn arity hyps in
-        (tname,arity',template,cnames,lc''))
-      	inds in
   let nparams' = nparams + Array.length args in
-(* To be sure to be the same as before, should probably be moved to process_inductive *)
-  let params' = let (_,arity,_,_,_) = List.hd inds' in
-		let (params,_) = decompose_prod_n_assum nparams' arity in
+  let inds' =
+    Array.mapi
+      (fun i (tname,arity,template,cnames,lc) ->
+        let liftk = constrs.(i) in
+        let lc' = List.mapi (fun j c ->
+                      let ctx, c = decompose_prod_n_assum nparams c in
+                      let c = abstract_constructors mind' constrs nparams' i j c in
+                      (** hyps ; I1..In, params, c0..cliftk, ci0..cij |- c,
+                          I1..In, hyps |- subs : I1..In *)
+                      substnl subs (liftk + j + nparams) c) lc in
+	let lc'' =
+          List.mapi (fun j b ->
+              let prodpars' = it_mkNamedProd_wo_LetIn (liftk + j + nparams) b hyps in
+              snd (decompose_prod_n_assum (Array.length args) prodpars')) lc' in
+	let arity = it_mkNamedProd_wo_LetIn 0 arity hyps in
+        let params, arity = decompose_prod_n_assum nparams' arity in
+        let arity = abstract_inductives mind' nparams' i arity in
+        (tname,params,arity,template,cnames,lc''))
+      	inds in
+  (* To be sure to be the same as before, should probably be moved to process_inductive *)
+  let inds' = Array.to_list inds' in
+  let params' = let (_,params,arity,_,_,_) = List.hd inds' in
                 List.map detype_param params
   in
   let ind'' =
-  List.map
-    (fun (a,arity,template,c,lc) ->
-      let _, short_arity = decompose_prod_n_assum nparams' arity in
-      let shortlc =
-	List.map (fun c -> snd (decompose_prod_n_assum nparams' c)) lc in
+  List.mapi
+    (fun i (a,_,arity,template,c,lc) ->
       { mind_entry_typename = a;
-	mind_entry_arity = short_arity;
+	mind_entry_arity = arity;
 	mind_entry_template = template;
 	mind_entry_consnames = c;
-	mind_entry_lc =
-          (* MS FIXME: Discharging of ind-ind defs is broken*)
-          List.mapi (fun i -> lift i) shortlc })
+	mind_entry_lc = lc })
     inds'
   in (params',ind'')
 
@@ -95,15 +133,24 @@ let process_inductive (sechyps,abs_ctx) modlist mind mib =
 	inst, Univ.UContext.make (inst, Univ.subst_instance_constraints inst cstrs)
     else Univ.Instance.empty, mib.mind_universes
   in
+  let constrs =
+    let init = Array.map (fun mip -> Array.length mip.mind_user_lc) mib.mind_packets in
+    let init = Array.cons 0 init in
+    for i = 1 to Array.length init - 1 do
+      init.(i) <- init.(i-1) + init.(i)
+    done;
+    init
+  in
   let inds =
-    Array.map_to_list
+    Array.map
       (fun mip ->
 	let ty, template = refresh_polymorphic_type_of_inductive (mib,mip) in
 	let arity = expmod_constr modlist ty in
 	let arity = Vars.subst_instance_constr subst arity in
-	let lc = Array.map 
-	  (fun c -> Vars.subst_instance_constr subst (expmod_constr modlist c))
-	  mip.mind_user_lc 
+	let lc =
+          Array.map
+            (fun c -> Vars.subst_instance_constr subst (expmod_constr modlist c))
+	    mip.mind_user_lc
 	in
 	  (mip.mind_typename,
 	   arity, template,
@@ -111,7 +158,7 @@ let process_inductive (sechyps,abs_ctx) modlist mind mib =
 	   Array.to_list lc))
       mib.mind_packets in
   let sechyps' = Context.Named.map (expmod_constr modlist) sechyps in
-  let (params',inds') = abstract_inductive mind sechyps' nparams inds in
+  let (params',inds') = abstract_inductive mind sechyps' nparams constrs inds in
   let abs_ctx = Univ.instantiate_univ_context abs_ctx in
   let univs = Univ.UContext.union abs_ctx univs in
   let record = match mib.mind_record with
