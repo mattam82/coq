@@ -276,9 +276,26 @@ Hint Unfold Transitive : core.
 
 (** Resolution with subrelation: favor decomposing products over applying reflexivity
   for unconstrained goals. *)
+
+Ltac has_concrete_value t :=
+  lazymatch t with
+  | respectful ?from ?to =>
+    (tryif is_evar from then has_concrete_value to else idtac)
+  | _ => tryif is_evar t then fail else idtac
+ end.
+
+Ltac subrelation_respectful :=
+  lazymatch goal with
+  |- subrelation (?lhs ==> ?rhs)%signature (?lhs' ==> ?rhs')%signature =>
+  (tryif has_concrete_value lhs; has_concrete_value lhs' then
+     class_apply @subrelation_respectful
+   else class_apply @subrelation_respectful; cycle 1)
+  | |- _ => class_apply @subrelation_respectful
+  end.
+
 Ltac subrelation_tac T U :=
   (is_ground T ; is_ground U ; class_apply @subrelation_refl) ||
-    class_apply @subrelation_respectful || class_apply @subrelation_refl.
+  ltac:(repeat subrelation_respectful) || class_apply @subrelation_refl.
 
 Hint Extern 3 (@subrelation _ ?T ?U) => subrelation_tac T U : typeclass_instances.
 
@@ -732,7 +749,7 @@ Arguments related_lambda /.
 Instance related_subrelation {A B} (R S : hrel A B) x y :
   Related R x y -> hsubrelation _ _ R S -> Related S x y | 10.
 Proof. firstorder. Defined.
-Hint Cut [!*; related_subrelation; related_subrelation] : typeclass_instances.
+Hint Cut [_* related_subrelation related_subrelation] : typeclass_instances.
 Arguments related_subrelation /.
 
 Local Open Scope signature_scope.
@@ -771,9 +788,9 @@ Instance subrelation_hsubrelation A (R S : hrel A A) :
   subrelation R S -> hsubrelation R S | 1000 := fun x => x.
 Instance hsubrelation_subrelation A (R S : hrel A A) :
   hsubrelation R S -> subrelation R S | 1000 := fun x => x.
-Hint Cut [!*; subrelation_hsubrelation; !*; hsubrelation_subrelation]
+Hint Cut [_* subrelation_hsubrelation (_*) hsubrelation_subrelation]
   : typeclass_instances.
-Hint Cut [!*; hsubrelation_subrelation; !*; subrelation_hsubrelation]
+Hint Cut [_* hsubrelation_subrelation (_*) subrelation_hsubrelation]
   : typeclass_instances.
 Arguments subrelation_hsubrelation /.
 Arguments hsubrelation_subrelation /.
@@ -793,7 +810,7 @@ Instance related_refl {A} (R : relation A)
   Related R m m | 2.
 Proof. red. reflexivity. Defined.
 Arguments related_refl /.
-Hint Cut [!*; related_subrelation; related_refl] : typeclass_instances.
+Hint Cut [_* related_subrelation related_refl] : typeclass_instances.
 
 (** Special-purpose class to do normalization of signatures w.r.t. flip. *)
 

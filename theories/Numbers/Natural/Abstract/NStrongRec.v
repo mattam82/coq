@@ -112,7 +112,7 @@ Proof.
  intros n IH m Hm.
  rewrite lt_succ_r in Hm.
  rewrite add_succ_l.
- rewrite 2 strong_rec0_succ.
+ rewrite !strong_rec0_succ.
  apply step_good.
  intros m' Hm'.
  apply IH.
