@@ -104,7 +104,7 @@ let incl_all_subdirs dir opts =
 
 (** OCaml + CamlpX libraries *)
 
-let ocaml_libs = ["str.cma";"unix.cma";"nums.cma";"dynlink.cma";"threads.cma"]
+let ocaml_libs = ["str.cma";"unix.cma";"nums.cma";"dynlink.cma";"threads.cma";"landmarks-threads.cma"]
 let camlp4_libs = if is_camlp5 then ["gramlib.cma"] else ["camlp4lib.cma"]
 let libobjs = ocaml_libs @ camlp4_libs
 

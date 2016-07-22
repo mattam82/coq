@@ -10,7 +10,7 @@
 # some variables.
 
 ###########################################################################
-# User-customizable variables
+# User-customizable variablesq
 ###########################################################################
 
 # The following variables could be modified via the command-line of make,
@@ -23,6 +23,15 @@ VERBOSE ?=
 # If set to 1 (or non-empty) then *.ml files corresponding to *.ml4 files
 # will be generated in a human-readable format rather than in a binary format.
 READABLE_ML4 ?=
+
+LANDMARKS_MOD=
+LANDMARKS_FLAGS=
+ifdef OCAML_LANDMARKS
+LANDMARKS_SRC=$(shell ocamlfind query landmarks)
+LANDMARKS_MOD=landmarks-threads
+USERFLAGS=$(USERFLAGS) -I $(LANDMARKS_SRC)
+LANDMARKS_FLAGS=-I $(LANDMARKS_SRC) -ppx $(LANDMARKS_SRC)/ppx_landmarks
+endif
 
 # When non-empty, a time command is performed at each .v compilation.
 # To collect compilation timings of .v and import them in a spreadsheet,
@@ -106,8 +115,8 @@ BOOTCOQC=$(TIMER) $(COQTOPEXE) -boot $(COQOPTS) -compile
 LOCALINCLUDES=$(addprefix -I , $(SRCDIRS) )
 MLINCLUDES=$(LOCALINCLUDES) -I $(MYCAMLP4LIB)
 
-OCAMLC := $(OCAMLFIND) ocamlc $(CAMLFLAGS)
-OCAMLOPT := $(OCAMLFIND) opt $(CAMLFLAGS)
+OCAMLC := $(OCAMLFIND) ocamlc $(CAMLPFLAGS)
+OCAMLOPT := $(OCAMLFIND) opt $(CAMLFLAGS) $(LANDMARKS_FLAGS)
 
 BYTEFLAGS=-thread $(CAMLDEBUG) $(USERFLAGS)
 OPTFLAGS=-thread $(CAMLDEBUGOPT) $(CAMLTIMEPROF) $(USERFLAGS)
@@ -142,8 +151,8 @@ endef
 
 define bestocaml
 $(if $(OPT),\
-$(OCAMLOPT) $(MLINCLUDES) $(OPTFLAGS) $(LINKMETADATA) -o $@ $(1) $(addsuffix .cmxa,$(2)) $^ && $(STRIP) $@ && $(CODESIGN) $@,\
-$(OCAMLC) $(MLINCLUDES) $(BYTEFLAGS) $(CUSTOM) -o $@ $(1) $(addsuffix .cma,$(2)) $^)
+$(OCAMLOPT) $(MLINCLUDES) $(LANDMARKS_FLAGS) $(OPTFLAGS) $(LINKMETADATA) -o $@ $(1) $(addsuffix .cmxa,$(2)) $^ && $(STRIP) $@ && $(CODESIGN) $@,\
+$(OCAMLC) $(MLINCLUDES) $(LANDMARKS_FLAGS) $(BYTEFLAGS) $(CUSTOM) -o $@ $(1) $(addsuffix .cma,$(2)) $^)
 endef
 
 # Camlp4 / Camlp5 settings
@@ -157,7 +166,7 @@ endif
 
 PR_O := $(if $(READABLE_ML4),pr_o.cmo,pr_dump.cmo)
 
-SYSMOD:=str unix dynlink threads
+SYSMOD:=str unix dynlink threads $(LANDMARKS_MOD)
 SYSCMA:=$(addsuffix .cma,$(SYSMOD))
 SYSCMXA:=$(addsuffix .cmxa,$(SYSMOD))
 
@@ -396,7 +405,7 @@ $(COQDEPBOOT): $(call bestobj, $(COQDEPBOOTSRC))
 
 $(OCAMLLIBDEP): $(call bestobj, tools/ocamllibdep.cmo)
 	$(SHOW)'OCAMLBEST -o $@'
-	$(HIDE)$(call bestocaml, -I tools, unix)
+	$(HIDE)$(call bestocaml, -I tools, unix threads $(LANDMARKS_MOD))
 
 # The full coqdep (unused by this build, but distributed by make install)
 
@@ -446,7 +455,7 @@ FAKEIDECMO:= lib/clib.cma lib/cErrors.cmo lib/spawn.cmo ide/document.cmo \
 
 $(FAKEIDE): $(call bestobj, $(FAKEIDECMO)) | $(IDETOPLOOPCMA:.cma=$(BESTDYN))
 	$(SHOW)'OCAMLBEST -o $@'
-	$(HIDE)$(call bestocaml,-I ide,str unix threads)
+	$(HIDE)$(call bestocaml,-I ide,str unix threads $(LANDMARKS_MOD))
 
 # votour: a small vo explorer (based on the checker)
 
@@ -464,7 +473,7 @@ CSDPCERTCMO:=lib/clib.cma $(addprefix plugins/micromega/, \
 
 $(CSDPCERT): $(call bestobj, $(CSDPCERTCMO))
 	$(SHOW)'OCAMLBEST -o $@'
-	$(HIDE)$(call bestocaml,,nums unix)
+	$(HIDE)$(call bestocaml,,nums unix threads $(LANDMARKS_MOD))
 
 ###########################################################################
 # tests
