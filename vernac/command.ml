@@ -542,14 +542,14 @@ let is_flexible_sort evd u =
   | Some l -> Evd.is_flexible_level evd l
   | None -> false
 
-let inductive_levels env evdref poly arities inds =
+let inductive_levels env evdref poly arities indlevs inds =
   let destarities = List.map (fun x -> x, Reduction.dest_arity env x) arities in
   let levels = List.map (fun (x,(ctx,a)) -> 
     if a = Prop Null then None
     else Some (univ_of_sort a)) destarities
   in
   let _, (cstrs_levels, min_levels, sizes) = 
-    List.fold_left2 (fun (env, (cstrs_levels, min_levels, sizes)) ((_,tys,_)) (arity,(ctx,du)) -> 
+    List.fold_left3 (fun (env, (cstrs_levels, min_levels, sizes)) ((_,tys,_)) (arity,(ctx,du)) ilev -> 
 	let len = List.length tys in
 	let minlev = Sorts.univ_of_sort du in
 	let minlev =
@@ -557,17 +557,15 @@ let inductive_levels env evdref poly arities inds =
 	    Univ.sup minlev Univ.type0_univ
 	  else minlev
 	in
-	let minlev =
-	  (** Indices contribute. *)
-	  if Indtypes.is_indices_matter () && List.length ctx > 0 then (
-	    let ilev = sign_level env !evdref ctx in
-	      Univ.sup ilev minlev)
-	  else minlev
+	let minlev = (** Indices contribute. *)
+          match ilev with
+          | None -> minlev
+          | Some ilev -> Univ.sup ilev minlev
 	in
 	let clev = extract_level !evdref minlev tys in
         let levels = (clev :: cstrs_levels, minlev :: min_levels, len :: sizes) in
 	(push_rel (LocalAssum (Anonymous, arity)) env, levels))
-        (env, ([], [], [])) inds destarities
+        (env, ([], [], [])) inds destarities indlevs
   in
   (* Take the transitive closure of the system of constructors *)
   (* level constraints and remove the recursive dependencies *)
@@ -807,12 +805,17 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   (* Interpret the arities *)
   let interp_arity (env, subst, i, decls, arities) ind =
     let t, poly, impls = interp_ind_arity env evdref ind in
-    (* let tname = make_name make_mind ind.ind_name in *)
+    let signlev =
+      let ctx, s = Reduction.dest_arity env t in
+      if Indtypes.is_indices_matter () && List.length ctx > 0 then
+	Some (sign_level env !evdref ctx)
+      else None
+    in
     let t = substl subst t in
     let full = Term.it_mkProd_or_LetIn t ctx_params in
     let decl = LocalAssum(Name ind.ind_name, full) in
     (push_rel decl env, mkRel (nparams + 1) :: List.map (lift 1) subst,
-     succ i, full :: decls, (t, poly, impls) :: arities)
+     succ i, full :: decls, (t, poly, signlev, impls) :: arities)
   in
   let (aritiesenv, _, _, fullarities, arities) =
     List.fold_left interp_arity (env_params, [], 0, [], []) indl in
@@ -821,9 +824,11 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   let env_ar = push_types env0 indnames fullarities in
 
   (* Compute interpretation metadatas *)
-  let indimpls = List.map (fun (_, _, impls) -> userimpls @ 
+  let indimpls = List.map (fun (_, _, _, impls) -> userimpls @ 
     lift_implicits (Context.Rel.nhyps ctx_params) impls) arities in
-  let arities = List.map pi1 arities and aritypoly = List.map pi2 arities in
+  let arities = List.map (fun (x, _, _, _) -> x) arities
+  and indlevs = List.map (fun (_, _, x, _) -> x) arities
+  and aritypoly = List.map (fun (_, x, _, _) -> x) arities in
   let impls = compute_internalization_env env0 (Inductive params) indnames fullarities indimpls in
   let implsforntn = compute_internalization_env env0 Variable indnames fullarities indimpls in
   let mldatas = List.map2 (mk_mltype_data evdref env_params params) arities indnames in
@@ -853,13 +858,15 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   let sigma = solve_remaining_evars all_and_fail_flags env_params !evdref Evd.empty in
   evdref := sigma;
   (* Compute renewed arities *)
-  let nf,_ = e_nf_evars_and_universes evdref in
+  let nf,subst = e_nf_evars_and_universes evdref in
   let arities = List.map nf arities in
+  let subst = Universes.make_opt_subst subst in
+  let indlevs = List.map (Option.map (Univ.subst_univs_universe subst)) indlevs in
   let constructors =
     List.map (fun (idl,cl,impsl) -> (idl,List.map (fun (e, t) -> (e, nf (EConstr.Unsafe.to_constr t))) cl,impsl))
              constructors in
   let _ = List.iter2 (fun ty poly -> make_conclusion_flexible evdref ty poly) arities aritypoly in
-  let arities = inductive_levels env_ar_fix_params evdref poly arities constructors in
+  let arities = inductive_levels env_ar_fix_params evdref poly arities indlevs constructors in
   let nf',_ = e_nf_evars_and_universes evdref in
   let nf x = nf' (nf x) in
   let arities = List.map nf' arities in
