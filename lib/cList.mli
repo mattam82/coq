@@ -166,7 +166,15 @@ sig
       length of [l]. *)
 
 
+(* [split_when p l] splits [l] into two lists [(l1,a::l2)] such that
+    [l1++(a::l2)=l], [p a=true] and [p b = false] for every element [b] of [l1].
+    If there is no such [a], then it returns [(l,[])] instead *)
   val split_when : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+  (* [split_with p l] splits [l] into two lists [(l1,l2)] such that
+    [p a=true] for every element of l1 and [p b = false] for every element [b] of [l2]. *)
+  val split_with : ('a -> bool) -> 'a list -> 'a list * 'a list
+
   val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
   val firstn : int -> 'a list -> 'a list
   val last : 'a list -> 'a
