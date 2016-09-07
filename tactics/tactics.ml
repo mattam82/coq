@@ -1547,8 +1547,6 @@ let simplest_elim c = default_elim false None (c,NoBindings)
 *)
 
 let clenv_chain_in id ?(flags=elim_flags ()) env sigma mv elimclause ?occs hypclause =
-  (** The evarmap of elimclause is assumed to be an extension of hypclause, so
-      we do not need to merge the universes coming from hypclause. *)
   try clenv_chain ~flags env sigma mv ?occs elimclause hypclause
   with PretypeError (env,evd,NoOccurrenceFound (op,_)) ->
     (* Set the hypothesis name in the message *)
