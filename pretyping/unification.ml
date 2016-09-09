@@ -787,8 +787,16 @@ let rec check_compatibility_ORIG env pbty flags (sigma,metasubst,evarsubst) tyM 
     match subst_defined_metas_evars (metasubst,evarsubst) tyN with
     | None -> sigma
     | Some n ->
-      if is_ground_term sigma m && is_ground_term sigma n then
-	let sigma, b = infer_conv ~pb:pbty ~ts:Names.full_transparent_state env sigma m n in
+     if is_ground_term sigma m && is_ground_term sigma n then
+       let state = ((), universe_no_comparison) in
+       let sigma, b =
+         try ignore(Reduction.generic_conv ~l2r:true pbty (safe_evar_value sigma)
+                                           Names.full_transparent_state env state m n);
+             (** We just compare the shapes of types first, and only if that succeeds
+                 do a unification of universes *)
+             infer_conv ~pb:pbty ~ts:Names.full_transparent_state env sigma m n
+         with Reduction.NotConvertible -> sigma, false
+       in
 	if b then sigma
 	else error_cannot_unify env sigma (m,n)
       else sigma
