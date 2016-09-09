@@ -837,6 +837,12 @@ let fresh_constructor_instance ?loc env evd c =
 let fresh_global ?loc ?(rigid=univ_flexible) ?names env evd gr =
   with_context_set ?loc rigid evd (Universes.fresh_global_instance ?names env gr)
 
+let check_eq evd s s' =
+  UGraph.check_eq (UState.ugraph evd.universes) s s'
+
+let check_leq evd s s' =
+  UGraph.check_leq (UState.ugraph evd.universes) s s'
+
 let whd_sort_variable evd t = t
 
 let is_sort_variable evd s = UState.is_sort_variable evd.universes s
@@ -845,12 +851,12 @@ let is_flexible_level evd l =
   let uctx = evd.universes in
     Univ.LMap.mem l (UState.subst uctx)
 
-let is_eq_sort s1 s2 =
+let is_eq_sort d s1 s2 =
   if Sorts.equal s1 s2 then None
   else
     let u1 = univ_of_sort s1
     and u2 = univ_of_sort s2 in
-      if Univ.Universe.equal u1 u2 then None
+      if check_eq d u1 u2 then None
       else Some (u1, u2)
 
 let normalize_universe evd =
@@ -872,8 +878,8 @@ let normalize_sort evars s =
 
 (* FIXME inefficient *)
 let rec set_eq_sort_ORIG env d s1 s2 =
-  let s1 = normalize_sort d s1 and s2 = normalize_sort d s2 in
-  match is_eq_sort s1 s2 with
+  (* let s1 = normalize_sort d s1 and s2 = normalize_sort d s2 in *)
+  match is_eq_sort d s1 s2 with
   | None -> d
   | Some (u1, u2) ->
     if not (type_in_type env) then
@@ -881,6 +887,7 @@ let rec set_eq_sort_ORIG env d s1 s2 =
         (Universes.Constraints.singleton (u1,Universes.UEq,u2))
     else
       d
+
 and set_eq_sort env d s1 s2 =
   let name = "set_eq_sort" in
   let _ = Timer.start_timer name in
@@ -910,7 +917,7 @@ let set_eq_instances ?(flex=false) d u1 u2 =
 let rec set_leq_sort_ORIG env evd s1 s2 =
   let s1 = normalize_sort evd s1 
   and s2 = normalize_sort evd s2 in
-  match is_eq_sort s1 s2 with
+  match is_eq_sort evd s1 s2 with
   | None -> evd
   | Some (u1, u2) ->
      if not (type_in_type env) then
@@ -927,12 +934,6 @@ and set_leq_sort env d s1 s2 =
     let _ = Timer.stop_timer name in
     raise exn
        
-let check_eq evd s s' =
-  UGraph.check_eq (UState.ugraph evd.universes) s s'
-
-let check_leq evd s s' =
-  UGraph.check_leq (UState.ugraph evd.universes) s s'
-
 let normalize_evar_universe_context_variables = UState.normalize_variables
 
 let abstract_undefined_variables = UState.abstract_undefined_variables
