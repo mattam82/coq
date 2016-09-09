@@ -774,6 +774,11 @@ and subst_defined_metas_evars (bl,el) c =
     let _ = Timer.stop_timer name in
     raise exn
 
+let universe_no_comparison =
+  { (* Might raise NotConvertible *)
+    compare = (fun env pb s1 s2 state -> state);
+    compare_instances = (fun ~flex i1 i2 state -> state)
+  } 
 
 let rec check_compatibility_ORIG env pbty flags (sigma,metasubst,evarsubst) tyM tyN =
   match subst_defined_metas_evars (metasubst,evarsubst) tyM with
@@ -1229,7 +1234,7 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
       raise exn
 
   and expand_ORIG (curenv,_ as curenvnb) pb opt (sigma,metasubst,evarsubst as substn) cM f1 l1 cN f2 l2 =
-    let res =
+    let res, opt =
       (* Try full conversion on meta-free terms. *)
       (* Back to 1995 (later on called trivial_unify in 2002), the
 	 heuristic was to apply conversion on meta-free (but not
@@ -1242,16 +1247,16 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
 	 (it is used by apply and rewrite); it might now be redundant
 	 with the support for delta-expansion (which is used
 	 essentially for apply)... *)
-      if subterm_restriction opt flags then None else 
+      if subterm_restriction opt flags then None, opt else 
 	match flags.modulo_conv_on_closed_terms with
-	| None -> None
+	| None -> None, opt
 	| Some convflags ->
 	  let subst = ((if flags.use_metas_eagerly_in_conv_on_closed_terms then metasubst else ms), (if flags.use_evars_eagerly_in_conv_on_closed_terms then evarsubst else es)) in
 	  match subst_defined_metas_evars subst cM with
-	  | None -> (* some undefined Metas in cM *) None
+	  | None -> (* some undefined Metas in cM *) None, opt
 	  | Some m1 ->
 	    match subst_defined_metas_evars subst cN with
-	    | None -> (* some undefined Metas in cN *) None
+	    | None -> (* some undefined Metas in cN *) None, opt
 	    | Some n1 ->
               (* No subterm restriction there, too much incompatibilities *)
 	      let sigma =
@@ -1263,13 +1268,14 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
 		  with RetypeError _ ->
 	       (* Renounce, maybe metas/evars prevents typing *) sigma
 		else sigma
-	      in 
+	      in
+              let opt = { opt with with_types = false } in
 	      let sigma, b = infer_conv ~pb ~ts:convflags curenv sigma m1 n1 in
-	      if b then Some (sigma, metasubst, evarsubst)
+	      if b then Some (sigma, metasubst, evarsubst), opt
 	      else 
 		if is_ground_term sigma m1 && is_ground_term sigma n1 then
 		  error_cannot_unify curenv sigma (cM,cN)
-		else None
+		else None, opt
     in
     match res with
     | Some substn -> substn
