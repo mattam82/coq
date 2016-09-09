@@ -780,7 +780,7 @@ let universe_no_comparison =
     compare_instances = (fun ~flex i1 i2 state -> state)
   } 
 
-let rec check_compatibility_ORIG env pbty flags (sigma,metasubst,evarsubst) tyM tyN =
+let rec check_compatibility_ORIG env flags (sigma,metasubst,evarsubst) tyM tyN =
   match subst_defined_metas_evars (metasubst,evarsubst) tyM with
   | None -> sigma
   | Some m ->
@@ -790,17 +790,20 @@ let rec check_compatibility_ORIG env pbty flags (sigma,metasubst,evarsubst) tyM 
      if is_ground_term sigma m && is_ground_term sigma n then
        let state = ((), universe_no_comparison) in
        let sigma, b =
-         try ignore(Reduction.generic_conv ~l2r:true pbty (safe_evar_value sigma)
-                                           Names.full_transparent_state env state m n);
-             (** We just compare the shapes of types first, and only if that succeeds
+         try
+           if leq_constr_univs (universes sigma) m n then sigma, true
+           else
+             (ignore(Reduction.generic_conv ~l2r:true CUMUL (safe_evar_value sigma)
+                                            Names.full_transparent_state env state m n);
+              (** We just compare the shapes of types first, and only if that succeeds
                  do a unification of universes *)
-             infer_conv ~pb:pbty ~ts:Names.full_transparent_state env sigma m n
+              infer_conv ~pb:CUMUL ~ts:Names.full_transparent_state env sigma m n)
          with Reduction.NotConvertible -> sigma, false
        in
 	if b then sigma
 	else error_cannot_unify env sigma (m,n)
       else sigma
-and check_compatibility env pbty flags (sigma,metasubst,evarsubst) tyM tyN =
+and check_compatibility env flags (sigma,metasubst,evarsubst) tyM tyN =
   let name = "check_compatibility" in 
   let start_tm = Timer.start_timer name in
   let print_threshold_msec = 20.0 in
@@ -814,7 +817,7 @@ and check_compatibility env pbty flags (sigma,metasubst,evarsubst) tyM tyN =
       flush stdout
     end in
   try
-    let result = check_compatibility_ORIG env pbty flags (sigma,metasubst,evarsubst) tyM tyN in
+    let result = check_compatibility_ORIG env flags (sigma,metasubst,evarsubst) tyM tyN in
     let stop_tm = Timer.stop_timer name in
     let _ = Hashtbl.add Timer.check_compat_tbl start_tm (env,tyM,tyN) in
     let _ = prn_tm stop_tm in
@@ -919,7 +922,7 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
 	    let tyM = Typing.meta_type sigma k1 in
 	    let tyN = Typing.meta_type sigma k2 in
 	    let l, r = if k2 < k1 then tyN, tyM else tyM, tyN in
-	    check_compatibility curenv CUMUL flags substn l r
+	    check_compatibility curenv flags substn l r
 	  else sigma
 	in
 	if k2 < k1 then sigma,(k1,cN,stN)::metasubst,evarsubst
@@ -931,7 +934,7 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
 	  (try
              let tyM = Typing.meta_type sigma k in
              let tyN = get_type_of curenv ~lax:true sigma cN in
-             check_compatibility curenv CUMUL flags substn tyN tyM
+             check_compatibility curenv flags substn tyN tyM
 	   with RetypeError _ ->
                    (* Renounce, maybe metas/evars prevents typing *) sigma)
 	else sigma
@@ -951,7 +954,7 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
           (try
              let tyM = get_type_of curenv ~lax:true sigma cM in
              let tyN = Typing.meta_type sigma k in
-             check_compatibility curenv CUMUL flags substn tyM tyN
+             check_compatibility curenv flags substn tyM tyN
            with RetypeError _ ->
                  (* Renounce, maybe metas/evars prevents typing *) sigma)
 	else sigma
@@ -1272,7 +1275,7 @@ let rec unify_0_with_initial_metas_ORIG (sigma,ms,es as subst) conv_at_top env c
 		  try (* Ensure we call conversion on terms of the same type *)
 		    let tyM = get_type_of curenv ~lax:true sigma m1 in
 		    let tyN = get_type_of curenv ~lax:true sigma n1 in
-		    check_compatibility curenv CUMUL flags substn tyM tyN
+		    check_compatibility curenv flags substn tyM tyN
 		  with RetypeError _ ->
 	       (* Renounce, maybe metas/evars prevents typing *) sigma
 		else sigma
