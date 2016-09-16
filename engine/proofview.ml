@@ -611,6 +611,10 @@ let tclINDEPENDENT tac =
 
 (** {7 Goal manipulation} *)
 
+let shelf =
+  let open Proof in
+  Shelf.get >>= fun shelf -> tclUNIT shelf
+
 (** Shelves all the goals under focus. *)
 let shelve =
   let open Proof in
@@ -683,8 +687,12 @@ let guard_no_unifiable =
 let unshelve l p =
   (* advance the goals in case of clear *)
   let l = undefined p.solution l in
-  { p with comb = p.comb@l }
+  { p with comb = p.comb@l; shelf = List.filter (fun g -> not (List.mem g l)) p.shelf }
 
+let unshelve_goals l =
+  let open Proof in
+  Pv.get >>= fun pv -> Pv.set (unshelve l pv)
+    
 let with_shelf tac =
   let open Proof in
   Pv.get >>= fun pv ->
