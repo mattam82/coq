@@ -24,13 +24,13 @@ val new_evar :
   env -> 'r Sigma.t -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
   ?candidates:constr list -> ?store:Store.t ->
   ?naming:Misctypes.intro_pattern_naming_expr ->
-  ?principal:bool -> types -> (constr, 'r) Sigma.sigma
+  ?future_goal:bool -> ?principal:bool -> types -> (constr, 'r) Sigma.sigma
 
 val new_pure_evar :
   named_context_val -> 'r Sigma.t -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
   ?candidates:constr list -> ?store:Store.t ->
   ?naming:Misctypes.intro_pattern_naming_expr ->
-  ?principal:bool -> types -> (evar, 'r) Sigma.sigma
+  ?future_goal:bool -> ?principal:bool -> types -> (evar, 'r) Sigma.sigma
 
 val new_pure_evar_full : 'r Sigma.t -> evar_info -> (evar, 'r) Sigma.sigma
 
@@ -39,18 +39,20 @@ val e_new_evar :
   env -> evar_map ref -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
   ?candidates:constr list -> ?store:Store.t ->
   ?naming:Misctypes.intro_pattern_naming_expr ->
-  ?principal:bool -> types -> constr
+  ?future_goal:bool -> ?principal:bool -> types -> constr
 
 (** Create a new Type existential variable, as we keep track of 
     them during type-checking and unification. *)
 val new_type_evar :
   env -> 'r Sigma.t -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
-  ?naming:Misctypes.intro_pattern_naming_expr -> ?principal:bool -> rigid ->
+  ?naming:Misctypes.intro_pattern_naming_expr ->
+  ?future_goal:bool -> ?principal:bool -> rigid ->
   (constr * sorts, 'r) Sigma.sigma
 
 val e_new_type_evar : env -> evar_map ref ->
   ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
-  ?naming:Misctypes.intro_pattern_naming_expr -> ?principal:bool -> rigid -> constr * sorts
+  ?naming:Misctypes.intro_pattern_naming_expr ->
+  ?future_goal:bool -> ?principal:bool -> rigid -> constr * sorts
 
 val new_Type : ?rigid:rigid -> env -> 'r Sigma.t -> (constr, 'r) Sigma.sigma
 val e_new_Type : ?rigid:rigid -> env -> evar_map ref -> constr
@@ -70,7 +72,7 @@ val new_evar_instance :
  named_context_val -> 'r Sigma.t -> types -> 
   ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t -> ?candidates:constr list ->
   ?store:Store.t -> ?naming:Misctypes.intro_pattern_naming_expr ->
-  ?principal:bool ->
+  ?future_goal:bool -> ?principal:bool ->
   constr list -> (constr, 'r) Sigma.sigma
 
 val make_pure_subst : evar_info -> constr array -> (Id.t * constr) list
