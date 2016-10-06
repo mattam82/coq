@@ -1067,6 +1067,20 @@ struct
   let (pr_constrv,pr_constr) =
     Hook.make ~default:(fun _env _sigma _c -> Pp.str"<constr>") ()
 
+  let constant_bodies_of_effect = function
+    | { Entries.eff = Entries.SEsubproof (kn, cb, eff_env) } ->
+       [ kn, cb ]
+    | { Entries.eff = Entries.SEscheme (l,_) } ->
+       List.map (fun (_,kn,cb,eff_env) ->
+           kn, cb) l
+                
+  let constant_bodies_of_effects =
+    List.map_append constant_bodies_of_effect
+                    
+  let add_side_effects csts env =
+    let csts = constant_bodies_of_effects csts in
+    List.fold_left (fun env (kn, cb) -> Environ.add_constant kn cb env) env csts
+
   let refine ?(unsafe = true) f = Goal.enter begin fun gl ->
     let sigma = Goal.sigma gl in
     let env = Goal.env gl in
@@ -1079,6 +1093,11 @@ struct
     let (sigma, c) = f (Evd.reset_future_goals sigma) in
     let evs = Evd.future_goals sigma in
     let evkmain = Evd.principal_future_goal sigma in
+    (** Redo the effects of sigma in the env *)
+    let privates_csts = Evd.eval_side_effects sigma in
+    let sideff = Safe_typing.side_effects_of_private_constants privates_csts in
+    let env = add_side_effects sideff env in
+    (* let c = Safe_typing.inline_private_constants_in_constr env c privates_csts in *)
     (** Check that the introduced evars are well-typed *)
     let fold accu ev = typecheck_evar ev env accu in
     let sigma = if unsafe then sigma else CList.fold_left fold sigma evs in
@@ -1105,7 +1124,7 @@ struct
     let comb = undefined sigma (CList.rev evs) in
     let sigma = CList.fold_left Unsafe.mark_as_goal_evm sigma comb in
     let open Proof in
-    InfoL.leaf (Info.Tactic (fun () -> Pp.(hov 2 (str"simple refine"++spc()++ Hook.get pr_constrv env sigma c)))) >>
+    InfoL.leaf (Info.Tactic (fun () -> Pp.(hov 2 (str"simple refine"++spc()++ Hook.get pr_constrv env sigma c)))) >> Env.set env >>
     Pv.modify (fun ps -> { ps with solution = sigma; comb; })
   end
 

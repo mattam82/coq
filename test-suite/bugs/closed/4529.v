@@ -41,5 +41,5 @@ End cofe_mixin.
     split.
     *
  intros x.
-apply equiv_dist.
+rewrite equiv_dist.
 
