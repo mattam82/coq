@@ -51,6 +51,12 @@ let typecheck_proof c concl env sigma =
 let (pr_constrv,pr_constr) =
   Hook.make ~default:(fun _env _sigma _c -> Pp.str"<constr>") ()
 
+let handle_unification_result env sigma t c r =
+  Evarsolve.(match r with
+             | Success evd -> evd
+             | UnifFailure (_, e) ->
+                Pretype_errors.error_cannot_unify env sigma (t, c))
+            
 let make_refine_enter ?(unsafe = true) f =
   { enter = fun gl ->
   let gl = Proofview.Goal.assume gl in
@@ -78,11 +84,21 @@ let make_refine_enter ?(unsafe = true) f =
     else Pretype_errors.error_occur_check env sigma self c
   in
   (** Proceed to the refinement *)
+  let inst = List.map Constr.mkVar (Termops.ids_of_named_context (Proofview.Goal.hyps gl))
+  in
+  let define sigma =
+    let fn = Evarconv.evar_conv_x Names.full_transparent_state in
+    let t = Constr.mkEvar (self, Array.of_list inst) in
+    let sigma =
+      handle_unification_result env sigma t c (fn env sigma Reduction.CONV t c)
+    in handle_unification_result env sigma t c
+                                 (Evarsolve.reconsider_conv_pbs fn sigma)
+  in
   let sigma = match evkmain with
-    | None -> Evd.define self c sigma
+    | None -> define sigma
     | Some evk ->
         let id = Evd.evar_ident self sigma in
-        let sigma = Evd.define self c sigma in
+        let sigma = define sigma in
         match id with
         | None -> sigma
         | Some id -> Evd.rename evk id sigma
