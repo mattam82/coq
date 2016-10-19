@@ -504,12 +504,10 @@ let print_evar_constraints gl sigma =
              spc () ++ pr_lconstr_env env sigma t2)
   in
   let pr_candidate ev evi (candidates,acc) =
-    Printf.printf "Folding over evars with potential candidates";
     if Option.has_some evi.evar_candidates then
       (succ candidates, acc ++ pr_evar sigma (ev,evi) ++ fnl ())
     else (candidates, acc)
   in
-  Printf.printf "Printing evar constraints\n%!";
   let constraints =
     let _, cstrs = Evd.extract_all_conv_pbs sigma in
     if List.is_empty cstrs then mt ()

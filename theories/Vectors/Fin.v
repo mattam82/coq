@@ -24,7 +24,7 @@ Inductive t : nat -> Set :=
 
 Section SCHEMES.
 Definition case0 P (p: t 0): P p :=
-  match p with | F1 | FS  _ => fun devil => False_rect (@IDProp) devil (* subterm !!! *) end.
+  match p with | F1 | FS _ => fun devil => False_rect (@IDProp) devil (* subterm !!! *) end.
 
 Definition caseS' {n : nat} (p : t (S n)) : forall (P : t (S n) -> Type) 
   (P1 : P F1) (PS : forall (p : t n), P (FS p)), P p :=
@@ -65,7 +65,7 @@ End SCHEMES.
 Definition FS_inj {n} (x y: t n) (eq: FS x = FS y): x = y :=
 match eq in _ = a return
   match a as a' in t m return match m with |0 => Prop |S n' => t n' -> Prop end
-  with F1 =>  fun _ => True |FS y => fun x' => x' = y end x with
+  with F1 =>  fun _ => True |@FS n y => fun x' => x' = y end x with
   eq_refl => eq_refl
 end.
 
@@ -73,7 +73,7 @@ end.
 Fixpoint to_nat {m} (n : t m) : {i | i < m} :=
   match n with
     |@F1 j => exist _ 0 (Lt.lt_0_Sn j)
-    |FS p => match to_nat p with |exist _ i P => exist _ (S i) (Lt.lt_n_S _ _ P) end
+    |@FS n p => match to_nat p with |exist _ i P => exist _ (S i) (Lt.lt_n_S _ _ P) end
   end.
 
 (** [of_nat p n] answers the p{^ th} element of [fin n] if p < n or a proof of
@@ -147,7 +147,7 @@ end.
 (** The p{^ th} element of [fin m] viewed as the p{^ th} element of
 [fin (m + n)] *)
 Fixpoint L {m} n (p : t m) : t (m + n) :=
-  match p with |F1 => F1 |FS p' => FS (L n p') end.
+  match p with |@F1 m => F1 |@FS m p' => FS (L n p') end.
 
 Lemma L_sanity {m} n (p : t m) : proj1_sig (to_nat (L n p)) = proj1_sig (to_nat p).
 Proof.
@@ -166,7 +166,7 @@ induction n.
 - exact ((fix LS k (p: t k) :=
     match p with
       |@F1 k' => @F1 (S k')
-      |FS p' => FS (LS _ p')
+      |@FS n p' => FS (LS _ p')
     end) _ IHn).
 Defined.
 
@@ -185,7 +185,7 @@ Qed.
 Fixpoint depair {m n} (o : t m) (p : t n) : t (m * n) :=
 match o with
   |@F1 m' => L (m' * n) p
-  |FS o' => R n (depair o' p)
+  |@FS m o' => R n (depair o' p)
 end.
 
 Lemma depair_sanity {m n} (o : t m) (p : t n) :
@@ -204,7 +204,7 @@ match p, q with
 | @F1 m', @F1 n' => EqNat.beq_nat m' n'
 | FS _, F1 => false
 | F1, FS _ => false
-| FS p', FS q' => eqb p' q'
+| @FS m p', @FS n q' => eqb p' q'
 end.
 
 Lemma eqb_nat_eq : forall m n (p : t m) (q : t n), eqb p q = true -> m = n.
@@ -240,11 +240,11 @@ Definition cast: forall {m} (v: t m) {n}, m = n -> t n.
 Proof.
 refine (fix cast {m} (v: t m) {struct v} :=
  match v in t m' return forall n, m' = n -> t n with
- |F1 => fun n => match n with
+ |@F1 m => fun n => match n with
    | 0 => fun H => False_rect _ _
    | S n' => fun H => F1
  end
- |FS f => fun n => match n with
+ |@FS m f => fun n => match n with
    | 0 => fun H => False_rect _ _
    | S n' => fun H => FS (cast f n' (f_equal pred H))
  end

@@ -324,13 +324,13 @@ let empty_csubst = (0, Int.Map.empty)
 
 type ext_named_context =
   csubst * (Id.t * Constr.constr) list *
-  Id.Set.t * Context.Named.t
+  Id.Set.t * Context.Named.t * Constr.constr list
 
 let push_var id (n, s) =
   let s = Int.Map.add n (mkVar id) s in
   (succ n, s)
 
-let push_rel_decl_to_named_context decl (subst, vsubst, avoid, nc) =
+let push_rel_decl_to_named_context decl (subst, vsubst, avoid, nc, inst) =
   let open Context.Named.Declaration in
   let replace_var_named_declaration id0 id decl =
     let id' = get_id decl in
@@ -338,10 +338,8 @@ let push_rel_decl_to_named_context decl (subst, vsubst, avoid, nc) =
     let vsubst = [id0 , mkVar id] in
     decl |> set_id id' |> map_constr (replace_vars vsubst)
   in
-  let extract_if_neq id = function
-    | Anonymous -> None
-    | Name id' when id_ord id id' = 0 -> None
-    | Name id' -> Some id'
+  let extract_if_neq id id' = 
+    if id_ord id id' = 0 then None else Some id'
   in
   let open Context.Rel.Declaration in
   let (na, c, t) = to_tuple decl in
@@ -358,30 +356,35 @@ let push_rel_decl_to_named_context decl (subst, vsubst, avoid, nc) =
           here *)
       next_ident_away (id_of_name_using_hdchar empty_env t na) avoid
   in
-  match extract_if_neq id na with
-  | Some id0 when not (is_section_variable id0) ->
-      (* spiwack: if [id<>id0], rather than introducing a new
+  match na with
+  | Anonymous -> (subst, vsubst, avoid, nc, List.map (lift 1) inst)
+  | Name id' ->
+     match extract_if_neq id id' with
+     | Some id0 when not (is_section_variable id0) ->
+        (* spiwack: if [id<>id0], rather than introducing a new
           binding named [id], we will keep [id0] (the name given
           by the user) and rename [id0] into [id] in the named
           context. Unless [id] is a section variable. *)
-      let subst = (fst subst, Int.Map.map (replace_vars [id0,mkVar id]) (snd subst)) in
-      let vsubst = (id0,mkVar id)::vsubst in
-      let d = match c with
-        | None -> LocalAssum (id0, subst2 subst vsubst t)
-        | Some c -> LocalDef (id0, subst2 subst vsubst c, subst2 subst vsubst t)
-      in
-      let nc = List.map (replace_var_named_declaration id0 id) nc in
-      (push_var id0 subst, vsubst, Id.Set.add id avoid, d :: nc)
-  | _ ->
-      (* spiwack: if [id0] is a section variable renaming it is
+        let subst = (fst subst, Int.Map.map (replace_vars [id0,mkVar id]) (snd subst)) in
+        let vsubst = (id0,mkVar id)::vsubst in
+        let d = match c with
+          | None -> LocalAssum (id0, subst2 subst vsubst t)
+          | Some c -> LocalDef (id0, subst2 subst vsubst c, subst2 subst vsubst t)
+        in
+        let nc = List.map (replace_var_named_declaration id0 id) nc in
+        (push_var id0 subst, vsubst, Id.Set.add id avoid, d :: nc,
+         mkRel 1 :: List.map (lift 1) inst)
+     | _ ->
+        (* spiwack: if [id0] is a section variable renaming it is
           incorrect. We revert to a less robust behaviour where
           the new binder has name [id]. Which amounts to the same
           behaviour than when [id=id0]. *)
-      let d = match c with
-        | None -> LocalAssum (id, subst2 subst vsubst t)
-        | Some c -> LocalDef (id, subst2 subst vsubst c, subst2 subst vsubst t)
-      in
-      (push_var id subst, vsubst, Id.Set.add id avoid, d :: nc)
+        let d = match c with
+          | None -> LocalAssum (id, subst2 subst vsubst t)
+          | Some c -> LocalDef (id, subst2 subst vsubst c, subst2 subst vsubst t)
+        in
+        (push_var id subst, vsubst, Id.Set.add id avoid, d :: nc,
+         mkRel 1 :: List.map (lift 1) inst)
 
 let push_rel_context_to_named_context env typ =
   (* compute the instances relative to the named context and rel_context *)
@@ -392,13 +395,12 @@ let push_rel_context_to_named_context env typ =
     (named_context_val env, typ, inst_vars, empty_csubst, [])
   else
     let avoid = List.fold_right Id.Set.add ids Id.Set.empty in
-    let inst_rels = List.rev (rel_list 0 (nb_rel env)) in
     (* move the rel context to a named context and extend the named instance *)
     (* with vars of the rel context *)
     (* We do keep the instances corresponding to local definition (see above) *)
-    let (subst, vsubst, _, env) =
+    let (subst, vsubst, _, env, inst_rels) =
       Context.Rel.fold_outside push_rel_decl_to_named_context
-        (rel_context env) ~init:(empty_csubst, [], avoid, named_context env) in
+        (rel_context env) ~init:(empty_csubst, [], avoid, named_context env, []) in
     (val_of_named_context env, subst2 subst vsubst typ, inst_rels@inst_vars, subst, vsubst)
 
 (*------------------------------------*

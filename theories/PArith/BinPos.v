@@ -357,13 +357,13 @@ Inductive PeanoView : positive -> Type :=
 Fixpoint peanoView_xO p (q:PeanoView p) : PeanoView (p~0) :=
   match q in PeanoView x return PeanoView (x~0) with
     | PeanoOne => PeanoSucc _ PeanoOne
-    | PeanoSucc _ q => PeanoSucc _ (PeanoSucc _ (peanoView_xO _ q))
+    | PeanoSucc p0 q => PeanoSucc _ (PeanoSucc _ (peanoView_xO _ q))
   end.
 
 Fixpoint peanoView_xI p (q:PeanoView p) : PeanoView (p~1) :=
   match q in PeanoView x return PeanoView (x~1) with
     | PeanoOne => PeanoSucc _ (PeanoSucc _ PeanoOne)
-    | PeanoSucc _ q => PeanoSucc _ (PeanoSucc _ (peanoView_xI _ q))
+    | PeanoSucc p0 q => PeanoSucc _ (PeanoSucc _ (peanoView_xI _ q))
   end.
 
 Fixpoint peanoView p : PeanoView p :=
@@ -378,7 +378,7 @@ Definition PeanoView_iter (P:positive->Type)
   (fix iter p (q:PeanoView p) : P p :=
     match q in PeanoView p return P p with
       | PeanoOne => a
-      | PeanoSucc _ q => f _ (iter _ q)
+      | PeanoSucc p0 q => f _ (iter _ q)
     end).
 
 Theorem eq_dep_eq_positive :

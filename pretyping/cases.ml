@@ -1651,8 +1651,11 @@ let abstract_tycon loc env evdref subst tycon extenv t =
       let ty = lift (-k) (aux x ty) in
       let depvl = free_rels ty in
       let inst =
-	List.map_i
-	  (fun i _ -> if Int.List.mem i vl then u else mkRel i) 1
+	List.map_filter_i
+	  (fun i decl ->
+            let i = succ i in
+            if Context.Rel.Declaration.get_name decl == Anonymous then None
+            else Some (if Int.List.mem i vl then u else mkRel i))
 	  (rel_context extenv) in
       let rel_filter =
 	List.map (fun a -> not (isRel a) || dependent a u

@@ -45,7 +45,7 @@ Definition rectS {A} (P:forall {n}, t A (S n) -> Type)
  |@cons _ a 0 v =>
    match v with
      |nil _ => bas a
-     |_ => fun devil => False_ind (@IDProp) devil (* subterm !!! *)
+     |cons _ a (S n) v  => fun devil => False_ind (@IDProp) devil (* subterm !!! *)
    end
  |@cons _ a (S nn') v => rect a v (rectS_fix v)
  |_ => fun devil => False_ind (@IDProp) devil (* subterm !!! *)
