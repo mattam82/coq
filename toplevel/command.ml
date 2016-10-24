@@ -233,7 +233,7 @@ match local with
     strbrk " is not visible from current goals")
   in
   let r = VarRef ident in
-  let () = Typeclasses.declare_instance None true r in
+  let () = Typeclasses.declare_instance Hints.empty_hint_info true r in
   let () = if is_coe then Class.try_add_new_coercion r ~local:true false in
   (r,Univ.Instance.empty,true)
 
@@ -251,7 +251,7 @@ match local with
   let () = maybe_declare_manual_implicits false gr imps in
   let () = Universes.register_universe_binders gr pl in
   let () = assumption_message ident in
-  let () = Typeclasses.declare_instance None false gr in
+  let () = Typeclasses.declare_instance Hints.empty_hint_info false gr in
   let () = if is_coe then Class.try_add_new_coercion gr local p in
   let inst = 
     if p (* polymorphic *) then Univ.UContext.instance ctx 

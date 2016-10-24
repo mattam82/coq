@@ -25,6 +25,8 @@ exception Bound
 
 val decompose_app_bound : constr -> global_reference * constr array
 
+val empty_hint_info : 'a hint_info_gen
+
 (** Pre-created hint databases *)
 
 type 'a hint_ast =
@@ -120,20 +122,21 @@ type hint_db = Hint_db.t
 
 type hnf = bool
 
+type hint_info = (patvar list * constr_pattern) hint_info_gen
+
 type hint_term =
   | IsGlobRef of global_reference
   | IsConstr of constr * Univ.universe_context_set
 
 type hints_entry =
-  | HintsResolveEntry of (int option * polymorphic * hnf * hints_path_atom * 
-			  hint_term) list
+  | HintsResolveEntry of
+    (hint_info * polymorphic * hnf * hints_path_atom * hint_term) list
   | HintsImmediateEntry of (hints_path_atom * polymorphic * hint_term) list
   | HintsCutEntry of hints_path
   | HintsUnfoldEntry of evaluable_global_reference list
   | HintsTransparencyEntry of evaluable_global_reference list * bool
   | HintsModeEntry of global_reference * hint_mode list
-  | HintsExternEntry of
-      int * (patvar list * constr_pattern) option * Tacexpr.glob_tactic_expr
+  | HintsExternEntry of hint_info * Tacexpr.glob_tactic_expr
 
 val searchtable_map : hint_db_name -> hint_db
 
@@ -160,22 +163,32 @@ val prepare_hint : bool (* Check no remaining evars *) ->
   (bool * bool) (* polymorphic or monomorphic, local or global *) ->
   env -> evar_map -> open_constr -> hint_term
 
-(** [make_exact_entry pri (c, ctyp)].
+(** [make_exact_entry info (c, ctyp)].
    [c] is the term given as an exact proof to solve the goal;
-   [ctyp] is the type of [c]. *)
+   [ctyp] is the type of [c].
+   In info:
+   [hint_priority] is the hint's desired priority, it is 0 if unspecified
+   [hint_pattern] is the hint's desired pattern, it is inferred if not specified
+*)
 
-val make_exact_entry : env -> evar_map -> int option -> polymorphic -> ?name:hints_path_atom -> 
+val make_exact_entry : env -> evar_map -> hint_info -> polymorphic -> ?name:hints_path_atom ->
   (constr * types * Univ.universe_context_set) -> hint_entry
 
-(** [make_apply_entry (eapply,hnf,verbose) pri (c,cty)].
+(** [make_apply_entry (eapply,hnf,verbose) info (c,cty)].
    [eapply] is true if this hint will be used only with EApply;
    [hnf] should be true if we should expand the head of cty before searching for
    products;
    [c] is the term given as an exact proof to solve the goal;
-   [cty] is the type of [c]. *)
+   [cty] is the type of [c].
+   In info:
+   [hint_priority] is the hint's desired priority, it is computed as the number of products in [cty]
+   if unspecified
+   [hint_pattern] is the hint's desired pattern, it is inferred from the conclusion of [cty]
+   if not specified
+*)
 
 val make_apply_entry :
-  env -> evar_map -> bool * bool * bool -> int option -> polymorphic -> ?name:hints_path_atom -> 
+  env -> evar_map -> bool * bool * bool -> hint_info -> polymorphic -> ?name:hints_path_atom ->
   (constr * types * Univ.universe_context_set) -> hint_entry
 
 (** A constr which is Hint'ed will be:
@@ -186,7 +199,7 @@ val make_apply_entry :
          has missing arguments. *)
 
 val make_resolves :
-  env -> evar_map -> bool * bool * bool -> int option -> polymorphic -> ?name:hints_path_atom -> 
+  env -> evar_map -> bool * bool * bool -> hint_info -> polymorphic -> ?name:hints_path_atom ->
   hint_term -> hint_entry list
 
 (** [make_resolve_hyp hname htyp].
