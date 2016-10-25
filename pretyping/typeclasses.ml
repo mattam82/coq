@@ -408,6 +408,7 @@ let remove_instance i =
 
 let declare_instance info local glob =
   let ty = Global.type_of_global_unsafe glob in
+  let info = Option.default {hint_priority = None; hint_pattern = None} info in
     match class_of_constr ty with
     | Some (rels, ((tc,_), args) as _cl) ->
       add_instance (new_instance tc info (not local) (Flags.use_polymorphic_flag ()) glob)
@@ -420,7 +421,7 @@ let add_class cl =
 	     | Some (Backward, info) ->
 	       (match body with
 	       | None -> CErrors.error "Non-definable projection can not be declared as a subinstance"
-	       | Some b -> declare_instance info false (ConstRef b))
+	       | Some b -> declare_instance (Some info) false (ConstRef b))
 	     | _ -> ())
   cl.cl_projs
 

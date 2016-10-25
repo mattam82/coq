@@ -20,8 +20,8 @@ val mismatched_props : env -> constr_expr list -> Context.Rel.t -> 'a
 
 (** Instance declaration *)
 
-val existing_instance : bool -> reference -> Vernacexpr.hint_info_expr -> unit
-(** globality, reference, optional priority and pattern *)
+val existing_instance : bool -> reference -> Vernacexpr.hint_info_expr option -> unit
+(** globality, reference, optional priority and pattern information *)
 
 val declare_instance_constant :
   typeclass ->

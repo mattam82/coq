@@ -122,7 +122,7 @@ val remove_instance_hint : global_reference -> unit
 val solve_all_instances_hook : (env -> evar_map -> evar_filter -> bool -> bool -> bool -> evar_map) Hook.t
 val solve_one_instance_hook : (env -> evar_map -> types -> bool -> open_constr) Hook.t
 
-val declare_instance : Vernacexpr.hint_info_expr -> bool -> global_reference -> unit
+val declare_instance : Vernacexpr.hint_info_expr option -> bool -> global_reference -> unit
 
 
 (** Build the subinstances hints for a given typeclass object.

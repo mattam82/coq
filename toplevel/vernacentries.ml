@@ -843,7 +843,7 @@ let vernac_context poly l =
 
 let vernac_declare_instances locality insts =
   let glob = not (make_section_locality locality) in
-  List.iter (fun (id, info) -> Classes.existing_instance glob id info) insts
+  List.iter (fun (id, info) -> Classes.existing_instance glob id (Some info)) insts
 
 let vernac_declare_class id =
   Record.declare_existing_class (Nametab.global id)

@@ -67,6 +67,7 @@ open Vernacexpr
 (** TODO: add subinstances *)
 let existing_instance glob g info =
   let c = global g in
+  let info = Option.default Hints.empty_hint_info info in
   let instance = Global.type_of_global_unsafe c in
   let _, r = decompose_prod_assum instance in
     match class_of_constr r with
@@ -106,7 +107,7 @@ open Pp
 
 let instance_hook k info global imps ?hook cst =
   Impargs.maybe_declare_manual_implicits false cst ~enriching:false imps;
-  Typeclasses.declare_instance info (not global) cst;
+  Typeclasses.declare_instance (Some info) (not global) cst;
   (match hook with Some h -> h cst | None -> ())
 
 let declare_instance_constant k info global imps ?hook id pl poly evm term termtype =
@@ -305,7 +306,7 @@ let new_instance ?(abstract=false) ?(global=false) ?(refine= !refine_instance) p
 	      let hook vis gr _ =
 		let cst = match gr with ConstRef kn -> kn | _ -> assert false in
 		  Impargs.declare_manual_implicits false gr ~enriching:false [imps];
-		  Typeclasses.declare_instance pri (not global) (ConstRef cst)
+		  Typeclasses.declare_instance (Some pri) (not global) (ConstRef cst)
 	      in
 	      let obls, constr, typ =
 		match term with 
