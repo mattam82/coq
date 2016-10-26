@@ -643,8 +643,11 @@ GEXTEND Gram
       | IDENT "Existing"; IDENT "Instance"; id = global;
           info = hint_info ->
 	  VernacDeclareInstances [id, info]
-      | IDENT "Existing"; IDENT "Instances";
-	insts = LIST1 [ g = global; info = hint_info -> (g,info) ] SEP "," ->
+
+      | IDENT "Existing"; IDENT "Instances"; ids = LIST1 global;
+        pri = OPT [ "|"; i = natural -> i ] ->
+         let info = { hint_priority = pri; hint_pattern = None } in
+         let insts = List.map (fun i -> (i, info)) ids in
 	  VernacDeclareInstances insts
 
       | IDENT "Existing"; IDENT "Class"; is = global -> VernacDeclareClass is
