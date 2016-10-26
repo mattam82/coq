@@ -1,3 +1,16 @@
+Module onlyclasses.
+
+  Variable Foo : Type.
+  Variable foo : Foo.
+  Hint Extern 0 Foo => exact foo : typeclass_instances.
+  Goal Foo * Foo.
+    split. shelve.
+    Fail typeclasses eauto.
+    typeclasses eauto with typeclass_instances.
+    Unshelve. typeclasses eauto with typeclass_instances.
+  Abort.
+End onlyclasses.
+
 Module bt.
 Require Import Equivalence.
 
