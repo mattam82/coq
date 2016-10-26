@@ -92,7 +92,7 @@ open Goptions
 let _ =
   declare_bool_option
     { optsync  = true;
-      optdepr  = false;
+      optdepr  = true;
       optname  = "do typeclass search modulo eta conversion";
       optkey   = ["Typeclasses";"Modulo";"Eta"];
       optread  = get_typeclasses_modulo_eta;
@@ -1201,9 +1201,12 @@ module Search = struct
         unit Proofview.tactic =
     let open Proofview in
     let open Proofview.Notations in
-    let dep = dep || Proofview.unifiable sigma (Goal.goal gl) gls in
-    let info = make_autogoal ?st only_classes dep (cut_of_hints hints) i gl in
-    search_tac hints depth 1 info
+    if only_classes && not (is_class_type sigma (Goal.concl gl)) then
+      Proofview.shelve
+    else
+      let dep = dep || Proofview.unifiable sigma (Goal.goal gl) gls in
+      let info = make_autogoal ?st only_classes dep (cut_of_hints hints) i gl in
+      search_tac hints depth 1 info
 
   let search_tac ?(st=full_transparent_state) only_classes dep hints depth =
     let open Proofview in
@@ -1255,9 +1258,14 @@ module Search = struct
                                      else str" without reaching its limit"))
       | Proofview.MoreThanOneSuccess ->
          Tacticals.New.tclFAIL 0 (str"Proof search failed: " ++
-                                  str"more than one success found.")
+                                  str"more than one success found")
       | e -> Proofview.tclZERO ~info:ie e
-    in Proofview.tclOR tac error
+    in Proofview.with_shelf (Proofview.tclOR tac error) >>=
+         fun (shelved, res) ->
+         if not (List.is_empty shelved) then
+           Tacticals.New.tclFAIL 0 (str"Proof search failed: " ++
+                                    str "shelved subgoals remain")
+         else Proofview.tclUNIT res
 
   let run_on_evars ?(unique=false) p evm tac =
     match evars_to_goals p evm with
