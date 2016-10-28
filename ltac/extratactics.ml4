@@ -346,27 +346,91 @@ let constr_flags = {
   Pretyping.fail_evar = false;
   Pretyping.expand_evars = true }
 
-let refine_tac ist simple c =
+type refine_opts = {
+  refine_with_typeclasses : bool;
+  refine_simple : bool }
+                     
+let refine_tac ist opts c =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
     let concl = Proofview.Goal.concl gl in
     let env = Proofview.Goal.env gl in
-    let flags = constr_flags in
+    let flags =
+      { constr_flags with Pretyping.use_typeclasses = opts.refine_with_typeclasses } in
     let expected_type = Pretyping.OfType concl in
     let c = Pretyping.type_uconstr ~flags ~expected_type ist c in
     let update = { run = fun sigma -> c.delayed env sigma } in
     let refine = Refine.refine ~unsafe:false update in
-    if simple then refine
+    if opts.refine_simple then refine
     else refine <*>
            Tactics.New.reduce_after_refine <*>
            Proofview.shelve_unifiable
   end }
 
 TACTIC EXTEND refine
-| [ "refine" uconstr(c) ] -> [ refine_tac ist false c ]
+| [ "refine" uconstr(c) ] ->
+   [ refine_tac ist {refine_simple = false; refine_with_typeclasses = true} c ]
 END
 
 TACTIC EXTEND simple_refine
-| [ "simple" "refine" uconstr(c) ] -> [ refine_tac ist true c ]
+| [ "simple" "refine" uconstr(c) ] ->
+   [ refine_tac ist {refine_simple = true; refine_with_typeclasses = true} c ]
+END
+
+let get_flag s l =
+  let rec aux l =
+    match l with
+    | (status, hd) :: tl when String.equal hd s ->
+       let () =
+         try ignore(List.find (fun (_, s') -> String.equal s s') tl);
+             CErrors.error ("Flag " ^ s ^ " appears multiple times")
+         with Not_found -> ()
+       in
+       status, tl
+    | hd :: tl ->
+       let found, tl' = aux tl in
+       found, hd :: tl'
+    | [] -> true, l
+  in aux l
+  
+let pr_tactic_opt (b, s) =
+  let open Pp in
+  (if b then mt() else str"-") ++ str s
+
+let pr_tactic_opts o =
+  let open Pp in
+  prlist_with_sep spc pr_tactic_opt o 
+
+let no_more_flags flags =
+  if List.is_empty flags then ()
+  else CErrors.errorlabstrm "flags" Pp.(str"Unrecognized flags: " ++
+                                          pr_tactic_opts flags)
+
+let process_flags flags =
+  let refine_simple, flags = get_flag "simple" flags in
+  let refine_with_typeclasses, flags = get_flag "typeclasses" flags in
+  no_more_flags flags;
+  { refine_simple; refine_with_typeclasses }
+
+let pr_refine_opts _ _ _ o =
+  let opts = [(o.refine_simple, "simple");
+              (o.refine_with_typeclasses,"typeclasses")] in
+  pr_tactic_opts opts
+    
+let pr_tactic_opt _ _ _ o = pr_tactic_opt o
+let pr_tactic_opts _ _ _ o = pr_tactic_opts o
+
+ARGUMENT EXTEND opt TYPED AS (bool * string) PRINTED BY pr_tactic_opt
+| [ ident(s) ] -> [ (true, Id.to_string s) ]
+| [ "-" ident(s) ] -> [ (false, Id.to_string s) ]
+END
+
+ARGUMENT EXTEND refine_opts TYPED AS refine_opts PRINTED BY pr_refine_opts
+| [ ":{" opt_list(l) "}" ] -> [ process_flags l ]
+| [ ] -> [ { refine_simple = false; refine_with_typeclasses = true } ]
+END
+
+TACTIC EXTEND refine_notcs
+| [ "refine" refine_opts(o) uconstr(c) ] -> [ refine_tac ist o c ]
 END
 
 (**********************************************************************)
