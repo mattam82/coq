@@ -108,6 +108,8 @@ val info_env : 'a infos -> env
 val info_evar_closures : 'a infos -> evar_closures
 val info_flags: 'a infos -> reds
 
+val info_push_rel : Context.Rel.Declaration.t -> 'a infos -> 'a infos
+
 (***********************************************************************
   s Lazy reduction. *)
 
@@ -178,6 +180,7 @@ val mk_atom : constr -> fconstr
 val mk_red : fterm -> fconstr
 
 val fterm_of : fconstr -> fterm
+val term_of_fconstr_lift : lift -> fconstr -> constr
 val term_of_fconstr : fconstr -> constr
 val destFLambda :
   (fconstr subs -> constr -> fconstr) -> fconstr -> Name.t * fconstr * fconstr

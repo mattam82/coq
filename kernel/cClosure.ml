@@ -271,6 +271,10 @@ let info_evar_closures info = info.i_cache.i_sigma
 
 open Context.Named.Declaration
 
+let info_push_rel d info =
+  let env = push_rel d (info_env info) in
+  { info with i_cache = { info.i_cache with i_env = env } }
+
 let assoc_defined id env = match Environ.lookup_named id env with
 | LocalDef (_, c, _) -> c
 | _ -> raise Not_found
@@ -651,16 +655,16 @@ let rec to_constr constr_fun lfts v =
    fconstr. When we find a closure whose substitution is the identity,
    then we directly return the constr to avoid possibly huge
    reallocation. *)
-let term_of_fconstr =
-  let rec term_of_fconstr_lift lfts v =
-    match v.term with
-      | FCLOS(t,env) when is_subs_id env && is_lift_id lfts -> t
-      | FLambda(_,tys,f,e) when is_subs_id e && is_lift_id lfts ->
-          Term.compose_lam (List.rev tys) f
-      | FFix(fx,e) when is_subs_id e && is_lift_id lfts -> mkFix fx
-      | FCoFix(cfx,e) when is_subs_id e && is_lift_id lfts -> mkCoFix cfx
-      | _ -> to_constr term_of_fconstr_lift lfts v in
-  term_of_fconstr_lift el_id
+let rec term_of_fconstr_lift lfts v =
+  match v.term with
+  | FCLOS(t,env) when is_subs_id env && is_lift_id lfts -> t
+  | FLambda(_,tys,f,e) when is_subs_id e && is_lift_id lfts ->
+     Term.compose_lam (List.rev tys) f
+  | FFix(fx,e) when is_subs_id e && is_lift_id lfts -> mkFix fx
+  | FCoFix(cfx,e) when is_subs_id e && is_lift_id lfts -> mkCoFix cfx
+  | _ -> to_constr term_of_fconstr_lift lfts v
+
+let term_of_fconstr = term_of_fconstr_lift el_id
 
 
 
