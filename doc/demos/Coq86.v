@@ -181,12 +181,6 @@ End UnifConstraints.
     corresponding warning, to silence the build of this file. *)
 Local Set Warnings "-deprecated-option".
 
-(* In 8.5, "intros [|]", taken e.g. on a goal "A\/B->C", does not
-   behave as "intros [H|H]" but leave instead hypotheses quantified in
-   the goal, here producing subgoals A->C and B->C. *)
-
-Global Unset Bracketing Last Introduction Pattern.
-
 (** Subst has some irregularities *)
 
 Global Unset Regular Subst Tactic.
@@ -272,3 +266,44 @@ Module Contradiction.
   Qed.
 
 End Contradiction.
+
+Module IntroductionPatterns.
+
+  Module TupleIntroductionPatterns.
+    (* Tuples pattern must now combine as many patterns as there are
+       arguments to the corresponding constructor *)
+
+    Goal (exists x, x = 0) -> True.
+    Fail intros (x).
+    intros (x,Hx).
+    Abort.
+
+    (* Former code which does not comply to this invariant is expected
+       to be upgraded *)
+
+  End TupleIntroductionPatterns.
+
+  Module BracketingLastIntroductionPattern.
+    (* The last disjunctive/conjunctive introduction pattern of a
+       sequence now behaves as if it were not the last of the sequence,
+       padding with enough names to ensure well-bracketing and
+       composability. *)
+
+    Goal forall A B C D, A \/ B -> C /\ D -> A /\ C \/ B /\ D.
+    intros * [|]; intros (HC,HD).
+    Undo.
+
+    (* The 8.5 behavior can be recovered with the following option *)
+
+    Global Unset Bracketing Last Introduction Pattern.
+
+    (* In 8.5, "intros [|]", taken e.g. on a goal "A\/B->...", does not
+       behave as "intros [H|H]" but leave instead hypotheses quantified in
+       the goal, here producing subgoals A->... and B->... *)
+
+    intros * [|]. Fail intros (HC,HD).
+    Abort.
+
+  End BracketingLastIntroductionPattern.
+
+End IntroductionPatterns.
