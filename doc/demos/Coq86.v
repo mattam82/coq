@@ -85,20 +85,55 @@ Print Warnings "numbers":"large-nat".
 
 (** Irrefutable patterns *)
 
+Require Vector.
+
 Module IrrefutablePatterns.
-  
+  (* Show uses of irrefutable patterns in binders *)
+
   Definition fst {A B} '((a, b) : _ * B) : A := a.
   Definition snd {A B} '((a, b) : A * B) := b.
+
+  Definition swap {A B} '((x,y) : A*B) := (y,x).
+  Print swap.
   
+  (** The syntax is actually for any destructive patterns, not only for pairs *)
+
   Record myrec := makemy { somebool : bool; somenat : nat }.
          
   Lemma eta_my : forall '(makemy b n), b = true \/ b = false.
     intros [[|] n]; auto.
-  Qed.
 
-  Definition map_pair (l : list (nat * nat)) : list nat :=
-    map (fun '(pair x _) => x) l.
-  
+  Definition proj_informative A P '(exist _ x _ : { x:A | P x }) : A := x.
+  Print proj_informative.
+
+  (* Binding a pair, without explicit type *)
+
+  Definition sum '(x,y) := x+y.
+  Print sum.
+
+  (* Using pairs in "fun" and "forall" *)
+
+  Check fun (A B:Type) '((x,y) : A*B) => swap (x,y) = (y,x).
+  Check forall (A B:Type) '((x,y) : A*B), swap (x,y) = (y,x).
+
+  (* Using pairs in arbitrary notations supporting binders *)
+
+  Check exists A '((x,y):A*A), swap (x,y) = (y,x).
+  Check exists A '((x,y):A*A) '(z,w), swap (x,y) = (z,w).
+
+  Inductive Foo := Bar : nat -> bool -> unit -> nat -> Foo.
+  Definition foo '(Bar n b tt p) := if b then n+p else n-p.
+  Print foo.
+
+  Definition baz '(Bar n1 b1 tt p1) '(Bar n2 b2 tt p2) := n1+p1.
+  Print baz.
+
+  (** Irrefutable patterns can also be used for pattern-matching on a
+      type with several constructors when only one of them is possible *)
+
+  Import Vector VectorDef.VectorNotations.
+  Definition hd A n '(a::v : Vector.t  A (S n)) := a.
+
 End IrrefutablePatterns.
 
 (** Ltacprof *)
