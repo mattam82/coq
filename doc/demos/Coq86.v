@@ -229,3 +229,31 @@ Goal forall x y, (x,y)=(0,0) -> True.
 intros * H.
 injection H.
 Abort.
+
+Module Notations.
+  (* Recursive notations for binders can now be combined with
+     recursive notations for terms *)
+
+  Inductive ftele : Type :=
+  | fb {T:Type} : T -> ftele
+  | fr {T} : (T -> ftele) -> ftele.
+
+  Fixpoint args ftele : Type :=
+    match ftele with
+      | fb _ => unit
+      | fr f => sigT (fun t => args (f t))
+    end.
+
+  Definition fpack := sigT args.
+  Definition pack fp fa : fpack := existT _ fp fa.
+
+  Notation "'telescope' x .. z := b" :=
+    (fun x => .. (fun z =>
+                    pack (fr (fun x => .. ( fr (fun z => fb b) ) .. ) )
+                         (existT _ x .. (existT _ z tt) .. )
+                 ) ..)
+      (at level 85, x binder, z binder).
+
+  Check telescope (t:Type) '((y,z):nat*nat) (x:t) := tt.
+
+End Notations.
