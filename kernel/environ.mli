@@ -251,6 +251,16 @@ type 'types punsafe_type_judgment = {
 
 type unsafe_type_judgment = types punsafe_type_judgment
 
+(** {5 Evar environment. }
+    Holds types and definitions of evars/metas as closures.
+    Raise [Not_found] or [Anomaly] on invalid arguments. *)
+
+type evar_closures = {
+    meta_type : metavariable -> types;
+    meta_val : metavariable -> constr option;
+    evar_type : existential -> types;
+    evar_val : existential -> constr option }
+
 (** {6 Compilation of global declaration } *)
 
 val compile_constant_body : env -> constant_universes -> constant_def -> Cemitcodes.body_code option

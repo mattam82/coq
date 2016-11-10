@@ -1038,12 +1038,21 @@ let meta_fvalue evd mv =
 let meta_value evd mv =
   (fst (try_meta_fvalue evd mv)).rebus
 
+let meta_opt_value evd mv =
+  Option.map (fun v -> (fst v).rebus) (meta_opt_fvalue evd mv)
+
 let meta_ftype evd mv =
   match Metamap.find mv evd.metas with
     | Cltyp (_,b) -> b
     | Clval(_,_,b) -> b
 
 let meta_type evd mv = (meta_ftype evd mv).rebus
+
+let evar_closures evd = {
+    meta_type = meta_type evd;
+    meta_val = meta_opt_value evd;
+    evar_type = existential_type evd;
+    evar_val = existential_opt_value evd }
 
 let meta_declare mv v ?(name=Anonymous) evd =
   let metas = Metamap.add mv (Cltyp(name,mk_freelisted v)) evd.metas in

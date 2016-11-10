@@ -482,6 +482,14 @@ type 'types punsafe_type_judgment = {
 
 type unsafe_type_judgment = types punsafe_type_judgment
 
+(*s Evar environment. *)
+
+type evar_closures = {
+    meta_type : metavariable -> types;
+    meta_val : metavariable -> constr option;
+    evar_type : existential -> types;
+    evar_val : existential -> constr option }
+
 (*s Compilation of global declaration *)
 
 let compile_constant_body = Cbytegen.compile_constant_body false

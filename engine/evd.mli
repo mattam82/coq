@@ -139,6 +139,9 @@ val from_env : env -> evar_map
 (** The empty evar map with given universe context, taking its initial 
     universes from env. *)
 
+val evar_closures : evar_map -> evar_closures
+(** Returns the closures producing types and values for evars and metas. *)
+
 val from_ctx : UState.t -> evar_map
 (** The empty evar map with given universe context *)
 
@@ -436,6 +439,7 @@ val meta_list : evar_map -> (metavariable * clbinding) list
 val meta_defined : evar_map -> metavariable -> bool
 
 val meta_value     : evar_map -> metavariable -> constr
+val meta_opt_value : evar_map -> metavariable -> constr option
 (** [meta_fvalue] raises [Not_found] if meta not in map or [Anomaly] if
    meta has no value *)
 
