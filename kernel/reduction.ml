@@ -129,7 +129,7 @@ type 'a kernel_conversion_function = env -> 'a -> 'a -> unit
 (* functions of this type can be called from outside the kernel *)
 type 'a extended_conversion_function =
   ?l2r:bool -> ?reds:Names.transparent_state -> env ->
-  ?evars:((existential->constr option) * UGraph.t) ->
+  ?evars:(evar_closures * UGraph.t) ->
   'a -> 'a -> unit
 
 exception NotConvertible
@@ -776,7 +776,7 @@ let gen_conv cv_pb l2r reds env evars univs t1 t2 =
 	()
 
 (* Profiling *)
-let gen_conv cv_pb ?(l2r=false) ?(reds=full_transparent_state) env ?(evars=(fun _->None), universes env) =
+let gen_conv cv_pb ?(l2r=false) ?(reds=full_transparent_state) env ?(evars=no_evars, universes env) =
   let evars, univs = evars in
   if Flags.profile then
     let fconv_universes_key = Profile.declare_profile "trans_fconv_universes" in
@@ -810,17 +810,17 @@ let infer_conv_universes =
       Profile.profile8 infer_conv_universes_key infer_conv_universes
   else infer_conv_universes
 
-let infer_conv ?(l2r=false) ?(evars=fun _ -> None) ?(ts=full_transparent_state)
+let infer_conv ?(l2r=false) ?(evars=no_evars) ?(ts=full_transparent_state)
     env univs t1 t2 = 
   infer_conv_universes CONV l2r evars ts env univs t1 t2
 
-let infer_conv_leq ?(l2r=false) ?(evars=fun _ -> None) ?(ts=full_transparent_state) 
+let infer_conv_leq ?(l2r=false) ?(evars=no_evars) ?(ts=full_transparent_state) 
     env univs t1 t2 = 
   infer_conv_universes CUMUL l2r evars ts env univs t1 t2
 
 (* This reference avoids always having to link C code with the kernel *)
 let vm_conv = ref (fun cv_pb env ->
-		   gen_conv cv_pb env ~evars:((fun _->None), universes env))
+		   gen_conv cv_pb env ~evars:(no_evars, universes env))
 
 let warn_bytecode_compiler_failed =
   let open Pp in

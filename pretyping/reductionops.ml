@@ -667,9 +667,7 @@ let pr_state (tm,sk) =
 
 let safe_evar_value = Evarutil.safe_evar_value
 
-let safe_meta_value sigma ev =
-  try Some (Evd.meta_value sigma ev)
-  with Not_found -> None
+let safe_meta_value = Evarutil.safe_meta_value
 
 let strong whdfun env sigma t =
   let rec strongrec env t =
@@ -1266,7 +1264,7 @@ let nf_evar = Evarutil.nf_evar
    a [nf_evar] here *)
 let clos_norm_flags flgs env sigma t =
   try
-    let evars ev = safe_evar_value sigma ev in
+    let evars = Evarutil.safe_evar_closures sigma in
     EConstr.of_constr (CClosure.norm_val
       (CClosure.create_clos_infos ~evars flgs env)
       (CClosure.inject (EConstr.Unsafe.to_constr t)))
@@ -1274,7 +1272,7 @@ let clos_norm_flags flgs env sigma t =
 
 let clos_whd_flags flgs env sigma t =
   try
-    let evars ev = safe_evar_value sigma ev in
+    let evars = Evarutil.safe_evar_closures sigma in
     EConstr.of_constr (CClosure.whd_val
       (CClosure.create_clos_infos ~evars flgs env)
       (CClosure.inject (EConstr.Unsafe.to_constr t)))
@@ -1330,8 +1328,7 @@ let f_conv_leq ?l2r ?reds env ?evars x y =
 
 let test_trans_conversion (f: constr Reduction.extended_conversion_function) reds env sigma x y =
   try
-    let evars ev = safe_evar_value sigma ev in
-    let _ = f ~reds env ~evars:(evars, Evd.universes sigma) x y in
+    let _ = f ~reds env ~evars:(Evarutil.safe_evar_closures sigma, Evd.universes sigma) x y in
     true
   with Reduction.NotConvertible -> false
     | e when is_anomaly e -> report_anomaly e
@@ -1347,7 +1344,7 @@ let check_conv ?(pb=Reduction.CUMUL) ?(ts=full_transparent_state) env sigma x y 
     | Reduction.CONV -> f_conv
     | Reduction.CUMUL -> f_conv_leq
   in
-    try f ~reds:ts env ~evars:(safe_evar_value sigma, Evd.universes sigma) x y; true
+    try f ~reds:ts env ~evars:(Evarutil.safe_evar_closures sigma, Evd.universes sigma) x y; true
     with Reduction.NotConvertible -> false
     | Univ.UniverseInconsistency _ -> false
     | e when is_anomaly e -> report_anomaly e
@@ -1472,7 +1469,7 @@ let infer_conv_gen conv_fun ?(catch_incon=true) ?(pb=Reduction.CUMUL)
   | e when is_anomaly e -> report_anomaly e
 
 let infer_conv = infer_conv_gen (fun pb ~l2r sigma ->
-      Reduction.generic_conv pb ~l2r (safe_evar_value sigma))
+      Reduction.generic_conv pb ~l2r (Evarutil.safe_evar_closures sigma))
 
 (* This reference avoids always having to link C code with the kernel *)
 let vm_infer_conv = ref (infer_conv ~catch_incon:true ~ts:full_transparent_state)

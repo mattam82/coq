@@ -87,6 +87,11 @@ val new_evar_instance :
 val make_pure_subst : evar_info -> 'a array -> (Id.t * 'a) list
 
 val safe_evar_value : evar_map -> Constr.existential -> Constr.constr option
+val safe_meta_value : evar_map -> metavariable -> Constr.constr option
+
+(* Like [evar_closures] but does not raise exceptions
+   when getting the value of an unknown meta or existential. *)
+val safe_evar_closures : evar_map -> evar_closures
 
 (** {6 Evars/Metas switching...} *)
 

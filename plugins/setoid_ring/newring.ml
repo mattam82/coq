@@ -86,7 +86,7 @@ let lookup_map map =
     CErrors.user_err ~hdr:"lookup_map" (str"map "++qs map++str"not found")
 
 let protect_red map env sigma c0 =
-  let evars ev = Evarutil.safe_evar_value sigma ev in
+  let evars = Evarutil.safe_evar_closures sigma in
   let c = EConstr.Unsafe.to_constr c0 in
   EConstr.of_constr (kl (create_clos_infos ~evars all env)
     (mk_clos_but (lookup_map map sigma c0) (Esubst.subs_id 0) c));;

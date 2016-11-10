@@ -1494,6 +1494,9 @@ sig
     utj_type : Sorts.t }
 
   type unsafe_type_judgment = Term.types punsafe_type_judgment
+
+  type evar_closures
+
   val empty_env : env
   val lookup_mind : Names.MutInd.t -> env -> Declarations.mutual_inductive_body
   val push_rel : Context.Rel.Declaration.t -> env -> env
@@ -1580,7 +1583,7 @@ sig
   val betaiota : RedFlags.reds
   val betaiotazeta : RedFlags.reds
 
-  val create_clos_infos : ?evars:(Term.existential -> Constr.t option) -> RedFlags.reds -> Environ.env -> clos_infos
+  val create_clos_infos : ?evars:Environ.evar_closures -> RedFlags.reds -> Environ.env -> clos_infos
 
   val whd_val : clos_infos -> fconstr -> Constr.t
 
@@ -1607,7 +1610,7 @@ sig
 
   type 'a extended_conversion_function =
     ?l2r:bool -> ?reds:Names.transparent_state -> Environ.env ->
-    ?evars:((Term.existential->Constr.t option) * UGraph.t) ->
+    ?evars:(Environ.evar_closures * UGraph.t) ->
     'a -> 'a -> unit
   val conv : Constr.t extended_conversion_function
 end
@@ -2720,6 +2723,7 @@ sig
 
     val empty : evar_map
     val from_env : Environ.env -> evar_map
+    val evar_closures : evar_map -> Environ.evar_closures
     val find : evar_map -> Evar.t -> evar_info
     val find_undefined : evar_map -> evar -> evar_info
     val is_defined : evar_map -> Evar.t -> bool
@@ -3148,6 +3152,7 @@ sig
     Evd.evar_map * (EConstr.constr * Sorts.t)
   val nf_evars_universes : Evd.evar_map -> Constr.t -> Constr.t
   val safe_evar_value : Evd.evar_map -> Term.existential -> Constr.t option
+  val safe_evar_closures : Evd.evar_map -> Environ.evar_closures
   val evd_comb1 : (Evd.evar_map -> 'b -> Evd.evar_map * 'a) -> Evd.evar_map ref -> 'b -> 'a
 end
 

@@ -261,6 +261,8 @@ type evar_closures = {
     evar_type : existential -> types;
     evar_val : existential -> constr option }
 
+val no_evars : evar_closures
+
 (** {6 Compilation of global declaration } *)
 
 val compile_constant_body : env -> constant_universes -> constant_def -> Cemitcodes.body_code option

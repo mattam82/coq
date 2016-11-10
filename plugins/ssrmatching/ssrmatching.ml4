@@ -274,7 +274,7 @@ exception NoProgress
 (*      comparison can be much faster than the HO one.          *)
 
 let unif_EQ env sigma p c =
-  let evars = existential_opt_value sigma, Evd.universes sigma in 
+  let evars = evar_closures sigma, Evd.universes sigma in
   try let _ = Reduction.conv env p ~evars c in true with _ -> false
 
 let unif_EQ_args env sigma pa a =

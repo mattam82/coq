@@ -670,7 +670,7 @@ let infer_inductive_subtyping_arity_constructor
     let result =
       if !numchecked >= numparams then
         let csts' =
-          Reduction.infer_conv_leq ~evars:(Evd.existential_opt_value evd) env (Evd.universes evd) tp (subst tp)
+          Reduction.infer_conv_leq ~evars:(Evd.evar_closures evd) env (Evd.universes evd) tp (subst tp)
         in update_contexts (env, evd, csts) csts'
       else
         (env, evd, csts)

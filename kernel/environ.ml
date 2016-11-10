@@ -490,6 +490,12 @@ type evar_closures = {
     evar_type : existential -> types;
     evar_val : existential -> constr option }
 
+let no_evars = {
+    meta_type = (fun _ -> raise Not_found);
+    meta_val = (fun _ -> None);
+    evar_type = (fun _ -> raise Not_found);
+    evar_val = (fun _ -> None) }
+
 (*s Compilation of global declaration *)
 
 let compile_constant_body = Cbytegen.compile_constant_body false

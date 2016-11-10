@@ -23,6 +23,16 @@ let safe_evar_value sigma ev =
   try Some (Evd.existential_value sigma ev)
   with NotInstantiatedEvar | Not_found -> None
 
+let safe_meta_value sigma ev =
+  try Some (Evd.meta_value sigma ev)
+  with Not_found -> None
+
+let safe_evar_closures sigma = {
+    meta_type = meta_type sigma;
+    meta_val = safe_meta_value sigma;
+    evar_type = existential_type sigma;
+    evar_val = safe_evar_value sigma }
+
 (** Combinators *)
 
 let evd_comb0 f evdref =
