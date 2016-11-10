@@ -257,3 +257,18 @@ Module Notations.
   Check telescope (t:Type) '((y,z):nat*nat) (x:t) := tt.
 
 End Notations.
+
+Module Contradiction.
+  (* "contradiction", hence "easy" now solves intuitively contradictory
+  goals negating a trivially true formula ("True", "unit", "t=t", etc. *)
+
+  Goal ~True -> 0=1.
+  intros.
+  contradiction.
+  Qed.
+
+  Goal 0<>0 -> 0=1.
+  easy.
+  Qed.
+
+End Contradiction.
