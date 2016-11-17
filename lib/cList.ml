@@ -78,6 +78,7 @@ sig
   exception IndexOutOfRange
   val goto : int -> 'a list -> 'a list * 'a list
   val split_when : ('a -> bool) -> 'a list -> 'a list * 'a list
+  val split_with : ('a -> bool) -> 'a list -> 'a list * 'a list
   val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
   val firstn : int -> 'a list -> 'a list
   val last : 'a list -> 'a
@@ -681,6 +682,17 @@ let split_when p =
       | (a::l)  -> if (p a) then (List.rev x,y) else split_when_loop (a::x) l
   in
   split_when_loop []
+
+(* [split_with p l] splits [l] into two lists [(l1,l2)] such that
+   [p a=true] for all elements in l1 and [p b = false] for every element [b] of [l2]. *)
+let split_with p =
+  let rec split_with_loop x y ls =
+    match ls with
+      | []      -> (List.rev x, List.rev y)
+      | (l::ls)  -> if p l then split_with_loop (l :: x) y ls
+                   else split_with_loop x (l :: y) ls
+  in
+  split_with_loop [] []
 
 let rec split3 = function
   | [] -> ([], [], [])
