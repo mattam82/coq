@@ -1135,8 +1135,11 @@ module Search = struct
           in
           let remaining = CList.map_filter filter shelf in
           (if !typeclasses_debug > 1 then
-             let prunsolved (ev, _) =
-               int (Evar.repr ev) ++ spc () ++ pr_ev sigma ev in
+             let prunsolved (ev, shelve) =
+               int (Evar.repr ev) ++ spc () ++ pr_ev sigma ev ++
+                 (if shelve then str" moving to shelf"
+                  else str" turning into goal")
+             in
              let unsolved = prlist_with_sep spc prunsolved remaining in
              Feedback.msg_debug
                (pr_depth (i :: info.search_depth) ++
