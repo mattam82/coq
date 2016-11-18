@@ -183,3 +183,25 @@ Module PolyNoLowerProp.
   Fail Check Foo True : Prop.
 
 End PolyNoLowerProp.
+
+Module IndSet.
+
+  Inductive list (A : Type) :=
+  | nil : list A
+  | cons : A -> list A -> list A.
+
+  Set Printing Universes.
+  Check list.
+
+  Check list True : Set.
+  
+  Definition somety := Type.
+
+  Definition foo :=
+    ltac:(match type of @list with
+          | ?U -> _ => idtac U;
+                         let t := constr:(match false return Type with true => unit | false => U end) in
+                         let T := match t with (match _ in bool return ?X with end) => constr:(X) end in
+                         idtac t
+        (* exact (eq_refl T : T = T) *)
+      end).
