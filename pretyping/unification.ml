@@ -728,6 +728,12 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb 
 	    let cmvars = free_rels cM and cnvars = free_rels cN in
 	      if Int.Set.subset cnvars cmvars then
 		sigma,metasubst,((curenv,ev,cN)::evarsubst)
+              else if isEvar cN then (** Needed for symmetry! *)
+                let (evk', _ as ev') = destEvar cN in
+                if not (Evar.Set.mem evk' flags.frozen_evars) && not (occur_evar evk' cM) &&
+                     Int.Set.subset cmvars cnvars then
+                  sigma, metasubst, ((curenv,ev',cM)::evarsubst)
+                else error_cannot_unify_local curenv sigma (m,n,cN)
 	      else error_cannot_unify_local curenv sigma (m,n,cN)
 	| _, Evar (evk,_ as ev)
             when not (Evar.Set.mem evk flags.frozen_evars)

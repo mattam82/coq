@@ -188,3 +188,43 @@ Proof.
   apply idpath.
   apply idpath.
 Defined.
+
+(* Bug report by Eddy Westbrook *)
+
+(** Due to the refine, we use [evarconv]'s algorithms (the one of type inference)
+    instead of [apply]'s *)
+Tactic Notation "unify'" open_constr(t) open_constr(u) :=
+  assert(t = u); [refine eq_refl|].
+
+Tactic Notation "unify" open_constr(t) open_constr(u) :=
+  idtac t " ~ " u;
+  unify t u.
+
+Goal { T:_ & T }.
+  refine (existT _ (forall (x:?[T1]) (y:?[T2]), ?T1) _).
+  evar (Tnew:Type).
+
+  unify (fun (x:?T1) => ?T2) (fun (x:?T1) => ?Tnew). Undo.
+  unify' (fun (x:?T1) => ?Tnew) (fun (x:?T1) => ?T2). Undo.
+  Set Printing Existential Instances.
+  unify (fun (x:?T1) => ?Tnew) (fun (x:?T1) => ?T2). Undo.
+
+  unify (forall (x:?T1), ?T2) (forall (x:?T1), ?Tnew). Undo.
+  unify (forall (x:?T1), ?Tnew) (forall (x:?T1), ?T2). Undo.
+
+  unify' (forall (x:?T1), ?T2) (forall (x:?T1), ?Tnew). Undo.
+  unify' (forall (x:?T1), ?Tnew) (forall (x:?T1), ?T2). Undo.
+  
+  Fail unify (forall (x:?T1) (y:?T2), ?T1) (forall (x:?T1), ?Tnew).
+  Fail unify (forall (x:?T1), ?Tnew) (forall (x:?T1) (y:?T2), ?T1).
+
+  unify' (forall (x:?T1) (y:?T2), ?T1) (forall (x:?T1), ?Tnew). Undo.
+  unify' (forall (x:?T1), ?Tnew) (forall (x:?T1) (y:?T2), ?T1).
+Abort.
+  
+Definition foo'' A B : (A -> B) = (A -> B) := eq_refl.
+
+Goal { T:Type | T=T }.
+  refine (exist _ (forall (x:?[T1]), ?[T2]) _).
+  refine (foo'' _ _). Show Proof.
+Abort.
