@@ -102,6 +102,7 @@ Module IrrefutablePatterns.
          
   Lemma eta_my : forall '(makemy b n), b = true \/ b = false.
     intros [[|] n]; auto.
+  Qed.
 
   Definition proj_informative A P '(exist _ x _ : { x:A | P x }) : A := x.
   Print proj_informative.
