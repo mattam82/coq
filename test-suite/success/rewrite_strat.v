@@ -16,15 +16,15 @@ Proof. Admitted.
 Ltac rew c :=
   rewrite_strat inorder (fi:ipat:c).
 
-Lemma example1 a b c :
-  a + (b * c - a) + a = b * c + a.
+Lemma example1 a b c d :
+  a + (b * c - a) + d = b * c + d.
 Proof.
   rewrite_strat inorder fi:addrC.
-  change (a + (a + (b * c - a)) = b * c + a).
+  change (d + (a + (b * c - a)) = b * c + d).
   rewrite_strat inorder <- fi: addrC.
-  change (a + (b * c - a) + a = b * c + a).
+  change (a + (b * c - a) + d = b * c + d).
   rewrite_strat inorder (pattern (_ - a); fi:addrC).
-  change (a + (-a + b * c) + a = b * c + a).
+  change (a + (-a + b * c) + d = b * c + d).
   now rew addNKr.
 Qed.
 
@@ -56,7 +56,7 @@ Admitted.
 (* Close Scope Z. *)
 Local Open Scope nat.
 
-Lemma addnA n m p : n + (m + p) = (n + m) + p.
+Lemma addnA n m p : n + (m + p) = n + m + p.
 Admitted.
 Require Import Arith.
 
@@ -65,9 +65,11 @@ Proof.
   rewrite addnA. (* No conversion *)
   Undo.
   Time rewrite_strat topdown fi:addnA. (* 0.029 With conversion, find n + (m + (m + 0)) *)
-  Undo.
+  change (n + m + (m + 0) = m + (m + n)).
+  Undo 2.
   Time rewrite_strat inorder fi:addnA. (* 0.009 With conversion, find n + (m + (m + 0)) *)
-  Undo.
+  change (n + m + (m + 0) = m + (m + n)).
+  Undo 2.
   Time rewrite_strat inorder fi:ipat:addnA. (* 0.008 With pattern matching guard m + m + n *)
   change (n + 2 * m = m + m + n).
   now rewrite Nat.add_comm, !Nat.mul_succ_l.
@@ -113,8 +115,11 @@ Proof.
   rewrite <- mult_n_O. Undo.
 Set Keyed Unification.
   rewrite <- mult_n_O.
+  Undo.
+Unset Keyed Unification.
+rewrite_strat inorder (<- fi:mult_n_O).
 Undo.
-Fail Timeout 1 rewrite_strat inorder (<- fi:mult_n_O).
+Set Keyed Unification.
 Time rewrite_strat topdown (pattern (_ * _); <- fi:mult_n_O). (* 0.08 *)
 Undo.
 Time rewrite_strat inorder (pattern (_ * _); <- fi:mult_n_O).
@@ -124,6 +129,7 @@ change (Init.Nat.add (pow 2 100) 0 = 0).
 rewrite_strat inorder (<- fi:ipat:plus_n_O).
 Admitted.
 
+(** Generalized rewriting with equality *)
 Variable X : Set.
 
 Goal forall x y : nat, forall P : nat -> nat, x = y -> P x = P y.
@@ -218,7 +224,8 @@ Qed.
 
 Goal forall x, h 10 x = f x.
 Proof. 
-  intros.
+  intros. simpl.
+  Unset Keyed Unification.
   Time rewrite_strat topdown (hints rew). (* 0.38 *) 
   reflexivity.
 Time Qed. (* 0.06 s *)
