@@ -1,6 +1,5 @@
 Require Import RelationClasses Setoid. 
 
-
 (** Patterns *)
 Module Patterns.
 Require Import ZArith.
@@ -13,15 +12,42 @@ Infix "a - b" := (a + -b) (at level 80).
 Lemma addNKr x y : x + (- x + y) = y.
 Proof. Admitted.
 
-Ltac rew c :=
+(** [rew c] infers the pattern from the left-hand side of c 
+  and rewrites all occurrences of the first instance of c.
+  The subterm selected has hence to pass the syntactic filtering
+  test of the pattern _and_ the unification (using full conversion)
+  with the lhs. 
+
+  The syntax for rewriting with a lemma c allows the following switches:
+  - "<-" for right-to-left
+  - "fi:" for the first instance only (default is all instances of the lhs)
+  - "ipat:" for inferrence of the pattern, otherwise no pattern is used (only 
+   unification)
+
+*)
+
+Tactic Notation "rew" uconstr(c) :=
   rewrite_strat inorder (fi:ipat:c).
+
+Tactic Notation "rew" "<-" uconstr(c) :=
+  rewrite_strat inorder (<- fi:ipat:c).
+
+(** This variant expects the pattern to be given explicitely 
+    Not working yet, rewstrategy(s) argument not handled correctly,
+   neither is constr_pattern(p) 
+*)
+(* Tactic Notation "rew" "[" uconstr(p) "]" uconstr(c) := *)
+(*   rewrite_strat inorder (pattern p; fi:c). *)
+
+(* Tactic Notation "rewwith" rewstrategy(s) uconstr(c) := *)
+(*   rewrite_strat inorder s. *)
 
 Lemma example1 a b c d :
   a + (b * c - a) + d = b * c + d.
 Proof.
-  rewrite_strat inorder fi:addrC.
+  rew addrC.
   change (d + (a + (b * c - a)) = b * c + d).
-  rewrite_strat inorder <- fi: addrC.
+  rew <- addrC.
   change (a + (b * c - a) + d = b * c + d).
   rewrite_strat inorder (pattern (_ - a); fi:addrC).
   change (a + (-a + b * c) + d = b * c + d).
