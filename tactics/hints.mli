@@ -129,7 +129,7 @@ type hints_entry =
   | HintsImmediateEntry of (hints_path_atom * polymorphic * hint_term) list
   | HintsCutEntry of hints_path
   | HintsUnfoldEntry of evaluable_global_reference list
-  | HintsTransparencyEntry of evaluable_global_reference list * bool
+  | HintsTransparencyEntry of evaluable_global_reference hints_transparency_target * bool
   | HintsModeEntry of global_reference * hint_mode list
   | HintsExternEntry of
       int * (patvar list * constr_pattern) option * Tacexpr.glob_tactic_expr

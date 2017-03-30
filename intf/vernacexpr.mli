@@ -123,11 +123,16 @@ type hint_mode =
   | ModeNoHeadEvar (* No evar at the head *)
   | ModeOutput (* Anything *)
 
+type 'a hints_transparency_target =
+  | HintsVariables
+  | HintsConstants
+  | HintsReferences of 'a list
+
 type hints_expr =
   | HintsResolve of (int option * bool * reference_or_constr) list
   | HintsImmediate of reference_or_constr list
   | HintsUnfold of reference list
-  | HintsTransparency of reference list * bool
+  | HintsTransparency of reference hints_transparency_target * bool
   | HintsMode of reference * hint_mode list
   | HintsConstructors of reference list
   | HintsExtern of int * constr_expr option * raw_tactic_expr
