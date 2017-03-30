@@ -430,12 +430,30 @@ let keyed_occurrence_test env _ c =
       test_unification (Evarconv.default_flags_of empty_transparent_state) env sigma t u
 
 let default_pat = Pattern.PMeta None
-                       
+
+let rec simplify_pat pat =
+  let open Pattern in
+  match pat with
+  | PApp (PRef g, args) ->
+     let impls = Impargs.implicits_of_global g in
+     let l = match impls with [] -> [] | hd :: tl -> snd hd in
+     let rec args' is ls =
+       match is, ls with
+       | i :: is, _ :: ls when Impargs.is_status_implicit i ->
+          PMeta None :: args' is ls
+       | _ :: is, l :: ls -> l :: args' is ls
+       | _, _ -> ls
+     in PApp (PRef g, Array.map_of_list simplify_pat (args' l (Array.to_list args)))
+  | PLambda _ -> PMeta None
+  | _ -> pat
+
 let pattern_occurrence_test pat env sigma c =
   let pat =
     match pat with
     | Some pat -> pat
-    | None -> Patternops.pattern_of_constr env sigma c
+    | None ->
+       let pat = Patternops.pattern_of_constr env sigma c in
+       simplify_pat pat
   in
   fun env sigma k t u ->
   (** Cut search in terms with are not closed, we can't rewrite them. *)
@@ -454,8 +472,10 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
   let type_of_cls = type_of_clause cls gl in
   let dep = dep_proof_ok && dep_fun c type_of_cls in
   let Sigma ((elim, effs), sigma, p) = find_elim hdcncl lft2rgt dep cls (Some t) gl in
-  let occs = if dep then [Some (AllOccurrences true); Some occs]
-	     else [Some occs] in
+  let occs =
+    let open Evarconv in
+    if dep then [AtOccurrences (AllOccurrences true); AtOccurrences occs]
+    else [AtOccurrences occs] in
   let tac =
       Proofview.tclEFFECTS effs <*>
       general_elim_clause with_evars frzevars tac cls c t l

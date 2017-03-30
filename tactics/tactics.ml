@@ -1412,7 +1412,7 @@ type eliminator = {
   elimindex : int option;  (* None = find it automatically *)
   elimrename : (bool * int array) option; (** None = don't rename Prop hyps with H-names *)
   elimbody : constr with_bindings;
-  elimoccs : Evarconv.occurrence_selection option;
+  elimoccs : Evarconv.occurrences_selection option;
 }
 
 let general_elim_clause_gen elimtac indclause elim =
@@ -1445,7 +1445,7 @@ let general_elim with_evars ~holes_order clear_flag (c, lbindc) elim =
 
 let default_occurrences env ind dep =
   let elim_args = inductive_nrealargs_env env ind + if dep then 1 else 0 in
-  Some (Evarconv.default_occurence_test, List.init elim_args (fun _ -> None))
+  Some (Evarconv.default_occurrences_selection elim_args)
 
 let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
@@ -4108,12 +4108,12 @@ let get_eliminator elim dep s gl =
                         pi1 (decompose_prod_letin (get_type d)))
                  (List.rev s.branches)
       in
-      let occs = List.init (s.nargs + if s.indarg_in_concl then 1 else 0)
-                           (fun _ -> None) in
+      let occs = Evarconv.default_occurrences_selection
+                   (s.nargs + if s.indarg_in_concl then 1 else 0) in
       let elim =
         {elimindex = None; elimbody = elimc;
          elimrename = Some (isrec, Array.of_list branchlengthes);
-         elimoccs = Some (Evarconv.default_occurence_test, occs)}
+         elimoccs = Some occs}
       in evd, isrec, (elim, elimt), l
 
 let get_hyp_typ id env =

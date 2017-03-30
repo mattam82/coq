@@ -269,7 +269,7 @@ type eliminator = {
   elimindex : int option;  (** None = find it automatically *)
   elimrename : (bool * int array) option; (** None = don't rename Prop hyps with H-names *)
   elimbody : constr with_bindings;
-  elimoccs : Evarconv.occurrence_selection option;
+  elimoccs : Evarconv.occurrences_selection option;
 }
 
 val general_elim  : evars_flag -> holes_order:bool -> clear_flag ->
