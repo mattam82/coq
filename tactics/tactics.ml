@@ -4196,7 +4196,7 @@ let induction_tac with_evars params indvars elim toclear =
   (* let resolved = Tacmach.New.of_old (clenv_unique_resolver ~flags:(elim_flags ()) elimclause') gl in *)
   Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
                     (enforce_prop_bound_names rename
-                      (Clenvtac.clenv_refine2 ~with_evars elimclause'))
+                      (Clenvtac.clenv_refine2 ~with_classes:false ~with_evars elimclause'))
   end }
 
 (* Apply induction "in place" taking into account dependent
