@@ -1255,8 +1255,10 @@ module Search = struct
                       let okev = Evd.mem evm ev || List.mem ev shelved in
                       if not okev then
                         Feedback.msg_debug
-                          (str "leaking evar " ++ int (Evar.repr ev) ++
-                             spc () ++ pr_ev evm' ev);
+                          (str "Leaking evar " ++ int (Evar.repr ev) ++
+                             spc () ++ pr_ev evm' ev ++
+                             str " this is certainly a sign that the shelf is not \
+                                  handled correctly by tactics used in type-class resolution");
                       acc && okev) evm' true);
            let evm' = Evd.restore_future_goals evm' (shelved @ fgoals) pgoal in
            let evm' = evars_reset_evd ~with_conv_pbs:true ~with_univs:false evm' evm in
@@ -1511,15 +1513,14 @@ let is_ground c gl =
   if Evarutil.is_ground_term (project gl) c then tclIDTAC gl
   else tclFAIL 0 (str"Not ground") gl
 
-let autoapply c i gl =
+let autoapply c i =
+  let open Proofview in
+  let open Tacmach.New in
   let flags = auto_unif_flags Evar.Set.empty
-    (Hints.Hint_db.transparent_state (Hints.searchtable_map i)) in
-  let cty = pf_unsafe_type_of gl c in
-  let ce = pf_apply (make_clenv_from_env ?len:None ?occs:None) gl (c,cty) in
-  let tac = { enter = fun gl -> (unify_e_resolve false flags).enter gl
-    ((c,cty,Univ.ContextSet.empty),0,ce) } in
-  Proofview.V82.of_tactic
-    (Tacticals.New.tclTHEN
-       (Proofview.Goal.nf_enter tac)
-       Proofview.shelve_unifiable)
-       gl
+                              (Hints.Hint_db.transparent_state (Hints.searchtable_map i)) in
+  Goal.enter { enter = fun gl ->
+    let cty = pf_unsafe_type_of gl c in
+    let ce = pf_apply (make_clenv_from_env ?len:None ?occs:None) gl (c,cty) in
+    let tac = (unify_e_resolve false flags).enter gl
+             ((c,cty,Univ.ContextSet.empty),0,ce) in
+    tac <*> Proofview.shelve_unifiable }
