@@ -22,7 +22,8 @@ open Proofview.Notations
 (* Rewriting rules *)
 type rew_rule = { rew_lemma: constr;
 		  rew_type: types;
-		  rew_pat: constr;
+                  rew_constr: constr;
+		  rew_pat: Pattern.constr_pattern option;
 		  rew_ctx: Univ.universe_context_set;
 		  rew_l2r: bool;
 		  rew_tac: Genarg.glob_generic_argument option }
@@ -30,11 +31,12 @@ type rew_rule = { rew_lemma: constr;
 let subst_hint subst hint =
   let cst' = subst_mps subst hint.rew_lemma in
   let typ' = subst_mps subst hint.rew_type in
-  let pat' = subst_mps subst hint.rew_pat in
+  let constr' = subst_mps subst hint.rew_constr in
+  let pat' = Option.map (Patternops.subst_pattern subst) hint.rew_pat in
   let t' = Option.smartmap (Genintern.generic_substitute subst) hint.rew_tac in
     if hint.rew_lemma == cst' && hint.rew_type == typ' && hint.rew_tac == t' then hint else
       { hint with
-	rew_lemma = cst'; rew_type = typ';
+	rew_lemma = cst'; rew_type = typ'; rew_constr = constr';
 	rew_pat = pat';	rew_tac = t' }
 
 module HintIdent =
@@ -45,7 +47,7 @@ struct
 
   let subst s (i,t) = (i,subst_hint s t)
 
-  let constr_of (i,t) = t.rew_pat
+  let constr_of (i,t) = t.rew_constr
 end
 
 module HintOpt =
@@ -86,19 +88,20 @@ let print_rewrite_hintdb bas =
 	       Pptactic.pr_glb_generic (Global.env()) tac) (mt ()) h.rew_tac)
 	   (find_rewrites bas))
 
-type raw_rew_rule = Loc.t * constr Univ.in_universe_context_set * bool * Genarg.raw_generic_argument option
+type raw_rew_rule = Loc.t * Pattern.constr_pattern option *
+                      constr Univ.in_universe_context_set * bool * Genarg.raw_generic_argument option
 
 (* Applies all the rules of one base *)
 let one_base general_rewrite_maybe_in tac_main bas =
   let lrul = find_rewrites bas in
-  let try_rewrite dir ctx c tc =
+  let try_rewrite dir pat ctx c tc =
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
     let sigma = Proofview.Goal.sigma gl in
     let subst, ctx' = Universes.fresh_universe_context_set_instance ctx in
     let c' = Vars.subst_univs_level_constr subst c in
     let sigma = Sigma.to_evar_map sigma in
     let sigma = Evd.merge_context_set Evd.univ_flexible sigma ctx' in
-    let tac = general_rewrite_maybe_in dir c' tc in
+    let tac = general_rewrite_maybe_in dir pat c' tc in
     Sigma.Unsafe.of_pair (tac, sigma)
   end } in
   let lrul = List.map (fun h -> 
@@ -108,11 +111,11 @@ let one_base general_rewrite_maybe_in tac_main bas =
     let ist = { Geninterp.lfun = Id.Map.empty; extra = Geninterp.TacStore.empty } in
     Ftactic.run (Geninterp.interp wit ist tac) (fun _ -> Proofview.tclUNIT ())
   in
-    (h.rew_ctx,h.rew_lemma,h.rew_l2r,tac)) lrul in
-    Tacticals.New.tclREPEAT_MAIN (Proofview.tclPROGRESS (List.fold_left (fun tac (ctx,csr,dir,tc) ->
+    (h.rew_ctx,h.rew_lemma,h.rew_pat,h.rew_l2r,tac)) lrul in
+    Tacticals.New.tclREPEAT_MAIN (Proofview.tclPROGRESS (List.fold_left (fun tac (ctx,csr,pat,dir,tc) ->
       Tacticals.New.tclTHEN tac
         (Tacticals.New.tclREPEAT_MAIN
-	    (Tacticals.New.tclTHENFIRST (try_rewrite dir ctx csr tc) tac_main)))
+	    (Tacticals.New.tclTHENFIRST (try_rewrite dir pat ctx csr tc) tac_main)))
       (Proofview.tclUNIT()) lrul))
 
 (* The AutoRewrite tactic *)
@@ -120,9 +123,9 @@ let autorewrite ?(conds=Naive) tac_main lbas =
   Tacticals.New.tclREPEAT_MAIN (Proofview.tclPROGRESS
     (List.fold_left (fun tac bas ->
        Tacticals.New.tclTHEN tac
-        (one_base (fun dir c tac ->
+        (one_base (fun dir pat c tac ->
 	  let tac = (tac, conds) in
-	    general_rewrite dir (AllOccurrences false) true false ~tac c)
+	    general_rewrite dir ?pat (AllOccurrences false) true false ~tac c)
 	  tac_main bas))
       (Proofview.tclUNIT()) lbas))
 
@@ -133,14 +136,14 @@ let autorewrite_multi_in ?(conds=Naive) idl tac_main lbas =
  let general_rewrite_in id =
   let id = ref id in
   let to_be_cleared = ref false in
-   fun dir cstr tac gl ->
+   fun dir pat cstr tac gl ->
     let last_hyp_id =
      match Tacmach.pf_hyps gl with
         d :: _ -> Context.Named.Declaration.get_id d
       | _ -> (* even the hypothesis id is missing *)
         raise (Logic.RefinerError (Logic.NoSuchHyp !id))
     in
-    let gl' = Proofview.V82.of_tactic (general_rewrite_in dir (AllOccurrences false) true ~tac:(tac, conds) false !id cstr false) gl in
+    let gl' = Proofview.V82.of_tactic (general_rewrite_in dir ?pat (AllOccurrences false) true ~tac:(tac, conds) false !id cstr false) gl in
     let gls = gl'.Evd.it in
     match gls with
        g::_ ->
@@ -165,7 +168,7 @@ let autorewrite_multi_in ?(conds=Naive) idl tac_main lbas =
           | _ -> assert false) (* there must be at least an hypothesis *)
      | _ -> assert false (* rewriting cannot complete a proof *)
  in
- let general_rewrite_in x y z w = Proofview.V82.tactic (general_rewrite_in x y z w) in
+ let general_rewrite_in x y z v w = Proofview.V82.tactic (general_rewrite_in x y z v w) in
  Tacticals.New.tclMAP (fun id ->
   Tacticals.New.tclREPEAT_MAIN (Proofview.tclPROGRESS
     (List.fold_left (fun tac bas ->
@@ -307,14 +310,14 @@ let add_rew_rules base lrul =
   let intern tac = snd (Genintern.generic_intern ist tac) in
   let lrul =
     List.fold_left
-      (fun dn (loc,(c,ctx),b,t) ->
+      (fun dn (loc,pat,(c,ctx),b,t) ->
 	let sigma = Evd.merge_context_set Evd.univ_rigid sigma ctx in
 	let info = find_applied_relation false loc env sigma c b in
-	let pat = if b then info.hyp_left else info.hyp_right in
-	let rul = { rew_lemma = c; rew_type = info.hyp_ty;
+	let constr = if b then info.hyp_left else info.hyp_right in
+	let rul = { rew_lemma = c; rew_type = info.hyp_ty; rew_constr = constr;
 		    rew_pat = pat; rew_ctx = ctx; rew_l2r = b;
 		    rew_tac = Option.map intern t}
 	in incr counter;
-	  HintDN.add pat (!counter, rul) dn) HintDN.empty lrul
+	  HintDN.add constr (!counter, rul) dn) HintDN.empty lrul
   in Lib.add_anonymous_leaf (inHintRewrite (base,lrul))
 

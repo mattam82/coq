@@ -13,7 +13,8 @@ open Tacexpr
 open Equality
 
 (** Rewriting rules before tactic interpretation *)
-type raw_rew_rule = Loc.t * constr Univ.in_universe_context_set * bool * Genarg.raw_generic_argument option
+type raw_rew_rule = Loc.t * Pattern.constr_pattern option * constr Univ.in_universe_context_set * bool *
+                      Genarg.raw_generic_argument option
 
 (** To add rewriting rules to a base *)
 val add_rew_rules : string -> raw_rew_rule list -> unit
@@ -28,7 +29,8 @@ val autorewrite_in : ?conds:conditions -> Names.Id.t -> unit Proofview.tactic ->
 (** Rewriting rules *)
 type rew_rule = { rew_lemma: constr;
 		  rew_type: types;
-		  rew_pat: constr;
+                  rew_constr: constr;
+		  rew_pat: Pattern.constr_pattern option;
 		  rew_ctx: Univ.universe_context_set;
 		  rew_l2r: bool;
 		  rew_tac: Genarg.glob_generic_argument option }

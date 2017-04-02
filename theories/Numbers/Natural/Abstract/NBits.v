@@ -366,7 +366,11 @@ Proof.
  split. apply bits_inj. intros EQ; now rewrite EQ.
 Qed.
 
-Hint Rewrite lxor_spec lor_spec land_spec ldiff_spec bits_0 : bitwise.
+Hint Rewrite [(lxor _ _).[_]]lxor_spec
+     [(lor _ _).[_]]lor_spec
+     [(land _ _).[_]]land_spec
+     [(ldiff _ _).[_]]ldiff_spec
+     bits_0 : bitwise.
 
 Ltac bitwise := apply bits_inj; intros ?m; autorewrite with bitwise.
 
