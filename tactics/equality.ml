@@ -431,36 +431,62 @@ let keyed_occurrence_test env _ c =
 
 let default_pat = Pattern.PMeta None
 
-let rec simplify_pat pat =
+(** The default pattern just filters by the application structure at the top
+ level, all arguments are unified with full conversion. *)
+let simplify_pat pat =
   let open Pattern in
-  match pat with
-  | PApp (PRef g, args) ->
-     let impls = Impargs.implicits_of_global g in
-     let l = match impls with [] -> [] | hd :: tl -> snd hd in
-     let rec args' is ls =
-       match is, ls with
-       | i :: is, _ :: ls when Impargs.is_status_implicit i ->
-          PMeta None :: args' is ls
-       | _ :: is, l :: ls -> l :: args' is ls
-       | _, _ -> ls
-     in PApp (PRef g, Array.map_of_list simplify_pat (args' l (Array.to_list args)))
-  | PLambda _ -> PMeta None
-  | _ -> pat
+  let rec aux top pat =
+    match pat with
+    | PApp (PRef (ConstructRef _), args) when not top -> PMeta None
+    | PRef (ConstructRef _) when not top -> PMeta None
+    | PApp (PRef g, args) ->
+       let impls = Impargs.implicits_of_global g in
+       let l = match impls with [] -> [] | hd :: tl -> snd hd in
+       let rec args' is ls =
+         match is, ls with
+         | i :: is, _ :: ls when Impargs.is_status_implicit i ->
+            PMeta None :: args' is ls
+         | _ :: is, l :: ls -> l :: args' is ls
+         | _, _ -> ls
+       in PApp (PRef g, Array.map (fun _ -> PMeta None) args)
+    (* Array.map_of_list (aux false) (args' l (Array.to_list args))) *)
+    | PLambda _ -> PMeta None
+    | _ -> pat
+  in aux true pat
+
+(** If the _inferred_ pattern is an application, and we know it matches u, we
+ force first-order unification at this level to avoid spurious unifications involving
+ unfolding. E.g. 1 * ?s unifies with any application t * t for example. *)
+let decompose_unif_pat env sigma unif pat t u =
+  match kind_of_term t, kind_of_term u with
+  | App (f, args), App (g, args') when Int.equal (Array.length args) (Array.length args') ->
+     let b, sigma = unif env sigma f g in
+     if b then
+       Array.fold_left2 (fun (b, sigma) x y ->
+           if b then unif env sigma x y
+           else (b, sigma)) (b, sigma) args args'
+     else b, sigma
+  | _ -> unif env sigma t u
 
 let pattern_occurrence_test pat env sigma c =
-  let pat =
+  let unif env sigma t u =
+    test_unification (Evarconv.default_flags_of full_transparent_state) env sigma t u
+  in
+  let pat, unif =
     match pat with
-    | Some pat -> pat
+    | Some pat -> pat, unif
     | None ->
        let pat = Patternops.pattern_of_constr env sigma c in
-       simplify_pat pat
+       let pat = simplify_pat pat in
+       let unif env sigma t u =
+         decompose_unif_pat env sigma unif pat t u
+       in pat, unif
   in
   fun env sigma k t u ->
   (** Cut search in terms with are not closed, we can't rewrite them. *)
   if not (closedn k u) then false, sigma
   else
-    if Constr_matching.is_matching env sigma pat u then
-      test_unification (Evarconv.default_flags_of full_transparent_state) env sigma t u
+    if Constr_matching.is_matching env sigma pat u then unif env sigma t u
     else false, sigma
   
 let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
