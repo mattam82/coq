@@ -101,7 +101,7 @@ type 'a with_uid = {
 
 type raw_hint = constr * types * Univ.universe_context_set
 
-type hint = (raw_hint * (evar_map * clause)) hint_ast with_uid
+type hint = raw_hint hint_ast with_uid
 
 type 'a with_metadata = {
   pri  : int;            (* A number lower is higher priority *)
@@ -231,22 +231,6 @@ let is_transparent_gr (ids, csts) = function
   | VarRef id -> Id.Pred.mem id ids
   | ConstRef cst -> Cpred.mem cst csts
   | IndRef _ | ConstructRef _ -> false
-
-let instantiate_hint env sigma p =
-  let mk_clenv (c, cty, ctx) =
-    let sigma = Evd.merge_context_set univ_flexible sigma ctx in
-    make_clenv_from_env env sigma (c,cty)
-  in
-  let code = match p.code.obj with
-    | Res_pf c -> Res_pf (c, mk_clenv c)
-    | ERes_pf c -> ERes_pf (c, mk_clenv c)
-    | Res_pf_THEN_trivial_fail c ->
-      Res_pf_THEN_trivial_fail (c, mk_clenv c)
-    | Give_exact c -> Give_exact (c, mk_clenv c)
-    | Unfold_nth e -> Unfold_nth e
-    | Extern t -> Extern t
-  in
-  { p with code = { p.code with obj = code } }
 
 let hints_path_atom_eq h1 h2 = match h1, h2 with
 | PathHints l1, PathHints l2 -> List.equal eq_gr l1 l2
@@ -509,7 +493,6 @@ module Hint_db = struct
       List.fold_left (fun db (gr,(id,v)) -> addkv gr id v db) db' db.hintdb_nopat
 
   let add_one env sigma (k, v) db =
-    let v = instantiate_hint env sigma v in
     let st',db,rebuild =
       match v.code.obj with
       | Unfold_nth egr ->
@@ -595,7 +578,7 @@ let rewrite_db = "rewrite"
 
 let auto_init_db =
   Hintdbmap.add typeclasses_db (Hint_db.empty full_transparent_state true)
-    (Hintdbmap.add rewrite_db (Hint_db.empty cst_full_transparent_state true)
+    (Hintdbmap.add rewrite_db (Hint_db.empty full_transparent_state true)
        Hintdbmap.empty)
 
 let searchtable : hint_db_table = ref auto_init_db
@@ -1258,10 +1241,10 @@ let make_db_list dbnames =
 let pr_hint_elt (c, _, _) = pr_constr c
 
 let pr_hint h = match h.obj with
-  | Res_pf (c, _) -> (str"apply " ++ pr_hint_elt c)
-  | ERes_pf (c, _) -> (str"eapply " ++ pr_hint_elt c)
-  | Give_exact (c, _) -> (str"exact " ++ pr_hint_elt c)
-  | Res_pf_THEN_trivial_fail (c, _) ->
+  | Res_pf c -> (str"apply " ++ pr_hint_elt c)
+  | ERes_pf c -> (str"eapply " ++ pr_hint_elt c)
+  | Give_exact c -> (str"exact " ++ pr_hint_elt c)
+  | Res_pf_THEN_trivial_fail c ->
       (str"apply " ++ pr_hint_elt c ++ str" ; trivial")
   | Unfold_nth c -> (str"unfold " ++  pr_evaluable_reference c)
   | Extern tac ->
