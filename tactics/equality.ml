@@ -433,51 +433,66 @@ let default_pat = Pattern.PMeta None
 
 (** The default pattern just filters by the application structure at the top
  level, all arguments are unified with full conversion. *)
-let simplify_pat pat =
+let simplify_pat ts pat =
   let open Pattern in
+  let indexed gr =
+    match gr with
+    | ConstRef c -> not (Cpred.mem c (snd ts))
+    | VarRef c -> not (Idpred.mem c (fst ts))
+    | _ -> true
+  in
   let rec aux top pat =
     match pat with
     | PApp (PRef (ConstructRef _), args) when not top -> PMeta None
     | PRef (ConstructRef _) when not top -> PMeta None
-    | PApp (PRef g, args) ->
-       let impls = Impargs.implicits_of_global g in
-       let l = match impls with [] -> [] | hd :: tl -> snd hd in
-       let rec args' is ls =
-         match is, ls with
-         | i :: is, _ :: ls when Impargs.is_status_implicit i ->
-            PMeta None :: args' is ls
-         | _ :: is, l :: ls -> l :: args' is ls
-         | _, _ -> ls
-       in PApp (PRef g, Array.map (fun _ -> PMeta None) args)
-    (* Array.map_of_list (aux false) (args' l (Array.to_list args))) *)
+    | PRef g | PApp (PRef g, _) when not (top || indexed g) -> PMeta None
+    | PApp (g, args) ->
+       let args' =
+         match g with
+         | PRef g ->
+            let impls = Impargs.implicits_of_global g in
+            let l = match impls with [] -> [] | hd :: tl -> snd hd in
+            let rec args' is ls =
+              match is, ls with
+              | i :: is, _ :: ls when Impargs.is_status_implicit i ->
+                 PMeta None :: args' is ls
+              | _ :: is, l :: ls -> l :: args' is ls
+              | _, _ -> ls
+            in Array.map_of_list (aux false) (args' l (Array.to_list args))
+         | _ -> Array.map (aux false) args
+       in PApp (g, args')
     | PLambda _ -> PMeta None
     | _ -> pat
   in aux true pat
 
-(** If the _inferred_ pattern is an application, and we know it matches u, we
- force first-order unification at this level to avoid spurious unifications involving
- unfolding. E.g. 1 * ?s unifies with any application t * t for example. *)
-let decompose_unif_pat env sigma unif pat t u =
-  match kind_of_term t, kind_of_term u with
-  | App (f, args), App (g, args') when Int.equal (Array.length args) (Array.length args') ->
+(** If the _inferred_ pattern is an application, and we know it matches
+ u, we force first-order unification, following the application
+ structure of the pattern.  This avoids spurious unifications involving
+ unfolding. E.g. 1 * ?s unifies with any application t * t for
+ example. *)
+let rec decompose_unif_pat env sigma unif pat u t =
+  match pat, kind_of_term u, kind_of_term t with
+  | Pattern.PApp (_, pargs), App (f, args), App (g, args') when
+         Int.equal (Array.length args) (Array.length args') ->
      let b, sigma = unif env sigma f g in
      if b then
-       Array.fold_left2 (fun (b, sigma) x y ->
-           if b then unif env sigma x y
-           else (b, sigma)) (b, sigma) args args'
+       Array.fold_left3 (fun (b, sigma) p x y ->
+           if b then decompose_unif_pat env sigma unif p x y
+           else (b, sigma)) (b, sigma) pargs args args'
      else b, sigma
   | _ -> unif env sigma t u
 
 let pattern_occurrence_test pat env sigma c =
+  let ts = Hints.Hint_db.transparent_state (Hints.searchtable_map Hints.rewrite_db) in
   let unif env sigma t u =
-    test_unification (Evarconv.default_flags_of full_transparent_state) env sigma t u
+    test_unification (Evarconv.default_flags_of ts) env sigma t u
   in
   let pat, unif =
     match pat with
     | Some pat -> pat, unif
     | None ->
        let pat = Patternops.pattern_of_constr env sigma c in
-       let pat = simplify_pat pat in
+       let pat = simplify_pat ts pat in
        let unif env sigma t u =
          decompose_unif_pat env sigma unif pat t u
        in pat, unif
