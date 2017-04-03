@@ -1,0 +1,50 @@
+- eapply could shelve subgoals before.
+
+  Two cases: forall e : Equiv, Reflexive (equiv e) applied to Reflexive ?X
+  -> Equiv becomes a subgoal even if dependent
+
+  ?X := equiv ?e
+
+  Proper (respectful (relprod ?R ?S) ?S) (snd t) applied to Proper (respectful ?R' eq) (@snd t t)
+
+  -> ?R does not become a subgoal, ?R dependent
+
+  No difference? ?MR is an initial _meta_ of the lemma, with ?R' :=
+  relprod ?R' ?S with ?MR := ?R', an evar.  ?Me is an initial meta of
+  the lemma with ?X := equiv ?e'.  ?Me := e'
+
+  Here ?R is a meta instantiated by an evar and unify_resolve succeeds
+  without seeing that evar is left around, as clenv_pose_dependent_evars
+  was just looking at the meta substitution which contains no meta
+  without instance.
+
+
+- eapply in eauto now shelves any dependent subgoals.  One fix in the
+  standard library (instances of Reflexive equiv, Symmetric equiv and
+  Transitive equiv).
+
+
+- rewrite uses a syntactic pattern to filter subterms on which
+  unification with conversion is applied.  + Evars appear in the pattern
+  and have to match syntactically (source of incompatibility).
+
+- apply's unification first-order heuristic is a bit strange in the
+  sense that it does not subsitute existing solutions to previous evars
+  eagerly, allowing to unify (fun x y => S) u v with ?X ?U ?V even if ?X
+  was already instantiated with a lambda. Evarconv reduces in this case.
+  One example in FMapFacts/cardinal_2 where a "change" was used to
+  produce a dummy beta-redex changed to use explicit with bindings
+  instead.
+
+- simple apply's unification does conversion only on closed subterms,
+  but these are not recognized the same way in evarconv (unification.ml
+  can solve subproblems f ?X = g t using conversion on f and g but not
+  on ?X and t). Evarconv is uniform with respect to this (no "subterm"
+  restriction).  To re-establish compatibility in this case we make
+  (e)auto's apply unfold local variables, using a new Hint Variables
+  Transparent directive on the "core" hint database.  TODO: cleanup in
+  auto.ml, we now always use flags from the database.  See
+  e.g. FMapFacts/Partition_cardinal's eauto.
+
+- rewrite does not simplify goals w.r.t. zeta to find occurrences anymore,
+  requiring explicit simplifications instead.
