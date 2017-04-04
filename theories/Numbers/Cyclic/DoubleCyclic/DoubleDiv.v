@@ -1200,10 +1200,10 @@ Section DoubleDivGt.
    apply Zis_gcd_mod;zarith.
    change ([|ah|] * wB + [|al|]) with (double_to_Z w_digits w_to_Z 1 (WW ah al)).
    rewrite <- (@spec_double_modn1 w w_digits w_zdigits w_0 w_WW w_head0 w_add_mul_div
-    w_div21 w_compare w_sub w_to_Z spec_to_Z spec_w_zdigits spec_w_0 spec_w_WW spec_head0 spec_add_mul_div
-    spec_div21 spec_compare spec_sub 1 (WW ah al) bl Hbl).
+    w_div21 w_compare w_sub w_to_Z); trivial.
    apply spec_gcd_gt.
-   rewrite  (@spec_double_modn1 w w_digits w_zdigits w_0 w_WW); trivial.
+   rewrite (@spec_double_modn1 w w_digits w_zdigits w_0 w_WW w_head0 w_add_mul_div
+    w_div21 w_compare w_sub w_to_Z); trivial.
    apply Z.lt_gt;match goal with | |- ?x mod ?y < ?y =>
     destruct (Z_mod_lt x y);zarith end.
    Spec_w_to_Z bl;exfalso;omega.
@@ -1222,10 +1222,10 @@ Section DoubleDivGt.
    apply Zis_gcd_mod;zarith.
    change ([|bh|] * wB + [|bl|]) with (double_to_Z w_digits w_to_Z 1 (WW bh bl)).
    rewrite <- (@spec_double_modn1 w w_digits w_zdigits w_0 w_WW w_head0 w_add_mul_div
-   w_div21 w_compare w_sub w_to_Z spec_to_Z spec_w_zdigits spec_w_0 spec_w_WW spec_head0 spec_add_mul_div
-   spec_div21 spec_compare spec_sub 1 (WW bh bl) ml Hml).
+   w_div21 w_compare w_sub w_to_Z); trivial.
    apply spec_gcd_gt.
-   rewrite  (@spec_double_modn1 w w_digits w_zdigits w_0 w_WW); trivial.
+   rewrite  (@spec_double_modn1 w w_digits w_zdigits w_0 w_WW w_head0 w_add_mul_div
+   w_div21 w_compare w_sub w_to_Z); trivial.
    apply Z.lt_gt;match goal with | |- ?x mod ?y < ?y =>
    destruct (Z_mod_lt x y);zarith end.
    Spec_w_to_Z ml;exfalso;omega.
