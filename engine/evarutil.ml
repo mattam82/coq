@@ -398,11 +398,6 @@ let push_rel_context_to_named_context env typ =
 
 let default_source = (Loc.ghost,Evar_kinds.InternalHole)
 
-let restrict_evar evd evk filter candidates =
-  let evd = Sigma.to_evar_map evd in
-  let evd, evk' = Evd.restrict evk filter ?candidates evd in
-  Sigma.Unsafe.of_pair (evk', Evd.declare_future_goal evk' evd)
-
 let new_pure_evar_full evd evi =
   let evd = Sigma.to_evar_map evd in
   let (evd, evk) = Evd.new_evar evd evi in
@@ -494,12 +489,24 @@ let generalize_evar_over_rels sigma (ev,args) =
 type clear_dependency_error =
 | OccurHypInSimpleClause of Id.t option
 | EvarTypingBreak of existential
+| NoCandidatesLeft of existential_key
 
 exception ClearDependencyError of Id.t * clear_dependency_error
 
 let cleared = Store.field ()
 
 exception Depends of Id.t
+
+let restrict_evar evd evk filter candidates =
+  let evd = Sigma.to_evar_map evd in
+  let evd, evk' = Evd.restrict evk filter ?candidates evd in
+  let evi = Evd.find_undefined evd evk' in
+  let evi' = { evi with evar_concl = nf_evar evd evi.evar_concl } in
+  let evd = Evd.add evd evk' evi' in
+  match evar_candidates evi with
+  | Some [] -> raise (ClearDependencyError (*FIXME*)(Id.of_string "blah", (NoCandidatesLeft evk')))
+  | None | Some _ ->
+     Sigma.Unsafe.of_pair (evk', evd)
 
 let rec check_and_clear_in_constr env evdref err ids global c =
   (* returns a new constr where all the evars have been 'cleaned'
@@ -568,8 +575,10 @@ let rec check_and_clear_in_constr env evdref err ids global c =
             else
               let origfilter = Evd.evar_filter evi in
               let filter = Evd.Filter.apply_subfilter origfilter filter in
-              let evd = Sigma.Unsafe.of_evar_map !evdref in
-              let Sigma (_, evd, _) = restrict_evar evd evk filter None in
+              let evd = Evd.declare_future_goal evk !evdref in
+              let evd = Sigma.Unsafe.of_evar_map evd in
+              let candidates = Evd.evar_candidates evi in
+              let Sigma (_, evd, _) = restrict_evar evd evk filter candidates in
               let evd = Sigma.to_evar_map evd in
               evdref := evd;
 	    (* spiwack: hacking session to mark the old [evk] as having been "cleared" *)

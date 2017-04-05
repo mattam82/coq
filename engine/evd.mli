@@ -114,6 +114,7 @@ val evar_filtered_context : evar_info -> Context.Named.t
 val evar_hyps : evar_info -> named_context_val
 val evar_filtered_hyps : evar_info -> named_context_val
 val evar_body : evar_info -> evar_body
+val evar_candidates : evar_info -> constr list option
 val evar_filter : evar_info -> Filter.t
 val evar_env :  evar_info -> env
 val evar_filtered_env :  evar_info -> env
@@ -241,7 +242,10 @@ val evars_reset_evd  : ?with_conv_pbs:bool -> ?with_univs:bool ->
 val restrict : evar -> Filter.t -> ?candidates:constr list ->
   evar_map -> evar_map * evar
 (** Restrict an undefined evar into a new evar by filtering context and
-    possibly limiting the instances to a set of candidates *)
+    possibly limiting the instances to a set of candidates (candidates
+    are filtered according to the filter) *)
+
+val filter_effective_candidates : evar_info -> Filter.t -> constr list -> constr list
 
 val downcast : evar -> types -> evar_map -> evar_map
 (** Change the type of an undefined evar to a new type assumed to be a

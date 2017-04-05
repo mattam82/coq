@@ -55,9 +55,6 @@ val e_new_type_evar : env -> evar_map ref ->
 val new_Type : ?rigid:rigid -> env -> 'r Sigma.t -> (constr, 'r) Sigma.sigma
 val e_new_Type : ?rigid:rigid -> env -> evar_map ref -> constr
 
-val restrict_evar : 'r Sigma.t -> existential_key -> Filter.t ->
-  constr list option -> (existential_key, 'r) Sigma.sigma
-
 (** Polymorphic constants *)
 
 val new_global : 'r Sigma.t -> Globnames.global_reference -> (constr, 'r) Sigma.sigma
@@ -186,8 +183,16 @@ raise OccurHypInSimpleClause if the removal breaks dependencies *)
 type clear_dependency_error =
 | OccurHypInSimpleClause of Id.t option
 | EvarTypingBreak of existential
+| NoCandidatesLeft of existential_key
 
 exception ClearDependencyError of Id.t * clear_dependency_error
+
+(** Restrict an undefined evar according to a (sub)filter and candidates.
+    The evar will be defined if there is only one candidate left,
+@raise ClearDependencyError NoCandidatesLeft is the filter turns the candidates
+  into an empty list. *)
+val restrict_evar : 'r Sigma.t -> existential_key -> Filter.t ->
+  constr list option -> (existential_key, 'r) Sigma.sigma
 
 (* spiwack: marks an evar that has been "defined" by clear.
     used by [Goal] and (indirectly) [Proofview] to handle the clear tactic gracefully*)

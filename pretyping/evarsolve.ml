@@ -914,15 +914,10 @@ let invert_invertible_arg fullenv evd aliases k (evk,argsv) args' =
  * such that "hyps' |- ?e : T"
  *)
 
-let set_of_evctx l =
-  List.fold_left (fun s decl -> Id.Set.add (get_id decl) s) Id.Set.empty l
-
-let filter_effective_candidates evi filter candidates =
+let filter_effective_candidates evi filter l =
   match filter with
-  | None -> candidates
-  | Some filter ->
-      let ids = set_of_evctx (Filter.filter_list filter (evar_context evi)) in
-      List.filter (fun a -> Id.Set.subset (collect_vars a) ids) candidates
+  | None -> l
+  | Some filter -> filter_effective_candidates evi filter l
 
 let filter_candidates evd evk filter candidates_update =
   let evi = Evd.find_undefined evd evk in

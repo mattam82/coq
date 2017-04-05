@@ -168,6 +168,8 @@ let evar_context evi = named_context_of_val evi.evar_hyps
 let evar_filtered_context evi =
   Filter.filter_list (evar_filter evi) (evar_context evi)
 
+let evar_candidates evi = evi.evar_candidates
+
 let evar_hyps evi = evi.evar_hyps
 
 let evar_filtered_hyps evi = match Filter.repr (evar_filter evi) with
@@ -640,6 +642,7 @@ let merge_universe_context evd uctx' =
 let set_universe_context evd uctx' =
   { evd with universes = uctx' }
 
+(* TODO: make unique *)
 let add_conv_pb ?(tail=false) pb d =
   if tail then {d with conv_pbs = d.conv_pbs @ [pb]}
   else {d with conv_pbs = pb::d.conv_pbs}
@@ -672,9 +675,18 @@ let define evk body evd =
   let evar_names = EvNames.remove_name_defined evk evd.evar_names in
   { evd with defn_evars; undf_evars; last_mods; evar_names }
 
+
+let set_of_evctx l =
+  List.fold_left (fun s decl -> Id.Set.add (get_id decl) s) Id.Set.empty l
+
+let filter_effective_candidates evi filter candidates =
+  let ids = set_of_evctx (Filter.filter_list filter (evar_context evi)) in
+  List.filter (fun a -> Id.Set.subset (collect_vars a) ids) candidates
+
 let restrict evk filter ?candidates evd =
   let evk' = new_untyped_evar () in
   let evar_info = EvMap.find evk evd.undf_evars in
+  let candidates = Option.map (filter_effective_candidates evar_info filter) candidates in
   let evar_info' =
     { evar_info with evar_filter = filter;
       evar_candidates = candidates;
@@ -684,8 +696,19 @@ let restrict evk filter ?candidates evd =
   let id_inst = Array.map_of_list (mkVar % get_id) ctxt in
   let body = mkEvar(evk',id_inst) in
   let (defn_evars, undf_evars) = define_aux evd.defn_evars evd.undf_evars evk body in
+  let future_goals =
+    if List.mem_f Evar.equal evk evd.future_goals then
+      evk' :: List.remove Evar.equal evk evd.future_goals
+    else evd.future_goals
+  in
+  let principal_future_goal =
+    match evd.principal_future_goal with
+    | Some ev when Evar.equal ev evk -> Some evk'
+    | x -> x
+  in
   { evd with undf_evars = EvMap.add evk' evar_info' undf_evars;
-    defn_evars; evar_names }, evk'
+             defn_evars; evar_names;
+             future_goals; principal_future_goal }, evk'
 
 let downcast evk ccl evd =
   let evar_info = EvMap.find evk evd.undf_evars in
