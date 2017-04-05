@@ -433,11 +433,11 @@ let default_pat = Pattern.PMeta None
 
 (** The default pattern just filters by the application structure at the top
  level, all arguments are unified with full conversion. *)
-let simplify_pat ts pat =
+let simplify_pat env ts pat =
   let open Pattern in
   let indexed gr =
     match gr with
-    | ConstRef c -> not (Cpred.mem c (snd ts))
+    | ConstRef c -> not (evaluable_constant c env) || not (Cpred.mem c (snd ts))
     | VarRef c -> not (Idpred.mem c (fst ts))
     | _ -> true
   in
@@ -470,8 +470,8 @@ let simplify_pat ts pat =
  structure of the pattern.  This avoids spurious unifications involving
  unfolding. E.g. 1 * ?s unifies with any application t * t for
  example. *)
-let rec decompose_unif_pat env sigma unif pat u t =
-  match pat, kind_of_term u, kind_of_term t with
+let rec decompose_unif_pat env sigma unif pat t u =
+  match pat, kind_of_term t, kind_of_term u with
   | Pattern.PApp (_, pargs), App (f, args), App (g, args') when
          Int.equal (Array.length args) (Array.length args') ->
      let b, sigma = unif env sigma f g in
@@ -492,7 +492,7 @@ let pattern_occurrence_test pat env sigma c =
     | Some pat -> pat, unif
     | None ->
        let pat = Patternops.pattern_of_constr env sigma c in
-       let pat = simplify_pat ts pat in
+       let pat = simplify_pat env ts pat in
        let unif env sigma t u =
          decompose_unif_pat env sigma unif pat t u
        in pat, unif
