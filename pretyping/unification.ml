@@ -31,7 +31,7 @@ open Find_subterm
 open Sigma.Notations
 open Context.Named.Declaration
 
-let keyed_unification = ref (false)
+let keyed_unification = ref true
 let _ = Goptions.declare_bool_option {
   Goptions.optsync = true; Goptions.optdepr = false;
   Goptions.optname = "Unification is keyed";
