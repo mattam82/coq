@@ -1938,6 +1938,17 @@ let w_unify2 env evd flags dep cv_pb ty1 ty2 =
    convertible and first-order otherwise. But if failed if e.g. the type of
    Meta(1) had meta-variables in it. *)
 let w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 =
+  let open_ts = flags.core_unify_flags.modulo_delta in
+  let closed_ts = Option.default open_ts flags.core_unify_flags.modulo_conv_on_closed_terms in
+  let flags = Evarconv.{ open_ts; closed_ts; with_cs = true } in
+  let res = Evarconv.evar_conv_x flags env evd cv_pb ty1 ty2 in
+  match res with
+  | Success evd ->
+     Evarconv.consider_remaining_unif_problems ~flags ~with_ho:true env evd
+  | UnifFailure (evd, reason) ->
+     raise (PretypeError (env, evd, CannotUnify (ty1, ty2, Some reason)))
+
+let old_w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 =
   let hd1,l1 = decompose_appvect (whd_nored evd ty1) in
   let hd2,l2 = decompose_appvect (whd_nored evd ty2) in
   let is_empty1 = Array.is_empty l1 in
