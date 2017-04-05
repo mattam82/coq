@@ -58,7 +58,7 @@ val clenv_fchain :
 
 (** {6 Unification with clenvs } *)
 
-(** Unifies two terms in a clenv. The boolean is [allow_K] (see [Unification]) *)
+(** Unifies two terms in a clenv. *)
 val clenv_unify :
   ?flags:unify_flags -> conv_pb -> constr -> constr -> clausenv -> clausenv
 
@@ -136,8 +136,6 @@ val pr_clenv : clausenv -> Pp.std_ppcmds
 type hole = {
   hole_evar : constr;
   (** The hole itself. Guaranteed to be an evar. *)
-  hole_type : types;
-  (** Type of the hole in the current environment. *)
   hole_deps  : bool;
   (** Whether the remainder of the clause was dependent in the hole. Note that
       because let binders are substituted, it does not mean that it actually
@@ -146,13 +144,23 @@ type hole = {
   (** Name of the hole coming from its binder. *)
 }
 
+val hole_type : evar_map -> hole -> types
+              
+
 type clause = {
   cl_holes : hole list;
+  (** The holes of the clause. *)
   cl_concl : types;
+  (** The conclusion: an evar applied to some terms *)
+  cl_concl_occs : Evarconv.occurrences_selection option;
+  (** The occurrences of the terms to be abstracted when unifying *)
+  cl_val   : constr;
+  (** The value the clause was built from, applied to holes *)
 }
 
-val make_evar_clause : env -> evar_map -> ?len:int -> types ->
-  (evar_map * clause)
+val make_evar_clause :
+  env -> evar_map -> ?len:int -> ?occs:Evarconv.occurrences_selection ->
+  constr -> types -> (evar_map * clause)
 (** An evar version of {!make_clenv_binding}. Given a type [t],
     [evar_environments env sigma ~len t bl] tries to eliminate at most [len]
     products of the type [t] by filling it with evars. It returns the resulting
@@ -160,10 +168,56 @@ val make_evar_clause : env -> evar_map -> ?len:int -> types ->
     well-typed in the environment. *)
 
 val solve_evar_clause : env -> evar_map -> bool -> clause -> constr bindings ->
-  evar_map
+  evar_map * clause
 (** [solve_evar_clause env sigma hyps cl bl] tries to solve the holes contained
     in [cl] according to the [bl] argument. Assumes that [bl] are well-typed in
     the environment. The boolean [hyps] is a compatibility flag that allows to
     consider arguments to be dependent only when they appear in hypotheses and
     not in the conclusion. This boolean is only used when [bl] is of the form
     [ImplicitBindings _]. *)
+
+val make_clenv_from_env :
+  env -> evar_map -> ?len:int -> ?occs:Evarconv.occurrences_selection ->
+  constr * types -> evar_map * clause
+
+val make_clenv_bindings :
+  env -> evar_map -> ?len:int -> ?occs:Evarconv.occurrences_selection ->
+  constr * constr -> hyps_only:bool -> constr bindings ->
+  evar_map * clause
+
+(* Can raise NotExtensibleClause *)
+val clenv_dest_prod : env -> evar_map -> clause -> evar_map * clause
+
+(** Returns the independent holes in the clause, according to the
+    hyps_only flag that was used during its construction. *)
+val clenv_indep : clause -> hole list
+
+val clenv_chain : ?holes_order:bool -> (* true = holes of the first clause first *)
+                  ?flags:unify_flags -> ?occs:Evarconv.occurrences_selection ->
+                  env -> evar_map -> hole ->
+                  clause -> clause -> evar_map * clause
+                                 
+val clenv_concl : clause -> types
+val clenv_val : clause -> constr
+val clenv_holes : clause -> hole list
+
+val clenv_recompute_deps : evar_map -> clause -> clause
+
+(** Returns the dependent goals *)
+val clenv_dep_holes: clause -> hole list
+
+(** @raises Evarconv.UnableToUnify *)
+val clenv_unify_concl : env -> evar_map ->
+                        Evarconv.unify_flags -> types -> clause ->
+                        evar_map * clause
+
+val clenv_advance : evar_map -> clause -> clause
+val clenv_advance_clear : evar_map -> clause -> clause
+val clenv_map : (constr -> constr) -> clause -> clause
+
+val clenv_map_concl : (constr -> constr) -> clause -> clause
+                                     
+(** Refresh the universes in a clenv *)
+val refresh_clenv : Univ.universe_level_subst -> clause -> clause
+
+val flags_of : Unification.unify_flags -> Evarconv.unify_flags
