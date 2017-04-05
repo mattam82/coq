@@ -187,7 +187,7 @@ let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=
   let sigma =
     if with_classes then
       let sigma = Typeclasses.resolve_typeclasses ~filter:Typeclasses.all_evars
-        ~fail:(not with_evars) env sigma
+         ~fail:false (*(not with_evars) *) env sigma
       in Typeclasses.mark_unresolvables ~filter:Typeclasses.all_goals sigma
     else sigma
   in
