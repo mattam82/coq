@@ -219,12 +219,12 @@ let auto_unif_flags freeze st =
     resolve_evars = false
 }
 
-let e_give_exact flags poly (c,clenv) gl =
+let e_give_exact flags poly (c,(evd,clenv)) gl =
   let (c, _, _) = c in
   let c, gl =
     if poly then
-      let clenv', subst = Clenv.refresh_undefined_univs clenv in
-      let evd = evars_reset_evd ~with_conv_pbs:true gl.sigma clenv'.evd in
+      let evd', subst = Evd.refresh_undefined_universes evd in
+      let evd = evars_reset_evd ~with_conv_pbs:true gl.sigma evd' in
       let c = Vars.subst_univs_level_constr subst c in
         c, {gl with sigma = evd}
     else c, gl
@@ -233,15 +233,19 @@ let e_give_exact flags poly (c,clenv) gl =
   Proofview.V82.of_tactic (Clenvtac.unify ~flags t1 <*> exact_no_check c) gl
 
 let unify_e_resolve poly flags = { enter = begin fun gls (c,_,clenv) ->
-  let clenv', c = connect_hint_clenv poly c clenv gls in
-  let clenv' = Tacmach.New.of_old (clenv_unique_resolver ~flags clenv') gls in
-    Clenvtac.clenv_refine true ~with_classes:false clenv'
+  let evd, clenv', c = connect_hint_clenv poly c clenv gls in
+  Tacticals.New.tclTHEN
+    (Proofview.Unsafe.tclEVARS evd)
+    (Clenvtac.clenv_refine2 ~with_evars:true ~with_classes:false ~flags
+                            clenv')
   end }
 
 let unify_resolve poly flags = { enter = begin fun gls (c,_,clenv) ->
-  let clenv', _ = connect_hint_clenv poly c clenv gls in
-  let clenv' = Tacmach.New.of_old (clenv_unique_resolver ~flags clenv') gls in
-    Clenvtac.clenv_refine false ~with_classes:false clenv'
+  let evd, clenv', _ = connect_hint_clenv poly c clenv gls in
+  Tacticals.New.tclTHEN
+    (Proofview.Unsafe.tclEVARS evd)
+    (Clenvtac.clenv_refine2 ~with_evars:true ~with_classes:false ~flags
+                            clenv')
   end }
 
 (** Application of a lemma using [refine] instead of the old [w_unify] *)
@@ -262,14 +266,13 @@ let unify_resolve_refine poly flags =
           let sigma = Evd.merge_context_set Evd.univ_flexible sigma ctx in
           sigma, c, t
       in
-      let sigma', cl = Clenv.make_evar_clause env sigma ?len:n ty in
-      let term = applistc term (List.map (fun x -> x.hole_evar) cl.cl_holes) in
+      let sigma', cl = Clenv.make_evar_clause env sigma ?len:n term ty in
       let sigma' =
         let evdref = ref sigma' in
         if not (Evarconv.e_cumul env ~ts:flags.core_unify_flags.modulo_delta
                                       evdref cl.cl_concl concl) then
           Type_errors.error_actual_type env
-            {Environ.uj_val = term; Environ.uj_type = cl.cl_concl}
+            {Environ.uj_val = cl.cl_val; Environ.uj_type = cl.cl_concl}
             concl;
         !evdref
       in Sigma.here term (Sigma.Unsafe.of_evar_map sigma') }
@@ -288,7 +291,7 @@ let clenv_of_prods poly nprods (c, clenv) gl =
       if Pervasives.(>=) diff 0 then
         (* Was Some clenv... *)
         Some (Some diff,
-              Tacmach.New.of_old (fun gls -> mk_clenv_from_n gls (Some diff) (c,ty)) gl)
+              Tacmach.New.of_old (fun gls -> make_clenv_from_env (pf_env gls) (project gls) ~len:diff (c,ty)) gl)
       else None
 
 let with_prods nprods poly (c, clenv) f =
@@ -1512,7 +1515,11 @@ let autoapply c i gl =
   let flags = auto_unif_flags Evar.Set.empty
     (Hints.Hint_db.transparent_state (Hints.searchtable_map i)) in
   let cty = pf_unsafe_type_of gl c in
-  let ce = mk_clenv_from gl (c,cty) in
+  let ce = pf_apply (make_clenv_from_env ?len:None ?occs:None) gl (c,cty) in
   let tac = { enter = fun gl -> (unify_e_resolve false flags).enter gl
     ((c,cty,Univ.ContextSet.empty),0,ce) } in
-  Proofview.V82.of_tactic (Proofview.Goal.nf_enter tac) gl
+  Proofview.V82.of_tactic
+    (Tacticals.New.tclTHEN
+       (Proofview.Goal.nf_enter tac)
+       Proofview.shelve_unifiable)
+       gl

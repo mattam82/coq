@@ -110,14 +110,21 @@ open Auto
 let priority l = List.map snd (List.filter (fun (pr,_) -> Int.equal pr 0) l)
 
 let unify_e_resolve poly flags (c,clenv) =
-  Proofview.Goal.nf_enter { enter = begin fun gl ->
-      let clenv', c = connect_hint_clenv poly c clenv gl in
-      Proofview.V82.tactic
-	(fun gls ->
-	 let clenv' = clenv_unique_resolver ~flags clenv' gls in
-	 tclTHEN (Refiner.tclEVARUNIVCONTEXT (Evd.evar_universe_context clenv'.evd))
-		 (Proofview.V82.of_tactic (Tactics.Simple.eapply c)) gls)
-    end }
+  let open Proofview in
+  connect_clenv poly c clenv
+    begin fun (clenv', c) ->
+    try
+      Clenvtac.clenv_refine2 ~with_evars:true ~shelve_subgoals:true ~flags clenv'
+      (** MS: compat, was eapply who would do shelve_unifiable *)
+      (* (Tactics.Simple.eapply c) *)
+    with Evarconv.UnableToUnify (evm, err) ->
+	Proofview.Goal.nf_enter { enter = fun gl ->
+	let env = Proofview.Goal.env gl in
+	let concl = Proofview.Goal.concl gl in
+	let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
+	let exn = Pretype_errors.CannotUnify (concl, (clenv_concl clenv'), Some err) in
+	let exn = Pretype_errors.PretypeError (env, sigma, exn) in
+        tclZERO exn } end
 
 let hintmap_of hdc concl =
   match hdc with
@@ -129,11 +136,15 @@ let hintmap_of hdc concl =
 
 let e_exact poly flags (c,clenv) =
   Proofview.Goal.enter { enter = begin fun gl ->
-    let clenv', c = connect_hint_clenv poly c clenv gl in
+    let evd, clenv', c = connect_hint_clenv poly c clenv gl in
     Tacticals.New.tclTHEN
-    (Proofview.Unsafe.tclEVARUNIVCONTEXT (Evd.evar_universe_context clenv'.evd))
+    (Proofview.Unsafe.tclEVARUNIVCONTEXT (Evd.evar_universe_context evd))
     (e_give_exact c)
   end }
+
+(* let e_exact poly flags (c,clenv) = *)
+(*   connect_clenv poly c clenv *)
+(*     begin fun (clenv', c) -> e_give_exact c end *)
 
 let rec e_trivial_fail_db db_list local_db =
   let next = Proofview.Goal.nf_enter { enter = begin fun gl ->

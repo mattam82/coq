@@ -101,7 +101,7 @@ type 'a with_uid = {
 
 type raw_hint = constr * types * Univ.universe_context_set
 
-type hint = (raw_hint * clausenv) hint_ast with_uid
+type hint = (raw_hint * (evar_map * clause)) hint_ast with_uid
 
 type 'a with_metadata = {
   pri  : int;            (* A number lower is higher priority *)
@@ -232,30 +232,10 @@ let is_transparent_gr (ids, csts) = function
   | ConstRef cst -> Cpred.mem cst csts
   | IndRef _ | ConstructRef _ -> false
 
-let strip_params env c = 
-  match kind_of_term c with
-  | App (f, args) -> 
-    (match kind_of_term f with
-    | Const (p,_) ->
-      let cb = lookup_constant p env in
-	(match cb.Declarations.const_proj with
-	| Some pb -> 
-	  let n = pb.Declarations.proj_npars in
-	    if Array.length args > n then
-	      mkApp (mkProj (Projection.make p false, args.(n)), 
-		     Array.sub args (n+1) (Array.length args - (n + 1)))
-	    else c
-	| None -> c)
-    | _ -> c)
-  | _ -> c
-
 let instantiate_hint env sigma p =
   let mk_clenv (c, cty, ctx) =
     let sigma = Evd.merge_context_set univ_flexible sigma ctx in
-    let cl = mk_clenv_from_env env sigma None (c,cty) in 
-      {cl with templval = 
-	  { cl.templval with rebus = strip_params env cl.templval.rebus };
-	env = empty_env}
+    make_clenv_from_env env sigma (c,cty)
   in
   let code = match p.code.obj with
     | Res_pf c -> Res_pf (c, mk_clenv c)
