@@ -551,11 +551,13 @@ let make_hints g st only_classes sign =
     List.fold_left
       (fun hints hyp ->
         let consider =
-          let open Context.Named.Declaration in
-          try let t = Global.lookup_named (get_id hyp) |> get_type in
-              (* Section variable, reindex only if the type changed *)
-              not (Term.eq_constr t (get_type hyp))
-          with Not_found -> true
+          if not only_classes then true
+          else
+            let open Context.Named.Declaration in
+            try let t = Global.lookup_named (get_id hyp) |> get_type in
+                (* Section variable, reindex only if the type changed and not a class *)
+                not (Term.eq_constr t (get_type hyp))
+            with Not_found -> true
         in
         if consider then
           let hint =
@@ -959,13 +961,13 @@ module Search = struct
     | ReachedLimitEx, _ -> e
     | _, ReachedLimitEx -> e'
     | _, _ -> e
-
+               
   (** Determine if backtracking is needed for this goal.
       If the type class is unique or in Prop
       and there are no evars in the goal then we do
       NOT backtrack. *)
-  let needs_backtrack env evd unique concl =
-    if unique || is_Prop env evd concl then
+  let needs_backtrack env evd unique hyps concl =
+    if unique then
       occur_existential concl
     else true
 
@@ -989,7 +991,7 @@ module Search = struct
     let sigma = Goal.sigma gl in
     let s = Sigma.to_evar_map sigma in
     let unique = not info.search_dep || is_unique env concl in
-    let backtrack = needs_backtrack env s unique concl in
+    let backtrack = needs_backtrack env s unique (Goal.hyps gl) concl in
     if !typeclasses_debug > 0 then
       Feedback.msg_debug
         (pr_depth info.search_depth ++ str": looking for " ++
@@ -1134,34 +1136,45 @@ module Search = struct
     let ldb = Hint_db.add_list env s hint info.search_hints in
     let info' =
       { info with search_hints = ldb; last_tac = lazy (str"intro") }
-    in kont info'
+    in
+    if !typeclasses_debug > 0 then
+      Feedback.msg_debug
+        (pr_depth info.search_depth ++ str": " ++ Lazy.force info'.last_tac
+         ++ str" on" ++ spc () ++ pr_ev s (Proofview.Goal.goal gl));
+    kont info'
 
   let intro info kont =
     Proofview.tclBIND Tactics.intro
      (fun _ -> Proofview.Goal.nf_enter { enter = fun gl -> intro_tac info kont gl })
 
   let rec search_tac hints limit depth =
-    let kont info =
+    let kont depth info =
       Proofview.numgoals >>= fun i ->
       if !typeclasses_debug > 1 then
         Feedback.msg_debug
-          (str"calling eauto recursively at depth " ++ int (succ depth)
+          (str"calling eauto recursively at depth " ++ int depth
            ++ str" on " ++ int i ++ str" subgoals");
-      search_tac hints limit (succ depth) info
+      search_tac hints limit depth info
     in
     fun info ->
     if Int.equal depth (succ limit) then Proofview.tclZERO ReachedLimitEx
     else
-      Proofview.tclOR (hints_tac hints info kont)
-                      (fun e -> Proofview.tclOR (intro info kont)
+      Proofview.tclOR (hints_tac hints info (kont (succ depth)))
+                      (fun e -> Proofview.tclOR (intro info (kont depth))
                       (fun e' -> let (e, info) = merge_exceptions e e' in
                               Proofview.tclZERO ~info e))
+
+  let occur_existential_hyps h =
+    List.exists
+      (fun decl -> occur_existential (Context.Named.Declaration.get_type decl))
+      h
 
   let search_tac_gl ?st only_classes dep hints depth i sigma gls gl :
         unit Proofview.tactic =
     let open Proofview in
     let open Proofview.Notations in
-    let dep = dep || Proofview.unifiable sigma (Goal.goal gl) gls in
+    let dep = dep || Proofview.unifiable sigma (Goal.goal gl) gls
+              || occur_existential_hyps (Goal.hyps gl) in
     let info = make_autogoal ?st only_classes dep (cut_of_hints hints) i gl in
     search_tac hints depth 1 info
 
