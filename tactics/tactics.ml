@@ -1443,6 +1443,10 @@ let general_elim with_evars ~holes_order clear_flag (c, lbindc) elim =
 
 (* Case analysis tactics *)
 
+let default_occurrences env ind dep =
+  let elim_args = inductive_nrealargs_env env ind + if dep then 1 else 0 in
+  Some (Evarconv.default_occurence_test, List.init elim_args (fun _ -> None))
+
 let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
   let sigma = Proofview.Goal.sigma gl in
@@ -1456,12 +1460,11 @@ let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
       true, build_case_analysis_scheme env sigma mind true sort
     else build_case_analysis_scheme_default env sigma mind sort
   in
-  let nindices = inductive_nrealargs_env env (fst mind) + if dep then 1 else 0 in
   let tac =
   (general_elim with_evars false clear_flag (c,lbindc)
    {elimindex = None; elimbody = (elim,NoBindings);
     elimrename = Some (false, constructors_nrealdecls (fst mind));
-    elimoccs = if dep then Some (Evarconv.default_occurence_test, List.init nindices (fun _ -> None)) else None (* FIXME all occs ? *)})
+    elimoccs = default_occurrences env (fst mind) dep})
   in
   Sigma (tac, sigma, p)
   end }
@@ -1495,7 +1498,7 @@ let find_eliminator c gl =
   let evd, c = find_ind_eliminator ind (Tacticals.New.elimination_sort_of_goal gl) gl in
     evd, {elimindex = None; elimbody = (c,NoBindings);
           elimrename = Some (true, constructors_nrealdecls ind);
-          elimoccs = None (* FIXME all occs? *)}
+          elimoccs = default_occurrences (Tacmach.New.pf_env gl) ind true}
 
 let default_elim with_evars clear_flag (c,_ as cx) =
   Proofview.tclORELSE
