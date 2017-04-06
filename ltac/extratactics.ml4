@@ -950,6 +950,34 @@ TACTIC EXTEND unshelve
     ]
 END
 
+let unshelve_evars l =
+  Proofview.tclEVARMAP >>= fun sigma ->
+  let f (sigma, goals) gl =
+    let sigma = Proofview.Unsafe.mark_as_goal sigma gl in
+    (sigma, gl :: goals)
+  in
+  let sigma, goals = List.fold_left f (sigma, []) l in
+  Proofview.Unsafe.tclEVARS sigma <*>
+    Proofview.unshelve_goals (List.rev goals)
+
+(* Unshelves the specified goals. *)
+TACTIC EXTEND unshelve_goals
+| [ "unshelve_goals" ne_ident_list(l) ] ->
+   [
+     Proofview.tclEVARMAP >>= fun sigma ->
+     unshelve_evars (List.map (fun id -> Evd.evar_key id sigma) l)
+    ]
+END
+
+TACTIC EXTEND unshelve_evar
+| [ "unshelve_evar" constr(c) ] ->
+   [
+     Proofview.tclEVARMAP >>= fun sigma ->
+     unshelve_evars [if isEvar c then fst (destEvar c)
+                     else error "Not an evar"]
+    ]
+END
+
 (* Command to add every unshelved variables to the focus *)
 VERNAC COMMAND EXTEND Unshelve
 [ "Unshelve" ]
