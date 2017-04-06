@@ -1451,16 +1451,17 @@ let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   let t = Retyping.get_type_of env (Sigma.to_evar_map sigma) c in
   let (mind,_) = reduce_to_quantified_ind env (Sigma.to_evar_map sigma) t in
   let sort = Tacticals.New.elimination_sort_of_goal gl in
-  let Sigma (elim, sigma, p) =
+  let dep, Sigma (elim, sigma, p) =
     if occur_term c concl then
-      build_case_analysis_scheme env sigma mind true sort
-    else
-      build_case_analysis_scheme_default env sigma mind sort in
+      true, build_case_analysis_scheme env sigma mind true sort
+    else build_case_analysis_scheme_default env sigma mind sort
+  in
+  let nindices = inductive_nrealargs_env env (fst mind) + if dep then 1 else 0 in
   let tac =
   (general_elim with_evars false clear_flag (c,lbindc)
    {elimindex = None; elimbody = (elim,NoBindings);
     elimrename = Some (false, constructors_nrealdecls (fst mind));
-    elimoccs = None (* FIXME all occs ? *)})
+    elimoccs = if dep then Some (Evarconv.default_occurence_test, List.init nindices (fun _ -> None)) else None (* FIXME all occs ? *)})
   in
   Sigma (tac, sigma, p)
   end }
@@ -4039,7 +4040,7 @@ let guess_elim isrec dep s hyp0 gl =
         let Sigma (ind, sigma, _) = build_case_analysis_scheme env sigma mind true s in
         (Sigma.to_evar_map sigma, ind)
       else
-        let Sigma (ind, sigma, _) = build_case_analysis_scheme_default env sigma mind s in
+        let _, Sigma (ind, sigma, _) = build_case_analysis_scheme_default env sigma mind s in
         (Sigma.to_evar_map sigma, ind)
   in
   let elimt = Tacmach.New.pf_unsafe_type_of gl elimc in
@@ -4677,7 +4678,7 @@ let case_type t =
   let env = Tacmach.New.pf_env gl in
   let (ind,t) = reduce_to_atomic_ind env (Sigma.to_evar_map sigma) t in
   let s = Tacticals.New.elimination_sort_of_goal gl in
-  let Sigma (elimc, evd, p) = build_case_analysis_scheme_default env sigma ind s in
+  let _dep, Sigma (elimc, evd, p) = build_case_analysis_scheme_default env sigma ind s in
   Sigma (elim_scheme_type elimc t, evd, p)
   end }
 

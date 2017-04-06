@@ -660,7 +660,7 @@ let build_case_scheme fa =
 	   (ind,Univ.Instance.empty)(*FIXME*),prop_sort
   in
   let sigma = Sigma.Unsafe.of_evar_map sigma in
-  let Sigma (scheme, sigma, _) = 
+  let _dep, Sigma (scheme, sigma, _) =
       Indrec.build_case_analysis_scheme_default env sigma ind sf
   in
   let sigma = Sigma.to_evar_map sigma in
