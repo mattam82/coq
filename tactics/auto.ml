@@ -352,9 +352,10 @@ and my_find_search_nodelta db_list local_db hdc concl =
     (List.map_append (hintmap_of hdc concl) (local_db::db_list))
 
 and my_find_search mod_delta =
-  if mod_delta then my_find_search_delta
-  else my_find_search_nodelta
-
+  (* if mod_delta then my_find_search_delta *)
+  (* else my_find_search_nodelta *)
+  my_find_search_delta
+    
 and my_find_search_delta db_list local_db hdc concl =
   let f = hintmap_of hdc concl in
     if occur_existential concl then
