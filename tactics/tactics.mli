@@ -21,6 +21,9 @@ open Unification
 open Misctypes
 open Locus
 
+val clear_evar_hyps : Evd.evar_map -> existential ->
+                      Id.t list -> Evd.evar_map * existential
+
 (** Main tactics defined in ML. This file is huge and should probably be split
     in more reasonable units at some point. Because of its size and age, the
     implementation features various styles and stages of the proof engine.
@@ -186,8 +189,8 @@ val revert        : Id.t list -> unit Proofview.tactic
 val apply_type : constr -> constr list -> unit Proofview.tactic
 val bring_hyps : Context.Named.t -> unit Proofview.tactic
 
-val apply                 : constr -> unit Proofview.tactic
-val eapply                : constr -> unit Proofview.tactic
+val apply                 : ?with_delta:bool -> constr -> unit Proofview.tactic
+val eapply                : ?with_delta:bool -> constr -> unit Proofview.tactic
 
 val apply_with_bindings_gen :
   advanced_flag -> evars_flag -> (clear_flag * constr with_bindings located) list -> unit Proofview.tactic
@@ -195,8 +198,8 @@ val apply_with_bindings_gen :
 val apply_with_delayed_bindings_gen :
   advanced_flag -> evars_flag -> (clear_flag * delayed_open_constr_with_bindings located) list -> unit Proofview.tactic
 
-val apply_with_bindings   : constr with_bindings -> unit Proofview.tactic
-val eapply_with_bindings  : constr with_bindings -> unit Proofview.tactic
+val apply_with_bindings   : ?with_delta:bool -> constr with_bindings -> unit Proofview.tactic
+val eapply_with_bindings  : ?with_delta:bool -> constr with_bindings -> unit Proofview.tactic
 
 val cut_and_apply         : constr -> unit Proofview.tactic
 
@@ -265,14 +268,15 @@ val compute_elim_sig : ?elimc: constr with_bindings -> types -> elim_scheme
 type eliminator = {
   elimindex : int option;  (** None = find it automatically *)
   elimrename : (bool * int array) option; (** None = don't rename Prop hyps with H-names *)
-  elimbody : constr with_bindings
+  elimbody : constr with_bindings;
+  elimoccs : Evarconv.occurrence_selection option;
 }
 
-val general_elim  : evars_flag -> clear_flag ->
+val general_elim  : evars_flag -> holes_order:bool -> clear_flag ->
   constr with_bindings -> eliminator -> unit Proofview.tactic
 
-val general_elim_clause : evars_flag -> unify_flags -> identifier option ->
-  clausenv -> eliminator -> unit Proofview.tactic
+val general_elim_clause : evars_flag -> holes_order:bool -> unify_flags -> identifier option ->
+  Clenv.clause -> eliminator -> unit Proofview.tactic
 
 val default_elim  : evars_flag -> clear_flag -> constr with_bindings ->
   unit Proofview.tactic
@@ -421,7 +425,7 @@ val declare_intro_decomp_eq :
 module Simple : sig
   (** Simplified version of some of the above tactics *)
 
-  val intro           : Id.t -> unit Proofview.tactic
+  val intro  : Id.t -> unit Proofview.tactic
   val apply  : constr -> unit Proofview.tactic
   val eapply : constr -> unit Proofview.tactic
   val elim   : constr -> unit Proofview.tactic

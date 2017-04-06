@@ -44,6 +44,26 @@ open Misctypes
 open Proofview.Notations
 open Sigma.Notations
 
+(** TODO move *)
+let clear_evar_hyps sigma (evk, args) ids =
+  let open Context.Named.Declaration in
+  let evi = Evd.find_undefined sigma evk in
+  let origfilter = Evd.evar_filter evi in
+  let ctxt = Evd.evar_filtered_context evi in
+  let filter = List.map (fun decl -> not (List.mem (get_id decl) ids)) ctxt in
+  let filter = Evd.Filter.apply_subfilter origfilter filter in
+  let sigma = Sigma.Unsafe.of_evar_map sigma in
+  let candidates = Evd.evar_candidates evi in
+  let Sigma (ev, sigma, _) = restrict_evar sigma evk filter candidates in
+  let sigma = Sigma.to_evar_map sigma in
+  (* Mark old evar as cleared *)
+  let evi = Evd.find sigma evk in
+  let extra = evi.evar_extra in
+  let extra' = Store.set extra cleared true in
+  let evi' = { evi with evar_extra = extra' } in
+  let sigma = Evd.add sigma evk evi' in
+  sigma, (ev, Evd.Filter.filter_array filter args)
+
 let inj_with_occurrences e = (AllOccurrences false,e)
 
 let dloc = Loc.ghost
@@ -253,6 +273,9 @@ let clear_dependency_msg env sigma id = function
       str "Cannot remove " ++ pr_id id ++
       strbrk " without breaking the typing of " ++
       Printer.pr_existential env sigma ev ++ str"."
+  | Evarutil.NoCandidatesLeft ev ->
+      str "Cannot remove " ++ pr_id id ++ strbrk " without leaving " ++
+      Printer.pr_existential_key sigma ev ++ str" without candidates."
 
 let error_clear_dependency env sigma id err =
   errorlabstrm "" (clear_dependency_msg env sigma id err)
@@ -267,6 +290,9 @@ let replacing_dependency_msg env sigma id = function
       str "Cannot change " ++ pr_id id ++
       strbrk " without breaking the typing of " ++
       Printer.pr_existential env sigma ev ++ str"."
+  | Evarutil.NoCandidatesLeft ev ->
+      str "Cannot change " ++ pr_id id ++ strbrk " without leaving " ++
+      Printer.pr_existential_key sigma ev ++ str" without candidates."
 
 let error_replacing_dependency env sigma id err =
   errorlabstrm "" (replacing_dependency_msg env sigma id err)
@@ -291,11 +317,17 @@ let clear_gen fail = function
       try clear_hyps_in_evi env evdref (named_context_val env) concl ids
       with Evarutil.ClearDependencyError (id,err) -> fail env sigma id err
     in
+    let evd =
+      let conv = Evarconv.(conv_fun evar_conv_x (default_flags_of full_transparent_state)) in
+      match Evarsolve.reconsider_conv_pbs conv !evdref with
+      | Evarsolve.UnifFailure _ -> !evdref
+      | Evarsolve.Success evd -> evd
+    in
     let env = reset_with_named_context hyps env in
     let tac = Refine.refine ~unsafe:true { run = fun sigma ->
       Evarutil.new_evar env sigma ~principal:true concl
     } in
-    Sigma.Unsafe.of_pair (tac, !evdref)
+    Sigma.Unsafe.of_pair (tac, evd)
   end }
 
 let clear ids = clear_gen error_clear_dependency ids
@@ -1245,31 +1277,31 @@ let do_replace id = function
    [Ti] and the first one (resp last one) being [G] whose hypothesis
    [id] is replaced by P using the proof given by [tac] *)
 
-let clenv_refine_in ?(sidecond_first=false) with_evars ?(with_classes=true) 
-    targetid id sigma0 clenv tac =
-  let clenv = Clenvtac.clenv_pose_dependent_evars with_evars clenv in
-  let clenv =
+let clenv_refine_in ?(sidecond_first=false) with_evars ?(with_classes=true) flags
+                    targetid id env sigma clenv tac =
+  let sigma = 
     if with_classes then
-      { clenv with evd = Typeclasses.resolve_typeclasses 
-	  ~fail:(not with_evars) clenv.env clenv.evd }
-    else clenv
+      Typeclasses.resolve_typeclasses ~fail:(not with_evars) env sigma
+    else sigma
   in
-  let new_hyp_typ = clenv_type clenv in
-  if not with_evars then check_unresolved_evars_of_metas sigma0 clenv;
-  if not with_evars && occur_meta new_hyp_typ then
-    error_uninstantiated_metas new_hyp_typ clenv;
-  let new_hyp_prf = clenv_value clenv in
-  let exact_tac = Proofview.V82.tactic (Tacmach.refine_no_check new_hyp_prf) in
+  (* For compatibility: reduce the conclusion *)
+  let clenv = clenv_map_concl (Reductionops.nf_betaiota sigma) clenv in
+  let exact_tac =
+    Clenvtac.clenv_refine_no_check ~with_evars ~with_classes ~flags clenv in
+  let new_hyp_typ = clenv_concl clenv in
   let naming = NamingMustBe (dloc,targetid) in
   let with_clear = do_replace (Some id) naming in
   Tacticals.New.tclTHEN
-    (Proofview.Unsafe.tclEVARS clenv.evd)
-    (if sidecond_first then
+    (Tacticals.New.tclTHEN
+       (Proofview.Unsafe.tclEVARS sigma)
+       (Clenvtac.clenv_check_dep_holes with_evars sigma clenv >>= Proofview.shelve_goals))
+    ((if sidecond_first then
        Tacticals.New.tclTHENFIRST
-         (assert_before_then_gen with_clear naming new_hyp_typ tac) exact_tac
+         (assert_before_then_gen with_clear naming new_hyp_typ tac)
      else
        Tacticals.New.tclTHENLAST
-         (assert_after_then_gen with_clear naming new_hyp_typ tac) exact_tac)
+         (assert_after_then_gen with_clear naming new_hyp_typ tac))
+    exact_tac)
 
 (********************************************)
 (*       Elimination tactics                *)
@@ -1280,11 +1312,12 @@ let last_arg c = match kind_of_term c with
       Array.last cl
   | _ -> anomaly (Pp.str "last_arg")
 
-let nth_arg i c =
-  if Int.equal i (-1) then last_arg c else
-  match kind_of_term c with
-  | App (f,cl) -> cl.(i)
-  | _ -> anomaly (Pp.str "nth_arg")
+let nth_last l i =
+  if i < 0 then List.last l
+  else
+    try List.nth l i
+    with Not_found ->
+       anomaly (Pp.str "nth_last")
 
 let index_of_ind_arg t =
   let rec aux i j t = match kind_of_term t with
@@ -1343,21 +1376,28 @@ let rec contract_letin_in_lam_header c =
   | LetIn (x,b,t,c) -> contract_letin_in_lam_header (subst1 b c)
   | _ -> c
 
+let make_indep sigma mv = sigma
+                            
 let elimination_clause_scheme with_evars ?(with_classes=true) ?(flags=elim_flags ()) 
-    rename i (elim, elimty, bindings) indclause =
+  holes_order rename i (elim, elimty, occs, bindings) indclause =
   Proofview.Goal.enter { enter = begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Tacmach.New.project gl in
   let elim = contract_letin_in_lam_header elim in
-  let elimclause = make_clenv_binding env sigma (elim, elimty) bindings in
+  let sigma, elimclause =
+    make_clenv_bindings ~hyps_only:false ?occs
+      env sigma (elim, elimty) bindings in
   let indmv =
-    (match kind_of_term (nth_arg i elimclause.templval.rebus) with
-       | Meta mv -> mv
-       | _  -> errorlabstrm "elimination_clause"
-             (str "The type of elimination clause is not well-formed."))
+    let arg = nth_last (clenv_holes elimclause) i in
+    if isEvar arg.hole_evar then arg
+    else errorlabstrm "elimination_clause"
+             (str "The type of elimination clause is not well-formed.")
   in
-  let elimclause' = clenv_fchain ~flags indmv elimclause indclause in
-  enforce_prop_bound_names rename (Clenvtac.res_pf elimclause' ~with_evars ~with_classes ~flags)
+  let sigma, elimclause' =
+    clenv_chain ~holes_order ~flags env sigma indmv elimclause indclause in
+  Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+                    (enforce_prop_bound_names rename
+    (Clenvtac.clenv_refine2 elimclause' ~with_evars ~with_classes ~flags))
   end }
 
 (*
@@ -1371,7 +1411,8 @@ let elimination_clause_scheme with_evars ?(with_classes=true) ?(flags=elim_flags
 type eliminator = {
   elimindex : int option;  (* None = find it automatically *)
   elimrename : (bool * int array) option; (** None = don't rename Prop hyps with H-names *)
-  elimbody : constr with_bindings
+  elimbody : constr with_bindings;
+  elimoccs : Evarconv.occurrence_selection option;
 }
 
 let general_elim_clause_gen elimtac indclause elim =
@@ -1382,18 +1423,18 @@ let general_elim_clause_gen elimtac indclause elim =
   let elimt = Retyping.get_type_of env sigma elimc in
   let i =
     match elim.elimindex with None -> index_of_ind_arg elimt | Some i -> i in
-  elimtac elim.elimrename i (elimc, elimt, lbindelimc) indclause
+  elimtac elim.elimrename i (elimc, elimt, elim.elimoccs, lbindelimc) indclause
   end }
 
-let general_elim with_evars clear_flag (c, lbindc) elim =
+let general_elim with_evars ~holes_order clear_flag (c, lbindc) elim =
   Proofview.Goal.enter { enter = begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Tacmach.New.project gl in
   let ct = Retyping.get_type_of env sigma c in
   let t = try snd (reduce_to_quantified_ind env sigma ct) with UserError _ -> ct in
-  let elimtac = elimination_clause_scheme with_evars in
-  let indclause  = make_clenv_binding env sigma (c, t) lbindc in
-  let sigma = meta_merge sigma (clear_metas indclause.evd) in
+  let elimtac = elimination_clause_scheme with_evars holes_order in
+  let sigma, indclause =
+    make_clenv_bindings env sigma ~hyps_only:false (c, t) lbindc in
   Proofview.Unsafe.tclEVARS sigma <*>
   Tacticals.New.tclTHEN
     (general_elim_clause_gen elimtac indclause elim)
@@ -1416,9 +1457,10 @@ let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
     else
       build_case_analysis_scheme_default env sigma mind sort in
   let tac =
-  (general_elim with_evars clear_flag (c,lbindc)
+  (general_elim with_evars false clear_flag (c,lbindc)
    {elimindex = None; elimbody = (elim,NoBindings);
-    elimrename = Some (false, constructors_nrealdecls (fst mind))})
+    elimrename = Some (false, constructors_nrealdecls (fst mind));
+    elimoccs = None (* FIXME all occs ? *)})
   in
   Sigma (tac, sigma, p)
   end }
@@ -1451,14 +1493,15 @@ let find_eliminator c gl =
   if is_nonrec ind then raise IsNonrec;
   let evd, c = find_ind_eliminator ind (Tacticals.New.elimination_sort_of_goal gl) gl in
     evd, {elimindex = None; elimbody = (c,NoBindings);
-          elimrename = Some (true, constructors_nrealdecls ind)}
+          elimrename = Some (true, constructors_nrealdecls ind);
+          elimoccs = None (* FIXME all occs? *)}
 
 let default_elim with_evars clear_flag (c,_ as cx) =
   Proofview.tclORELSE
     (Proofview.Goal.s_enter { s_enter = begin fun gl ->
       let sigma, elim = find_eliminator c gl in
       let tac =
-	  (general_elim with_evars clear_flag cx elim)
+	  (general_elim with_evars ~holes_order:true clear_flag cx elim)
       in
       Sigma.Unsafe.of_pair (tac, sigma)
     end })
@@ -1472,8 +1515,9 @@ let default_elim with_evars clear_flag (c,_ as cx) =
 
 let elim_in_context with_evars clear_flag c = function
   | Some elim ->
-      general_elim with_evars clear_flag c
-        {elimindex = Some (-1); elimbody = elim; elimrename = None}
+      general_elim with_evars false clear_flag c
+                   {elimindex = Some (-1); elimbody = elim; elimrename = None;
+                    elimoccs = None}
   | None -> default_elim with_evars clear_flag c
 
 let elim with_evars clear_flag (c,lbindc as cx) elim =
@@ -1498,45 +1542,54 @@ let simplest_elim c = default_elim false None (c,NoBindings)
    (e.g. it could replace id:A->B->C by id:C, knowing A/\B)
 *)
 
-let clenv_fchain_in id ?(flags=elim_flags ()) mv elimclause hypclause =
+let clenv_chain_in id ?(flags=elim_flags ()) env sigma mv elimclause ?occs hypclause =
   (** The evarmap of elimclause is assumed to be an extension of hypclause, so
       we do not need to merge the universes coming from hypclause. *)
-  try clenv_fchain ~with_univs:false ~flags mv elimclause hypclause
+  try clenv_chain ~flags env sigma mv ?occs elimclause hypclause
   with PretypeError (env,evd,NoOccurrenceFound (op,_)) ->
     (* Set the hypothesis name in the message *)
     raise (PretypeError (env,evd,NoOccurrenceFound (op,Some id)))
 
-let elimination_in_clause_scheme with_evars ?(flags=elim_flags ()) 
-    id rename i (elim, elimty, bindings) indclause =
+let elimination_in_clause_scheme with_evars holes_order ?(flags=elim_flags ()) 
+    id rename i (elim, elimty, occs, bindings) indclause =
   Proofview.Goal.enter { enter = begin fun gl ->
   let env = Proofview.Goal.env gl in
-  let sigma = Tacmach.New.project gl in
+  let sigma0 = Tacmach.New.project gl in
   let elim = contract_letin_in_lam_header elim in
-  let elimclause = make_clenv_binding env sigma (elim, elimty) bindings in
-  let indmv = destMeta (nth_arg i elimclause.templval.rebus) in
+  let sigma, elimclause =
+    make_clenv_bindings env sigma0 ~hyps_only:false ?occs
+                        (elim, elimty) bindings in
+  let indmv = nth_last (clenv_holes elimclause) i in
   let hypmv =
-    try match List.remove Int.equal indmv (clenv_independent elimclause) with
+    try match List.remove (fun x y -> Constr.equal x.hole_evar y.hole_evar)
+                          indmv (clenv_indep elimclause) with
       | [a] -> a
       | _ -> failwith ""
     with Failure _ -> errorlabstrm "elimination_clause"
           (str "The type of elimination clause is not well-formed.") in
-  let elimclause'  = clenv_fchain ~flags indmv elimclause indclause in
+  let sigma, elimclause' =
+    clenv_chain ~holes_order ~flags env sigma indmv elimclause indclause in
   let hyp = mkVar id in
   let hyp_typ = Retyping.get_type_of env sigma hyp in
-  let hypclause = mk_clenv_from_env env sigma (Some 0) (hyp, hyp_typ) in
-  let elimclause'' = clenv_fchain_in id ~flags hypmv elimclause' hypclause in
-  let new_hyp_typ  = clenv_type elimclause'' in
+  let sigma, hypclause = make_clenv_from_env env sigma ~len:0 (hyp, hyp_typ) in
+  let sigma, elimclause'' =
+    clenv_chain_in id ~flags env sigma hypmv elimclause' ?occs hypclause in
+  let new_hyp_typ  = clenv_concl elimclause'' in
   if Term.eq_constr hyp_typ new_hyp_typ then
     errorlabstrm "general_rewrite_in"
       (str "Nothing to rewrite in " ++ pr_id id ++ str".");
-  clenv_refine_in with_evars id id sigma elimclause''
-    (fun id -> Proofview.tclUNIT ())
+  Proofview.Unsafe.tclEVARS sigma <*>
+    (Clenvtac.clenv_solve_clause_constraints ~flags ~with_ho:true elimclause'' >>=
+       fun elimclause'' ->
+       Proofview.tclEVARMAP >>= fun sigma ->
+       clenv_refine_in with_evars flags id id env sigma elimclause''
+                       (fun id -> Proofview.tclUNIT ()))
   end }
 
-let general_elim_clause with_evars flags id c e =
+let general_elim_clause with_evars ~holes_order flags id c e =
   let elim = match id with
-  | None -> elimination_clause_scheme with_evars ~with_classes:true ~flags
-  | Some id -> elimination_in_clause_scheme with_evars ~flags id
+  | None -> elimination_clause_scheme with_evars holes_order ~with_classes:true ~flags
+  | Some id -> elimination_in_clause_scheme with_evars holes_order ~flags id
   in
   general_elim_clause_gen elim c e
 
@@ -1657,7 +1710,8 @@ let tclORELSEOPT t k =
       Proofview.tclZERO ~info e
     | Some tac -> tac)
 
-let general_apply with_delta with_destruct with_evars clear_flag (loc,(c,lbind)) =
+let general_apply with_delta with_destruct with_evars ~delay_bindings clear_flag
+                  (loc,(c,lbind)) =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
   let concl = Proofview.Goal.concl gl in
   let flags =
@@ -1676,8 +1730,12 @@ let general_apply with_delta with_destruct with_evars clear_flag (loc,(c,lbind))
       try
         let n = nb_prod_modulo_zeta thm_ty - nprod in
         if n<0 then error "Applied theorem has not enough premisses.";
-        let clause = make_clenv_binding_apply env sigma (Some n) (c,thm_ty) lbind in
-        Clenvtac.res_pf clause ~with_evars ~flags
+        let sigma, clause =
+          make_clenv_from_env env sigma ~len:n (c, thm_ty)
+        in
+        Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+         (Clenvtac.clenv_refine_bindings
+            ~with_evars ~flags ~hyps_only:true ~delay_bindings lbind clause)
       with exn when catchable_exception exn ->
         Proofview.tclZERO exn
     in
@@ -1732,10 +1790,10 @@ let general_apply with_delta with_destruct with_evars clear_flag (loc,(c,lbind))
 
 let rec apply_with_bindings_gen b e = function
   | [] -> Proofview.tclUNIT ()
-  | [k,cb] -> general_apply b b e k cb
+  | [k,cb] -> general_apply b b e false k cb
   | (k,cb)::cbl ->
       Tacticals.New.tclTHENLAST
-        (general_apply b b e k cb)
+        (general_apply b b e false k cb)
         (apply_with_bindings_gen b e cbl)
 
 let apply_with_delayed_bindings_gen b e l = 
@@ -1745,7 +1803,7 @@ let apply_with_delayed_bindings_gen b e l =
       let env = Proofview.Goal.env gl in
       let (cb, sigma) = run_delayed env sigma f in
 	Tacticals.New.tclWITHHOLES e
-          (general_apply b b e k (loc,cb)) sigma
+          (general_apply b b e false k (loc,cb)) sigma
     end }
   in
   let rec aux = function
@@ -1756,13 +1814,17 @@ let apply_with_delayed_bindings_gen b e l =
         (one k f) (aux cbl)
   in aux l
 
-let apply_with_bindings cb = apply_with_bindings_gen false false [None,(dloc,cb)]
+let apply_with_bindings ?(with_delta=false) cb =
+  apply_with_bindings_gen false false [None,(dloc,cb)]
 
-let eapply_with_bindings cb = apply_with_bindings_gen false true [None,(dloc,cb)]
+let eapply_with_bindings ?(with_delta=false) cb =
+  apply_with_bindings_gen false true [None,(dloc,cb)]
 
-let apply c = apply_with_bindings_gen false false [None,(dloc,(c,NoBindings))]
+let apply ?(with_delta=false) c =
+  apply_with_bindings_gen with_delta false [None,(dloc,(c,NoBindings))]
 
-let eapply c = apply_with_bindings_gen false true [None,(dloc,(c,NoBindings))]
+let eapply ?(with_delta=false) c =
+  apply_with_bindings_gen false true [None,(dloc,(c,NoBindings))]
 
 let apply_list = function
   | c::l -> apply_with_bindings (c,ImplicitBindings l)
@@ -1778,59 +1840,66 @@ let apply_list = function
    unifiable with [t'] with unifier [rho]
 *)
 
-let find_matching_clause unifier clause =
-  let rec find clause =
-    try unifier clause
+let find_matching_clause unifier env sigma clause =
+  let rec find (sigma, clause) =
+    try unifier (sigma, clause)
     with e when catchable_exception e ->
-    try find (clenv_push_prod clause)
+    try find (clenv_dest_prod env sigma clause)
     with NotExtensibleClause -> failwith "Cannot apply"
-  in find clause
+  in find (sigma, clause)
 
-let progress_with_clause flags innerclause clause =
-  let ordered_metas = List.rev (clenv_independent clause) in
+let progress_with_clause env sigma flags innerclause clause =
+  let ordered_metas = List.rev (clenv_indep clause) in
   if List.is_empty ordered_metas then error "Statement without assumptions.";
   let f mv =
-    try Some (find_matching_clause (clenv_fchain ~with_univs:false mv ~flags clause) innerclause)
+    try Some (find_matching_clause
+                (fun (sigma, clause') ->
+                  clenv_chain ~holes_order:false env sigma mv ~flags clause clause')
+                env sigma innerclause)
     with Failure _ -> None
   in
   try List.find_map f ordered_metas
   with Not_found -> error "Unable to unify."
 
-let apply_in_once_main flags innerclause env sigma (d,lbind) =
+let apply_in_once_main flags env sigma innerclause (d,lbind) =
   let thm = nf_betaiota sigma (Retyping.get_type_of env sigma d) in
-  let rec aux clause =
-    try progress_with_clause flags innerclause clause
+  let rec aux (sigma, clause) =
+    try progress_with_clause env sigma flags innerclause clause
     with e when CErrors.noncritical e ->
     let e = CErrors.push e in
-    try aux (clenv_push_prod clause)
+    try aux (clenv_dest_prod env sigma clause)
     with NotExtensibleClause -> iraise e
   in
-  aux (make_clenv_binding env sigma (d,thm) lbind)
+  aux (make_clenv_bindings env sigma ~hyps_only:false (* TODO ?occs *) (d,thm) lbind)
 
 let apply_in_once sidecond_first with_delta with_destruct with_evars naming
     id (clear_flag,(loc,(d,lbind))) tac =
   let open Context.Rel.Declaration in
   Proofview.Goal.nf_enter { enter = begin fun gl ->
   let env = Proofview.Goal.env gl in
-  let sigma = Tacmach.New.project gl in
+  let sigma0 = Tacmach.New.project gl in
   let flags =
     if with_delta then default_unify_flags () else default_no_delta_unify_flags () in
   let t' = Tacmach.New.pf_get_hyp_typ id gl in
-  let innerclause = mk_clenv_from_env env sigma (Some 0) (mkVar id,t') in
+  let sigma, innerclause = make_clenv_from_env env sigma0 ~len:0 (mkVar id,t') in
   let targetid = find_name true (LocalAssum (Anonymous,t')) naming gl in
   let rec aux idstoclear with_destruct c =
     Proofview.Goal.enter { enter = begin fun gl ->
     let env = Proofview.Goal.env gl in
     let sigma = Tacmach.New.project gl in
     try
-      let clause = apply_in_once_main flags innerclause env sigma (c,lbind) in
-      clenv_refine_in ~sidecond_first with_evars targetid id sigma clause
+      let sigma, clause = apply_in_once_main flags env sigma innerclause (c,lbind) in
+      Proofview.Unsafe.tclEVARS sigma <*>
+        (Clenvtac.clenv_solve_clause_constraints ~flags ~with_ho:true clause >>=
+           fun clause ->
+           Proofview.tclEVARMAP >>= fun sigma ->
+      clenv_refine_in ~sidecond_first with_evars flags targetid id env sigma clause
         (fun id ->
           Tacticals.New.tclTHENLIST [
             apply_clear_request clear_flag false c;
             clear idstoclear;
             tac id
-          ])
+          ]))
     with e when with_destruct && CErrors.noncritical e ->
       let (e, info) = CErrors.push e in
         (descend_in_conjunctions [targetid]
@@ -2161,7 +2230,7 @@ let constructor_tac with_evars expctdnumopt i lbind =
 	(Proofview.Goal.env gl) sigma (fst mind, i) in
       let cons = mkConstructU cons in
 	
-      let apply_tac = general_apply true false with_evars None (dloc,(cons,lbind)) in
+      let apply_tac = general_apply true false with_evars ~delay_bindings:true None (dloc,(cons,lbind)) in
       let tac =
 	(Tacticals.New.tclTHENLIST
            [
@@ -2938,7 +3007,11 @@ let unfold_body x =
   end }
 
 (* Either unfold and clear if defined or simply clear if not a definition *)
-let expand_hyp id = Tacticals.New.tclTRY (unfold_body id) <*> clear [id]
+let expand_hyp id =
+  Proofview.Goal.enter { enter = fun gl ->
+   try ignore (Context.Named.lookup id (Proofview.Goal.hyps (Proofview.Goal.assume gl)));
+       Tacticals.New.tclTRY (unfold_body id) <*> clear [id]
+   with Not_found -> Proofview.tclUNIT () }
 
 (*****************************)
 (* High-level induction      *)
@@ -3999,7 +4072,7 @@ let find_induction_type isrec elim hyp0 gl =
 	let scheme = compute_elim_sig ~elimc elimt in
 	if Option.is_empty scheme.indarg then error "Cannot find induction type";
 	let indsign = compute_scheme_signature scheme hyp0 ind_guess in
-	let elim = ({elimindex = Some(-1); elimbody = elimc; elimrename = None},elimt) in
+	let elim = ({elimindex = Some(-1); elimbody = elimc; elimrename = None; elimoccs = None},elimt) in
 	scheme, ElimUsing (elim,indsign)
   in
   match scheme.indref with
@@ -4026,61 +4099,103 @@ let get_eliminator elim dep s gl =
   | ElimOver (isrec,id) ->
       let evd, (elimc,elimt),_ as elims = guess_elim isrec dep s id gl in
       let _, (l, s) = compute_elim_signature elims id in
-      let branchlengthes = List.map (fun d -> assert (is_local_assum d); pi1 (decompose_prod_letin (get_type d))) (List.rev s.branches) in
-      evd, isrec, ({elimindex = None; elimbody = elimc; elimrename = Some (isrec,Array.of_list branchlengthes)}, elimt), l
+      let branchlengthes =
+        List.map (fun d -> assert (is_local_assum d);
+                        pi1 (decompose_prod_letin (get_type d)))
+                 (List.rev s.branches)
+      in
+      let occs = List.init (s.nargs + if s.indarg_in_concl then 1 else 0)
+                           (fun _ -> None) in
+      let elim =
+        {elimindex = None; elimbody = elimc;
+         elimrename = Some (isrec, Array.of_list branchlengthes);
+         elimoccs = Some (Evarconv.default_occurence_test, occs)}
+      in evd, isrec, (elim, elimt), l
+
+let get_hyp_typ id env =
+  let open Context.Named.Declaration in
+  Environ.lookup_named id env |> get_type
 
 (* Instantiate all meta variables of elimclause using lid, some elts
    of lid are parameters (first ones), the other are
    arguments. Returns the clause obtained.  *)
-let recolle_clenv i params args elimclause gl =
-  let _,arr = destApp elimclause.templval.rebus in
+let recolle_clenv env sigma i params args elimclause =
+  let arr = Clenv.clenv_holes elimclause in
   let lindmv =
-    Array.map
+    Array.map_of_list
       (fun x ->
-	match kind_of_term x with
-	  | Meta mv -> mv
-	  | _  -> errorlabstrm "elimination_clause"
+        if isEvar x.hole_evar then x
+	else errorlabstrm "elimination_clause"
               (str "The type of the elimination clause is not well-formed."))
       arr in
   let k = match i with -1 -> Array.length lindmv - List.length args | _ -> i in
   (* parameters correspond to first elts of lid. *)
   let clauses_params =
-    List.map_i (fun i id -> mkVar id , pf_get_hyp_typ id gl, lindmv.(i))
+    List.map_i (fun i id -> mkVar id , get_hyp_typ id env, lindmv.(i))
       0 params in
   let clauses_args =
-    List.map_i (fun i id -> mkVar id , pf_get_hyp_typ id gl, lindmv.(k+i))
+    List.map_i (fun i id -> mkVar id , get_hyp_typ id env, lindmv.(k+i))
       0 args in
   let clauses = clauses_params@clauses_args in
   (* iteration of clenv_fchain with all infos we have. *)
   List.fold_right
-    (fun e acc ->
+    (fun e (sigma, cl) ->
       let x,y,i = e in
       (* from_n (Some 0) means that x should be taken "as is" without
          trying to unify (which would lead to trying to apply it to
          evars if y is a product). *)
-      let indclause  = Tacmach.New.of_old (fun gl -> mk_clenv_from_n gl (Some 0) (x,y)) gl in
-      let elimclause' = clenv_fchain ~with_univs:false i acc indclause in
+      let sigma, indclause = Clenv.make_clenv_from_env env sigma ~len:0 (x,y) in
+      let elimclause' = clenv_chain env sigma i cl indclause in
       elimclause')
     (List.rev clauses)
-    elimclause
+    (sigma, elimclause)
+
+let is_explicit_pattern hole concl =
+  let ev, l = decompose_appvect hole in
+  let hd, l' = decompose_appvect concl in
+  if Array.length l == Array.length l' then
+    try ignore(decompose_lam_n (Array.length l) hd); true
+    with e -> false
+  else false
 
 (* Unification of the goal and the principle applied to meta variables:
    (elimc ?i ?j ?k...?l). This solves partly meta variables (and may
     produce new ones). Then refine with the resulting term with holes.
 *)
-let induction_tac with_evars params indvars elim =
+let induction_tac with_evars params indvars elim toclear =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
-  let ({elimindex=i;elimbody=(elimc,lbindelimc);elimrename=rename},elimt) = elim in
+  let ({elimindex = i; elimbody = (elimc,lbindelimc); elimoccs = occs;
+         elimrename = rename}, elimt) = elim in
   let i = match i with None -> index_of_ind_arg elimt | Some i -> i in
   (* elimclause contains this: (elimc ?i ?j ?k...?l) *)
   let elimc = contract_letin_in_lam_header elimc in
   let elimc = mkCast (elimc, DEFAULTcast, elimt) in
-  let elimclause = pf_apply make_clenv_binding gl (elimc,elimt) lbindelimc in
+  let env = Tacmach.New.pf_env gl in
+  let sigma = Tacmach.New.project gl in
+  let sigma, elimclause = 
+    make_clenv_bindings ~hyps_only:true env sigma (elimc,elimt) ?occs lbindelimc in
   (* elimclause' is built from elimclause by instanciating all args and params. *)
-  let elimclause' = recolle_clenv i params indvars elimclause gl in
+  let sigma, elimclause' = recolle_clenv env sigma i params indvars elimclause in
+  (** The remaining holes are predicates and methods/branches, make them independent
+      of the destructed variable if not an explicit pattern. *)
+  let rest = clenv_holes elimclause' in
+  let clear_ids = toclear in
+  let sigma, elimclause' =
+    if is_explicit_pattern (clenv_concl elimclause') (Tacmach.New.pf_concl gl) then
+      sigma, elimclause'
+    else 
+      let make_indep sigma h =
+        let sigma, ev = clear_evar_hyps sigma (destEvar h.hole_evar) clear_ids in
+        sigma
+      in
+      let sigma = List.fold_left make_indep sigma rest in
+      sigma, clenv_advance_clear sigma elimclause'
+  in
   (* one last resolution (useless?) *)
-  let resolved = Tacmach.New.of_old (clenv_unique_resolver ~flags:(elim_flags ()) elimclause') gl in
-  enforce_prop_bound_names rename (Clenvtac.clenv_refine with_evars resolved)
+  (* let resolved = Tacmach.New.of_old (clenv_unique_resolver ~flags:(elim_flags ()) elimclause') gl in *)
+  Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+                    (enforce_prop_bound_names rename
+                      (Clenvtac.clenv_refine2 ~with_evars elimclause'))
   end }
 
 (* Apply induction "in place" taking into account dependent
@@ -4113,8 +4228,8 @@ let apply_induction_in_context with_evars hyp0 inhyps elim indvars names induct_
         (* Generalize dependent hyps (but not args) *)
         if deps = [] then Proofview.tclUNIT () else apply_type tmpcl deps_cstr;
         (* side-conditions in elim (resp case) schemes come last (resp first) *)
-        induct_tac elim;
-        Tacticals.New.tclMAP expand_hyp toclear;
+        induct_tac elim toclear;
+        Tacticals.New.tclMAP expand_hyp toclear
       ])
       (Array.map2
          (induct_discharge with_evars lhyp0 avoid
@@ -4128,8 +4243,9 @@ let induction_with_atomization_of_ind_arg isrec with_evars elim names hyp0 inhyp
   Proofview.Goal.enter { enter = begin fun gl ->
   let elim_info = find_induction_type isrec elim hyp0 (Proofview.Goal.assume gl) in
   atomize_param_of_ind_then elim_info hyp0 (fun indvars ->
-    apply_induction_in_context with_evars (Some hyp0) inhyps (pi3 elim_info) indvars names
-      (fun elim -> induction_tac with_evars [] [hyp0] elim))
+     apply_induction_in_context with_evars (Some hyp0) inhyps
+                                (pi3 elim_info) indvars names
+      (fun elim toclear -> induction_tac with_evars [] [hyp0] elim toclear))
   end }
 
 let msg_not_right_number_induction_arguments scheme =
@@ -4167,16 +4283,16 @@ let induction_without_atomization isrec with_evars elim names lid =
        but by chance, because of the addition of at least hyp0 for
        cook_sign, it behaved as if there was a real induction arg. *)
     if indvars = [] then [List.hd lid_params] else indvars in
-  let induct_tac elim = Tacticals.New.tclTHENLIST [
+  let induct_tac elim toclear = Tacticals.New.tclTHENLIST [
     (* pattern to make the predicate appear. *)
     reduce (Pattern (List.map inj_with_occurrences lidcstr)) onConcl;
     (* Induction by "refine (indscheme ?i ?j ?k...)" + resolution of all
        possible holes using arguments given by the user (but the
        functional one). *)
     (* FIXME: Tester ca avec un principe dependant et non-dependant *)
-    induction_tac with_evars params realindvars elim;
+    induction_tac with_evars params realindvars elim toclear;
   ] in
-  let elim = ElimUsing (({elimindex = Some (-1); elimbody = Option.get scheme.elimc; elimrename = None}, scheme.elimt), indsign) in
+  let elim = ElimUsing (({elimindex = Some (-1); elimbody = Option.get scheme.elimc; elimrename = None; elimoccs = None}, scheme.elimt), indsign) in
   apply_induction_in_context with_evars None [] elim indvars names induct_tac
   end }
 
@@ -4239,8 +4355,8 @@ let check_expected_type env sigma (elimc,bl) elimt =
   let sign,_ = splay_prod env sigma elimt in
   let n = List.length sign in
   if n == 0 then error "Scheme cannot be applied.";
-  let sigma,cl = make_evar_clause env sigma ~len:(n - 1) elimt in
-  let sigma = solve_evar_clause env sigma true cl bl in
+  let sigma,cl = make_evar_clause env sigma ~len:(n - 1) elimc elimt in
+  let sigma,cl = solve_evar_clause env sigma true cl bl in
   let (_,u,_) = destProd cl.cl_concl in
   fun t -> Evarconv.e_cumul env (ref sigma) t u
 
@@ -4528,15 +4644,24 @@ let simple_destruct = function
 
 let elim_scheme_type elim t =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
-  let clause = Tacmach.New.of_old (fun gl -> mk_clenv_type_of gl elim) gl in
-  match kind_of_term (last_arg clause.templval.rebus) with
-    | Meta mv ->
-        let clause' =
-	  (* t is inductive, then CUMUL or CONV is irrelevant *)
-	  clenv_unify ~flags:(elim_flags ()) Reduction.CUMUL t
-            (clenv_meta_type clause mv) clause in
-	Clenvtac.res_pf clause' ~flags:(elim_flags ()) ~with_evars:false
-    | _ -> anomaly (Pp.str "elim_scheme_type")
+  let sigma, ty = pf_type_of gl elim in
+  let env = Proofview.Goal.env gl in
+  let sigma, clause = make_clenv_from_env env sigma (elim, ty) in
+  let h = List.last (clenv_holes clause) in
+  let flags = Clenv.flags_of (elim_flags ()) in
+  let sigma =
+    (* t is inductive, then CUMUL or CONV is irrelevant *)
+    Evarconv.the_conv_x ~ts:flags.Evarconv.open_ts env t (hole_type sigma h) sigma in
+  let clause = clenv_advance sigma clause in
+  let tac = Clenvtac.clenv_unify_concl flags clause in
+  Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+    (Ftactic.run tac
+       (fun (sigma, clause) ->
+         let clause = clenv_map_concl (nf_betaiota sigma) clause in
+         let clause = clenv_recompute_deps sigma clause in
+         Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+                           (Clenvtac.clenv_refine_no_check ~flags:(elim_flags ())
+                                                           ~with_evars:false clause)))
   end }
 
 let elim_type t =

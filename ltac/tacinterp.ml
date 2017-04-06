@@ -1889,15 +1889,19 @@ and interp_atomic ist tac : unit Proofview.tactic =
   (* Equality and inversion *)
   | TacRewrite (ev,l,cl,by) ->
       Proofview.Goal.enter { enter = begin fun gl ->
-        let l' = List.map (fun (b,m,(keep,c)) ->
-          let f = { delayed = fun env sigma ->
-            let sigma = Sigma.to_evar_map sigma in
-            let (sigma, c) = interp_open_constr_with_bindings ist env sigma c in
-            Sigma.Unsafe.of_pair (c, sigma)
-          } in
-	  (b,m,keep,f)) l in
         let env = Proofview.Goal.env gl in
         let sigma = project gl in
+        let l =
+          List.map (fun (b,m,p,c) ->
+              let p = Option.map (interp_typed_pattern ist env sigma) p in
+              (b,m,p,c)) l
+        in
+        let l' = List.map (fun (b,m,p,(keep,c)) ->
+          let f = { delayed = fun env' sigma' ->
+            let sigma' = Sigma.to_evar_map sigma' in
+            let (sigma', c) = interp_open_constr_with_bindings ist env' sigma' c in
+            Sigma.Unsafe.of_pair (c, sigma') } in
+	  (b,m,keep,p,f)) l in
         let cl = interp_clause ist env sigma cl in
         name_atomic ~env
           (TacRewrite (ev,l,cl,Option.map ignore by))

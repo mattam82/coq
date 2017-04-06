@@ -624,18 +624,18 @@ module New = struct
     let sigma, elim = Tacmach.New.of_old (mk_elim ind) gl in
     Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
     (Proofview.Goal.nf_enter { enter = begin fun gl ->
-    let indclause = Tacmach.New.of_old (fun gl -> mk_clenv_from gl (c, t)) gl in
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    let sigma = Sigma.to_evar_map sigma in
+    let sigma, indclause = make_clenv_from_env env sigma (c, t) in
     (* applying elimination_scheme just a little modified *)
-    let elimclause = Tacmach.New.of_old (fun gls -> mk_clenv_from gls (elim,Tacmach.New.pf_unsafe_type_of gl elim)) gl in
-    let indmv =
-      match kind_of_term (last_arg elimclause.templval.Evd.rebus) with
-      | Meta mv -> mv
-      | _         -> anomaly (str"elimination")
-    in
+    let sigma, elimclause = make_clenv_from_env env sigma
+      (elim,Tacmach.New.pf_unsafe_type_of gl elim) in
+    let indmv = List.last (Clenv.clenv_holes elimclause) in
     let pmv =
-      let p, _ = decompose_app elimclause.templtyp.Evd.rebus in
+      let p, _ = decompose_app (Clenv.clenv_concl elimclause) in
       match kind_of_term p with
-      | Meta p -> p
+      | Evar _ -> p
       | _ ->
 	  let name_elim =
 	    match kind_of_term elim with
@@ -646,32 +646,37 @@ module New = struct
 	  errorlabstrm "Tacticals.general_elim_then_using"
             (str "The elimination combinator " ++ str name_elim ++ str " is unknown.")
     in
-    let elimclause' = clenv_fchain ~with_univs:false indmv elimclause indclause in
+    let sigma, elimclause' = clenv_chain env sigma indmv elimclause indclause in
     let branchsigns = compute_constructor_signatures isrec ind in
     let brnames = compute_induction_names_gen false branchsigns allnames in
     let flags = Unification.elim_flags () in
-    let elimclause' =
+    let flags = flags_of flags in
+    let sigma =
       match predicate with
-      | None   -> elimclause'
-      | Some p -> clenv_unify ~flags Reduction.CONV (mkMeta pmv) p elimclause'
+      | None   -> sigma
+      | Some p ->
+         let sigma = Evarconv.the_conv_x ~ts:flags.Evarconv.open_ts env pmv p sigma in
+         sigma
     in
-    let clenv' = Tacmach.New.of_old (clenv_unique_resolver ~flags elimclause') gl in
+    let concl = Proofview.Goal.concl gl in
+    let sigma, clenv' = clenv_unify_concl env sigma flags concl elimclause' in
     let after_tac i =
-      let (hd,largs) = decompose_app clenv'.templtyp.Evd.rebus in
+      let (hd,largs) = decompose_app (clenv_concl clenv') in
       let ba = { branchsign = branchsigns.(i);
                  branchnames = brnames.(i);
                  nassums = List.length branchsigns.(i);
                  branchnum = i+1;
                  ity = ind;
-                 largs = List.map (clenv_nf_meta clenv') largs;
-                 pred = clenv_nf_meta clenv' hd }
+                 largs = List.map (Evarutil.nf_evar sigma) largs;
+                 pred = Evarutil.nf_evar sigma hd }
       in
       tac ba
     in
     let branchtacs = List.init (Array.length branchsigns) after_tac in
     Proofview.tclTHEN
-      (Clenvtac.clenv_refine false clenv')
-      (Proofview.tclEXTEND [] tclIDTAC branchtacs)
+      (Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+                         (Clenvtac.clenv_refine2 clenv'))
+                         (Proofview.tclEXTEND [] tclIDTAC branchtacs)
     end }) end }
 
   let elimination_then tac c =

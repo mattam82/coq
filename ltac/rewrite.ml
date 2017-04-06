@@ -2120,13 +2120,16 @@ let poly_proof getp gett env evm car rel =
     getp env (evm,Evar.Set.empty) car rel
   else gett env (evm,Evar.Set.empty) car rel
 
+let apply c b =
+  apply_with_bindings_gen true false [None,(Loc.ghost,(c,b))]
+
 let setoid_reflexivity =
   setoid_proof "reflexive"
     (fun env evm car rel -> 
      tac_open (poly_proof PropGlobal.get_reflexive_proof
 			  TypeGlobal.get_reflexive_proof
 			  env evm car rel)
-	      (fun c -> tclCOMPLETE (Proofview.V82.of_tactic (apply c))))
+	      (fun c -> tclCOMPLETE (Proofview.V82.of_tactic (apply c NoBindings))))
     (reflexivity_red true)
 
 let setoid_symmetry =
@@ -2135,7 +2138,7 @@ let setoid_symmetry =
       tac_open
 	(poly_proof PropGlobal.get_symmetric_proof TypeGlobal.get_symmetric_proof
 	   env evm car rel)
-	(fun c -> Proofview.V82.of_tactic (apply c)))
+	(fun c -> Proofview.V82.of_tactic (apply c NoBindings)))
     (symmetry_red true)
     
 let setoid_transitivity c =
@@ -2145,7 +2148,7 @@ let setoid_transitivity c =
 	   env evm car rel)
 	(fun proof -> match c with
 	| None -> Proofview.V82.of_tactic (eapply proof)
-	| Some c -> Proofview.V82.of_tactic (apply_with_bindings (proof,ImplicitBindings [ c ]))))
+	| Some c -> Proofview.V82.of_tactic (apply proof (ImplicitBindings [ c ]))))
     (transitivity_red true c)
     
 let setoid_symmetry_in id =
@@ -2165,7 +2168,9 @@ let setoid_symmetry_in id =
    Proofview.V82.of_tactic
     (Tacticals.New.tclTHENLAST
       (Tactics.assert_after_replacing id new_hyp)
-      (Tacticals.New.tclTHENLIST [ intros; setoid_symmetry; apply (mkVar id); Tactics.assumption ]))
+      (Tacticals.New.tclTHENLIST
+         [ intros; setoid_symmetry;
+           apply (mkVar id) NoBindings; Tactics.assumption ]))
       gl)
 
 let _ = Hook.set Tactics.setoid_reflexivity setoid_reflexivity
