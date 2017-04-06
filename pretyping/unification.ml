@@ -110,7 +110,8 @@ let abstract_list_all env evd typ c l =
   evd,(p,typp)
 
 let set_occurrences_of_last_arg args =
-  Some (AllOccurrences false) :: List.tl (Array.map_to_list (fun _ -> None) args)
+  Evarconv.AtOccurrences (AllOccurrences false) ::
+    List.tl (Array.map_to_list (fun _ -> Evarconv.default_occurrence_selection) args)
 
 let abstract_list_all_with_dependencies env evd typ c l =
   let evd = Sigma.Unsafe.of_evar_map evd in
@@ -120,8 +121,8 @@ let abstract_list_all_with_dependencies env evd typ c l =
   let n = List.length l in
   let argoccs = set_occurrences_of_last_arg (Array.sub (snd ev') 0 n) in
   let evd,b =
-    Evarconv.second_order_matching empty_transparent_state
-      env evd ev' argoccs c in
+    Evarconv.second_order_matching (Evarconv.default_flags_of empty_transparent_state)
+    env evd ev' (Evarconv.default_occurrence_test, argoccs) c in
   if b then
     let p = nf_evar evd (existential_value evd (destEvar ev)) in
       evd, p
@@ -1264,7 +1265,7 @@ let order_metas metas =
 (* Solve an equation ?n[x1=u1..xn=un] = t where ?n is an evar *)
 
 let solve_simple_evar_eqn ts env evd ev rhs =
-  match solve_simple_eqn (Evarconv.evar_conv_x ts) env evd (None,ev,rhs) with
+  match solve_simple_eqn (Evarconv.conv_fun Evarconv.evar_conv_x ts) env evd (None,ev,rhs) with
   | UnifFailure (evd,reason) ->
       error_cannot_unify env evd ~reason (mkEvar ev,rhs);
   | Success evd ->
@@ -1275,6 +1276,7 @@ let solve_simple_evar_eqn ts env evd ev rhs =
    is true, unification of types of metas is required *)
 
 let w_merge env with_types flags (evd,metas,evars) =
+  let eflags = Evarconv.default_flags_of flags.modulo_delta_types in
   let rec w_merge_rec evd metas evars eqns =
 
     (* Process evars *)
@@ -1300,14 +1302,14 @@ let w_merge env with_types flags (evd,metas,evars) =
 	      else
 		let evd' = 
 		  let evd', rhs'' = pose_all_metas_as_evars curenv evd rhs' in
-		    try solve_simple_evar_eqn flags.modulo_delta_types curenv evd' ev rhs''
+		  try solve_simple_evar_eqn eflags curenv evd' ev rhs''
 		    with Retyping.RetypeError _ ->
 		      error_cannot_unify curenv evd' (mkEvar ev,rhs'')
 		in w_merge_rec evd' metas evars' eqns
           | _ ->
 	      let evd', rhs'' = pose_all_metas_as_evars curenv evd rhs' in
 	      let evd' = 
-		try solve_simple_evar_eqn flags.modulo_delta_types curenv evd' ev rhs''
+		try solve_simple_evar_eqn eflags curenv evd' ev rhs''
 		with Retyping.RetypeError _ -> error_cannot_unify curenv evd' (mkEvar ev, rhs'')
 	      in
 		w_merge_rec evd' metas evars' eqns

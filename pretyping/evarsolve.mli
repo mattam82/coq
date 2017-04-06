@@ -25,13 +25,15 @@ val expand_vars_in_term : env -> constr -> constr
    some problems that cannot be solved in a unique way (except if choose is
    true); fails if the instance is not valid for the given [ev] *)
 
-type conv_fun =
-  env ->  evar_map -> conv_pb -> constr -> constr -> unification_result
+type types_or_terms = bool
 
-type conv_fun_bool =
+type conv_fun = types_or_terms ->
+  env -> evar_map -> conv_pb -> constr -> constr -> unification_result
+
+type conv_fun_bool = types_or_terms ->
   env ->  evar_map -> conv_pb -> constr -> constr -> bool
 
-val evar_define : conv_fun -> ?choose:bool -> env -> evar_map -> 
+val evar_define : conv_fun -> ?choose:bool -> ?imitate_defs:bool -> env -> evar_map -> 
   bool option -> existential -> constr -> evar_map
 
 val refresh_universes :
@@ -51,7 +53,7 @@ val solve_evar_evar : ?force:bool ->
   conv_fun ->
   env ->  evar_map -> bool option -> existential -> existential -> evar_map
 
-val solve_simple_eqn : conv_fun -> ?choose:bool -> env ->  evar_map ->
+val solve_simple_eqn : conv_fun -> ?choose:bool -> ?imitate_defs:bool -> env ->  evar_map ->
   bool option * existential * constr -> unification_result
 
 val reconsider_conv_pbs : conv_fun -> evar_map -> unification_result

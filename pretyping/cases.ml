@@ -1632,7 +1632,8 @@ let abstract_tycon loc env evdref subst tycon extenv t =
               try list_assoc_in_triple i subst0 with Not_found -> mkRel i)
               1 (rel_context env) in
         let ev' = e_new_evar env evdref ~src ty in
-        begin match solve_simple_eqn (evar_conv_x full_transparent_state) env !evdref (None,ev,substl inst ev') with
+        begin match solve_simple_eqn (conv_fun evar_conv_x (default_flags_of full_transparent_state))
+				     env !evdref (None,ev,substl inst ev') with
         | Success evd -> evdref := evd
         | UnifFailure _ -> assert false
         end;
