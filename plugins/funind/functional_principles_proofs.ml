@@ -1336,7 +1336,7 @@ let prove_princ_for_struct (evd:Evd.evar_map ref) interactive_proof fun_num fnam
 		 in
 		 let fname = destConst (fst (decompose_app (List.hd (List.rev pte_args)))) in
 		 tclTHENSEQ
-		   [Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences, Names.EvalConstRef (fst fname))]);
+		   [Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences false, Names.EvalConstRef (fst fname))]);
 		    let do_prove =
 		      build_proof
 			interactive_proof
@@ -1439,7 +1439,7 @@ let rec rewrite_eqs_in_eqs eqs =
 	       (fun id gl ->
 		  observe_tac
 		    (Format.sprintf "rewrite %s in %s " (Id.to_string eq) (Id.to_string id))
-		    (tclTRY (Proofview.V82.of_tactic (Equality.general_rewrite_in true Locus.AllOccurrences
+		    (tclTRY (Proofview.V82.of_tactic (Equality.general_rewrite_in true (Locus.AllOccurrences false)
 			       true (* dep proofs also: *) true id (mkVar eq) false)))
 		    gl
 	       )
@@ -1462,7 +1462,7 @@ let new_prove_with_tcc is_mes acc_inv hrec tcc_hyps eqs : tactic =
 		  (fun g ->
 		     if is_mes
 		     then
-		       Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences, evaluable_of_global_reference (delayed_force ltof_ref))]) g
+		       Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences false, evaluable_of_global_reference (delayed_force ltof_ref))]) g
 		     else tclIDTAC g
 		  );
 		  observe_tac "rew_and_finish"

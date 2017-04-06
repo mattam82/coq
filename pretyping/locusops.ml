@@ -16,34 +16,38 @@ let occurrences_map f = function
     if l' = [] then NoOccurrences else OnlyOccurrences l'
   | AllOccurrencesBut l ->
     let l' = f l in
-    if l' = [] then AllOccurrences else AllOccurrencesBut l'
-  | (NoOccurrences|AllOccurrences) as o -> o
+    if l' = [] then AllOccurrences false else AllOccurrencesBut l'
+  | (NoOccurrences|AllOccurrences _) as o -> o
 
 let convert_occs = function
-  | AllOccurrences -> (false,[])
+  | AllOccurrences _ -> (false,[])
   | AllOccurrencesBut l -> (false,l)
   | NoOccurrences -> (true,[])
   | OnlyOccurrences l -> (true,l)
 
 let is_selected occ = function
-  | AllOccurrences -> true
+  | AllOccurrences _ -> true
   | AllOccurrencesBut l -> not (Int.List.mem occ l)
   | OnlyOccurrences l -> Int.List.mem occ l
   | NoOccurrences -> false
 
 (** Usual clauses *)
 
-let allHypsAndConcl = { onhyps=None; concl_occs=AllOccurrences }
+let allHypsAndConcl = { onhyps=None; concl_occs=AllOccurrences false }
 let allHyps = { onhyps=None; concl_occs=NoOccurrences }
-let onConcl = { onhyps=Some[]; concl_occs=AllOccurrences }
+let onConcl = { onhyps=Some[]; concl_occs=AllOccurrences false }
 let nowhere = { onhyps=Some[]; concl_occs=NoOccurrences }
 let onHyp h =
-  { onhyps=Some[(AllOccurrences,h),InHyp]; concl_occs=NoOccurrences }
+  { onhyps=Some[(AllOccurrences false,h),InHyp]; concl_occs=NoOccurrences }
 
 let is_nowhere = function
 | { onhyps=Some[]; concl_occs=NoOccurrences } -> true
 | _ -> false
 
+let is_all_occurrences = function
+  | Locus.AllOccurrences _ -> true
+  | _ -> false
+       
 (** Clause conversion functions, parametrized by a hyp enumeration function *)
 
 (** From [clause] to [simple_clause] *)
@@ -59,12 +63,12 @@ let simple_clause_of enum_hyps cl =
 	List.map Option.make (enum_hyps ())
     | Some l ->
 	List.map (fun ((occs,id),w) ->
-	  if occs <> AllOccurrences then error_occurrences ();
+	  if not (is_all_occurrences occs) then error_occurrences ();
 	  if w = InHypValueOnly then error_body_selection ();
 	  Some id) l in
   if cl.concl_occs = NoOccurrences then hyps
   else
-    if cl.concl_occs <> AllOccurrences then error_occurrences ()
+    if not (is_all_occurrences cl.concl_occs) then error_occurrences ()
     else None :: hyps
 
 (** From [clause] to [concrete_clause] *)
@@ -73,7 +77,7 @@ let concrete_clause_of enum_hyps cl =
   let hyps =
     match cl.onhyps with
     | None ->
-	let f id = OnHyp (id,AllOccurrences,InHyp) in
+	let f id = OnHyp (id,AllOccurrences false,InHyp) in
 	List.map f (enum_hyps ())
     | Some l ->
 	List.map (fun ((occs,id),w) -> OnHyp (id,occs,w)) l in
@@ -94,7 +98,7 @@ let occurrences_of_hyp id cls =
         occurrences_map (List.map out_arg) occs, hl
     | _::l -> hyp_occ l in
   match cls.onhyps with
-      None -> AllOccurrences,InHyp
+      None -> AllOccurrences false,InHyp
     | Some l -> hyp_occ l
 
 let occurrences_of_goal cls =
@@ -107,9 +111,9 @@ let clause_with_generic_occurrences cls =
   | None -> true
   | Some hyps ->
      List.for_all
-       (function ((AllOccurrences,_),_) -> true | _ -> false) hyps in
+       (function ((AllOccurrences _,_),_) -> true | _ -> false) hyps in
   let concl = match cls.concl_occs with
-  | AllOccurrences | NoOccurrences -> true
+  | AllOccurrences _ | NoOccurrences -> true
   | _ -> false in
   hyps && concl
 
@@ -118,8 +122,8 @@ let clause_with_generic_context_selection cls =
   | None -> true
   | Some hyps ->
      List.for_all
-       (function ((AllOccurrences,_),InHyp) -> true | _ -> false) hyps in
+       (function ((AllOccurrences _,_),InHyp) -> true | _ -> false) hyps in
   let concl = match cls.concl_occs with
-  | AllOccurrences | NoOccurrences -> true
+  | AllOccurrences _ | NoOccurrences -> true
   | _ -> false in
   hyps && concl

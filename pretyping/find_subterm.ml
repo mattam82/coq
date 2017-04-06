@@ -119,7 +119,7 @@ let replace_term_occ_gen_modulo occs like_first test bywhat cl occ t =
          end;
          add_subst t subst; incr pos;
          (* Check nested matching subterms *)
-         if occs != Locus.AllOccurrences && occs != Locus.NoOccurrences then
+         if not (Locusops.is_all_occurrences occs) && occs != Locus.NoOccurrences then
            begin nested := true; ignore (subst_below k t); nested := false end;
          (* Do the effective substitution *)
          Vars.lift k (bywhat ()))
@@ -135,13 +135,15 @@ let replace_term_occ_gen_modulo occs like_first test bywhat cl occ t =
 
 let replace_term_occ_modulo occs test bywhat t =
   let occs',like_first =
-    match occs with AtOccs occs -> occs,false | LikeFirst -> AllOccurrences,true in
+    match occs with AtOccs occs -> occs,false
+		  | LikeFirst -> AllOccurrences true,true in
   proceed_with_occurrences
     (replace_term_occ_gen_modulo occs' like_first test bywhat None) occs' t
 
 let replace_term_occ_decl_modulo occs test bywhat d =
   let (plocs,hyploc),like_first =
-    match occs with AtOccs occs -> occs,false | LikeFirst -> (AllOccurrences,InHyp),true in
+    match occs with AtOccs occs -> occs,false
+		  | LikeFirst -> (AllOccurrences true,InHyp),true in
   proceed_with_occurrences
     (map_named_declaration_with_hyploc
        (replace_term_occ_gen_modulo plocs like_first test bywhat)
@@ -171,7 +173,8 @@ let subst_closed_term_occ env evd occs c t =
 let subst_closed_term_occ_decl env evd occs c d =
   let test = make_eq_univs_test env evd c in
   let (plocs,hyploc),like_first =
-    match occs with AtOccs occs -> occs,false | LikeFirst -> (AllOccurrences,InHyp),true in
+    match occs with AtOccs occs -> occs,false
+		  | LikeFirst -> (AllOccurrences true,InHyp),true in
   let bywhat () = mkRel 1 in
   proceed_with_occurrences
     (map_named_declaration_with_hyploc

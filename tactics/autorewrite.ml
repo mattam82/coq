@@ -122,7 +122,7 @@ let autorewrite ?(conds=Naive) tac_main lbas =
        Tacticals.New.tclTHEN tac
         (one_base (fun dir c tac ->
 	  let tac = (tac, conds) in
-	    general_rewrite dir AllOccurrences true false ~tac c)
+	    general_rewrite dir (AllOccurrences false) true false ~tac c)
 	  tac_main bas))
       (Proofview.tclUNIT()) lbas))
 
@@ -140,7 +140,7 @@ let autorewrite_multi_in ?(conds=Naive) idl tac_main lbas =
       | _ -> (* even the hypothesis id is missing *)
         raise (Logic.RefinerError (Logic.NoSuchHyp !id))
     in
-    let gl' = Proofview.V82.of_tactic (general_rewrite_in dir AllOccurrences true ~tac:(tac, conds) false !id cstr false) gl in
+    let gl' = Proofview.V82.of_tactic (general_rewrite_in dir (AllOccurrences false) true ~tac:(tac, conds) false !id cstr false) gl in
     let gls = gl'.Evd.it in
     match gls with
        g::_ ->
@@ -179,7 +179,7 @@ let gen_auto_multi_rewrite conds tac_main lbas cl =
   let try_do_hyps treat_id l =
     autorewrite_multi_in ~conds (List.map treat_id l) tac_main lbas
   in
-  if cl.concl_occs != AllOccurrences &&
+  if not (Locusops.is_all_occurrences cl.concl_occs) &&
      cl.concl_occs != NoOccurrences
   then
     Tacticals.New.tclZEROMSG (str"The \"at\" syntax isn't available yet for the autorewrite tactic.")

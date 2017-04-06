@@ -150,7 +150,8 @@ TACTIC EXTEND specialize
 END
 
 TACTIC EXTEND symmetry
-  [ "symmetry" ] -> [ Tactics.intros_symmetry {onhyps=Some[];concl_occs=AllOccurrences} ]
+[ "symmetry" ] -> [ Tactics.intros_symmetry
+		    {onhyps=Some[];concl_occs=AllOccurrences false} ]
 | [ "symmetry" clause_dft_concl(cl) ] -> [ Tactics.intros_symmetry cl ]
 END
 
@@ -303,7 +304,7 @@ open Tacexpr
 
 let initial_atomic () =
   let dloc = Loc.ghost in
-  let nocl = {onhyps=Some[];concl_occs=AllOccurrences} in
+  let nocl = {onhyps=Some[];concl_occs=AllOccurrences false} in
   let iter (s, t) =
     let body = TacAtom (dloc, t) in
     Tacenv.register_ltac false false (Id.of_string s) body

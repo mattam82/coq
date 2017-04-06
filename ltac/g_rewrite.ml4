@@ -125,7 +125,7 @@ let clsubstitute o c =
       (fun cl ->
         match cl with
           | Some id when is_tac id -> tclIDTAC
-          | _ -> cl_rewrite_clause c o AllOccurrences cl)
+          | _ -> cl_rewrite_clause c o (AllOccurrences false) cl)
 
 TACTIC EXTEND substitute
 | [ "substitute" orient(o) glob_constr_with_bindings(c) ] -> [ Proofview.V82.tactic (clsubstitute o c) ]
@@ -136,9 +136,9 @@ END
 
 TACTIC EXTEND setoid_rewrite
    [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) ]
-   -> [ Proofview.V82.tactic (cl_rewrite_clause c o AllOccurrences None) ]
+   -> [ Proofview.V82.tactic (cl_rewrite_clause c o (AllOccurrences true) None) ]
  | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "in" hyp(id) ] ->
-      [ Proofview.V82.tactic (cl_rewrite_clause c o AllOccurrences (Some id))]
+      [ Proofview.V82.tactic (cl_rewrite_clause c o (AllOccurrences true) (Some id))]
  | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) ] ->
       [ Proofview.V82.tactic (cl_rewrite_clause c o (occurrences_of occ) None)]
  | [ "setoid_rewrite" orient(o) glob_constr_with_bindings(c) "at" occurrences(occ) "in" hyp(id)] ->

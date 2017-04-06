@@ -44,7 +44,7 @@ open Misctypes
 open Proofview.Notations
 open Sigma.Notations
 
-let inj_with_occurrences e = (AllOccurrences,e)
+let inj_with_occurrences e = (AllOccurrences false,e)
 
 let dloc = Loc.ghost
 
@@ -624,46 +624,39 @@ let bind_change_occurrences occs = function
 
 let bind_red_expr_occurrences occs nbcl redexp =
   let has_at_clause = function
-    | Unfold l -> List.exists (fun (occl,_) -> occl != AllOccurrences) l
-    | Pattern l -> List.exists (fun (occl,_) -> occl != AllOccurrences) l
-    | Simpl (_,Some (occl,_)) -> occl != AllOccurrences
+    | Unfold l ->
+       List.exists (fun (occl,_) -> not (Locusops.is_all_occurrences occl)) l
+    | Pattern l ->
+       List.exists (fun (occl,_) -> not (Locusops.is_all_occurrences occl)) l
+    | Simpl (_,Some (occl,_)) -> not (Locusops.is_all_occurrences occl)
     | _ -> false in
-  if occs == AllOccurrences then
+  if Locusops.is_all_occurrences occs then
     if nbcl > 1 && has_at_clause redexp then
       error_illegal_non_atomic_clause ()
     else
       redexp
   else
+    let check_all occl =
+      if not (Locusops.is_all_occurrences occl) then error_illegal_clause ()
+    in
     match redexp with
     | Unfold (_::_::_) ->
 	error_illegal_clause ()
     | Unfold [(occl,c)] ->
-	if occl != AllOccurrences then
-	  error_illegal_clause ()
-	else
-	  Unfold [(occs,c)]
+       check_all occl; Unfold [(occs,c)]
     | Pattern (_::_::_) ->
 	error_illegal_clause ()
     | Pattern [(occl,c)] ->
-	if occl != AllOccurrences then
-	  error_illegal_clause ()
-	else
-	  Pattern [(occs,c)]
+       check_all occl; Pattern [(occs,c)]
     | Simpl (f,Some (occl,c)) ->
-	if occl != AllOccurrences then
-	  error_illegal_clause ()
-	else
-	  Simpl (f,Some (occs,c))
+       check_all occl;
+       Simpl (f,Some (occs,c))
     | CbvVm (Some (occl,c)) ->
-        if occl != AllOccurrences then
-          error_illegal_clause ()
-        else
-          CbvVm (Some (occs,c))
+       check_all occl;
+       CbvVm (Some (occs,c))
     | CbvNative (Some (occl,c)) ->
-        if occl != AllOccurrences then
-          error_illegal_clause ()
-        else
-          CbvNative (Some (occs,c))
+       check_all occl;
+       CbvNative (Some (occs,c))
     | Red _ | Hnf | Cbv _ | Lazy _ | Cbn _
     | ExtraRedExpr _ | Fold _ | Simpl (_,None) | CbvVm None | CbvNative None ->
 	error_occurrences_not_unsupported ()
@@ -881,8 +874,8 @@ let reduce redexp cl =
 (* Unfolding occurrences of a constant *)
 
 let unfold_constr = function
-  | ConstRef sp -> unfold_in_concl [AllOccurrences,EvalConstRef sp]
-  | VarRef id -> unfold_in_concl [AllOccurrences,EvalVarRef id]
+  | ConstRef sp -> unfold_in_concl [AllOccurrences false,EvalConstRef sp]
+  | VarRef id -> unfold_in_concl [AllOccurrences false,EvalVarRef id]
   | _ -> errorlabstrm "unfold_constr" (str "Cannot unfold a non-constant.")
 
 (*******************************************)
@@ -2791,7 +2784,7 @@ let old_generalize_dep ?(with_let=false) c gl =
       | _ -> None
     else None
   in
-  let cl'',evd = generalize_goal gl 0 ((AllOccurrences,c,body),Anonymous)
+  let cl'',evd = generalize_goal gl 0 ((AllOccurrences false,c,body),Anonymous)
     (cl',project gl) in
   let args = Context.Named.to_instance to_quantify_rev in
   tclTHENLIST
@@ -2850,7 +2843,7 @@ let new_generalize_gen lconstr =
     (occs,c,None),na) lconstr)
 
 let generalize l =
-  new_generalize_gen_let (List.map (fun c -> ((AllOccurrences,c,None),Anonymous)) l)
+  new_generalize_gen_let (List.map (fun c -> ((AllOccurrences false,c,None),Anonymous)) l)
 
 (* Faudra-t-il une version avec plusieurs args de generalize_dep ?
 Cela peut-être troublant de faire "Generalize Dependent H n" dans
@@ -4950,7 +4943,7 @@ module New = struct
   let reduce_after_refine =
     reduce
       (Lazy {rBeta=true;rMatch=true;rFix=true;rCofix=true;rZeta=false;rDelta=false;rConst=[]})
-      {onhyps=None; concl_occs=AllOccurrences }
+      {onhyps=None; concl_occs=AllOccurrences false }
 
   let refine ?unsafe c =
     Refine.refine ?unsafe c <*>

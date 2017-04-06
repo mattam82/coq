@@ -1372,7 +1372,7 @@ module Strategies =
 
     let lemmas cs : 'a pure_strategy =
       List.fold_left (fun tac (l,l2r,by) ->
-	choice tac (apply_lemma l2r rewrite_unif_flags l by AllOccurrences))
+	choice tac (apply_lemma l2r rewrite_unif_flags l by (AllOccurrences true)))
 	fail cs
 
     let inj_open hint = (); fun sigma ->
@@ -1721,7 +1721,8 @@ let rec strategy_of_ast = function
       | Compose -> Strategies.seq
       | Choice -> Strategies.choice
     in f' s' t'
-  | StratConstr (c, b) -> { strategy = apply_glob_constr (fst c) b AllOccurrences }
+  | StratConstr (c, b) -> { strategy = apply_glob_constr (fst c) b
+							 (AllOccurrences true) }
   | StratHints (old, id) -> if old then Strategies.old_hints id else Strategies.hints id
   | StratTerms l -> { strategy =
     (fun ({ state = () ; env } as input) ->

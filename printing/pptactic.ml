@@ -137,7 +137,8 @@ module Make
 
   let pr_with_occurrences pr (occs,c) =
     match occs with
-      | AllOccurrences ->
+      | AllOccurrences atleast ->
+        (if atleast then str "!" else mt ()) ++
         pr c
       | NoOccurrences ->
         failwith "pr_with_occurrences: no occurrences"
@@ -602,7 +603,7 @@ module Make
     | { onhyps=Some []; concl_occs=occs }
         when (match default_is_concl with Some true -> true | _ -> false) ->
       pr_with_occurrences mt (occs,())
-    | { onhyps=None; concl_occs=AllOccurrences }
+    | { onhyps=None; concl_occs=AllOccurrences _ }
         when (match default_is_concl with Some false -> true | _ -> false) -> mt ()
     | { onhyps=None; concl_occs=NoOccurrences } ->
       pr_in (str " * |-")

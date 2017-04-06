@@ -433,8 +433,9 @@ let rewrite_side_tac tac sidetac = side_tac tac (Option.map fst sidetac)
 
 let general_rewrite_ebindings_clause cls lft2rgt occs frzevars dep_proof_ok ?tac
     ((c,l) : constr with_bindings) with_evars =
-  if occs != AllOccurrences then (
-    rewrite_side_tac (Hook.get forward_general_setoid_rewrite_clause cls lft2rgt occs (c,l) ~new_goals:[]) tac)
+  if not (Locusops.is_all_occurrences occs) then (
+    rewrite_side_tac (Hook.get forward_general_setoid_rewrite_clause
+                               cls lft2rgt occs (c,l) ~new_goals:[]) tac)
   else
     Proofview.Goal.enter { enter = begin fun gl ->
       let sigma = Tacmach.New.project gl in
@@ -516,7 +517,12 @@ let general_rewrite_clause l2r with_evars ?tac c cl =
 	  | [] -> tclZEROMSG (Pp.str"Nothing to rewrite.")
 	  | id :: l ->
 	    tclIFTHENTRYELSEMUST
+<<<<<<< HEAD
 	     (general_rewrite_ebindings_in l2r AllOccurrences false true ?tac id c with_evars)
+=======
+	      (general_rewrite_ebindings_in l2r (AllOccurrences true) ?pat
+                                            false true ?tac id c with_evars)
+>>>>>>> 7c9694c... Add an "atleast" boolean value to AllOccs
 	     (do_hyps_atleastonce l)
 	in
 	let do_hyps =
@@ -572,8 +578,15 @@ let general_multi_rewrite with_evars l cl tac =
           (tclTHEN (doN l2r c m) (apply_special_clear_request clear_flag c)) (loop l)
   in loop l
 
+<<<<<<< HEAD
 let rewriteLR = general_rewrite true AllOccurrences true true
 let rewriteRL = general_rewrite false AllOccurrences true true
+=======
+let rewriteLR = general_rewrite true (AllOccurrences true)
+				~pat:default_pat true true
+let rewriteRL = general_rewrite false (AllOccurrences true)
+				~pat:default_pat true true
+>>>>>>> 7c9694c... Add an "atleast" boolean value to AllOccs
 
 (* Replacing tactics *)
 
@@ -584,15 +597,16 @@ let init_setoid () =
   if is_dirpath_prefix_of classes_dirpath (Lib.cwd ()) then ()
   else Coqlib.check_required_library ["Coq";"Setoids";"Setoid"]
 
-let check_setoid cl = 
+let check_setoid cl =
+  let concloccs = Locusops.occurrences_map (fun x -> x) cl.concl_occs in
   Option.fold_left
-    ( List.fold_left 
+    (List.fold_left
 	(fun b ((occ,_),_) -> 
-	  b||(Locusops.occurrences_map (fun x -> x) occ <> AllOccurrences)
+	  b||(not (Locusops.is_all_occurrences (Locusops.occurrences_map (fun x -> x) occ)))
 	)
     )
-    ((Locusops.occurrences_map (fun x -> x) cl.concl_occs <> AllOccurrences) &&
-	(Locusops.occurrences_map (fun x -> x) cl.concl_occs <> NoOccurrences))
+    (not (Locusops.is_all_occurrences concloccs) &&
+     (concloccs <> NoOccurrences))
     cl.onhyps
 
 let replace_core clause l2r eq =
@@ -1702,7 +1716,7 @@ let subst_one dep_proof_ok x (hyp,rhs,dir) =
   tclTHENLIST
     ((if need_rewrite then
       [revert (List.map snd dephyps);
-       general_rewrite dir AllOccurrences true dep_proof_ok (mkVar hyp);
+       general_rewrite dir (AllOccurrences true) true dep_proof_ok (mkVar hyp);
        (tclMAP (fun (dest,id) -> intro_move (Some id) dest) dephyps)]
       else
        [Proofview.tclUNIT ()]) @

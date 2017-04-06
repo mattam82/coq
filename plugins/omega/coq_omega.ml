@@ -151,7 +151,7 @@ let exists_tac c = constructor_tac false (Some 1) 1 (ImplicitBindings [c])
 let generalize_tac t = generalize t
 let elim t = simplest_elim t
 let exact t = Tacmach.refine t
-let unfold s = Tactics.unfold_in_concl [Locus.AllOccurrences, Lazy.force s]
+let unfold s = Tactics.unfold_in_concl [Locus.AllOccurrences false, Lazy.force s]
 
 let rev_assoc k =
   let rec loop = function

@@ -1090,7 +1090,7 @@ let unfoldoccs env sigma (occs,name) c =
   in
   match occs with
     | NoOccurrences -> c
-    | AllOccurrences -> unfold env sigma name c
+    | AllOccurrences _ -> unfold env sigma name c
     | OnlyOccurrences l -> unfo true l
     | AllOccurrencesBut l -> unfo false l
 

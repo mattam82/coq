@@ -14,7 +14,7 @@ open Misctypes
 (** {6 Occurrences} *)
 
 type 'a occurrences_gen =
-  | AllOccurrences
+  | AllOccurrences of bool (** At least one? *)
   | AllOccurrencesBut of 'a list (** non-empty *)
   | NoOccurrences
   | OnlyOccurrences of 'a list (** non-empty *)

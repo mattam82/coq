@@ -186,7 +186,7 @@ let map_int_or_var f = function
   | ArgArg x -> ArgArg (f x)
   | ArgVar _ as y -> y
 
-let all_concl_occs_clause = { onhyps=Some[]; concl_occs=AllOccurrences }
+let all_concl_occs_clause = { onhyps=Some[]; concl_occs=AllOccurrences false }
 
 let merge_occurrences loc cl = function
   | None ->
@@ -195,12 +195,12 @@ let merge_occurrences loc cl = function
 	user_err_loc (loc,"",str "Found an \"at\" clause without \"with\" clause.")
   | Some (occs, p) ->
     let ans = match occs with
-    | AllOccurrences -> cl
+    | AllOccurrences _ -> cl
     | _ ->
       begin match cl with
-      | { onhyps = Some []; concl_occs = AllOccurrences } ->
+      | { onhyps = Some []; concl_occs = AllOccurrences atleast } ->
         { onhyps = Some []; concl_occs = occs }
-      | { onhyps = Some [(AllOccurrences, id), l]; concl_occs = NoOccurrences } ->
+      | { onhyps = Some [(AllOccurrences _, id), l]; concl_occs = NoOccurrences } ->
         { cl with onhyps = Some [(occs, id), l] }
       | _ ->
         if Locusops.clause_with_generic_occurrences cl then
@@ -257,7 +257,7 @@ GEXTEND Gram
   ;
   conversion:
     [ [ c = constr -> (None, c)
-      | c1 = constr; "with"; c2 = constr -> (Some (AllOccurrences,c1),c2)
+      | c1 = constr; "with"; c2 = constr -> (Some (AllOccurrences true,c1),c2)
       | c1 = constr; "at"; occs = occs_nums; "with"; c2 = constr ->
           (Some (occs,c1), c2) ] ]
   ;
@@ -268,7 +268,7 @@ GEXTEND Gram
 	   AllOccurrencesBut (List.map (map_int_or_var abs) (n::nl)) ] ]
   ;
   occs:
-    [ [ "at"; occs = occs_nums -> occs | -> AllOccurrences ] ]
+    [ [ "at"; occs = occs_nums -> occs | -> AllOccurrences true ] ]
   ;
   pattern_occ:
     [ [ c = constr; nl = occs -> (nl,c) ] ]
@@ -413,7 +413,7 @@ GEXTEND Gram
   ;
   clause_dft_all:
     [ [ "in"; cl = in_clause -> cl
-      | -> {onhyps=None; concl_occs=AllOccurrences} ] ]
+      | -> {onhyps=None; concl_occs=AllOccurrences false} ] ]
   ;
   opt_clause:
     [ [ "in"; cl = in_clause -> Some cl
@@ -581,9 +581,9 @@ GEXTEND Gram
 	  TacAtom (!@loc, TacAssert (false,Some tac,ipat,c))
 
       | IDENT "generalize"; c = constr ->
-	  TacAtom (!@loc, TacGeneralize [((AllOccurrences,c),Names.Anonymous)])
+	  TacAtom (!@loc, TacGeneralize [((AllOccurrences false,c),Names.Anonymous)])
       | IDENT "generalize"; c = constr; l = LIST1 constr ->
-	  let gen_everywhere c = ((AllOccurrences,c),Names.Anonymous) in
+	  let gen_everywhere c = ((AllOccurrences false,c),Names.Anonymous) in
           TacAtom (!@loc, TacGeneralize (List.map gen_everywhere (c::l)))
       | IDENT "generalize"; c = constr; lookup_at_as_comma; nl = occs;
           na = as_name;

@@ -912,7 +912,7 @@ let compute_dec_tact ind lnamesparrec nparrec =
                   Auto.default_auto
 		]);
 	      Equality.general_rewrite_bindings_in true
-	                      Locus.AllOccurrences true false
+	                      (Locus.AllOccurrences false) true false
                               (List.hd !avoid)
                               ((mkVar (List.hd (List.tl !avoid))),
                                 NoBindings

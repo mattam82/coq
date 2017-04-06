@@ -171,7 +171,7 @@ and e_my_find_search db_list local_db hdc concl =
         | Res_pf_THEN_trivial_fail (term,cl) ->
           Tacticals.New.tclTHEN (unify_e_resolve poly st (term,cl))
             (e_trivial_fail_db db_list local_db)
-        | Unfold_nth c -> reduce (Unfold [AllOccurrences,c]) onConcl
+        | Unfold_nth c -> reduce (Unfold [AllOccurrences false,c]) onConcl
         | Extern tacast -> conclPattern concl p tacast
        in
        let tac = run_hint t tac in
@@ -436,8 +436,8 @@ let autounfolds db occs cls gl =
     let (ids, csts) = Hint_db.unfolds db in
     let hyps = pf_ids_of_hyps gl in
     let ids = Idset.filter (fun id -> List.mem id hyps) ids in
-      Cset.fold (fun cst -> cons (AllOccurrences, EvalConstRef cst)) csts
-	(Id.Set.fold (fun id -> cons (AllOccurrences, EvalVarRef id)) ids [])) db)
+      Cset.fold (fun cst -> cons (AllOccurrences false, EvalConstRef cst)) csts
+	(Id.Set.fold (fun id -> cons (AllOccurrences false, EvalVarRef id)) ids [])) db)
   in Proofview.V82.of_tactic (unfold_option unfolds cls) gl
 
 let autounfold db cls =

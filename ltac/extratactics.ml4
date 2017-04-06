@@ -244,11 +244,11 @@ TACTIC EXTEND rewrite_star
 | [ "rewrite" "*" orient(o) uconstr(c) "at" occurrences(occ) "in" hyp(id) by_arg_tac(tac) ] ->
     [ rewrite_star ist (Some id) o (occurrences_of occ) c tac ]
 | [ "rewrite" "*" orient(o) uconstr(c) "in" hyp(id) by_arg_tac(tac) ] ->
-    [ rewrite_star ist (Some id) o Locus.AllOccurrences c tac ]
+    [ rewrite_star ist (Some id) o (Locus.AllOccurrences false) c tac ]
 | [ "rewrite" "*" orient(o) uconstr(c) "at" occurrences(occ) by_arg_tac(tac) ] ->
     [ rewrite_star ist None o (occurrences_of occ) c tac ]
 | [ "rewrite" "*" orient(o) uconstr(c) by_arg_tac(tac) ] ->
-    [ rewrite_star ist None o Locus.AllOccurrences c tac ]
+    [ rewrite_star ist None o (Locus.AllOccurrences false) c tac ]
     END
 
 (**********************************************************************)
@@ -711,8 +711,12 @@ exception Found of unit Proofview.tactic
 let rewrite_except h =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
   let hyps = Tacmach.New.pf_ids_of_hyps gl in
-  Tacticals.New.tclMAP (fun id -> if Id.equal id h then Proofview.tclUNIT () else 
-      Tacticals.New.tclTRY (Equality.general_rewrite_in true Locus.AllOccurrences true true id (mkVar h) false))
+  Tacticals.New.tclMAP
+    (fun id ->
+       if Id.equal id h then Proofview.tclUNIT () else 
+       Tacticals.New.tclTRY
+       (Equality.general_rewrite_in true
+         (Locus.AllOccurrences false) true true id (mkVar h) false))
     hyps
   end }
 

@@ -485,8 +485,8 @@ let interp_hyp_location ist env sigma ((occs,id),hl) =
 
 let interp_hyp_location_list_as_list ist env sigma ((occs,id),hl as x) =
   match occs,hl with
-  | AllOccurrences,InHyp ->
-      List.map (fun id -> ((AllOccurrences,id),InHyp))
+  | AllOccurrences atleast,InHyp ->
+      List.map (fun id -> ((AllOccurrences atleast,id),InHyp))
         (interp_hyp_list_as_list ist env sigma id)
   | _,_ -> [interp_hyp_location ist env sigma x]
 
@@ -755,8 +755,8 @@ let interp_closed_typed_pattern_with_occurrences ist env sigma (occs, a) =
 
 let interp_constr_with_occurrences_and_name_as_list =
   interp_constr_in_compound_list
-    (fun c -> ((AllOccurrences,c),Anonymous))
-    (function ((occs,c),Anonymous) when occs == AllOccurrences -> c
+    (fun c -> ((AllOccurrences false,c),Anonymous))
+    (function ((occs,c),Anonymous) when Locusops.is_all_occurrences occs -> c
       | _ -> raise Not_found)
     (fun ist env sigma (occ_c,na) ->
       let (sigma,c_interp) = interp_constr_with_occurrences ist env sigma occ_c in
@@ -1839,7 +1839,7 @@ and interp_atomic ist tac : unit Proofview.tactic =
           | _ -> false
         in
         let is_onconcl = match cl.concl_occs with
-          | AllOccurrences | NoOccurrences -> true
+          | AllOccurrences _ | NoOccurrences -> true
           | _ -> false
         in
         let c_interp patvars = { Sigma.run = begin fun sigma ->

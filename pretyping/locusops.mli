@@ -19,6 +19,8 @@ val convert_occs : occurrences -> bool * int list
 
 val is_selected : int -> occurrences -> bool
 
+val is_all_occurrences : 'a occurrences_gen -> bool
+
 (** Usual clauses *)
 
 val allHypsAndConcl : 'a clause_expr
@@ -30,7 +32,7 @@ val onHyp : 'a -> 'a clause_expr
 (** Tests *)
 
 val is_nowhere : 'a clause_expr -> bool
-
+				   
 (** Clause conversion functions, parametrized by a hyp enumeration function *)
 
 val simple_clause_of : (unit -> Id.t list) -> clause -> simple_clause

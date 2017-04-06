@@ -110,7 +110,7 @@ let abstract_list_all env evd typ c l =
   evd,(p,typp)
 
 let set_occurrences_of_last_arg args =
-  Some AllOccurrences :: List.tl (Array.map_to_list (fun _ -> None) args)
+  Some (AllOccurrences false) :: List.tl (Array.map_to_list (fun _ -> None) args)
 
 let abstract_list_all_with_dependencies env evd typ c l =
   let evd = Sigma.Unsafe.of_evar_map evd in
@@ -1605,7 +1605,7 @@ let make_abstraction_core name (test,out) env sigma c ty occs check_occs concl =
             ++ str ".")
         else
           (push_named_context_val d sign,depdecls)
-    | AllOccurrences, InHyp as occ ->
+    | AllOccurrences _, InHyp as occ ->
         let occ = if likefirst then LikeFirst else AtOccs occ in
         let newdecl = replace_term_occ_decl_modulo occ test mkvarid d in
         if Context.Named.Declaration.equal d newdecl

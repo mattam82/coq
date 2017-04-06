@@ -276,7 +276,7 @@ let tclUSER tac is_mes l g =
       if is_mes
       then observe_tclTHENLIST (str "tclUSER2")
         [
-	  Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences, evaluable_of_global_reference
+	  Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences false, evaluable_of_global_reference
             (delayed_force Indfun_common.ltof_ref))]);
          tac
 	 ]
@@ -867,7 +867,7 @@ let rec make_rewrite_list expr_info max = function
 	    let def_na,_,_ = destProd t in
 	    Nameops.out_name k_na,Nameops.out_name def_na
 	  in
-	  Proofview.V82.of_tactic (general_rewrite_bindings false Locus.AllOccurrences
+	  Proofview.V82.of_tactic (general_rewrite_bindings false (Locus.AllOccurrences false)
 	    true (* dep proofs also: *) true 
 	    (mkVar hp,
 	     ExplicitBindings[Loc.ghost,NamedHyp def,
@@ -894,7 +894,7 @@ let make_rewrite expr_info l hp max =
 	    Nameops.out_name k_na,Nameops.out_name def_na
 	  in
 	 observe_tac (str "general_rewrite_bindings")
-	   (Proofview.V82.of_tactic (general_rewrite_bindings false Locus.AllOccurrences
+	   (Proofview.V82.of_tactic (general_rewrite_bindings false (Locus.AllOccurrences false)
 	    true (* dep proofs also: *) true 
 	    (mkVar hp,
 	     ExplicitBindings[Loc.ghost,NamedHyp def,
@@ -1426,7 +1426,7 @@ let start_equation (f:global_reference) (term_f:global_reference)
   let x = n_x_id ids nargs in
   observe_tac (str "start_equation") (observe_tclTHENLIST (str "start_equation") [
     h_intros x;
-    Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences, evaluable_of_global_reference f)]);
+    Proofview.V82.of_tactic (unfold_in_concl [(Locus.AllOccurrences false, evaluable_of_global_reference f)]);
     observe_tac (str "simplest_case")
       (Proofview.V82.of_tactic (simplest_case (mkApp (terminate_constr,
                              Array.of_list (List.map mkVar x)))));
