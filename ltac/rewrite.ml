@@ -1647,7 +1647,7 @@ let cl_rewrite_clause_aux ?(abs=None) debug strat env avoid sigma concl is_hyp
 	  Evar.Set.fold
 	    (fun ev acc ->
 	      if not (Evd.is_defined acc ev) then
-	        user_err ~hdr:"rewrite"
+	        errorlabstrm "rewrite"
 		         (str "Unsolved constraint remaining: " ++ spc () ++
 			    Evd.pr_evar_info (Evd.find acc ev))
 	      else Evd.remove acc ev)

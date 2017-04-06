@@ -110,7 +110,7 @@ let pr_strategy _ _ _ (s : strategy) = Pp.str "<strategy>"
 
 let pr_raw_strategy prc prlc prj (s : raw_strategy) =
   let prr = Pptactic.pr_red_expr (prc, prlc,
-                                  Pputils.pr_or_by_notation Libnames.pr_reference,
+                                  Pptactic.pr_or_by_notation Libnames.pr_reference,
                                   prc) in
   Rewrite.pr_strategy (pr_constr_expr_with_bindings prc prlc prj) prr s
   
