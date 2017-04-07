@@ -1013,7 +1013,10 @@ type 'a is_fix = IsFix of fixpoint * 'a definition_entry
               | IsParam of parameter_entry
                              
 let typecheck_fixl env kn mbs fixl =
-  let subst = Inductive.ind_subst kn mbs Univ.Instance.empty in
+  let poly = mbs.mind_polymorphic in
+  let u = if poly then Univ.UContext.instance mbs.mind_universes
+          else Univ.Instance.empty in
+  let subst = Inductive.ind_subst kn mbs u in
   let fixenv = Environ.add_mind kn mbs [] env in
   let open Context.Named.Declaration in
   let subst_entry ce =

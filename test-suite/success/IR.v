@@ -150,6 +150,7 @@ fix blas (x : nat) : Set :=
   | S n => (bla * blas n)
   end.
 
+
 Section blaind.
 
   
@@ -191,3 +192,21 @@ fix F (n : nat) : Type :=
 
 Eval compute in ty.
 
+Module Poly.
+  Set Universe Polymorphism.
+
+Inductive Unit : Set :=
+    tt : Unit.
+
+Inductive foo : Type :=
+| base
+
+fix eval (Γ : foo) : Type :=
+       match Γ with
+       | base => Unit
+
+       end.
+
+Check eval.
+
+End Poly.
