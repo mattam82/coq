@@ -16,13 +16,11 @@ Module WithNamed.
 Section elim.
     Variables 
       (ConM : Con -> Set)
-      (TyM : forall Γ, ConM Γ -> Ty Γ -> Set).
-    Variables
-      
-     (f : ConM empty)
-               (f1 : forall (x : Con) (x0 : ConM x) (x1 : Ty x) (x2 : TyM x x0 x1), ConM (ext x x1))
-               (f2 : forall x (x0 : ConM x), TyM x x0 (Uunit x))
-               (f3 : forall Γ A B pΓ pa, TyM _ (f1 _ pΓ _ pa) B -> TyM Γ pΓ (Upi _ A B)).
+      (TyM : forall Γ, ConM Γ -> Ty Γ -> Set)
+      (f : ConM empty)
+      (f1 : forall (x : Con) (x0 : ConM x) (x1 : Ty x) (x2 : TyM x x0 x1), ConM (ext x x1))
+      (f2 : forall x (x0 : ConM x), TyM x x0 (Uunit x))
+      (f3 : forall Γ A B pΓ pa, TyM _ (f1 _ pΓ _ pa) B -> TyM Γ pΓ (Upi _ A B)).
 
   Definition con_elim :=
       fix F (c : Con) : ConM c :=
