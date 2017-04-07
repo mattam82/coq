@@ -607,10 +607,10 @@ let rec to_constr constr_fun lfts v =
 		Array.map (fun b -> constr_fun lfts (mk_clos env b)) ve)
     | FFix ((op,(lna,tys,bds)),e) ->
         let n = Array.length bds in
-        let ftys = CArray.Fun1.map mk_clos e tys in
+        let ftys = CArray.mapi (fun i -> mk_clos (subs_liftn i e)) tys in
         let fbds = CArray.Fun1.map mk_clos (subs_liftn n e) bds in
 	let lfts' = el_liftn n lfts in
-	mkFix (op, (lna, CArray.Fun1.map constr_fun lfts ftys,
+	mkFix (op, (lna, CArray.mapi (fun i -> constr_fun (el_liftn i lfts)) ftys,
 		         CArray.Fun1.map constr_fun lfts' fbds))
     | FCoFix ((op,(lna,tys,bds)),e) ->
         let n = Array.length bds in
@@ -1026,7 +1026,7 @@ and norm_head info m =
             CArray.Fun1.map mk_clos (subs_liftn (Array.length na) e) bds in
           mkCoFix(n,(na, CArray.Fun1.map kl info ftys, CArray.Fun1.map kl info fbds))
       | FFix((n,(na,tys,bds)),e) ->
-          let ftys = CArray.Fun1.map mk_clos e tys in
+          let ftys = CArray.mapi (fun i -> mk_clos (subs_liftn i e)) tys in
           let fbds =
             CArray.Fun1.map mk_clos (subs_liftn (Array.length na) e) bds in
           mkFix(n,(na, CArray.Fun1.map kl info ftys, CArray.Fun1.map kl info fbds))

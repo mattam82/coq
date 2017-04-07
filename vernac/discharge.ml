@@ -36,7 +36,14 @@ let detype_param =
      I1..Ip:(B1 y1..yq)..(Bp y1..yq) |- ci : (y1..yq:C1..Cq)Ti[Ij:=(Ij y1..yq)]
 *)
 
-let abstract_inductive hyps nparams inds =
+let abstract_constructors mind i lc =
+  let rec aux k c =
+    match kind_of_term c with
+    | Construct ((ind, i), u) when eq_mind mind (fst ind) -> mkRel (succ k + i)
+    | _ -> map_constr_with_binders succ aux k c
+  in aux 0 lc
+                
+let abstract_inductive mind hyps nparams inds =
   let ntyp = List.length inds in
   let nhyp = Context.Named.length hyps in
   let args = Context.Named.to_instance mkVar (List.rev hyps) in
@@ -45,7 +52,7 @@ let abstract_inductive hyps nparams inds =
   let inds' =
     List.map
       (function (tname,arity,template,cnames,lc) ->
-	let lc' = List.map (substl subs) lc in
+        let lc' = List.map (substl subs) lc in
 	let lc'' = List.map (fun b -> Termops.it_mkNamedProd_wo_LetIn b hyps) lc' in
 	let arity' = Termops.it_mkNamedProd_wo_LetIn arity hyps in
         (tname,arity',template,cnames,lc''))
@@ -66,7 +73,9 @@ let abstract_inductive hyps nparams inds =
 	mind_entry_arity = short_arity;
 	mind_entry_template = template;
 	mind_entry_consnames = c;
-	mind_entry_lc = shortlc })
+	mind_entry_lc =
+          (* MS FIXME: Discharging of ind-ind defs is broken*)
+          List.mapi (fun i -> lift i) shortlc })
     inds'
   in (params',ind'')
 
@@ -77,7 +86,7 @@ let refresh_polymorphic_type_of_inductive (_,mip) =
     let ctx = List.rev mip.mind_arity_ctxt in
       mkArity (List.rev ctx, Type ar.template_level), true
 
-let process_inductive (sechyps,abs_ctx) modlist mib =
+let process_inductive (sechyps,abs_ctx) modlist mind mib =
   let nparams = mib.mind_nparams in
   let subst, univs = 
     if mib.mind_polymorphic then 
@@ -102,7 +111,7 @@ let process_inductive (sechyps,abs_ctx) modlist mib =
 	   Array.to_list lc))
       mib.mind_packets in
   let sechyps' = Context.Named.map (expmod_constr modlist) sechyps in
-  let (params',inds') = abstract_inductive sechyps' nparams inds in
+  let (params',inds') = abstract_inductive mind sechyps' nparams inds in
   let abs_ctx = Univ.instantiate_univ_context abs_ctx in
   let univs = Univ.UContext.union abs_ctx univs in
   let record = match mib.mind_record with

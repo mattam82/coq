@@ -111,7 +111,8 @@ val add_constant :
 (** Adding an inductive type *)
 
 val add_mind :
-  DirPath.t -> Label.t -> Entries.mutual_inductive_entry ->
+  DirPath.t -> Label.t -> Entries.mutual_inductive_entry -> 
+  (Names.Constant.t * private_constants Entries.constant_entry) list ->
     mutual_inductive safe_transformer
 
 (** Adding a module or a module type *)

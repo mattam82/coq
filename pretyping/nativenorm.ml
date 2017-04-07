@@ -326,7 +326,7 @@ and nf_atom_type env sigma atom =
       let name = Array.map (fun _ -> (Name (id_of_string "Fcofix"))) tt in
       let lvl = nb_rel env in
       let fargs = mk_rels_accu lvl (Array.length ft) in
-      let env = push_rec_types (name,tt,[||]) env in
+      let env = push_corec_types (name,tt,[||]) env in
       let ft = Array.mapi (fun i v -> nf_val env sigma (napply v fargs) tt.(i)) ft in
       mkCoFix(s,(name,tt,ft)), tt.(s)
   | Aprod(n,dom,codom) ->

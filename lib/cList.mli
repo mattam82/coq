@@ -88,6 +88,9 @@ sig
     ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
   val map4 : ('a -> 'b -> 'c -> 'd -> 'e) -> 'a list -> 'b list -> 'c list ->
     'd list -> 'e list
+  val rev_map2_i :
+    (int -> 'a -> 'b -> 'c) -> int -> 'a list -> 'b list -> 'c list
+    
   val filteri : (int -> 'a -> bool) -> 'a list -> 'a list
   val partitioni : (int -> 'a -> bool) -> 'a list -> 'a list * 'a list
 

@@ -517,11 +517,12 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
 	if Int.equal i1 i2 && Array.equal Int.equal op1 op2
 	then
 	  let n = Array.length cl1 in
-          let fty1 = Array.map (mk_clos e1) tys1 in
-          let fty2 = Array.map (mk_clos e2) tys2 in
+          let fty1 = Array.mapi (fun i -> mk_clos (subs_liftn i e1)) tys1 in
+          let fty2 = Array.mapi (fun i -> mk_clos (subs_liftn i e2)) tys2 in
           let fcl1 = Array.map (mk_clos (subs_liftn n e1)) cl1 in
           let fcl2 = Array.map (mk_clos (subs_liftn n e2)) cl2 in
-	  let cuniv = convert_vect l2r infos el1 el2 fty1 fty2 cuniv in
+	  let cuniv = convert_vect_i l2r infos (fun i -> el_liftn i el1)
+                                     (fun i -> el_liftn i el2) fty1 fty2 cuniv in
           let cuniv =
             convert_vect l2r infos
 	      (el_liftn n el1) (el_liftn n el2) fcl1 fcl2 cuniv in
@@ -566,6 +567,19 @@ and convert_vect l2r infos lft1 lft2 v1 v2 cuniv =
       if n >= lv1 then cuniv
       else
         let cuniv = ccnv CONV l2r infos lft1 lft2 v1.(n) v2.(n) cuniv in
+        fold (n+1) cuniv in
+    fold 0 cuniv
+  else raise NotConvertible
+
+and convert_vect_i l2r infos lft1 lft2 v1 v2 cuniv =
+  let lv1 = Array.length v1 in
+  let lv2 = Array.length v2 in
+  if Int.equal lv1 lv2
+  then
+    let rec fold n cuniv =
+      if n >= lv1 then cuniv
+      else
+        let cuniv = ccnv CONV l2r infos (lft1 n) (lft2 n) v1.(n) v2.(n) cuniv in
         fold (n+1) cuniv in
     fold 0 cuniv
   else raise NotConvertible

@@ -32,9 +32,9 @@ Type_errors
 Modops
 Inductive
 Typeops
-Indtypes
 Cooking
 Term_typing
+Indtypes
 Subtyping
 Mod_typing
 Nativelibrary

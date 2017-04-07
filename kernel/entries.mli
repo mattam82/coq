@@ -73,7 +73,7 @@ type 'a definition_entry = {
 type inline = int option (* inlining level, None for no inlining *)
 
 type parameter_entry = 
-    Context.Named.t option * bool * types Univ.in_universe_context * inline 
+    Context.Named.t option * bool (* polymorphic? *) * types Univ.in_universe_context * inline 
 
 type projection_entry = {
   proj_entry_ind : mutual_inductive;

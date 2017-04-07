@@ -11,4 +11,5 @@ open Entries
 open Opaqueproof
 
 val process_inductive :
-  Context.Named.t Univ.in_universe_context -> work_list -> mutual_inductive_body -> mutual_inductive_entry
+  Context.Named.t Univ.in_universe_context -> work_list ->
+  Names.mutual_inductive -> mutual_inductive_body -> mutual_inductive_entry

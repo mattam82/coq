@@ -892,10 +892,10 @@ let merge_inductive (ind1: inductive) (ind2: inductive)
   let indexpr = glob_constr_list_to_inductive_expr prms1 prms2 mib1 mib2 shift_prm rawlist in
   (* Declare inductive *)
   let indl,_,_ = Command.extract_mutual_inductive_declaration_components [(indexpr,[])] in
-  let mie,pl,impls = Command.interp_mutual_inductive indl []
-          false (*FIXMEnon-poly *) false (* means not private *) Decl_kinds.Finite (* means: not coinductive *) in
+  let mie,pl,impls,fixl = Command.interp_mutual_inductive indl []
+          [] false (*FIXMEnon-poly *) false (* means not private *) Decl_kinds.Finite (* means: not coinductive *) in
   (* Declare the mutual inductive block with its associated schemes *)
-  ignore (Command.declare_mutual_inductive_with_eliminations mie pl impls)
+  ignore (Command.declare_mutual_inductive_with_eliminations mie pl impls fixl)
 
 
 (* Find infos on identifier id. *)

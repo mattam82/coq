@@ -461,7 +461,7 @@ let add_field ((l,sfb) as field) gn senv =
   let senv = add_constraints_list cst senv in
   let env' = match sfb, gn with
     | SFBconst cb, C con -> Environ.add_constant con cb senv.env
-    | SFBmind mib, I mind -> Environ.add_mind mind mib senv.env
+    | SFBmind mib, I mind -> Environ.add_mind mind mib [] senv.env
     | SFBmodtype mtb, MT -> Environ.add_modtype mtb senv.env
     | SFBmodule mb, M -> Modops.add_module mb senv.env
     | _ -> assert false
@@ -541,14 +541,21 @@ let check_mind mie lab =
     (* The label and the first inductive type name should match *)
     assert (Id.equal (Label.to_id lab) oie.mind_entry_typename)
 
-let add_mind dir l mie senv =
+let add_mind dir l mie fixl senv =
   let () = check_mind mie l in
   let kn = make_mind senv.modpath dir l in
-  let mib = Term_typing.translate_mind senv.env kn mie in
+  let (mib, cbs) = Indtypes.translate_mind senv.env kn mie fixl in
   let mib =
     match mib.mind_hyps with [] -> Declareops.hcons_mind mib | _ -> mib
   in
-  kn, add_field (l,SFBmind mib) (I kn) senv
+     kn, add_field (l,SFBmind mib) (I kn) 
+                   (List.fold_left
+                      (fun senv (kn, fixl) ->
+                        add_field (Constant.label kn, SFBconst fixl)
+                                  (C kn)
+                                  senv)
+                      senv cbs)
+
 
 (** Insertion of module types *)
 

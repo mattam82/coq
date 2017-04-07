@@ -565,10 +565,6 @@ let translate_local_def mb env id centry =
   end;
   def, typ, univs
 
-(* Insertion of inductive types. *)
-
-let translate_mind env kn mie = Indtypes.check_inductive env kn mie
-
 let inline_entry_side_effects env ce = { ce with
   const_entry_body = Future.chain ~pure:true
     ce.const_entry_body (fun ((body, ctx), side_eff) ->

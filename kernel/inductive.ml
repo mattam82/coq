@@ -924,7 +924,7 @@ let check_one_fix renv recpos trees def =
               end
 		
         | Case (ci,p,c_0,lrest) ->
-            List.iter (check_rec_call renv []) (c_0::p::l);
+            List.iter (check_rec_call renv []) (c_0::(* p:: FIXME!*)l);
             (* compute the recarg information for the arguments of
                each branch *)
             let case_spec = branches_specif renv 
@@ -1157,7 +1157,7 @@ let check_one_cofix env nbfix def deftype =
             then
 	      if Array.for_all (noccur_with_meta n nbfix) varit then
 		let nbfix = Array.length vdefs in
-		let env' = push_rec_types recdef env in
+		let env' = push_corec_types recdef env in
 		(Array.iter (check_rec_call env' alreadygrd (n+nbfix) tree vlra) vdefs;
 		 List.iter (check_rec_call env alreadygrd n tree vlra) args)
               else
@@ -1203,7 +1203,7 @@ let check_cofix env (bodynum,(names,types,bodies as recdef)) =
   if flags.check_guarded then
     let nbfix = Array.length bodies in
     for i = 0 to nbfix-1 do
-      let fixenv = push_rec_types recdef env in
+      let fixenv = push_corec_types recdef env in
       try check_one_cofix fixenv nbfix bodies.(i) types.(i)
       with CoFixGuardError (errenv,err) ->
         error_ill_formed_rec_body errenv err names i

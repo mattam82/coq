@@ -64,9 +64,6 @@ val export_side_effects :
 val constant_entry_of_side_effect :
   constant_body -> seff_env -> side_effects constant_entry
 
-val translate_mind :
-  env -> mutual_inductive -> mutual_inductive_entry -> mutual_inductive_body
-
 val translate_recipe : env -> constant -> Cooking.recipe -> constant_body
 
 (** Internal functions, mentioned here for debug purpose only *)

@@ -64,6 +64,7 @@ val nb_rel           : env -> int
 val push_rel         : Context.Rel.Declaration.t -> env -> env
 val push_rel_context : Context.Rel.t -> env -> env
 val push_rec_types   : rec_declaration -> env -> env
+val push_corec_types : rec_declaration -> env -> env
 
 (** Looks up in the context of local vars referred by indice ([rel_context]) 
    raises [Not_found] if the index points out of the context *)
@@ -176,7 +177,8 @@ val is_projection : constant -> env -> bool
 
 (** {5 Inductive types } *)
 val add_mind_key : mutual_inductive -> Pre_env.mind_key -> env -> env
-val add_mind : mutual_inductive -> mutual_inductive_body -> env -> env
+val add_mind : mutual_inductive -> mutual_inductive_body -> 
+               (Names.Constant.t * constant_body) list -> env -> env
 
 (** Looks up in the context of global inductive names 
    raises [Not_found] if the required path is not found *)

@@ -622,7 +622,15 @@ let adjust_app_array_size f1 l1 f2 l2 =
    time being almost those of the ML representation (except for
    (co-)fixpoint) *)
 
-let fold_rec_types g (lna,typarray,_) e =
+let fold_rec_types g (lna,typarray,_) f e =
+  let open EConstr in
+  let open Vars in
+  Array.fold_map2' (fun na t e ->
+    let t' = f e t in
+    let decl = RelDecl.LocalAssum (na, t') in
+    t', g decl e) lna typarray e
+
+let fold_corec_types g (lna,typarray,_) e =
   let open EConstr in
   let open Vars in
   let ctxt = Array.map2_i (fun i na t -> RelDecl.LocalAssum (na, lift i t)) lna typarray in
@@ -692,13 +700,13 @@ let map_constr_with_binders_left_to_right sigma g f l c =
 	if b' == b && p' == p && bl' == bl then c
 	else mkCase (ci, p', b', bl')
   | Fix (ln,(lna,tl,bl as fx)) ->
-      let l' = fold_rec_types g fx l in
-      let (tl', bl') = map_left2 (f l) tl (f l') bl in
+      let tl', l' = fold_rec_types g fx f l in
+      let bl' = Array.map_left (f l') bl in
 	if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
 	then c
 	else mkFix (ln,(lna,tl',bl'))
   | CoFix(ln,(lna,tl,bl as fx)) ->
-      let l' = fold_rec_types g fx l in
+      let l' = fold_corec_types g fx l in
       let (tl', bl') = map_left2 (f l) tl (f l') bl in
 	if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
 	then c
@@ -745,9 +753,10 @@ let map_constr_with_full_binders sigma g f l cstr =
       if p==p' && c==c' && Array.for_all2 (==) bl bl' then cstr else
         mkCase (ci, p', c', bl')
   | Fix (ln,(lna,tl,bl)) ->
-      let tl' = Array.map (f l) tl in
-      let l' =
-        Array.fold_left2 (fun l na t -> g (LocalAssum (na, t)) l) l lna tl in
+      let tl',l' = Array.fold_map2' (fun na t l ->
+                       let t' = f l t in
+                       let decl = LocalAssum (na, t') in
+                       t', g decl l) lna tl l in
       let bl' = Array.map (f l') bl in
       if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
       then cstr
@@ -783,9 +792,12 @@ let fold_constr_with_full_binders sigma g f n acc c =
   | Evar (_,l) -> Array.fold_left (f n) acc l
   | Case (_,p,c,bl) -> Array.fold_left (f n) (f n (f n acc p) c) bl
   | Fix (_,(lna,tl,bl)) ->
-      let n' = CArray.fold_left2 (fun c n t -> g (LocalAssum (n, inj t)) c) n lna tl in
-      let fd = Array.map2 (fun t b -> (t,b)) tl bl in
-      Array.fold_left (fun acc (t,b) -> f n' (f n acc t) b) acc fd
+     let n', acc =
+       CArray.fold_left2 (fun (n, acc) na t ->
+           let acc' = f n acc t in
+           let decl = LocalAssum (na, inj t) in
+           g decl n, acc') (n,acc) lna tl in
+      Array.fold_left (f n') acc bl
   | CoFix (_,(lna,tl,bl)) ->
       let n' = CArray.fold_left2 (fun c n t -> g (LocalAssum (n, inj t)) c) n lna tl in
       let fd = Array.map2 (fun t b -> (t,b)) tl bl in
@@ -813,8 +825,7 @@ let iter_constr_with_full_binders g f l c =
   | Evar (_,args) -> Array.iter (f l) args
   | Case (_,p,c,bl) -> f l p; f l c; Array.iter (f l) bl
   | Fix (_,(lna,tl,bl)) ->
-      let l' = Array.fold_left2 (fun l na t -> g (LocalAssum (na,t)) l) l lna tl in
-      Array.iter (f l) tl;
+      let l' = Array.fold_left2 (fun l na t -> f l t; g (LocalAssum (na,t)) l) l lna tl in
       Array.iter (f l') bl
   | CoFix (_,(lna,tl,bl)) ->
       let l' = Array.fold_left2 (fun l na t -> g (LocalAssum (na,t)) l) l lna tl in

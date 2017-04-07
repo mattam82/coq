@@ -81,6 +81,10 @@ let push_rel = push_rel
 let push_rel_context ctxt x = Context.Rel.fold_outside push_rel ctxt ~init:x
 
 let push_rec_types (lna,typarray,_) env =
+  let ctxt = Array.map2 (fun na t -> LocalAssum (na, t)) lna typarray in
+  Array.fold_left (fun e assum -> push_rel assum e) env ctxt
+
+let push_corec_types (lna,typarray,_) env =
   let ctxt = Array.map2_i (fun i na t -> LocalAssum (na, lift i t)) lna typarray in
   Array.fold_left (fun e assum -> push_rel assum e) env ctxt
 
@@ -378,8 +382,11 @@ let add_mind_key kn mind_key env =
 	env_inductives = new_inds } in
   { env with env_globals = new_globals }
 
-let add_mind kn mib env =
-  let li = ref no_link_info in add_mind_key kn (mib, li) env
+let add_mind kn mib fixl env =
+  let li = ref no_link_info in
+  let env = add_mind_key kn (mib, li) env in
+  List.fold_left (fun env (n, dec) -> add_constant n dec env) env fixl 
+
 
 (* Lookup of section variables *)
 

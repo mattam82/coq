@@ -248,6 +248,11 @@ let push_rec_types pfix env =
   let inj c = EConstr.Unsafe.to_constr c in
   push_rec_types (i, Array.map inj c, Array.map inj t) env
 
+let push_corec_types pfix env =
+  let (i, c, t) = pfix in
+  let inj c = EConstr.Unsafe.to_constr c in
+  push_corec_types (i, Array.map inj c, Array.map inj t) env
+
 (* This function tries to unify 2 stacks element by element. It works
    from the end to the beginning. If it unifies a non empty suffix of
    stacks but not the entire stacks, the first part of the answer is
@@ -829,7 +834,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
                 [(fun i -> ise_array2 i
                     (fun i -> evar_conv_x ts env i CONV) tys1 tys2);
                  (fun i -> ise_array2 i
-		     (fun i -> evar_conv_x ts (push_rec_types recdef1 env) i CONV)
+		     (fun i -> evar_conv_x ts (push_corec_types recdef1 env) i CONV)
 		     bds1 bds2);
                  (fun i -> exact_ise_stack2 env i
                      (evar_conv_x ts) sk1 sk2)]

@@ -388,6 +388,18 @@ let process_inference_flags flags env initial_sigma (sigma,c) =
 (* Allow references to syntactically nonexistent variables (i.e., if applied on an inductive) *)
 let allow_anonymous_refs = ref false
 
+let evar_type_fixpoint loc env evdref lna lar vdefj =
+  let open Context.Rel.Declaration in
+  let lt = Array.length vdefj in
+  if Int.equal (Array.length lar) lt then
+    let env = ref env in
+      for i = 0 to lt-1 do
+        if not (e_cumul !env.ExtraEnv.env evdref (vdefj.(i)).uj_type
+		  lar.(i)) then
+          error_ill_typed_rec_body ~loc !env.ExtraEnv.env !evdref i lna vdefj lar
+        else env := push_rel !evdref (LocalAssum (lna.(i), lar.(i))) !env
+      done
+
 (* coerce to tycon if any *)
 let inh_conv_coerce_to_tycon resolve_tc loc env evdref j = function
   | None -> j
@@ -572,6 +584,20 @@ let (f_genarg_interp, genarg_interp_hook) = Hook.make ()
 (* in environment [env], with existential variables [evdref] and *)
 (* the type constraint tycon *)
 
+let nf_evar_context sigma ctx =
+  let open EConstr in
+  Context.Rel.map (Evarutil.nf_evar sigma) ctx
+
+let reset_with_named_context nctx env sigma =
+  let env = reset_with_named_context nctx env.ExtraEnv.env in
+  { env; extra = lazy (get_extra env sigma) }
+
+let nf_evar_env sigma env =
+  let ctx = EConstr.rel_context env.ExtraEnv.env in
+  let nctx = Environ.named_context_val env.ExtraEnv.env in
+  let ctx' = nf_evar_context sigma ctx in
+  push_rel_context sigma ctx' (reset_with_named_context nctx env sigma)
+
 let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdref (lvar : ltac_var_map) t =
   let inh_conv_coerce_to_tycon = inh_conv_coerce_to_tycon resolve_tc in
   let pretype_type = pretype_type k0 resolve_tc in
@@ -646,13 +672,19 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
         let dcl' = LocalDef (ltac_interp_name lvar na, bd'.uj_val, ty'.utj_val) in
 	  type_bl (push_rel !evdref dcl env) (Context.Rel.add dcl' ctxt) bl in
     let ctxtv = Array.map (type_bl env Context.Rel.empty) bl in
-    let larj =
-      Array.map2
-        (fun e ar ->
-          pretype_type empty_valcon (push_rel_context !evdref e env) evdref lvar ar)
-        ctxtv lar in
-    let lara = Array.map (fun a -> a.utj_val) larj in
-    let ftys = Array.map2 (fun e a -> it_mkProd_or_LetIn a e) ctxtv lara in
+
+    (* TODO: treat cofixpoints right *)
+    let ftys, (fixdecls, env_ar) =
+      CArray.fold_map3
+        (fun na bl ar (decls, env) ->
+          let arty =
+            pretype_type empty_valcon (push_rel_context !evdref bl env) evdref lvar ar
+          in
+          let ar = it_mkProd_or_LetIn arty.utj_val bl in
+          let decl = LocalAssum (Name na, ar) in
+          (ar, (decl :: decls, push_rel !evdref decl env)))
+        names ctxtv lar ([], env)
+    in
     let nbfix = Array.length lar in
     let names = Array.map (fun id -> Name id) names in
     let _ = 
@@ -664,25 +696,71 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
 	in e_conv env.ExtraEnv.env evdref ftys.(fixi) t
       | None -> true
     in
-      (* Note: bodies are not used by push_rec_types, so [||] is safe *)
-    let newenv = push_rec_types !evdref (names,ftys,[||]) env in
+    let bodies, fixdecls =
+      let bodies =
+        Array.mapi (fun i ty ->
+          let ty = 
+            (lift (nbfix - i)
+                    (get_type (Context.Rel.lookup (nbfix - i) fixdecls)))
+          in
+          let body = e_new_evar env_ar evdref ty in
+          body) ftys
+      in
+      let indexes =
+	match fixkind with
+        | GFix (vn,i) -> Array.mapi
+	                  (fun i (n,_) ->
+                            match n with
+		            | Some n -> n
+		            | None -> Context.Rel.length ctxtv.(i) - 1)
+	                  vn
+        | GCoFix _ -> (* MS: FIXME *)
+           Array.map (fun ctxt -> Context.Rel.length ctxt - 1) ctxtv
+      in
+      let mkfix i = lift i (mkFix ((indexes, i), (names, ftys, bodies))) in
+      let fixes = Array.init nbfix mkfix in
+      let ctx = Array.rev_to_list
+                  (Array.map2_i (fun i na fix -> LocalDef (na, fix, ftys.(i)))
+                                names fixes)
+      in
+      Array.map (fun x -> destEvar !evdref x) bodies, ctx
+    in
+    let env_ar = push_rel_context !evdref fixdecls env in
     let vdefj =
-      Array.map2_i
+      CArray.map2_i
 	(fun i ctxt def ->
              (* we lift nbfix times the type in tycon, because of
-	      * the nbfix variables pushed to newenv *)
+	      * the nbfix variables pushed to env_ar *)
           let (ctxt,ty) =
-	    decompose_prod_n_assum !evdref (Context.Rel.length ctxt)
-              (lift nbfix ftys.(i)) in
-          let nenv = push_rel_context !evdref ctxt newenv in
+	    decompose_prod_n_assum !evdref
+              (Context.Rel.length ctxt)
+              (lift (nbfix - i)
+                    (get_type (Context.Rel.lookup (nbfix - i) fixdecls))) in
+          (* ctxt, ty is in env_ar_decls *)
+          let env_ar = nf_evar_env !evdref env_ar in
+          let nenv = push_rel_context !evdref ctxt env_ar in
+          (* env, f_i : F_i, ctxt |- ty *)
           let j = pretype (mk_tycon ty) nenv evdref lvar def in
-	    { uj_val = it_mkLambda_or_LetIn j.uj_val ctxt;
-	      uj_type = it_mkProd_or_LetIn j.uj_type ctxt })
+          (* env, f_i : F_i, ctxt |- j *)
+          let uj_val = it_mkLambda_or_LetIn j.uj_val ctxt in
+          let uj_type = it_mkProd_or_LetIn j.uj_type ctxt in
+          (* env, f_i : F_i |- uj_val, uj_type *)
+          let uj_type = lift (i - nbfix) uj_type in
+          (* env, f_0..f_i-1 |- uj_type *)
+          let _, inst, _, _, _ =
+            push_rel_context_to_named_context env_ar.ExtraEnv.env !evdref uj_val in
+          let () = evdref := Evd.define (fst bodies.(i)) (EConstr.Unsafe.to_constr inst) !evdref in
+          let () = match Evarsolve.reconsider_conv_pbs
+                           (Evarconv.evar_conv_x full_transparent_state) !evdref with
+            | Evarsolve.Success evd -> evdref := evd
+            | _ -> ()
+          in
+          { uj_val; uj_type })
         ctxtv vdef in
+      let ftys = Array.map (nf_evar !evdref) ftys in
+      let vdefj = Array.map (fun x -> j_nf_evar !evdref x) vdefj in
       Typing.check_type_fixpoint loc env.ExtraEnv.env evdref names ftys vdefj;
-      let nf c = nf_evar !evdref c in
-      let ftys = Array.map nf ftys in (** FIXME *)
-      let fdefs = Array.map (fun x -> nf (j_val x)) vdefj in
+      let fdefs = Array.map j_val vdefj in
       let fixj = match fixkind with
 	| GFix (vn,i) ->
 	      (* First, let's find the guard indexes. *)
@@ -699,11 +777,13 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
 			     vn)
 	  in
 	  let fixdecls = (names,ftys,fdefs) in
-          let indexes =
-            search_guard
-              loc env.ExtraEnv.env possible_indexes (nf_fix !evdref fixdecls)
+	  let indexes = search_guard loc env.ExtraEnv.env possible_indexes (nf_fix !evdref fixdecls) in
+          let make_one i = mkFix ((indexes,i),fixdecls) in
+          let ty =
+            let substi = List.init i (fun k -> make_one (pred i - k)) in
+            substl substi ftys.(i)
           in
-	    make_judge (mkFix ((indexes,i),fixdecls)) ftys.(i)
+	  make_judge (make_one i) ty
 	| GCoFix i ->
           let fixdecls = (names,ftys,fdefs) in
 	  let cofix = (i, fixdecls) in

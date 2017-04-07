@@ -735,7 +735,7 @@ open Decl_kinds
         let assumptions = prlist_with_sep spc (fun p -> hov 1 (str "(" ++ pr_params p ++ str ")")) l in
         return (hov 2 (pr_assumption_token (n > 1) stre ++
                        pr_non_empty_arg pr_assumption_inline t ++ spc() ++ assumptions))
-      | VernacInductive (p,f,l) ->
+      | VernacInductive (p,f,l,_) -> (* FIXME *)
         let pr_constructor (coe,(id,c)) =
           hov 2 (pr_lident id ++ str" " ++
                    (if coe then str":>" else str":") ++

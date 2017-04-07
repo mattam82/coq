@@ -38,7 +38,9 @@ val add_constant :
   DirPath.t -> Id.t -> Safe_typing.global_declaration ->
     constant * Safe_typing.exported_private_constant list
 val add_mind :
-  DirPath.t -> Id.t -> Entries.mutual_inductive_entry -> mutual_inductive
+  DirPath.t -> Id.t -> Entries.mutual_inductive_entry ->
+  (Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list ->
+  mutual_inductive
 
 (** Extra universe constraints *)
 val add_constraints : Univ.constraints -> unit

@@ -349,7 +349,7 @@ and nf_cofix env sigma cf =
   let ndef = Array.length vt in
   let cft = Array.map (fun v -> nf_val env sigma v crazy_type) vt in
   let name = Array.init ndef (fun _ -> (Name (Id.of_string "Fcofix"))) in
-  let env = push_rec_types (name,cft,cft) env in
+  let env = push_corec_types (name,cft,cft) env in
   let cfb = Util.Array.map2 (fun v t -> nf_val env sigma v t) vb cft in
   mkCoFix (init,(name,cft,cfb))
 

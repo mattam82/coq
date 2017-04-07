@@ -354,6 +354,7 @@ and execute_type env constr =
   snd (type_judgment env (constr,j))
 
 and execute_recdef env (names,lar,vdef) i =
+  (* FIXME: adapt to ind-ind *)
   let larj = execute_array env lar in
   let larj = Array.map2 (fun c ty -> c,ty) lar larj in
   let lara = Array.map (assumption_of_judgment env) larj in

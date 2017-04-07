@@ -310,7 +310,7 @@ let iter_with_binders g f n c = match kind c with
   | Case (_,p,c,bl) -> f n p; f n c; CArray.Fun1.iter f n bl
   | Proj (p,c) -> f n c
   | Fix (_,(_,tl,bl)) ->
-      CArray.Fun1.iter f n tl;
+      CArray.iteri (fun i -> f (iterate g i n)) tl;
       CArray.Fun1.iter f (iterate g (Array.length tl) n) bl
   | CoFix (_,(_,tl,bl)) ->
       CArray.Fun1.iter f n tl;
@@ -480,7 +480,7 @@ let map_with_binders g f l c0 = match kind c0 with
     if p' == p && c' == c && bl' == bl then c0
     else mkCase (ci, p', c', bl')
   | Fix (ln, (lna, tl, bl)) ->
-    let tl' = CArray.Fun1.smartmap f l tl in
+    let tl' = CArray.smartmapi (fun i -> f (iterate g i l)) tl in
     let l' = iterate g (Array.length tl) l in
     let bl' = CArray.Fun1.smartmap f l' bl in
     if tl' == tl && bl' == bl then c0

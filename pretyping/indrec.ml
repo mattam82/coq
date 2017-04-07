@@ -423,7 +423,7 @@ let mis_make_indrec env sigma listdepkind mib u =
             let fixtyi = Array.of_list (List.rev ltyp) in
             let fixdef = Array.of_list (List.rev ldef) in
             let names = Array.make nrec (Name(Id.of_string "F")) in
-	      mkFix ((fixn,p),(names,fixtyi,fixdef))
+	      mkFix ((fixn,p),(names,Array.mapi lift fixtyi,fixdef))
       in
 	mrec 0 [] [] []
     in

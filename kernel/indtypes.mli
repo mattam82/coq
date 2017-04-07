@@ -34,7 +34,9 @@ exception InductiveError of inductive_error
 
 (** The following function does checks on inductive declarations. *)
 
-val check_inductive : env -> mutual_inductive -> mutual_inductive_entry -> mutual_inductive_body
+val translate_mind : env -> mutual_inductive -> mutual_inductive_entry ->
+                      (Constant.t * Term_typing.side_effects constant_entry) list -> 
+		      mutual_inductive_body * (Names.Constant.t * constant_body) list
 
 (** The following enforces a system compatible with the univalent model *)
 

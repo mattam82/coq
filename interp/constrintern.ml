@@ -1533,8 +1533,13 @@ let internalize globalenv env allow_patvar (_, ntnvars as lvar) c =
           with Not_found ->
 	    raise (InternalizationError (locid,UnboundFixName (false,iddef)))
 	in
-	let idl_temp = Array.map
-          (fun (id,(n,order),bl,ty,_) ->
+        let push_decls decls env =
+          List.fold_left (fun env (impls, na) ->
+              push_name_env ntnvars impls env na)
+            env decls
+        in
+	let fixdecls, idl_temp = Array.fold_map
+          (fun decls (id,(n,order),bl,ty,_) ->
 	     let intern_ro_arg f =
 	       let before, after = split_at_annot bl n in
 	       let (env',rbefore) = List.fold_left intern_local_binder (env,[]) before in
@@ -1552,14 +1557,19 @@ let internalize globalenv env allow_patvar (_, ntnvars as lvar) c =
 		   intern_ro_arg (fun f -> GMeasureRec (f m, Option.map f r))
 	     in
 	     let bl = List.rev (List.map glob_local_binder_of_extended rbl) in
-             ((n, ro), bl, intern_type env' ty, env')) dl in
-        let idl = Array.map2 (fun (_,_,_,_,bd) (a,b,c,env') ->
-	     let env'' = List.fold_left_i (fun i en name -> 
-					     let (_,bli,tyi,_) = idl_temp.(i) in
-					     let fix_args = (List.map (fun (na, bk, _, _) -> (build_impls bk na)) bli) in
-					       push_name_env ntnvars (impls_type_list ~args:fix_args tyi)
-					    en (Loc.ghost, Name name)) 0 env' lf in
-             (a,b,c,intern {env'' with tmp_scope = None} bd)) dl idl_temp in
+             let tyi = intern_type (push_decls decls env') ty in
+	     let fix_args = List.map (fun (na, bk, _, _) -> build_impls bk na) bl in
+             let impls = impls_type_list ~args:fix_args tyi in
+             let na = (fst id, Name (snd id)) in
+             let fixdecl = (impls, na) in
+	     (fixdecl :: decls, ((n, ro), bl, tyi, env'))) [] dl 
+        in
+        let idl =
+          Array.map2 (fun (_,_,_,_,bd) (a,b,c,env') ->
+              let env'' = push_decls fixdecls env' in
+	      (a,b,c,intern {env'' with tmp_scope = None} bd))
+                     dl idl_temp
+        in
 	GRec (loc,GFix
 	      (Array.map (fun (ro,_,_,_) -> ro) idl,n),
               Array.of_list lf,

@@ -149,10 +149,12 @@ GEXTEND Gram
           VernacDefinition ((Some Discharge, Definition), (id, None), b)
       (* Gallina inductive declarations *)
       | priv = private_token; f = finite_token;
-        indl = LIST1 inductive_definition SEP "with" ->
+        ind0 = inductive_definition ;  
+        defs = LIST0 [ "fix"; r = rec_definition -> Inr r | "with" ; i = inductive_definition -> Inl i ]  ->
 	  let (k,f) = f in
-	  let indl=List.map (fun ((a,b,c,d),e) -> ((a,b,c,k,d),e)) indl in
-          VernacInductive (priv,f,indl)
+          let fix=List.map_filter (function Inr r -> Some r | Inl i -> None) defs in
+	  let indl= List.map_filter (function Inl ((a,b,c,d),e) -> Some ((a,b,c,k,d),e) | Inr _ -> None) (Inl ind0 :: defs) in
+          VernacInductive (priv,f,indl,fix)
       | "Fixpoint"; recs = LIST1 rec_definition SEP "with" ->
           VernacFixpoint (None, recs)
       | IDENT "Let"; "Fixpoint"; recs = LIST1 rec_definition SEP "with" ->

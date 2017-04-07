@@ -327,7 +327,7 @@ let check_fixpoint env lna lar vdef vdeft =
   let lt = Array.length vdeft in
   assert (Int.equal (Array.length lar) lt);
   try
-    conv_leq_vecti env vdeft (Array.map (fun ty -> lift lt ty) lar)
+    conv_leq_vecti env vdeft (Array.mapi (fun i ty -> lift (lt - i) ty) lar)
   with NotConvertibleVect i ->
     error_ill_typed_rec_body env i lna (make_judgev vdef vdeft) lar
 
@@ -419,9 +419,13 @@ let rec execute env cstr =
           type_of_case env ci p pt c ct lf lft
 
     | Fix ((vn,i as vni),recdef) ->
-      let (fix_ty,recdef') = execute_recdef env recdef i in
+      let (fix_ty,recdef') = execute_recdef ~vn env recdef i in
       let fix = (vni,recdef') in
-        check_fix env fix; fix_ty
+      let () = check_fix env fix in
+      let fix_ty =
+        let substi = List.init i (fun k -> mkFix ((vn,pred i - k),recdef')) in
+        substl substi fix_ty
+      in fix_ty
 	  
     | CoFix (i,recdef) ->
       let (fix_ty,recdef') = execute_recdef env recdef i in
@@ -439,13 +443,22 @@ and execute_is_type env constr =
   let t = execute env constr in
     check_type env constr t
 
-and execute_recdef env (names,lar,vdef) i =
-  let lart = execute_array env lar in
-  let lara = Array.map2 (check_assumption env) lar lart in
-  let env1 = push_rec_types (names,lara,vdef) env in
+and execute_recdef ?vn env (names,lar,vdef as fixdecl) i =
+  let open Context.Rel.Declaration in
+  let mkfix na i =
+    match vn with
+    | None -> LocalAssum (na, lar.(i))
+    | Some indexes -> LocalDef (na, mkFix ((indexes, i), fixdecl), lar.(i))
+  in
+  let lara,env1 =
+    CArray.fold_map2_i (fun i na ar env ->
+        let art = execute env ar in
+        let env' = push_rel (mkfix na i) env in
+        let decl = check_assumption env ar art in
+        decl, env') names lar env in
   let vdeft = execute_array env1 vdef in
   let () = check_fixpoint env1 names lara vdef vdeft in
-    (lara.(i),(names,lara,vdef))
+  (lara.(i),(names,lara,vdef))
 
 and execute_array env = Array.map (execute env)
 

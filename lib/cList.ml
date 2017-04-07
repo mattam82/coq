@@ -45,6 +45,8 @@ sig
     ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
   val map4 :
     ('a -> 'b -> 'c -> 'd -> 'e) -> 'a list -> 'b list -> 'c list -> 'd list -> 'e list
+  val rev_map2_i :
+    (int -> 'a -> 'b -> 'c) -> int -> 'a list -> 'b list -> 'c list
   val filteri :
     (int -> 'a -> bool) -> 'a list -> 'a list
   val partitioni :
@@ -354,6 +356,14 @@ let map2_i f i l1 l2 =
     | (_, _) -> invalid_arg "map2_i"
   in
   map_i i (l1,l2)
+
+let rev_map2_i f i l1 l2 =
+  let rec map_i i acc = function
+    | ([], []) -> acc
+    | ((h1::t1), (h2::t2)) -> let v = f i h1 h2 in map_i (succ i) (v :: acc) (t1,t2)
+    | (_, _) -> invalid_arg "rev_map2_i"
+  in
+  map_i i [] (l1,l2)
 
 let map3 f l1 l2 l3 =
   let rec map = function
