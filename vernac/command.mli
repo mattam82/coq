@@ -105,15 +105,16 @@ val interp_mutual_inductive :
   decl_notation list -> polymorphic ->
     private_flag -> Decl_kinds.recursivity_kind ->
     mutual_inductive_entry * Universes.universe_binders * one_inductive_impls list *
-    (Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list
+      ((Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list *
+         Impargs.manual_implicits list)
 
 (** Registering a mutual inductive definition together with its
    associated schemes *)
 
 val declare_mutual_inductive_with_eliminations :
   mutual_inductive_entry -> Universes.universe_binders -> one_inductive_impls list ->
-  (Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list ->
-  mutual_inductive
+  (Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list *
+  Impargs.manual_implicits list -> mutual_inductive
 
 (** Entry points for the vernacular commands Inductive and CoInductive *)
 

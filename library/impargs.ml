@@ -175,7 +175,10 @@ let is_flexible_reference env bound depth f =
         let cb = Environ.lookup_constant kn env in
 	(match cb.const_body with Def _ -> true | _ -> false)
     | Var id ->
-        env |> Environ.lookup_named id |> is_local_def
+       (** Be lenient here, allowing to call automatic inferrence on 
+           inductives with free named variables. *)
+       (try env |> Environ.lookup_named id |> is_local_def
+        with Not_found -> false)
     | Ind _ | Construct _ -> false
     |  _ -> true
 

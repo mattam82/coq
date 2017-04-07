@@ -1,3 +1,12 @@
+Module Impls.
+  Set Implicit Arguments.
+
+Inductive bete :  Type :=
+| Cbete  : forall mtt (e : mtt = tt), rec e  -> bete  
+                                            fix rec (mtt :unit) (e: mtt = tt ) :Type  := unit.
+
+End Impls.
+
 (* Inductive Pack A (R : A -> Type) := pack { *)
 (*   TX : A; *)
 (*   TR : R TX; *)

@@ -65,6 +65,9 @@ val compute_internalization_env : env -> var_internalization_type ->
   Id.t list -> types list -> Impargs.manual_explicitation list list ->
   internalization_env
 
+val union_internalization_env : internalization_env -> internalization_env ->
+                                internalization_env
+  
 type ltac_sign = {
   ltac_vars : Id.Set.t;
   (** Variables of Ltac which may be bound to a term *)

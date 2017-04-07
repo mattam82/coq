@@ -193,6 +193,10 @@ let compute_internalization_env env ty =
     (fun map id typ impl -> Id.Map.add id (compute_internalization_data env ty typ impl) map)
     empty_internalization_env
 
+let union_internalization_env env env' =
+  Id.Map.merge (fun _ a b ->
+      match a, b with Some x, _ -> a | _, _ -> b) env env'
+  
 (**********************************************************************)
 (* Contracting "{ _ }" in notations *)
 

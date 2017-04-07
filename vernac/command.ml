@@ -838,6 +838,7 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
     = interp_recursive false env_ar evdref true fixl notations in
   let rec_rel = rel_of_named_context rec_sign in
   let env_ar_fix_params = push_rel_context ctx_params (EConstr.push_rel_context rec_rel env_ar) in
+  let impls = Constrintern.union_internalization_env impls fiximpls in
 
   let interp_cstrs evd impls mldata arity ind (cstrs, env) =
     let (names, typs, impls, env' as cstrs') =
@@ -889,7 +890,7 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
     List.fold_right2
       (fun id t env' ->
        (make_name make_con id, 
-        ParameterEntry (None,false, (t, Univ.UContext.empty), None)) :: env')
+        ParameterEntry (None, false, (t, Univ.UContext.empty), None)) :: env')
       fixnames fixtypes []
   in
 
@@ -918,7 +919,7 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   }
   in
   let fixl =
-    if List.is_empty fixl then [] else
+    if List.is_empty fixl then [], [] else
       let state = Summary.freeze_summaries ~marshallable:`No in
       let ((env,rec_sign,evd), (fixnames,fixdefs,fixtypes'), fixmeta) = 
         let (_,kn), _ = Declare.declare_mind (mentry,fixdecls) in
@@ -962,10 +963,12 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
         Summary.unfreeze_summaries state;
         (* Declare the recursive definitions *)
         fixpoint_message (Some indexes) fixnames;
-        List.map4 (fun id def t _ ->
-                   (make_name make_con id,
-                    DefinitionEntry (definition_entry ~types:t ~poly ~univs:ctx (*~eff*) def)))
-	          fixnames fixdecls fixtypes fiximps
+        let fixl =
+          List.map3 (fun id def t ->
+              (make_name make_con id,
+               DefinitionEntry (definition_entry ~types:t ~poly ~univs:ctx (*~eff*) def)))
+	            fixnames fixdecls fixtypes
+        in fixl, fiximps
   in
   (* Build the mutual inductive entry *)
   mentry, pl, impls', fixl
@@ -1017,7 +1020,7 @@ let is_recursive mie =
       List.exists (fun t -> is_recursive_constructor (nparams+1) t) ind.mind_entry_lc
   | _ -> false
 
-let declare_mutual_inductive_with_eliminations mie pl impls fixl =
+let declare_mutual_inductive_with_eliminations mie pl impls (fixl,fiximps) =
   (* spiwack: raises an error if the structure is supposed to be non-recursive,
         but isn't *)
   begin match mie.mind_entry_finite with
@@ -1041,7 +1044,12 @@ let declare_mutual_inductive_with_eliminations mie pl impls fixl =
 		 maybe_declare_manual_implicits false
 		    (ConstructRef (ind, succ j)) impls)
 		constrimpls)
-      impls;
+             impls;
+  List.iter2 (fun (fixn,_) impls ->
+      let gr = ConstRef fixn in
+      Universes.register_universe_binders gr pl;
+      maybe_declare_manual_implicits false gr impls)
+            fixl fiximps;
   let warn_prim = match mie.mind_entry_record with Some (Some _) -> not prim | _ -> false in
   if_verbose Feedback.msg_info (minductive_message warn_prim names);
   if mie.mind_entry_private == None
