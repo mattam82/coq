@@ -326,7 +326,7 @@ Section CompareRec.
    compare0_mn n x = (0 ?= double_to_Z n x).
  Proof.
   intros n; elim n; clear n; auto.
-  intros x; rewrite spec_compare0_m; rewrite w_to_Z_0; auto.
+  intros x; rewrite [compare0_mn _ _]spec_compare0_m; rewrite w_to_Z_0; auto.
   intros n Hrec x; case x; unfold compare0_mn; fold compare0_mn; auto.
   fold word in *.
   intros xh xl.

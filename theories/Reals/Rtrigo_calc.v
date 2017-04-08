@@ -301,7 +301,7 @@ Lemma sin_2PI3 : sin (2 * (PI / 3)) = sqrt 3 / 2.
 Proof.
   rewrite double; rewrite sin_plus; rewrite sin_PI3; rewrite cos_PI3;
     unfold Rdiv; repeat rewrite Rmult_1_l; rewrite (Rmult_comm (/ 2));
-      repeat rewrite <- Rmult_assoc; rewrite double_var;
+      rewrite [sqrt 3 * / 2]double_var at 3;
         reflexivity.
 Qed.
 

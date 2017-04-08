@@ -17,7 +17,7 @@ Hint Rewrite
  spec_div spec_modulo spec_gcd spec_compare spec_eqb spec_ltb spec_leb
  spec_square spec_sqrt spec_log2 spec_max spec_min spec_pow_pos spec_pow_N
  spec_pow spec_even spec_odd spec_testbit spec_shiftl spec_shiftr
- spec_land spec_lor spec_ldiff spec_lxor spec_div2 spec_of_N
+ spec_land spec_lor spec_ldiff spec_lxor spec_div2 [[of_N _]]spec_of_N
  : nsimpl.
 Ltac nsimpl := autorewrite with nsimpl.
 Ltac ncongruence := unfold eq, to_N; repeat red; intros; nsimpl; congruence.

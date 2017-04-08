@@ -392,7 +392,7 @@ intros x; case x; simpl ww_is_even.
  assert (tmp: forall p, 1 + (p - 1) = p); auto with zarith;
   rewrite <- (tmp X); clear tmp
  end.
- rewrite Zpower_exp; try rewrite Z.pow_1_r; auto with zarith.
+ rewrite [_ ^ (_ + _)]Zpower_exp; try rewrite Z.pow_1_r; auto with zarith.
  assert (tmp: forall p, 1 + (p -1) - 1 = p - 1); auto with zarith;
   rewrite tmp; clear tmp; auto with zarith.
  match goal with |- ?X + ?Y < _ =>

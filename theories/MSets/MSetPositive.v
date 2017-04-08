@@ -327,7 +327,7 @@ Module PositiveSet <: S with Module E:=PositiveOrderedTypeBits.
   (** Specification of [empty] *)
 
   Lemma empty_spec : Empty empty.
-  Proof. unfold Empty, In. intro. rewrite mem_Leaf. discriminate. Qed.
+  Proof. unfold Empty, In. intro. rewrite [_]mem_Leaf. discriminate. Qed.
 
   (** Specification of node  *)
 
@@ -650,7 +650,7 @@ Module PositiveSet <: S with Module E:=PositiveOrderedTypeBits.
   Lemma singleton_spec : forall x y, In y (singleton x) <-> y=x.
   Proof.
     unfold singleton. intros x y. rewrite add_spec. intuition.
-    unfold In in *. rewrite mem_Leaf in *. discriminate.
+    unfold In in *. rewrite [_]mem_Leaf in *. discriminate.
   Qed.
 
   (** Specification of [union] *)

@@ -466,7 +466,7 @@ assert (vlt1 : / (Rabs y + 1) < 1).
  rewrite Rinv_l; [rewrite Rmult_1_l | apply Rgt_not_eq]; fourier.
 assert (vlt2 : u < 1).
  apply Rlt_trans with (/ (Rabs y + 1)).
-  rewrite double_var.
+  rewrite [/ _]double_var.
   assert (t : forall x, 0 < x -> x < x + x) by (clear; intros; fourier).
   unfold u; rewrite Rmult_comm; apply t.
   unfold Rdiv; rewrite Rmult_comm; assumption.
@@ -502,7 +502,7 @@ split.
   rewrite (Rmult_comm (-1)); simpl ((/(Rabs y + 1)) ^ 0).
   unfold Rdiv; rewrite Rinv_1, !Rmult_assoc, <- !Rmult_plus_distr_l.
   apply tmp;[assumption | ].
-  rewrite Rplus_assoc, Rmult_1_l; pattern 1 at 3; rewrite <- Rplus_0_r.
+  rewrite Rplus_assoc; rewrite [_ ^ _ * _]Rmult_1_l; pattern 1 at 3; rewrite <- Rplus_0_r.
   apply Rplus_lt_compat_l.
   rewrite <- Rmult_assoc.
   match goal with |- (?a * (-1)) + _ < 0 =>
@@ -875,6 +875,8 @@ Proof.
 exact (alternated_series (Ratan_seq x)
   (Ratan_seq_decreasing _ Hx) (Ratan_seq_converging _ Hx)).
 Defined.
+
+Hint Opaque pow plus : rewrite.
 
 Lemma Ratan_seq_opp : forall x n, Ratan_seq (-x) n = -Ratan_seq x n.
 Proof.
@@ -1263,7 +1265,7 @@ intros N x x_lb x_ub.
    apply Rlt_trans with (r2:=Rabs
            (((x + h) ^ (2 * S N + 1) - x ^ (2 * S N + 1)) / h -
             INR (2 * S N + 1) * x ^ pred (2 * S N + 1))).
-   rewrite <- Rmult_1_l ; apply Rmult_lt_compat_r.
+   rewrite <- [Rabs (_ - _)]Rmult_1_l at 2. apply Rmult_lt_compat_r.
    apply Rabs_pos_lt ; assumption.
    rewrite Rabs_right.
    replace 1 with (/1) by field.

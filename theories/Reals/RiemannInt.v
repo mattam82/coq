@@ -429,7 +429,8 @@ Lemma maxN :
 Proof.
   intros; set (I := fun n:nat => a + INR n * del < b);
     assert (H0 :  exists n : nat, I n).
-  exists 0%nat; unfold I; rewrite Rmult_0_l; rewrite Rplus_0_r;
+  (* INR 0 not match by R0 *)
+  exists 0%nat; unfold I; rewrite [_ * _]Rmult_0_l; rewrite Rplus_0_r;
     assumption.
   cut (Nbound I).
   intro; assert (H2 := Nzorn H0 H1); elim H2; intros x p; exists x; elim p; intros;
@@ -753,7 +754,7 @@ Proof.
   left; assumption.
   right; set (I := fun j:nat => a + INR j * del <= t0);
     assert (H1 :  exists n : nat, I n).
-  exists 0%nat; unfold I; rewrite Rmult_0_l; rewrite Rplus_0_r; elim H8;
+  exists 0%nat; unfold I; rewrite [_ * _]Rmult_0_l; rewrite Rplus_0_r; elim H8;
     intros; assumption.
   assert (H4 : Nbound I).
   unfold Nbound; exists (S (max_N del H)); intros; unfold max_N;

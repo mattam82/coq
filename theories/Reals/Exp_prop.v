@@ -610,7 +610,7 @@ Proof.
   apply INR_lt.
   apply Rmult_lt_reg_l with (INR 2).
   simpl; prove_sup0.
-  rewrite Rmult_0_r; rewrite <- mult_INR.
+  rewrite [_ * _]Rmult_0_r; rewrite <- mult_INR.
   apply lt_INR_0.
   rewrite <- H7.
   apply lt_le_trans with 2%nat.

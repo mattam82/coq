@@ -145,9 +145,9 @@ Proof.
   replace (sum_f_R0 (tg_alt Un) n0) with
   (a * (1 - sum_f_R0 (fun i:nat => sin_n i * Rsqr a ^ i) (S n0))).
   unfold Rminus; rewrite Rmult_plus_distr_l; rewrite Rmult_1_r;
-    rewrite Ropp_plus_distr; rewrite Ropp_involutive;
-      repeat rewrite Rplus_assoc; rewrite (Rplus_comm a);
-        rewrite (Rplus_comm (- a)); repeat rewrite Rplus_assoc;
+    rewrite [- (_ + _)]Ropp_plus_distr; rewrite Ropp_involutive;
+      repeat rewrite [_ + _ + _]Rplus_assoc; rewrite (Rplus_comm a);
+        rewrite (Rplus_comm (- a)); repeat rewrite [_ + _ + _]Rplus_assoc;
           rewrite Rplus_opp_l; rewrite Rplus_0_r; apply Rmult_lt_reg_l with (/ Rabs a).
   apply Rinv_0_lt_compat; apply Rabs_pos_lt; assumption.
   pattern (/ Rabs a) at 1; rewrite <- (Rabs_Rinv a Hyp_a).
@@ -318,11 +318,11 @@ Proof.
   exists N; intros.
   replace (sum_f_R0 (tg_alt Un) n1) with
   (1 - sum_f_R0 (fun i:nat => cos_n i * Rsqr a0 ^ i) (S n1)).
-  unfold Rminus; rewrite Ropp_plus_distr; rewrite Ropp_involutive;
+  unfold Rminus; rewrite [- (_ + _)]Ropp_plus_distr; rewrite Ropp_involutive;
     repeat rewrite Rplus_assoc; rewrite (Rplus_comm 1);
       rewrite (Rplus_comm (-1)); repeat rewrite Rplus_assoc;
         rewrite Rplus_opp_l; rewrite Rplus_0_r; rewrite <- Rabs_Ropp;
-          rewrite Ropp_plus_distr; rewrite Ropp_involutive;
+          rewrite [- (_ + _)]Ropp_plus_distr; rewrite Ropp_involutive;
             unfold Rminus in H6; apply H6.
   unfold ge; apply le_trans with n1.
   exact H5.

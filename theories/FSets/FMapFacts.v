@@ -1558,7 +1558,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   rewrite (cardinal_fold m), (cardinal_fold m1).
   set (f:=fun (_:key)(_:elt)=>S).
   setoid_replace (fold f m 0) with (fold f m1 (fold f m2 0)).
-  rewrite <- cardinal_fold.
+  rewrite <- [fold _ m2 _]cardinal_fold.
   apply fold_rel with (R:=fun u v => u = v + cardinal m2); simpl; auto.
   apply Partition_fold with (eqA:=eq); repeat red; auto.
   Qed.

@@ -74,6 +74,7 @@ Proof.
   assert (H15 := Rlt_le_trans _ _ _ H13 (Rmin_r _ _)).
   assert (H16 := Rlt_le_trans _ _ _ H13 (Rmin_l _ _)).
   assert (H17 := H7 _ H11 H15).
+  Hint Opaque Rdiv Rminus : rewrite.
   rewrite formule; [ idtac | assumption | assumption | apply H2; apply H14 ].
   apply Rle_lt_trans with
     (Rabs (/ f2 (x + h) * ((f1 (x + h) - f1 x) / h - l1)) +

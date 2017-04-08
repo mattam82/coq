@@ -16,6 +16,8 @@ Require Import Omega.
 Local Open Scope nat_scope.
 Local Open Scope R_scope.
 
+Hint Opaque mult : rewrite.
+
 Definition Majxy (x y:R) (n:nat) : R :=
   Rmax 1 (Rmax (Rabs x) (Rabs y)) ^ (4 * S n) / INR (fact n).
 

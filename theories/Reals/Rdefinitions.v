@@ -69,3 +69,6 @@ Notation "x <= y <= z" := (x <= y /\ y <= z) : R_scope.
 Notation "x <= y < z"  := (x <= y /\ y <  z) : R_scope.
 Notation "x < y < z"   := (x <  y /\ y <  z) : R_scope.
 Notation "x < y <= z"  := (x <  y /\ y <= z) : R_scope.
+
+(** Do not allow to go under minus or div when matching for rewriting *)
+Hint Opaque Rminus Rdiv : rewrite.

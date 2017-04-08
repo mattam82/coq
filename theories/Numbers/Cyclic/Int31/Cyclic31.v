@@ -1590,7 +1590,7 @@ Section Int31_Specs.
  rewrite phi_twice, Z.double_spec.
  rewrite phi_twice_firstl; auto.
  change (Z.double [|y|]) with (2*[|y|]).
- rewrite Nat2Z.inj_succ, Z.pow_succ_r; auto with zarith.
+ rewrite [Z.of_nat (S _)]Nat2Z.inj_succ, Z.pow_succ_r; auto with zarith.
  rewrite Zplus_mod; rewrite Zmult_mod_idemp_l; rewrite <- Zplus_mod.
  f_equal.
  f_equal.
@@ -1602,7 +1602,7 @@ Section Int31_Specs.
  rewrite phi_twice_plus_one, Z.succ_double_spec.
  rewrite phi_twice; auto.
  change (Z.double [|y|]) with (2*[|y|]).
- rewrite Nat2Z.inj_succ, Z.pow_succ_r; auto with zarith.
+ rewrite [Z.of_nat (S _)]Nat2Z.inj_succ, Z.pow_succ_r; auto with zarith.
  rewrite Zplus_mod; rewrite Zmult_mod_idemp_l; rewrite <- Zplus_mod.
  rewrite Z.mul_add_distr_r, Z.mul_1_l, <- Z.add_assoc.
  f_equal.

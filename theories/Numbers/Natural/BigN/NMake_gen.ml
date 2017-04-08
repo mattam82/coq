@@ -918,7 +918,7 @@ pr
  reflexivity.
  intros.
  simpl red_t. unfold reduce_n1.
- rewrite <- (succ_pred_t n x) at 2.
+ rewrite <- (succ_pred_t n x) at 3.
  remember (pred_t n x) as x'.
  rewrite spec_mk_t, spec_succ_t.
  destruct x' as [ | xh xl]. simpl. apply ZnZ.spec_0.
@@ -980,7 +980,7 @@ pr "
   inversion LT |
   subst; change (reduce 0 x = red_t 0 x); reflexivity |
   specialize (H (pred n)); subst; destruct x;
-   [|unfold_red; rewrite H; auto]; reflexivity
+   [|unfold_red; rewrite [_]H; auto]; reflexivity
  ].
 
  Lemma reduce_equiv : forall n x, n <= Size -> reduce n x = red_t n x.
@@ -992,9 +992,9 @@ pr "
  Lemma spec_reduce_n : forall n x, [reduce_n n x] = [Nn n x].
  Proof.
  assert (H : forall x, reduce_%i x = red_t (SizePlus 1) x).
-  destruct x; [|unfold reduce_%i; rewrite (reduce_equiv Size)]; auto.
+  destruct x; [|unfold reduce_%i; rewrite [reduce_%i _](reduce_equiv Size)]; auto.
  induction n.
-   intros. rewrite H. apply spec_red_t.
+   intros. rewrite [reduce_n _ _]H. apply spec_red_t.
  destruct x as [|xh xl].
  simpl. rewrite make_op_S. exact ZnZ.spec_0.
  fold word in *.
@@ -1003,7 +1003,7 @@ pr "
  rewrite IHn.
  rewrite spec_extend_WW; auto.
  Qed.
-" (size+1) (size+1);
+" (size+1) (size+1) size;
 
 pr
 " Lemma spec_reduce : forall n x, [reduce n x] = ZnZ.to_Z x.

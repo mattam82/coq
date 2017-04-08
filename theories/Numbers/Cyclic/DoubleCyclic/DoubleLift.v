@@ -286,6 +286,9 @@ Section DoubleLift.
     (wB_div_plus w_digits w_to_Z spec_to_Z) : w_rewrite.
   Ltac w_rewrite := autorewrite with w_rewrite;trivial.
 
+  (** Index on plus and minus in Z for finding subterms in rewrite *)
+  Hint Opaque Zminus Zplus : rewrite.
+
   Lemma spec_ww_add_mul_div_aux : forall xh xl yh yl p,
    let zdigits := w_0W w_zdigits in
     [[p]] <= Zpos (xO w_digits) ->
@@ -434,7 +437,7 @@ Section DoubleLift.
     clear H1;w_rewrite);simpl ww_add_mul_div.
    replace [[WW w_0 w_0]] with 0;[w_rewrite|simpl;w_rewrite;trivial].
    intros Heq;rewrite <- Heq;clear Heq; auto.
-   rewrite spec_ww_compare. case Z.compare_spec; intros H1; w_rewrite.
+   rewrite spec_ww_compare. case Z.compare_spec; intros H1; simpl; w_rewrite.
    rewrite (spec_w_add_mul_div w_0 w_0);w_rewrite;zarith.
    generalize H1; w_rewrite; rewrite spec_zdigits; clear H1; intros H1.
    assert (HH0: [|low p|] = [[p]]).
@@ -444,6 +447,7 @@ Section DoubleLift.
      apply Z.lt_le_trans with (1 := H1).
      unfold base; apply Zpower2_le_lin; auto with zarith.
    rewrite HH0; auto with zarith.
+   simpl. w_rewrite.
    replace [[WW w_0 w_0]] with 0;[w_rewrite|simpl;w_rewrite;trivial].
    intros Heq;rewrite <- Heq;clear Heq.
    generalize (spec_ww_compare p (w_0W w_zdigits));

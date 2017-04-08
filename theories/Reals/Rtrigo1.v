@@ -694,10 +694,10 @@ Proof.
   red in |- *; intro; elim H2; symmetry  in |- *; assumption.
   rewrite (Rmult_comm (INR (fact (2 * S n + 1)))); repeat rewrite Rmult_assoc;
     rewrite <- Rinv_l_sym.
-  do 2 rewrite Rmult_1_r; apply Rle_lt_trans with (INR (fact (2 * n + 1)) * 4).
+  unfold pow. do 3 rewrite Rmult_1_r. apply Rle_lt_trans with (INR (fact (2 * n + 1)) * 4).
   apply Rmult_le_compat_l.
   replace 0 with (INR 0); [ idtac | reflexivity ]; apply le_INR; apply le_O_n.
-  simpl in |- *; rewrite Rmult_1_r; replace 4 with (Rsqr 2);
+  simpl in |- *. replace 4 with (Rsqr 2);
     [ idtac | ring_Rsqr ]; replace (a * a) with (Rsqr a);
     [ idtac | reflexivity ]; apply Rsqr_incr_1.
   apply Rle_trans with (PI / 2);
@@ -712,7 +712,7 @@ Proof.
   do 2 rewrite fact_simpl; do 2 rewrite mult_INR.
   repeat rewrite <- Rmult_assoc.
   rewrite <- (Rmult_comm (INR (fact (2 * n + 1)))).
-  rewrite Rmult_assoc.
+  repeat rewrite Rmult_assoc.
   apply Rmult_lt_compat_l.
   apply lt_INR_0; apply neq_O_lt.
   assert (H2 := fact_neq_0 (2 * n + 1)).
@@ -1784,7 +1784,7 @@ Proof.
   rewrite sin_0; ring.
   apply le_IZR.
   apply Rplus_le_reg_l with (IZR x0).
-  rewrite Rplus_0_r.
+  rewrite [_ + _]Rplus_0_r.
   rewrite Ropp_Ropp_IZR.
   rewrite Rplus_opp_r.
   left; replace 0 with (IZR 0); [ apply IZR_lt | reflexivity ].

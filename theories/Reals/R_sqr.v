@@ -290,6 +290,8 @@ Proof.
   rewrite Rinv_mult_distr; try reflexivity || assumption.
 Qed.
 
+Hint Opaque Rsqr : rewrite.
+
 Lemma canonical_Rsqr :
   forall (a:nonzeroreal) (b c x:R),
     a * Rsqr x + b * x + c =

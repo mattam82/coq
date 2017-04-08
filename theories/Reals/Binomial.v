@@ -178,7 +178,7 @@ Proof.
   apply sum_eq.
   intros; unfold An, Bn.
   change (S N - S i)%nat with (N - i)%nat.
-  rewrite <- pascal;
+  rewrite <- [C (S _) (S _)]pascal;
     [ ring
       | apply le_lt_trans with n; [ assumption | unfold N; apply lt_n_Sn ] ].
   unfold N; reflexivity.

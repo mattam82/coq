@@ -44,7 +44,7 @@ Module Make (W0:CyclicType) <: NType.
 
  Tactic Notation "destr_t" constr(x) "as" simple_intropattern(pat) :=
   destruct (destr_t x) as pat; cbv zeta;
-  rewrite ?iter_mk_t, ?spec_mk_t, ?spec_reduce.
+  rewrite ?iter_mk_t, ?[[mk_t _ _]]spec_mk_t, ?spec_reduce.
 
  Lemma spec_same_level : forall A (P:Z->Z->A->Prop)
   (f : forall n, dom_t n -> dom_t n -> A),
@@ -1054,6 +1054,8 @@ Module Make (W0:CyclicType) <: NType.
  Definition of_pos (x:positive) : t  :=
   let n := pheight x in
   reduce n (snd (ZnZ.of_pos x)).
+
+ Hint Opaque ZnZ.digits dom_op : rewrite.
 
  Theorem spec_of_pos: forall x,
    [of_pos x] = Zpos x.
