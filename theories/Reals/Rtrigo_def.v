@@ -336,10 +336,7 @@ Proof.
   apply lt_INR_0.
   replace ((2 * S n + 1) * (2 * S n))%nat with
   (S (S (S (S (S (S (4 * (n * n) + 10 * n))))))).
-  apply lt_O_Sn.
-  apply INR_eq; repeat rewrite S_INR; rewrite plus_INR; repeat rewrite mult_INR;
-    rewrite plus_INR; rewrite mult_INR; repeat rewrite S_INR;
-      replace (INR 0) with 0; [ ring | reflexivity ].
+  apply lt_O_Sn. ring.
 Qed.
 
 Lemma sin_no_R0 : forall n:nat, sin_n n <> 0.

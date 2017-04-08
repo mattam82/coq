@@ -300,7 +300,7 @@ pr "
 
  Instance dom_spec n : ZnZ.Specs (dom_op n) | 10.
  Proof.
-  do_size (destruct n; auto with *). apply wn_spec.
+  do_size (destruct n; auto with *).
  Qed.
 
  Let make_op_WW : forall n x y,

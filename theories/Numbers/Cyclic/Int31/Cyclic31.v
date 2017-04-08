@@ -25,6 +25,8 @@ Require Import ROmega.
 Local Open Scope nat_scope.
 Local Open Scope int31_scope.
 
+Hint Transparent twice twice_plus_one.
+
 Section Basics.
 
  (** * Basic results about [iszero], [shiftl], [shiftr] *)
@@ -1884,7 +1886,7 @@ Section Int31_Specs.
  intros Hj; generalize Hj k; pattern j; apply natlike_ind;
    auto; clear k j Hj.
  intros _ k Hk; repeat rewrite Z.add_0_l.
- apply  Z.mul_nonneg_nonneg; generalize (Z_div_pos k 2); auto with zarith.
+ apply Z.mul_nonneg_nonneg; cbn; generalize (Z_div_pos k 2); auto with zarith.
  intros j Hj Hrec _ k Hk; pattern k; apply natlike_ind; auto; clear k Hk.
  rewrite Z.mul_0_r, Z.add_0_r, Z.add_0_l.
  generalize (sqr_pos (Z.succ j / 2)) (quotient_by_2 (Z.succ j));
@@ -1984,7 +1986,7 @@ Section Int31_Specs.
         (1 * 2 + (([|j|] - 2) + [|i|] / [|j|])); try ring.
  rewrite Z_div_plus_full_l; auto with zarith.
  assert (0 <= [|i|]/ [|j|]) by (apply Z_div_pos; auto with zarith).
- assert (0 <= ([|j|] - 2 + [|i|] / [|j|]) / [|2|]) ; auto with zarith.
+ assert (0 <= ([|j|] - 2 + [|i|] / [|j|]) / 2); auto with zarith.
  rewrite <- Hj, Zdiv_1_r.
  replace (1 + [|i|])%Z with (1 * 2 + ([|i|] - 1))%Z; try ring.
  rewrite Z_div_plus_full_l; auto with zarith.
@@ -2178,16 +2180,10 @@ Section Int31_Specs.
  assert ((1 + [|j|]) <= 2 ^ 30); auto with zarith.
  apply Z.le_trans with ((2 ^ 30) * (2 ^ 30)); auto with zarith.
  assert (0 <= 1 + [|j|]); auto with zarith.
- apply Z.mul_le_mono_nonneg; auto with zarith.
+ apply Z.mul_le_mono_nonneg; unfold Z.pow_pos, Pos.iter; auto with zarith.
  change ((2 ^ 30) * (2 ^ 30)) with ((2 ^ 29) * base).
  apply Z.le_trans with ([|ih|] * base); auto with zarith.
- unfold phi2, base; auto with zarith.
- split; auto.
- apply sqrt_test_true; auto.
- unfold phi2, base; auto with zarith.
- apply Z.le_ge; apply Z.le_trans with (([|j|] * base)/[|j|]).
- rewrite Z.mul_comm, Z_div_mult; auto with zarith.
- apply Z.ge_le; apply Z_div_ge; auto with zarith.
+ unfold phi2, base; auto with zarith. cbn [Z.pow_pos Pos.iter]. auto with zarith.
  Qed.
 
  Lemma iter312_sqrt_correct n rec ih il j:
@@ -2230,7 +2226,6 @@ Section Int31_Specs.
  assert (Hi2: phi2 ih il < (phi Tn + 1) ^ 2).
  { change ((phi Tn + 1) ^ 2) with (2^62).
    apply Z.le_lt_trans with ((2^31 -1) * base + (2^31 - 1)); auto with zarith.
-   2: simpl; unfold Z.pow_pos; simpl; auto with zarith.
    case (phi_bounded ih); case (phi_bounded il); intros H1 H2 H3 H4.
    unfold base, Z.pow, Z.pow_pos in H2,H4; simpl in H2,H4.
    unfold phi2. cbn [Z.pow Z.pow_pos Pos.iter]. auto with zarith. }

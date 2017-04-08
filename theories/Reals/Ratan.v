@@ -1099,7 +1099,7 @@ intros x y n n_lb x_encad ; assert (x_pos : x >= 0) by intuition.
  case x_pos ; clear x_pos ; intro x_pos.
  rewrite Hrew ; rewrite Hrew.
  apply Rmult_gt_0_lt_compat ; intuition.
- apply Rmult_gt_0_lt_compat ; intuition ; fourier.
+ unfold pow; apply Rmult_gt_0_lt_compat ; intuition ; fourier.
  rewrite x_pos.
  rewrite pow_i ; intuition.
 Qed.

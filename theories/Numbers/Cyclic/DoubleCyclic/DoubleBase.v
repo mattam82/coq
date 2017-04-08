@@ -154,6 +154,8 @@ Section DoubleBase.
    (interp_carry (-1) wwB ww_to_Z c) (at level 0, c at level 99).
   Notation "[! n | x !]" := (double_to_Z n x) (at level 0, x at level 99).
 
+  Hint Transparent ww_to_Z.
+
   Variable spec_w_0   : [|w_0|] = 0.
   Variable spec_w_1   : [|w_1|] = 1.
   Variable spec_w_Bm1 : [|w_Bm1|] = wB - 1.
@@ -360,7 +362,7 @@ Section DoubleBase.
   Lemma spec_double_WW : forall n (h l : word w n),
     [!S n|double_WW n h l!] = [!n|h!] * double_wB n + [!n|l!].
   Proof.
-   induction n;simpl;intros;trivial.
+   induction n;simpl;intros;trivial. unfold ww_to_Z in spec_w_WW.
    destruct h;auto.
    destruct l;auto.
   Qed.

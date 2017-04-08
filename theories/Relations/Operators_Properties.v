@@ -324,10 +324,10 @@ Section Properties.
     Lemma clos_rst1n_sym : forall x y, clos_refl_sym_trans_1n R x y ->
       clos_refl_sym_trans_1n R y x.
     Proof.
-      intros x y H; elim H.
+      intros x y H; induction H.
       constructor 1.
-      intros x0 y0 z D H0 H1; apply clos_rst1n_trans with y0; auto.
-      right with x0.
+      apply clos_rst1n_trans with y; auto.
+      right with x.
       tauto.
       left.
     Qed.
