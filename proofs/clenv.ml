@@ -604,7 +604,10 @@ type clause = {
 let make_prod_evar env sigma na t1 t2 =
   let store = Typeclasses.set_resolvable Evd.Store.empty false in
   let sigma = Sigma.Unsafe.of_evar_map sigma in
-  let Sigma (ev, sigma, _) = new_evar ~future_goal:false ~store env sigma t1 in
+  let naming =
+    match na with Name id -> IntroFresh id | Anonymous -> IntroAnonymous
+  in
+  let Sigma (ev, sigma, _) = new_evar ~future_goal:false ~store env sigma ~naming t1 in
   let sigma = Sigma.to_evar_map sigma in
   let dep = dependent (mkRel 1) t2 in
   let hole = {
@@ -726,7 +729,13 @@ let clenv_advance_clear sigma clenv =
   let { cl_concl; cl_holes; cl_val; cl_concl_occs } = clenv in
   let advance h =
     let h' = whd_evar sigma h.hole_evar in
-    if isEvar h' then Some { h with hole_evar = h' }
+    if isEvar h' then
+      let na =
+        match evar_ident (fst (destEvar h')) sigma with
+        | Some id -> Name id
+        | None -> h.hole_name
+      in
+      Some { h with hole_evar = h'; hole_name = na }
     else None
   in
   let holes = List.map_filter advance cl_holes in
