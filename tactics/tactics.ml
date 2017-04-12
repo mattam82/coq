@@ -1271,6 +1271,10 @@ let do_replace id = function
   | NamingMustBe (_,id') when Option.equal Id.equal id (Some id') -> true
   | _ -> false
 
+let clenvtac_advance_clear clenv =
+  Proofview.tclEVARMAP >>= fun sigma ->
+  Proofview.tclUNIT (clenv_advance_clear sigma clenv)
+
 (* For a clenv expressing some lemma [C[?1:T1,...,?n:Tn] : P] and some
    goal [G], [clenv_refine_in] returns [n+1] subgoals, the [n] last
    ones (resp [n] first ones if [sidecond_first] is [true]) being the
@@ -1287,21 +1291,21 @@ let clenv_refine_in ?(sidecond_first=false) with_evars ?(with_classes=true) flag
   (* For compatibility: reduce the conclusion *)
   let clenv = clenv_map_concl (Reductionops.nf_betaiota sigma) clenv in
   let exact_tac =
-    Clenvtac.clenv_refine_no_check ~with_evars ~with_classes ~flags clenv in
+    clenvtac_advance_clear clenv >>= fun clenv ->
+    Clenvtac.clenv_refine_no_check ~with_evars ~with_classes ~flags
+                                   ~shelve_subgoals:true clenv in
   let new_hyp_typ = clenv_concl clenv in
   let naming = NamingMustBe (dloc,targetid) in
   let with_clear = do_replace (Some id) naming in
   Tacticals.New.tclTHEN
-    (Tacticals.New.tclTHEN
-       (Proofview.Unsafe.tclEVARS sigma)
-       (Clenvtac.clenv_check_dep_holes with_evars sigma clenv >>= Proofview.shelve_goals))
+    (Proofview.Unsafe.tclEVARS sigma)
     ((if sidecond_first then
-       Tacticals.New.tclTHENFIRST
-         (assert_before_then_gen with_clear naming new_hyp_typ tac)
-     else
-       Tacticals.New.tclTHENLAST
-         (assert_after_then_gen with_clear naming new_hyp_typ tac))
-    exact_tac)
+        Tacticals.New.tclTHENFIRST
+        (assert_before_then_gen with_clear naming new_hyp_typ tac)
+      else
+        Tacticals.New.tclTHENLAST
+        (assert_after_then_gen with_clear naming new_hyp_typ tac))
+     exact_tac)
 
 (********************************************)
 (*       Elimination tactics                *)
@@ -1736,8 +1740,10 @@ let general_apply with_delta with_destruct with_evars ~delay_bindings clear_flag
           make_clenv_from_env env sigma ~len:n (c, thm_ty)
         in
         Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
-         (Clenvtac.clenv_refine_bindings
-            ~with_evars ~flags ~hyps_only:true ~delay_bindings lbind clause)
+                          (Clenvtac.clenv_refine_bindings
+                           ~recompute_deps:(not delay_bindings)
+                           ~with_evars ~flags ~hyps_only:true
+                           ~delay_bindings lbind clause)
       with exn when catchable_exception exn ->
         Proofview.tclZERO exn
     in
@@ -4661,7 +4667,7 @@ let elim_scheme_type elim t =
     (Ftactic.run tac
        (fun (sigma, clause) ->
          let clause = clenv_map_concl (nf_betaiota sigma) clause in
-         let clause = clenv_recompute_deps sigma clause in
+         let clause = clenv_recompute_deps sigma ~hyps_only:false clause in
          Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
                            (Clenvtac.clenv_refine_no_check ~flags:(elim_flags ())
                                                            ~with_evars:false clause)))

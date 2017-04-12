@@ -255,8 +255,9 @@ let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=tru
                                 flags None)
 
 let clenv_refine_bindings
-      ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-      ?(flags=dft ()) ~hyps_only ~delay_bindings b clenv =
+    ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
+    ?(recompute_deps=false) ?(flags=dft ())
+    ~hyps_only ~delay_bindings b clenv =
   let open Proofview in
   let flags = flags_of flags in
   Proofview.Goal.enter { enter = fun gl ->
@@ -271,9 +272,13 @@ let clenv_refine_bindings
     in
     let tac = clenv_unify_concl flags clenv in
     (Unsafe.tclEVARS sigma) <*>
-      (Ftactic.run tac
-                   (clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
-                                     flags bindings)) }
+    (Ftactic.run tac
+      (fun (sigma, clenv) ->
+      let clenv =
+        if recompute_deps then clenv_recompute_deps sigma ~hyps_only clenv
+        else clenv in
+      clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
+                       flags bindings (sigma, clenv))) }
 
 let res_pf ?(with_evars=false) ?(with_classes=true) ?(flags=dft ()) clenv =
   Proofview.Goal.enter { enter = begin fun gl ->

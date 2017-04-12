@@ -201,7 +201,7 @@ val clenv_concl : clause -> types
 val clenv_val : clause -> constr
 val clenv_holes : clause -> hole list
 
-val clenv_recompute_deps : evar_map -> clause -> clause
+val clenv_recompute_deps : evar_map -> hyps_only:bool -> clause -> clause
 
 (** Returns the dependent goals *)
 val clenv_dep_holes: clause -> hole list

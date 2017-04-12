@@ -747,7 +747,8 @@ let clenv_advance_clear sigma clenv =
 let hole_evar hole = fst (destEvar hole.hole_evar)
     
 let hole_type sigma hole =
-  Evd.evar_concl (Evd.find_undefined sigma (hole_evar hole))
+  let concl = Evd.evar_concl (Evd.find_undefined sigma (hole_evar hole)) in
+  Reductionops.nf_betaiota sigma (Evarutil.nf_evar sigma concl)
                  
 let solve_evar_clause env sigma hyp_only clause = function
 | NoBindings -> sigma, clause
@@ -897,15 +898,16 @@ let clenv_unify_type env sigma flags hole occs ty clenv =
 let clenv_unify_concl env sigma flags ty clenv =
   clenv_unify_type env sigma flags clenv.cl_concl clenv.cl_concl_occs ty clenv
 
-let clenv_recompute_deps sigma clenv =
+let clenv_recompute_deps sigma ~hyps_only clenv =
   let concl = clenv.cl_concl in
   let holes =
     List.fold_right
       (fun h rest ->
         if h.hole_deps then
           let ev, _ = destEvar h.hole_evar in
-          let dep = List.exists (fun h' -> occur_evar ev (hole_type sigma h')) rest in
-          let h' = { h with hole_deps = dep || occur_evar ev concl } in
+          let dep = List.exists (fun h' -> occur_evar ev (hole_type sigma h')) rest
+                    || (not hyps_only && occur_evar ev concl) in
+          let h' = { h with hole_deps = dep } in
           h' :: rest
         else h :: rest) clenv.cl_holes []
   in { clenv with cl_holes = holes }
