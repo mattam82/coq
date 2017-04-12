@@ -405,9 +405,9 @@ Qed.
    assumption. *)
 
 Goal exists f:nat->nat, forall x y, x = y -> f x = f y.
-intros; eexists; intros.
-eauto.
-Existential 1 := fun x => x.
+  intros; eexists; intros.
+eauto. (* MS: Eauto succeeds without leaving an unresolved evar now *)
+Fail Existential 1 := fun x => x.
 Qed.
 
 (* The following was accepted before r12612 but is still not accepted in r12658
@@ -521,7 +521,8 @@ intros x H H0 H1.
 eapply eq_trans in H. 2:apply H0.
 rewrite H1 in H.
 change (x+0=0) in H. (* Check the result in H1 *)
-Abort.
+exact I.
+Qed.
 
 Goal forall x, 2=x+1 -> (forall x, S x = 0) -> 2 = 0.
 intros x H H0.
@@ -535,9 +536,9 @@ Abort.
    compatibility while finding a more uniform way to proceed. *)
 
 Goal forall f:nat->nat, (forall P x, P (f x)) -> let x:=f 0 in x = 0.
-intros f H x.
-apply H.
-Qed.
+intros f H x. 
+eapply H. (* MS: different solution here *)
+Abort.
 
 (* Test that occur-check is not too restrictive (see comments of #3141) *)
 Lemma bar (X: nat -> nat -> Prop) (foo:forall x, X x x) (a: unit) (H: tt = a):
