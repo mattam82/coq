@@ -29,6 +29,7 @@ open Context.Rel.Declaration
 type unify_flags = {
   open_ts : transparent_state;
   closed_ts : transparent_state;
+  frozen_evars : Evar.Set.t;
   with_cs : bool }
 
 type unify_fun = unify_flags ->
@@ -38,7 +39,8 @@ let default_transparent_state env = full_transparent_state
 (* Conv_oracle.get_transp_state (Environ.oracle env) *)
 
 let default_flags_of ts =
-  { open_ts = ts; closed_ts = ts; with_cs = true }
+  { open_ts = ts; closed_ts = ts;
+    frozen_evars = Evar.Set.empty; with_cs = true }
 
 let default_flags env =
   let ts = default_transparent_state env in
@@ -1014,9 +1016,6 @@ open Context.Named.Declaration
 let apply_on_subterm env evdref fixedref f test c t =
   let test = test env !evdref c in
   let rec applyrec (env,(k,c) as acc) t =
-    (* By using eq_constr, we make an approximation, for instance, we *)
-    (* could also be interested in finding a term u convertible to t *)
-    (* such that c occurs in u *)
     if Evar.Set.exists (fun fixed -> occur_evar fixed t) !fixedref then
       match kind_of_term t with
       | Evar (ev, args) when Evar.Set.mem ev !fixedref -> t
@@ -1128,7 +1127,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
       (id,t,c,ty,evs,Filter.make filter',occs) :: make_subst (ctxt',l,occsl)
   | _, _, [] -> []
   | _ -> anomaly (Pp.str "Signature or instance are shorter than the occurrences list") in
-  let fixed = ref Evar.Set.empty in
+  let fixed = ref flags.frozen_evars in
   let rec set_holes evdref rhs = function
   | (id,idty,c,cty,evsref,filter,occs)::subst ->
      let c = nf_evar !evdref c in

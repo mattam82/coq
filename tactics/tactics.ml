@@ -4174,6 +4174,7 @@ let induction_tac with_evars params indvars elim toclear =
   let elimc = mkCast (elimc, DEFAULTcast, elimt) in
   let env = Tacmach.New.pf_env gl in
   let sigma = Tacmach.New.project gl in
+  let frozen = Evar.Map.domain (Evd.undefined_map sigma) in
   let sigma, elimclause = 
     make_clenv_bindings ~hyps_only:true env sigma (elimc,elimt) ?occs lbindelimc in
   (* elimclause' is built from elimclause by instanciating all args and params. *)
@@ -4193,9 +4194,11 @@ let induction_tac with_evars params indvars elim toclear =
       let sigma = List.fold_left make_indep sigma rest in
       sigma, clenv_advance_clear sigma elimclause'
   in
+  let flags = Unification.default_unify_flags () in
+  let flags = { flags with core_unify_flags = { flags.core_unify_flags with frozen_evars = frozen } } in
   Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
                     (enforce_prop_bound_names rename
-                      (Clenvtac.clenv_refine2 ~with_classes:false ~with_evars elimclause'))
+                      (Clenvtac.clenv_refine2 ~flags ~with_classes:false ~with_evars elimclause'))
   end }
 
 (* Apply induction "in place" taking into account dependent

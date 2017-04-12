@@ -18,6 +18,7 @@ open Locus
 type unify_flags = {
   open_ts : transparent_state;
   closed_ts : transparent_state;
+  frozen_evars : Evar.Set.t;
   with_cs : bool }
 
 val default_flags_of : transparent_state -> unify_flags

@@ -904,7 +904,8 @@ let clenv_recompute_deps sigma clenv =
 let flags_of flags =
   let open_ts = Unification.(flags.core_unify_flags.modulo_delta) in
   let closed_ts = Option.default open_ts Unification.(flags.core_unify_flags.modulo_conv_on_closed_terms) in
-  Evarconv.{ open_ts; closed_ts; with_cs = true }
+  let frozen_evars = Unification.(flags.core_unify_flags.frozen_evars) in
+  Evarconv.{ open_ts; closed_ts; frozen_evars; with_cs = true }
 
 (* [clenv_fchain mv clenv clenv']
  *
