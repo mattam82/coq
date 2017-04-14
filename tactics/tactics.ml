@@ -4188,17 +4188,20 @@ let induction_tac with_evars params indvars elim toclear =
   (** The remaining holes are predicates and methods/branches, make them independent
       of the destructed variable if not an explicit pattern. *)
   let rest = clenv_holes elimclause' in
-  let clear_ids = toclear in
+  let clear clear_ids = 
+    let make_indep sigma h =
+      let sigma, ev = clear_evar_hyps sigma (destEvar h.hole_evar) clear_ids in
+      sigma
+    in
+    let sigma = List.fold_left make_indep sigma rest in
+    sigma, clenv_advance_clear sigma elimclause'
+  in
   let sigma, elimclause' =
-    if is_explicit_pattern (clenv_concl elimclause') (Tacmach.New.pf_concl gl) then
-      sigma, elimclause'
-    else 
-      let make_indep sigma h =
-        let sigma, ev = clear_evar_hyps sigma (destEvar h.hole_evar) clear_ids in
-        sigma
-      in
-      let sigma = List.fold_left make_indep sigma rest in
-      sigma, clenv_advance_clear sigma elimclause'
+    let concl, args = decompose_app_vect (clenv_concl elimclause') in
+    (* let clear_ids = List.filter (fun f -> Array.exists (isVarId f) args) toclear in *)
+    (* let sigma, clenv' = clear clear_ids in *)
+    let occs = Evarconv.default_occurrences_selection (Array.length args) in
+    sigma, { elimclause' with cl_concl_occs = Some occs }
   in
   let flags = Unification.default_unify_flags () in
   let flags = { flags with core_unify_flags = { flags.core_unify_flags with frozen_evars = frozen } } in
