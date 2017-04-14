@@ -1106,19 +1106,22 @@ let discr_positions env sigma (lbeq,eqn,(t,t1,t2)) eq_clause cpath dirn =
   let sigma,(pf, absurd_term), eff = 
     discrimination_pf env sigma e (t,t1,t2) discriminator lbeq in
   let pf_ty = mkArrow eqn absurd_term in
-  let sigma, absurd_clause = apply_on_clause env sigma (pf,pf_ty) eq_clause in
   Proofview.Unsafe.tclEVARS sigma <*>
   Proofview.tclEFFECTS eff <*>
   tclTHENS (assert_after Anonymous absurd_term)
            [onLastHypId gen_absurdity;
-            Clenvtac.clenv_refine2 absurd_clause]
+            Proofview.Goal.enter { enter = fun gl ->
+             (** Reenter goal to have the effects in the environment *)
+             let sigma, absurd_clause = apply_on_clause (pf_env gl) (project gl) (pf,pf_ty) eq_clause in
+             Proofview.Unsafe.tclEVARS sigma <*>
+             Clenvtac.clenv_refine2 ~with_evars absurd_clause }]
 
-let discrEq env sigma (lbeq,_,(t,t1,t2) as u) eq_clause =
+let discrEq with_evars env sigma (lbeq,_,(t,t1,t2) as u) eq_clause =
   match find_positions env sigma t1 t2 with
   | Inr _ ->
      tclZEROMSG (str"Not a discriminable equality.")
   | Inl (cpath, (_,dirn), _) ->
-     discr_positions env sigma u eq_clause cpath dirn
+     discr_positions with_evars env sigma u eq_clause cpath dirn
 
 let decompose_eq gl eqn =
   try Proofview.tclUNIT (find_this_eq_data_decompose gl eqn)
