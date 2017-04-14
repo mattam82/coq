@@ -1098,7 +1098,7 @@ let apply_on_clause env sigma (f,t) clause =
     errorlabstrm "" (str "Ill-formed clause applicator.");
   clenv_chain env sigma argmv f_clause clause
 
-let discr_positions env sigma (lbeq,eqn,(t,t1,t2)) eq_clause cpath dirn =
+let discr_positions with_evars env sigma (lbeq,eqn,(t,t1,t2)) eq_clause cpath dirn =
   let e = next_ident_away eq_baseid (ids_of_context env) in
   let e_env = push_named (Context.Named.Declaration.LocalAssum (e,t)) env in
   let discriminator =
@@ -1161,10 +1161,10 @@ let onNegatedEquality with_evars tac =
   end }
 
 let discrSimpleClause with_evars = function
-  | None -> onNegatedEquality with_evars discrEq
-  | Some id -> onEquality with_evars discrEq (mkVar id,NoBindings)
+  | None -> onNegatedEquality with_evars (discrEq with_evars)
+  | Some id -> onEquality with_evars (discrEq with_evars) (mkVar id,NoBindings)
 
-let discr with_evars = onEquality with_evars discrEq
+let discr with_evars = onEquality with_evars (discrEq with_evars)
 
 let discrClause with_evars = onClause (discrSimpleClause with_evars)
 
@@ -1572,13 +1572,13 @@ let simpleInjClause with_evars = function
 let injConcl = injClause None false None
 let injHyp clear_flag id = injClause None false (Some (clear_flag,ElimOnIdent (Loc.ghost,id)))
 
-let decompEqThen ntac env sigma (lbeq,_,(t,t1,t2) as u) clause =
+let decompEqThen with_evars ntac env sigma (lbeq,_,(t,t1,t2) as u) clause =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
     let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
     let env = Proofview.Goal.env gl in
       match find_positions env sigma t1 t2 with
       | Inl (cpath, (_,dirn), _) ->
-	  discr_positions env sigma u clause cpath dirn
+	  discr_positions with_evars env sigma u clause cpath dirn
       | Inr [] -> (* Change: do not fail, simplify clear this trivial hyp *)
         ntac (clenv_val clause) 0
     | Inr posns ->
@@ -1587,8 +1587,8 @@ let decompEqThen ntac env sigma (lbeq,_,(t,t1,t2) as u) clause =
   end }
 
 let dEqThen with_evars ntac = function
-  | None -> onNegatedEquality with_evars (decompEqThen (ntac None))
-  | Some c -> onInductionArg (fun clear_flag -> onEquality with_evars (decompEqThen (ntac clear_flag))) c
+  | None -> onNegatedEquality with_evars (decompEqThen with_evars (ntac None))
+  | Some c -> onInductionArg (fun clear_flag -> onEquality with_evars (decompEqThen with_evars (ntac clear_flag))) c
 
 let dEq with_evars =
   dEqThen with_evars (fun clear_flag c x ->
@@ -1601,7 +1601,7 @@ let intro_decomp_eq tac data cl =
     let sigma, cl = make_clenv_bindings env (Sigma.to_evar_map (sigma gl))
                                         cl ~hyps_only:false NoBindings in
     Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
-                      (decompEqThen (fun _ -> tac) env sigma data cl)
+                      (decompEqThen false (fun _ -> tac) env sigma data cl)
   end }
 
 let _ = declare_intro_decomp_eq intro_decomp_eq
