@@ -753,22 +753,7 @@ let hole_type sigma hole =
 let solve_evar_clause env sigma hyp_only clause = function
 | NoBindings -> sigma, clause
 | ImplicitBindings largs ->
-  let fold holes h =
-    if h.hole_deps then
-      (** Some subsequent term uses the hole *)
-      let (ev, _) = destEvar h.hole_evar in
-      let is_dep hole = occur_evar ev (hole_type sigma hole) in
-      let in_hyp = List.exists is_dep holes in
-      let in_ccl = occur_evar ev clause.cl_concl in
-      let dep = if hyp_only then in_hyp && not in_ccl else in_hyp || in_ccl in
-      let h = { h with hole_deps = dep } in
-      h :: holes
-    else
-      (** The hole does not occur anywhere *)
-      h :: holes
-  in
-  let holes = List.fold_left fold [] (List.rev clause.cl_holes) in
-  let evs, holes' = List.split_with (fun h -> h.hole_deps) holes in
+  let evs, holes' = List.split_with (fun h -> h.hole_deps) clause.cl_holes in
   let len = List.length evs in
   if Int.equal len (List.length largs) then
     let fold sigma ev arg = define_with_type sigma env ev.hole_evar arg in
@@ -900,17 +885,22 @@ let clenv_unify_concl env sigma flags ty clenv =
 
 let clenv_recompute_deps sigma ~hyps_only clenv =
   let concl = clenv.cl_concl in
-  let holes =
-    List.fold_right
-      (fun h rest ->
-        if h.hole_deps then
-          let ev, _ = destEvar h.hole_evar in
-          let dep = List.exists (fun h' -> occur_evar ev (hole_type sigma h')) rest
-                    || (not hyps_only && occur_evar ev concl) in
-          let h' = { h with hole_deps = dep } in
-          h' :: rest
-        else h :: rest) clenv.cl_holes []
-  in { clenv with cl_holes = holes }
+  let fold h rest =
+    if h.hole_deps then
+      (** Some subsequent term uses the hole *)
+      let ev, _ = destEvar h.hole_evar in
+      let is_dep hole = occur_evar ev (hole_type sigma hole) in
+      let in_hyp = List.exists is_dep rest in
+      let in_concl = occur_evar ev concl in
+      let dep = if hyps_only then in_hyp && not in_concl else in_hyp || in_concl in
+      let h' = { h with hole_deps = dep } in
+      h' :: rest
+    else
+      (** The hole does not occur anywhere *)
+      h :: rest
+  in
+  let holes = List.fold_right fold clenv.cl_holes [] in
+  { clenv with cl_holes = holes }
 
 let flags_of flags =
   let open_ts = Unification.(flags.core_unify_flags.modulo_delta) in

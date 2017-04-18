@@ -256,7 +256,7 @@ let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=tru
 
 let clenv_refine_bindings
     ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-    ?(recompute_deps=false) ?(flags=dft ())
+    ?(recompute_deps=true) ?(flags=dft ())
     ~hyps_only ~delay_bindings b clenv =
   let open Proofview in
   let flags = flags_of flags in

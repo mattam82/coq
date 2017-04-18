@@ -1478,7 +1478,7 @@ let simplify_args env sigma t =
     | eq, [t1;c1;t2;c2] -> applist (eq,[t1;simpl env sigma c1;t2;simpl env sigma c2])
     | _ -> t
 
-let inject_at_positions env sigma l2r (eq,_,(t,t1,t2)) eq_clause posns tac =
+let inject_at_positions env sigma with_evars l2r (eq,_,(t,t1,t2)) eq_clause posns tac =
   let e = next_ident_away eq_baseid (ids_of_context env) in
   let e_env = push_named (LocalAssum (e,t)) env in
   let evdref = ref sigma in
@@ -1491,10 +1491,9 @@ let inject_at_positions env sigma l2r (eq,_,(t,t1,t2)) eq_clause posns tac =
       let pf = applist(congr,[t;resty;injfun;t1;t2]) in
       let sigma, pf_typ = Typing.type_of env sigma pf in
       let sigma, inj_clause = apply_on_clause env sigma (pf,pf_typ) eq_clause in
-      let pf = Clenv.clenv_val inj_clause in
       let ty = simplify_args env sigma (clenv_concl inj_clause) in
 	evdref := sigma;
-	Some (pf, ty)
+	Some (inj_clause, ty)
     with Failure _ -> None
   in
   let injectors = List.map_filter filter posns in
@@ -1506,11 +1505,11 @@ let inject_at_positions env sigma l2r (eq,_,(t,t1,t2)) eq_clause posns tac =
       (Proofview.tclIGNORE (Proofview.Monad.List.map
          (fun (pf,ty) -> tclTHENS (cut ty)
            [inject_if_homogenous_dependent_pair ty;
-            Proofview.V82.tactic (Tacmach.refine pf)])
+            Clenvtac.clenv_refine2 ~with_evars pf])
          (if l2r then List.rev injectors else injectors)))
       (tac (List.length injectors)))
 
-let injEqThen env sigma tac l2r (eq,_,(t,t1,t2) as u) eq_clause =
+let injEqThen env sigma with_evars tac l2r (eq,_,(t,t1,t2) as u) eq_clause =
   match find_positions env sigma t1 t2 with
   | Inl _ ->
      tclZEROMSG (strbrk"This equality is discriminable. You should use the discriminate tactic to solve the goal.")
@@ -1520,7 +1519,7 @@ let injEqThen env sigma tac l2r (eq,_,(t,t1,t2) as u) eq_clause =
   | Inr [([],_,_)] when Flags.version_strictly_greater Flags.V8_3 ->
      tclZEROMSG (str"Nothing to inject.")
   | Inr posns ->
-      inject_at_positions env sigma l2r u eq_clause posns
+      inject_at_positions env sigma with_evars l2r u eq_clause posns
 	(tac (clenv_val eq_clause))
 
 let get_previous_hyp_position id gl =
@@ -1557,7 +1556,7 @@ let injEq ?(old=false) with_evars clear_flag ipats env sigma =
         tclTHEN clear_tac intro_tac
       end }
     | None -> tclIDTAC in
-  injEqThen env sigma post_tac l2r
+  injEqThen env sigma with_evars post_tac l2r
 
 let inj ipats with_evars clear_flag = onEquality with_evars (injEq with_evars clear_flag ipats)
 
@@ -1582,7 +1581,7 @@ let decompEqThen with_evars ntac env sigma (lbeq,_,(t,t1,t2) as u) clause =
       | Inr [] -> (* Change: do not fail, simplify clear this trivial hyp *)
         ntac (clenv_val clause) 0
     | Inr posns ->
-	inject_at_positions env sigma true u clause posns
+	inject_at_positions env sigma with_evars true u clause posns
           (ntac (clenv_val clause))
   end }
 

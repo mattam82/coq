@@ -48,3 +48,5 @@
 
 - rewrite does not simplify goals w.r.t. zeta to find occurrences anymore,
   requiring explicit simplifications instead.
+
+- When checking which arguments are dependent or not for apply/exists/transitivity etc...

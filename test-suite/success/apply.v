@@ -278,6 +278,10 @@ exact O.
 trivial.
 Qed.
 
+Goal exists n : nat, True.
+now exists 0.
+Qed.
+
 (* Check pattern-unification on evars in apply unification *)
 
 Lemma evar : exists f : nat -> nat, forall x, f x = 0 -> x = 0.

@@ -4186,7 +4186,7 @@ let induction_tac with_evars params indvars elim toclear =
   (* elimclause' is built from elimclause by instanciating all args and params. *)
   let sigma, elimclause' = recolle_clenv env sigma i params indvars elimclause in
   (** The remaining holes are predicates and methods/branches, make them independent
-      of the destructed variable if not an explicit pattern. *)
+      sof the destructed variable if not an explicit pattern. *)
   let rest = clenv_holes elimclause' in
   let clear clear_ids = 
     let make_indep sigma h =
