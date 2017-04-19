@@ -773,8 +773,12 @@ let eq_constr_univs_test sigma1 sigma2 t u =
   (* spiwack: mild code duplication with {!Evd.eq_constr_univs}. *)
   let open Evd in
   let fold cstr sigma =
-    try Some (add_universe_constraints sigma cstr)
-    with Univ.UniverseInconsistency _ | UniversesDiffer -> None
+    try
+      (try Some (add_universe_constraints sigma cstr)
+       with UniversesDiffer ->
+         let cstrs = Universes.to_constraints (universes sigma) cstr in
+         Some (add_constraints sigma cstrs))
+    with Univ.UniverseInconsistency _ -> None
   in
   let ans =
     Universes.eq_constr_univs_infer_with

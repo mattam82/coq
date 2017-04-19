@@ -72,6 +72,10 @@ val subst_univs_universe_constraints : universe_subst_fn ->
 
 val enforce_eq_instances_univs : bool -> universe_instance universe_constraint_function
 
+(** Transform universe constraints into regular constraints, forcing equalities of
+    instances of constants.
+    @raise Invalid_argument if the universe constraints contain ill-formed algebraic 
+    constraints. *)  
 val to_constraints : UGraph.t -> universe_constraints -> constraints
 
 (** [eq_constr_univs_infer u a b] is [true, c] if [a] equals [b] modulo alpha, casts,
