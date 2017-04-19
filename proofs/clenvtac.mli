@@ -33,7 +33,7 @@ val clenv_refine_no_check :
                                                                              
 val clenv_refine_bindings :
   ?with_evars:evars_flag -> ?with_classes:bool -> ?shelve_subgoals:bool ->
-  ?recompute_deps:bool -> ?flags:unify_flags ->
+  ?flags:unify_flags ->
   hyps_only:bool -> delay_bindings:bool -> Constr.constr Misctypes.bindings ->
   clause -> unit Proofview.tactic
 

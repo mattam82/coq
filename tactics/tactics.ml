@@ -1716,7 +1716,7 @@ let tclORELSEOPT t k =
       Proofview.tclZERO ~info e
     | Some tac -> tac)
 
-let general_apply with_delta with_destruct with_evars ~delay_bindings clear_flag
+let general_apply ~with_delta ~with_destruct ~with_evars ~delay_bindings ~clear_flag
                   (loc,(c,lbind)) =
   Proofview.Goal.nf_enter { enter = begin fun gl ->
   let concl = Proofview.Goal.concl gl in
@@ -1741,7 +1741,6 @@ let general_apply with_delta with_destruct with_evars ~delay_bindings clear_flag
         in
         Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
                           (Clenvtac.clenv_refine_bindings
-                           ~recompute_deps:(not delay_bindings)
                            ~with_evars ~flags ~hyps_only:true
                            ~delay_bindings lbind clause)
       with exn when catchable_exception exn ->
@@ -1798,10 +1797,12 @@ let general_apply with_delta with_destruct with_evars ~delay_bindings clear_flag
 
 let rec apply_with_bindings_gen b e = function
   | [] -> Proofview.tclUNIT ()
-  | [k,cb] -> general_apply b b e false k cb
+  | [k,cb] -> general_apply ~with_delta:b ~with_destruct:b ~with_evars:e
+                           ~delay_bindings:false ~clear_flag:k cb
   | (k,cb)::cbl ->
       Tacticals.New.tclTHENLAST
-        (general_apply b b e false k cb)
+        (general_apply ~with_delta:b ~with_destruct:b ~with_evars:e
+                       ~delay_bindings:false ~clear_flag:k cb)
         (apply_with_bindings_gen b e cbl)
 
 let apply_with_delayed_bindings_gen b e l = 
@@ -1811,7 +1812,8 @@ let apply_with_delayed_bindings_gen b e l =
       let env = Proofview.Goal.env gl in
       let (cb, sigma) = run_delayed env sigma f in
 	Tacticals.New.tclWITHHOLES e
-          (general_apply b b e false k (loc,cb)) sigma
+           (general_apply ~with_delta:b ~with_destruct:b ~with_evars:e
+                          ~delay_bindings:false ~clear_flag:k (loc,cb)) sigma
     end }
   in
   let rec aux = function
@@ -2238,7 +2240,9 @@ let constructor_tac with_evars expctdnumopt i lbind =
 	(Proofview.Goal.env gl) sigma (fst mind, i) in
       let cons = mkConstructU cons in
 	
-      let apply_tac = general_apply true false with_evars ~delay_bindings:true None (dloc,(cons,lbind)) in
+      let apply_tac = general_apply ~with_delta:true ~with_destruct:false
+                                    ~with_evars ~delay_bindings:true
+                                    ~clear_flag:None (dloc,(cons,lbind)) in
       let tac =
 	(Tacticals.New.tclTHENLIST
            [

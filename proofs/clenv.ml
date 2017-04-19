@@ -692,7 +692,7 @@ let evar_with_name holes id =
 let nth_anonymous holes n =
   let rec hole holes n =
     match holes, n with
-    | h :: holes, n when h.hole_deps -> hole holes n
+    | h :: holes, n when h.hole_name <> Anonymous -> hole holes n
     | h :: holes, 0 -> h.hole_evar
     | h :: holes, n -> hole holes (pred n)
     | [], _ -> errorlabstrm "" (str "No such binder.")
@@ -749,19 +749,38 @@ let hole_evar hole = fst (destEvar hole.hole_evar)
 let hole_type sigma hole =
   let concl = Evd.evar_concl (Evd.find_undefined sigma (hole_evar hole)) in
   Reductionops.nf_betaiota sigma (Evarutil.nf_evar sigma concl)
-                 
-let solve_evar_clause env sigma hyp_only clause = function
+
+let clenv_recompute_deps sigma ~hyps_only clenv =
+  let concl = clenv.cl_concl in
+  let fold h rest =
+    if h.hole_deps then
+      (** Some subsequent term uses the hole *)
+      let ev, _ = destEvar h.hole_evar in
+      let is_dep hole = occur_evar ev (hole_type sigma hole) in
+      let in_hyp = List.exists is_dep rest in
+      let in_concl = occur_evar ev concl in
+      let dep = if hyps_only then in_hyp && not in_concl else in_hyp || in_concl in
+      let h' = { h with hole_deps = dep } in
+      h' :: rest
+    else
+      (** The hole does not occur anywhere *)
+      h :: rest
+  in
+  let holes = List.fold_right fold clenv.cl_holes [] in
+  { clenv with cl_holes = holes }
+
+let solve_evar_clause env sigma ~hyps_only clause b =
+  match b with
 | NoBindings -> sigma, clause
 | ImplicitBindings largs ->
+  let clause = if hyps_only then clenv_recompute_deps sigma ~hyps_only clause else clause in
   let evs, holes' = List.split_with (fun h -> h.hole_deps) clause.cl_holes in
   let len = List.length evs in
   if Int.equal len (List.length largs) then
     let fold sigma ev arg = define_with_type sigma env ev.hole_evar arg in
     let sigma = List.fold_left2 fold sigma evs largs in
-    let clause = { cl_holes = holes'; cl_concl = nf_evar sigma clause.cl_concl;
-                   cl_val = nf_evar sigma clause.cl_val;
-                   cl_concl_occs = clause.cl_concl_occs } in
-    sigma, clause
+    let clause = { clause with cl_holes = holes' } in
+    sigma, clenv_advance sigma clause
   else
     error_not_right_number_missing_arguments len
 | ExplicitBindings lbind ->
@@ -775,13 +794,13 @@ let solve_evar_clause env sigma hyp_only clause = function
   let sigma, holes = List.fold_left fold (sigma,clause.cl_holes) lbind in
   let clause = { clause with cl_holes = holes } in
   sigma, clenv_advance sigma clause
-
+  
 let make_clenv_from_env env sigma ?len ?occs (c, t) =
   make_evar_clause env sigma ?len ?occs (strip_outer_cast c) t
 
 let make_clenv_bindings env sigma ?len ?occs p ~hyps_only b =
   let sigma, cle = make_clenv_from_env env sigma ?len ?occs p in
-  solve_evar_clause env sigma hyps_only cle b
+  solve_evar_clause env sigma ~hyps_only cle b
 
 let clenv_indep c =
   let holes = c.cl_holes in
@@ -882,25 +901,6 @@ let clenv_unify_type env sigma flags hole occs ty clenv =
 
 let clenv_unify_concl env sigma flags ty clenv =
   clenv_unify_type env sigma flags clenv.cl_concl clenv.cl_concl_occs ty clenv
-
-let clenv_recompute_deps sigma ~hyps_only clenv =
-  let concl = clenv.cl_concl in
-  let fold h rest =
-    if h.hole_deps then
-      (** Some subsequent term uses the hole *)
-      let ev, _ = destEvar h.hole_evar in
-      let is_dep hole = occur_evar ev (hole_type sigma hole) in
-      let in_hyp = List.exists is_dep rest in
-      let in_concl = occur_evar ev concl in
-      let dep = if hyps_only then in_hyp && not in_concl else in_hyp || in_concl in
-      let h' = { h with hole_deps = dep } in
-      h' :: rest
-    else
-      (** The hole does not occur anywhere *)
-      h :: rest
-  in
-  let holes = List.fold_right fold clenv.cl_holes [] in
-  { clenv with cl_holes = holes }
 
 let flags_of flags =
   let open_ts = Unification.(flags.core_unify_flags.modulo_delta) in

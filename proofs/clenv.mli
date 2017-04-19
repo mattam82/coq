@@ -167,14 +167,17 @@ val make_evar_clause :
     type together with the list of holes generated. Assumes that [t] is
     well-typed in the environment. *)
 
-val solve_evar_clause : env -> evar_map -> bool -> clause -> constr bindings ->
+val solve_evar_clause : env -> evar_map -> hyps_only:bool -> clause -> constr bindings ->
   evar_map * clause
-(** [solve_evar_clause env sigma hyps cl bl] tries to solve the holes contained
-    in [cl] according to the [bl] argument. Assumes that [bl] are well-typed in
-    the environment. The boolean [hyps] is a compatibility flag that allows to
-    consider arguments to be dependent only when they appear in hypotheses and
-    not in the conclusion. This boolean is only used when [bl] is of the form
-    [ImplicitBindings _]. *)
+(** [solve_evar_clause env sigma recompute_deps hyps_only cl bl] tries
+    to solve the holes contained in [cl] according to the [bl]
+    argument. Assumes that [bl] are well-typed in the environment. The
+    boolean [recompute_deps] tells if the dependent holes of the clause
+    have to be recomputed first, in which case [hyps_only] is a flag
+    that allows to consider arguments to be dependent only when they
+    appear in hypotheses and not in the conclusion. This boolean is
+    especially used when [bl] is of the form [ImplicitBindings _] to
+    determine which bindings to instantiate. *)
 
 val make_clenv_from_env :
   env -> evar_map -> ?len:int -> ?occs:Evarconv.occurrences_selection ->

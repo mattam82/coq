@@ -171,17 +171,11 @@ let debug_print_shelf s =
      tclUNIT ())
 
 let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-                     flags b (sigma, clenv) =
+                     flags (sigma, clenv) =
   let open Proofview in
   let open Proofview.Notations in
   Proofview.Goal.enter { enter = begin fun gl ->
   let env = Tacmach.New.pf_env gl in
-  let sigma, clenv =
-    match b with
-    | Some (hyps_only, b) ->
-       Clenv.solve_evar_clause env sigma hyps_only clenv b
-    | None -> sigma, clenv
-  in
   let sigma =
     try Evarconv.consider_remaining_unif_problems ~flags env sigma with _ -> sigma in
   let sigma =
@@ -244,7 +238,7 @@ let clenv_refine_no_check
   let flags = flags_of flags in
   Proofview.tclEVARMAP >>= fun sigma ->
   clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
-                   flags None (sigma, clenv)
+                   flags (sigma, clenv)
 
 let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
                   ?(flags=dft ()) clenv =
@@ -252,12 +246,17 @@ let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=tru
   let tac = clenv_unify_concl flags clenv in
   Ftactic.run tac
               (clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
-                                flags None)
+                                flags)
 
+(** The dependent holes turned into subgoals are 
+    
+    - evars of the clause which are dependent in other hypotheses of the clause,
+      whether or not they appear in the instantiated conclusion.
+ *)
+  
 let clenv_refine_bindings
     ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-    ?(recompute_deps=true) ?(flags=dft ())
-    ~hyps_only ~delay_bindings b clenv =
+    ?(flags=dft ()) ~hyps_only ~delay_bindings b clenv =
   let open Proofview in
   let flags = flags_of flags in
   Proofview.Goal.enter { enter = fun gl ->
@@ -265,20 +264,26 @@ let clenv_refine_bindings
     let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
     let sigma, clenv, bindings =
       if delay_bindings then
-        sigma, clenv, Some (hyps_only, b)
+        sigma, clenv, Some b
       else
-        let sigma, clenv = Clenv.solve_evar_clause env sigma hyps_only clenv b in
+        let sigma, clenv = Clenv.solve_evar_clause env sigma ~hyps_only clenv b in
         sigma, clenv, None
     in
     let tac = clenv_unify_concl flags clenv in
     (Unsafe.tclEVARS sigma) <*>
     (Ftactic.run tac
       (fun (sigma, clenv) ->
-      let clenv =
-        if recompute_deps then clenv_recompute_deps sigma ~hyps_only clenv
-        else clenv in
-      clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
-                       flags bindings (sigma, clenv))) }
+        let sigma, clenv =
+          match bindings with
+          | Some b ->
+             (* Hack to make [exists 0] on [Σ x : nat, True] work, we
+                use implicit bindings for a hole that's not dependent
+                after unification, but reuse the typing information. *)
+             Clenv.solve_evar_clause env sigma ~hyps_only:false clenv b
+          | None -> sigma, clenv_recompute_deps sigma ~hyps_only:false clenv
+        in
+        clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
+                         flags (sigma, clenv))) }
 
 let res_pf ?(with_evars=false) ?(with_classes=true) ?(flags=dft ()) clenv =
   Proofview.Goal.enter { enter = begin fun gl ->

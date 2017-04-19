@@ -168,7 +168,7 @@ Proof.
  intros (l,F).
  destruct l.
  - left; exact F.
- - right. eexists. 
+ - right; now eexists a.
 Qed.
 
 Lemma Surjective_inverse :
