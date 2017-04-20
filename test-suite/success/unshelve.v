@@ -17,11 +17,11 @@ Goal A /\ B -> exists a : A, B.
   revert a.
   unshelve_evar ?a.
   unshelve_goals a; cycle 1. apply (proj1 H).
-
-  instantiate (1:=ltac:(refine (proj1 ?[a']))).
+  Undo.
+  shelve. instantiate (1:=ltac:(refine (proj1 ?[a']))).
   simple refine (let pf : A /\ B := ?[pf] in _); cycle 1.
   intro a.
   unify a (proj1 pf).
-  Fail unify (proj1 pf) a.
+  unify (proj1 pf) a.
   Fail all: [ > unify ?pf ?a' | ]; [ | ].
   Fail all: [ > unify ?a' ?pf | ]; [ | ].

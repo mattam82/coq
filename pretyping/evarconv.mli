@@ -115,6 +115,7 @@ val evar_eqappr_x : ?rhs_is_already_stuck:bool -> unify_flags ->
 val apply_on_subterm :
              Environ.env ->
            Evd.evar_map ref ->
+           Evar.Set.t ->
            Evar.Set.t ref ->
            (int -> Term.types -> Term.constr) ->
            (Environ.env ->

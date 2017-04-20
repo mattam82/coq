@@ -1013,12 +1013,12 @@ let default_occurrences_selection n =
   (default_occurrence_test, List.init n (fun _ -> default_occurrence_selection))
 
 open Context.Named.Declaration
-let apply_on_subterm env evdref fixedref f test c t =
+let apply_on_subterm env evdref frozen fixedref f test c t =
   let test = test env !evdref c in
   let rec applyrec (env,(k,c) as acc) t =
     if Evar.Set.exists (fun fixed -> occur_evar fixed t) !fixedref then
       match kind_of_term t with
-      | Evar (ev, args) when Evar.Set.mem ev !fixedref -> t
+      | Evar (ev, args) when Evar.Set.mem ev !fixedref && not (Evar.Set.mem ev frozen) -> t
       | _ -> map_constr_with_binders_left_to_right
 	      (fun d (env,(k,c)) -> (push_rel d env, (k+1,lift 1 c)))
 	      applyrec acc t
@@ -1163,7 +1163,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
         evsref := (evk,evty,prefer_abstraction)::!evsref;
         fixed := Evar.Set.add evk !fixed;
         ev in
-      let rhs' = apply_on_subterm env_evar_unf evdref fixed set_var test c rhs in
+      let rhs' = apply_on_subterm env_evar_unf evdref flags.frozen_evars fixed set_var test c rhs in
       if !debug_ho_unification then
         Feedback.msg_debug Pp.(str"abstracted: " ++ print_constr_env env_rhs rhs');
       let () =

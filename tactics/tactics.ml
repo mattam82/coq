@@ -4204,7 +4204,8 @@ let induction_tac with_evars params indvars elim toclear =
     let concl, args = decompose_app_vect (clenv_concl elimclause') in
     (* let clear_ids = List.filter (fun f -> Array.exists (isVarId f) args) toclear in *)
     (* let sigma, clenv' = clear clear_ids in *)
-    let occs = Evarconv.default_occurrences_selection (Array.length args) in
+    (* let occs = Evarconv.default_occurrences_selection (Array.length args) in *)
+    let occs = (Evarconv.default_occurrence_test, List.init (Array.length args) (fun _ -> Evarconv.Unspecified true)) in
     sigma, { elimclause' with cl_concl_occs = Some occs }
   in
   let flags = Unification.default_unify_flags () in

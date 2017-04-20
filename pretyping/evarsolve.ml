@@ -663,6 +663,19 @@ let restrict_upon_filter evd evk p args =
   let len = Array.length args in
   Filter.restrict_upon oldfullfilter len (fun i -> p (Array.unsafe_get args i))
 
+let check_evar_instance evd evk1 body conv_algo =
+  let evi = Evd.find evd evk1 in
+  let evenv = evar_env evi in
+  (* FIXME: The body might be ill-typed when this is called from w_merge *)
+  (* This happens in practice, cf MathClasses build failure on 2013-3-15 *)
+  let ty =
+    try Retyping.get_type_of ~lax:true evenv evd body
+    with Retyping.RetypeError _ -> error "Ill-typed evar instance"
+  in
+  match conv_algo true evenv evd Reduction.CUMUL ty evi.evar_concl with
+  | Success evd -> evd
+  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
+  
 (***************)
 (* Unification *)
 
@@ -795,12 +808,12 @@ let rec find_solution_type evarenv = function
  * pass [define] to [do_projection_effects] as a parameter.
  *)
 
-let rec do_projection_effects define_fun env ty evd = function
+let rec do_projection_effects conv_algo define_fun env ty evd = function
   | ProjectVar -> evd
   | ProjectEvar ((evk,argsv),evi,id,p) ->
-      let evd = Evd.define evk (mkVar id) evd in
+      let evd = check_evar_instance evd evk (mkVar id) conv_algo in
       (* TODO: simplify constraints involving evk *)
-      let evd = do_projection_effects define_fun env ty evd p in
+      let evd = do_projection_effects conv_algo define_fun env ty evd p in
       let ty = whd_all env evd (Lazy.force ty) in
       if not (isSort ty) then
         (* Don't try to instantiate if a sort because if evar_concl is an
@@ -1145,19 +1158,6 @@ let project_evar_on_evar force g env evd aliases k2 pbty (evk1,argsv1 as ev1) (e
   else
     raise (CannotProject (evd,ev1'))
 
-let check_evar_instance evd evk1 body conv_algo =
-  let evi = Evd.find evd evk1 in
-  let evenv = evar_env evi in
-  (* FIXME: The body might be ill-typed when this is called from w_merge *)
-  (* This happens in practice, cf MathClasses build failure on 2013-3-15 *)
-  let ty =
-    try Retyping.get_type_of ~lax:true evenv evd body
-    with Retyping.RetypeError _ -> error "Ill-typed evar instance"
-  in
-  match conv_algo true evenv evd Reduction.CUMUL ty evi.evar_concl with
-  | Success evd -> evd
-  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
-
 let update_evar_source ev1 ev2 evd =
   let loc, evs2 = evar_source ev2 evd in
   match evs2 with
@@ -1359,7 +1359,7 @@ let rec invert_definition conv_algo choose imitate_defs
             if choose then (mkVar id, p) else raise (NotUniqueInType sols)
       in
       let ty = lazy (Retyping.get_type_of env !evdref t) in
-      let evd = do_projection_effects (evar_define conv_algo ~choose) env ty !evdref p in
+      let evd = do_projection_effects conv_algo (evar_define conv_algo ~choose) env ty !evdref p in
       evdref := evd;
       c
     with

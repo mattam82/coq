@@ -642,11 +642,15 @@ let merge_universe_context evd uctx' =
 let set_universe_context evd uctx' =
   { evd with universes = uctx' }
 
-(* TODO: make unique *)
-let add_conv_pb ?(tail=false) pb d =
-  if tail then {d with conv_pbs = d.conv_pbs @ [pb]}
-  else {d with conv_pbs = pb::d.conv_pbs}
+let eq_conv_pb (pbty,env,t1,t2) (pbty',env',t1',t2') =
+  pbty == pbty' && env == env' && Constr.equal t1 t1' && Constr.equal t2 t2'
 
+let add_conv_pb ?(tail=false) pb d =
+  if not (List.mem_f eq_conv_pb pb d.conv_pbs) then
+    if tail then {d with conv_pbs = d.conv_pbs @ [pb]}
+    else {d with conv_pbs = pb::d.conv_pbs}
+  else d
+  
 let evar_source evk d = (find d evk).evar_source
 
 let evar_ident evk evd = EvNames.ident evk evd.evar_names

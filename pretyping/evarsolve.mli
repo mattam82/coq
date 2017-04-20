@@ -79,3 +79,43 @@ val remove_instance_local_defs :
 
 val get_type_of_refresh : 
   ?polyprop:bool -> ?lax:bool -> env -> evar_map -> constr -> evar_map * types
+
+val recheck_applications :            (bool ->
+            Environ.env ->
+            Evd.evar_map ->
+            Reduction.conv_pb ->
+            Term.types -> Term.types -> unification_result) ->
+           Environ.env -> Evd.evar_map ref -> Term.constr -> unit
+
+val invert_definition :            (bool ->
+            Environ.env ->
+            Evd.evar_map ->
+            Reduction.conv_pb ->
+            Term.types -> Term.constr -> unification_result) ->
+           bool ->
+           bool ->
+           Environ.env ->
+           Evd.evar_map ->
+           bool option ->
+           Evd.evar * Constr.constr array ->
+           Term.constr -> Evd.evar_map * Term.constr
+
+type evar_projection =
+| ProjectVar
+| ProjectEvar of existential * evar_info * Names.Id.t * evar_projection
+  
+val find_projectable_vars :            bool ->
+           Term.constr list Names.Id.Map.t * Term.constr list Int.Map.t ->
+           Evd.evar_map ->
+           Term.constr ->
+           (Term.constr * Term.constr option * Names.Id.t) list
+           Names.Id.Map.t -> (Names.Id.t * evar_projection) list
+
+  val assoc_up_to_alias :            Evd.evar_map ->
+           Term.constr list Names.Id.Map.t * Term.constr list Int.Map.t ->
+           Term.constr ->
+           Term.constr -> (Term.constr * Term.constr option * Names.Id.t) list -> Names.Id.t
+
+val normalize_alias_opt : Term.constr list Names.Id.Map.t * Term.constr list Int.Map.t ->
+           Term.constr -> Term.constr option
+
