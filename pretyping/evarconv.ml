@@ -1163,7 +1163,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
         evsref := (evk,evty,prefer_abstraction)::!evsref;
         fixed := Evar.Set.add evk !fixed;
         ev in
-      let rhs' = apply_on_subterm env_evar_unf evdref flags.frozen_evars fixed set_var test c rhs in
+      let rhs' = apply_on_subterm env_rhs evdref flags.frozen_evars fixed set_var test c rhs in
       if !debug_ho_unification then
         Feedback.msg_debug Pp.(str"abstracted: " ++ print_constr_env env_rhs rhs');
       let () =
