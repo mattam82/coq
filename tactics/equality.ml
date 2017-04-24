@@ -1121,7 +1121,8 @@ let discrEq with_evars env sigma (lbeq,_,(t,t1,t2) as u) eq_clause =
   | Inr _ ->
      tclZEROMSG (str"Not a discriminable equality.")
   | Inl (cpath, (_,dirn), _) ->
-     discr_positions with_evars env sigma u eq_clause cpath dirn
+     try discr_positions with_evars env sigma u eq_clause cpath dirn
+     with UserError _ as e -> Proofview.tclZERO e
 
 let decompose_eq gl eqn =
   try Proofview.tclUNIT (find_this_eq_data_decompose gl eqn)
