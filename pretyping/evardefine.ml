@@ -19,9 +19,10 @@ open Evarutil
 open Pretype_errors
 open Sigma.Notations
 
-let new_evar_unsafe env evd ?src ?filter ?candidates ?store ?naming ?principal typ =
+let new_evar_unsafe env evd ?src ?filter ?abstraction ?candidates ?store ?naming ?principal typ =
   let evd = Sigma.Unsafe.of_evar_map evd in
-  let Sigma (evk, evd, _) = new_evar env evd ?src ?filter ?candidates ?store ?naming ?principal typ in
+  let Sigma (evk, evd, _) = new_evar env evd ?src ?filter ?abstraction
+                                     ?candidates ?store ?naming ?principal typ in
   (Sigma.to_evar_map evd, evk)
 
 let env_nf_evar sigma env =
@@ -142,7 +143,8 @@ let define_pure_evar_as_lambda env evd evk =
   let newenv = push_named (LocalAssum (id, dom)) evenv in
   let filter = Filter.extend 1 (evar_filter evi) in
   let src = evar_source evk evd1 in
-  let evd2,body = new_evar_unsafe newenv evd1 ~src (subst1 (mkVar id) rng) ~filter in
+  let abstraction = Abstraction.abstract_last evi.evar_abstraction in
+  let evd2,body = new_evar_unsafe newenv evd1 ~src (subst1 (mkVar id) rng) ~filter ~abstraction in
   let lam = mkLambda (Name id, dom, subst_var id body) in
   Evd.define evk lam evd2, lam
 

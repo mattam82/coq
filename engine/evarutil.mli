@@ -22,13 +22,13 @@ val mk_new_meta : unit -> constr
 (** {6 Creating a fresh evar given their type and context} *)
 val new_evar :
   env -> 'r Sigma.t -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
-  ?candidates:constr list -> ?store:Store.t ->
+  ?abstraction:Abstraction.t -> ?candidates:constr list -> ?store:Store.t ->
   ?naming:Misctypes.intro_pattern_naming_expr ->
   ?future_goal:bool -> ?principal:bool -> types -> (constr, 'r) Sigma.sigma
 
 val new_pure_evar :
   named_context_val -> 'r Sigma.t -> ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t ->
-  ?candidates:constr list -> ?store:Store.t ->
+  ?abstraction:Abstraction.t -> ?candidates:constr list -> ?store:Store.t ->
   ?naming:Misctypes.intro_pattern_naming_expr ->
   ?future_goal:bool -> ?principal:bool -> types -> (evar, 'r) Sigma.sigma
 
@@ -70,8 +70,8 @@ val e_new_global : evar_map ref -> Globnames.global_reference -> constr
    as a telescope) is [sign] *)
 val new_evar_instance :
  named_context_val -> 'r Sigma.t -> types -> 
-  ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t -> ?candidates:constr list ->
-  ?store:Store.t -> ?naming:Misctypes.intro_pattern_naming_expr ->
+  ?src:Loc.t * Evar_kinds.t -> ?filter:Filter.t -> ?abstraction:Abstraction.t ->
+  ?candidates:constr list -> ?store:Store.t -> ?naming:Misctypes.intro_pattern_naming_expr ->
   ?future_goal:bool -> ?principal:bool ->
   constr list -> (constr, 'r) Sigma.sigma
 

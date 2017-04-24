@@ -79,6 +79,14 @@ sig
 
 end
 
+module Abstraction : sig
+  type t = bool list
+
+  val identity : t
+
+  val abstract_last : t -> t
+end
+
 (** {6 Evar infos} *)
 
 type evar_body =
@@ -99,6 +107,10 @@ type evar_info = {
   evar_filter : Filter.t;
   (** Boolean mask over {!evar_hyps}. Should have the same length.
       TODO: document me more. *)
+  evar_abstraction : Abstraction.t;
+  (** Boolean information over {!evar_hyps}, telling if an hypothesis instance
+      can be immitated or should stay abstract in HO unification problems
+      and inversion. *)
   evar_source : Evar_kinds.t located;
   (** Information about the evar. *)
   evar_candidates : constr list option;

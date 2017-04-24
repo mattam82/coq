@@ -1104,12 +1104,15 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
     (Feedback.msg_debug Pp.(str"env rhs: " ++ print_named_context env_rhs);
      Feedback.msg_debug Pp.(str"env evars: " ++ print_named_context env_evar));
   let args = Array.map (nf_evar evd) args in
-  let instance = List.map mkVar (List.map get_id ctxt) in
+  let vars = List.map get_id ctxt in
+  let argsubst = List.map2 (fun id c -> (id, c)) vars (Array.to_list args) in
+  let instance = List.map mkVar vars in
   let rhs = nf_evar evd rhs in
   if not (noccur_evar env_rhs evd evk rhs) then raise (TypingFailed evd);
   (** Ensure that any progress made by Typing.e_solve_evars will not contradict
       the solution we are trying to build here by adding the problem as a constraint. *)
   let evd = Evd.add_conv_pb (CONV,env_rhs,mkEvar (evk,args),rhs) evd in
+  let evdref = ref evd in
   let rec make_subst = function
   | decl'::ctxt', c::l, occs::occsl when isVarId (get_id decl') c ->
       begin match occs with
@@ -1122,7 +1125,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
       let (id,_,t) = to_tuple decl' in
       let evs = ref [] in
       let c = nf_evar evd c in
-      let ty = Retyping.get_type_of env_rhs evd c in
+      let ty = replace_vars argsubst t in
       let filter' = filter_possible_projections c (nf_evar evd ty) ctxt args in
       (id,t,c,ty,evs,Filter.make filter',occs) :: make_subst (ctxt',l,occsl)
   | _, _, [] -> []
@@ -1175,7 +1178,6 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
 
   let subst = make_subst (ctxt,Array.to_list args,argoccs) in
 
-  let evdref = ref evd in
   let rhs' = set_holes evdref rhs subst in
   let evd = !evdref in
   let rhs' = nf_evar evd rhs' in
@@ -1283,10 +1285,19 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   evd, true
   with TypingFailed evd -> evd, false
 
+let default_evar_selection evd (ev,args) =
+  let evi = Evd.find_undefined evd ev in
+  let rec aux args abs =
+    match args, abs with
+    | _ :: args, a :: abs -> Unspecified a :: aux args abs
+    | l, [] -> List.map (fun _ -> default_occurrence_selection) l
+    | [], _ :: _ -> assert false
+  in aux (Array.to_list args) evi.evar_abstraction
+
 let second_order_matching_with_args flags env evd with_ho pbty ev l t =
   if with_ho then
     let evd,ev = evar_absorb_arguments env evd ev (Array.to_list l) in
-    let argoccs = Array.map_to_list (fun _ -> default_occurrence_selection) (snd ev) in
+    let argoccs = default_evar_selection evd ev in
     let test = default_occurrence_test in
     let evd, b = second_order_matching flags env evd ev (test,argoccs) t in
     if b then Success evd
