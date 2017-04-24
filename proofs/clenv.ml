@@ -853,54 +853,54 @@ let clenv_map_concl f clenv =
   let concl = clenv.cl_concl in
   { clenv with cl_concl = f concl }
         
-let clenv_unify_type env sigma flags hole occs ty clenv =
+let clenv_unify_type env sigma flags hole occs ty =
   (** Give priority to second-order matching which avoids falling back
       to it with unfolded terms through evar_conv. *)
-  let sigma =
-    let ev, l = decompose_appvect (nf_evar sigma hole) in
-    let hd, l' = decompose_appvect ty in
-    let is_explicit_pattern =
-      if Array.length l == Array.length l' then
-        try ignore(decompose_lam_n (Array.length l) hd); true
-        with e -> false
-      else false
-    in
-    (** In case the clause is not higher-order (has no occurrences selected)
-        or the type we're unifying with is an explicit predicate
-        applied to the right number of arguments, we favor direct
-        unification. *)
-    match occs with
-    | Some (f, occs) when not is_explicit_pattern ->
-      let (evk, subst as ev) = destEvar ev in
-      let sigma, ev' =
-        Evardefine.evar_absorb_arguments env sigma ev (Array.to_list l) in
-      let argoccs = Array.map_to_list (fun _ -> Evarconv.default_occurrence_selection) (snd ev) in
-      let f, occs =
-        (** We are lenient here, allowing more occurrences to be specified than
+  let ev, l = decompose_appvect (nf_evar sigma hole) in
+  let hd, l' = decompose_appvect ty in
+  let is_explicit_pattern =
+    if Array.length l == Array.length l' then
+      try ignore(decompose_lam_n (Array.length l) hd); true
+      with e -> false
+    else false
+  in
+  (** In case the clause is not higher-order (has no occurrences selected)
+      or the type we're unifying with is an explicit predicate
+      applied to the right number of arguments, we favor direct
+      unification. *)
+  match occs with
+  | Some (f, occs) when not is_explicit_pattern ->
+     let (evk, subst as ev) = destEvar ev in
+     let sigma, ev' =
+       Evardefine.evar_absorb_arguments env sigma ev (Array.to_list l) in
+     let argoccs = Array.map_to_list (fun _ -> Evarconv.default_occurrence_selection) (snd ev) in
+     let f, occs =
+       (** We are lenient here, allowing more occurrences to be specified than
             the actual arguments of the evar. Helps dealing with eliminators we
             don't know the arity of (e.g. dependent or not). *)
-        let () =
-          if not (Array.length l <= List.length occs) then
-            error ("Clause unification: occurrence list does not match argument list")
-        in (f, List.firstn (Array.length l) occs)
-      in
-      let occs = List.rev (argoccs @ occs) in
-      let sigma, b =
-        Evarconv.second_order_matching flags env sigma ev' (f, occs) ty
-      in
-      if not b then
-        let reason = ConversionFailed (env,clenv.cl_concl,ty) in
-        Pretype_errors.error_cannot_unify env sigma ~reason (hole, ty)
-      else sigma
-    | _ ->
-      let sigma = Evd.add_conv_pb (CUMUL,env,hole,ty) sigma in
-      Evarconv.consider_remaining_unif_problems
-        ~flags ~with_ho:true env sigma
-  in
-  sigma, clenv_advance sigma clenv
+       let () =
+         if not (Array.length l <= List.length occs) then
+           error ("Clause unification: occurrence list does not match argument list")
+       in (f, List.firstn (Array.length l) occs)
+     in
+     let occs = List.rev (argoccs @ occs) in
+     let sigma, b =
+       Evarconv.second_order_matching flags env sigma ev' (f, occs) ty
+     in
+     if not b then
+       let reason = ConversionFailed (env,hole,ty) in
+       Pretype_errors.error_cannot_unify env sigma ~reason (hole, ty)
+     else sigma
+  | _ ->
+     let sigma = Evd.add_conv_pb (CUMUL,env,hole,ty) sigma in
+     Evarconv.consider_remaining_unif_problems
+       ~flags ~with_ho:true env sigma
 
 let clenv_unify_concl env sigma flags ty clenv =
-  clenv_unify_type env sigma flags clenv.cl_concl clenv.cl_concl_occs ty clenv
+  let concl, occs = clenv.cl_concl, clenv.cl_concl_occs in
+  let sigma = clenv_unify_type env sigma flags concl occs ty in
+  sigma, clenv_advance sigma clenv
+
 
 let flags_of flags =
   let open_ts = Unification.(flags.core_unify_flags.modulo_delta) in
@@ -940,7 +940,7 @@ let clenv_chain ?(holes_order=true) ?(flags=fchain_flags ()) ?occs
     | Some _ ->
        let ty = hole_type sigma h in
        let ty' = nextcl.cl_concl in
-       let sigma, cl = clenv_unify_type env sigma (flags_of flags) ty occs ty' cl in
+       let sigma = clenv_unify_type env sigma (flags_of flags) ty occs ty' in
        let (ev, _) = destEvar h.hole_evar in
        let sigma = Evd.define ev nextcl.cl_val sigma in
        sigma, cl
