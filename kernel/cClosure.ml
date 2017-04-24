@@ -883,7 +883,10 @@ and knht info e t stk =
     | Fix fx -> knh info { norm = Cstr; term = FFix (fx, e) } stk
     | Cast(a,_,_) -> knht info e a stk
     | Rel n -> knh info (clos_rel e n) stk
-    | Proj (p, c) -> knh info { norm = Red; term = FProj (p, mk_clos e c) } stk
+    | Proj (p, c) ->
+       (match unfold_projection info p with
+        | None -> knh info { norm = Whnf; term = FProj (p, mk_clos e c) } stk
+        | Some s -> knht info e c (s :: zupdate info { norm = Red; term = FProj (p, mk_clos e c) } stk))
     | (Ind _|Const _|Construct _|Var _|Meta _ | Sort _) -> (mk_clos e t, stk)
     | CoFix cfx -> { norm = Cstr; term = FCoFix (cfx,e) }, stk
     | Lambda _ -> { norm = Cstr; term = mk_lambda e t }, stk
