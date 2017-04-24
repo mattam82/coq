@@ -76,15 +76,18 @@ let refine ?(unsafe = true) f = Proofview.Goal.enter { enter = begin fun gl ->
     if not (Evarutil.occur_evar_upto sigma self c) then ()
     else Pretype_errors.error_occur_check env sigma self c
   in
-  (** Proceed to the refinement *)
-  let sigma = match evkmain with
-    | None -> Evd.define self c sigma
-    | Some evk ->
-        let id = Evd.evar_ident self sigma in
-        let sigma = Evd.define self c sigma in
-        match id with
-        | None -> sigma
-        | Some id -> Evd.rename evk id sigma
+  let sigma =
+    if Evd.is_defined sigma self then sigma
+    else
+      (** Proceed to the refinement *)
+      match evkmain with
+      | None -> Evd.define self c sigma
+      | Some evk ->
+         let id = Evd.evar_ident self sigma in
+         let sigma = Evd.define self c sigma in
+         match id with
+         | None -> sigma
+         | Some id -> Evd.rename evk id sigma
   in
   (** Restore the [future goals] state. *)
   let sigma = Evd.restore_future_goals sigma prev_future_goals prev_principal_goal in
