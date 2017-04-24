@@ -715,34 +715,26 @@ let clenv_advance sigma clenv =
   let { cl_concl; cl_holes; cl_val; cl_concl_occs } = clenv in
   let advance h =
     let h' = whd_evar sigma h.hole_evar in
-    Constr.equal h' h.hole_evar
+    if Constr.equal h' h.hole_evar then Some h
+    else
+      let ev, args = destEvar h.hole_evar in
+      match Proofview.Unsafe.advance sigma ev with
+      | Some ev' ->
+         let na =
+           match evar_ident ev' sigma with
+           | Some id -> Name id
+           | None -> h.hole_name
+         in
+         Some { h with hole_evar = h'; hole_name = na }
+      | None -> None
   in
-  let holes = List.smartfilter advance cl_holes in
+  let holes = List.map_filter advance cl_holes in
     if holes == cl_holes then clenv
     else
       { cl_holes = holes;
         cl_concl = nf_evar sigma cl_concl;
         cl_val = nf_evar sigma cl_val;
         cl_concl_occs }
-
-let clenv_advance_clear sigma clenv =
-  let { cl_concl; cl_holes; cl_val; cl_concl_occs } = clenv in
-  let advance h =
-    let h' = whd_evar sigma h.hole_evar in
-    if isEvar h' then
-      let na =
-        match evar_ident (fst (destEvar h')) sigma with
-        | Some id -> Name id
-        | None -> h.hole_name
-      in
-      Some { h with hole_evar = h'; hole_name = na }
-    else None
-  in
-  let holes = List.map_filter advance cl_holes in
-  { cl_holes = holes;
-    cl_concl = nf_evar sigma cl_concl;
-    cl_val = nf_evar sigma cl_val;
-    cl_concl_occs }
         
 let hole_evar hole = fst (destEvar hole.hole_evar)
     

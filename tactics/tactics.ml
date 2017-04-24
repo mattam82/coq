@@ -1271,9 +1271,9 @@ let do_replace id = function
   | NamingMustBe (_,id') when Option.equal Id.equal id (Some id') -> true
   | _ -> false
 
-let clenvtac_advance_clear clenv =
+let clenvtac_advance clenv =
   Proofview.tclEVARMAP >>= fun sigma ->
-  Proofview.tclUNIT (clenv_advance_clear sigma clenv)
+  Proofview.tclUNIT (clenv_advance sigma clenv)
 
 (* For a clenv expressing some lemma [C[?1:T1,...,?n:Tn] : P] and some
    goal [G], [clenv_refine_in] returns [n+1] subgoals, the [n] last
@@ -1291,7 +1291,7 @@ let clenv_refine_in ?(sidecond_first=false) with_evars ?(with_classes=true) flag
   (* For compatibility: reduce the conclusion *)
   let clenv = clenv_map_concl (Reductionops.nf_betaiota sigma) clenv in
   let exact_tac =
-    clenvtac_advance_clear clenv >>= fun clenv ->
+    clenvtac_advance clenv >>= fun clenv ->
     Clenvtac.clenv_refine_no_check ~with_evars ~with_classes ~flags
                                    ~shelve_subgoals:true clenv in
   let new_hyp_typ = clenv_concl clenv in
@@ -4198,7 +4198,7 @@ let induction_tac with_evars params indvars elim toclear =
       sigma
     in
     let sigma = List.fold_left make_indep sigma rest in
-    sigma, clenv_advance_clear sigma elimclause'
+    sigma, clenv_advance sigma elimclause'
   in
   let sigma, elimclause' =
     let concl, args = decompose_app_vect (clenv_concl elimclause') in

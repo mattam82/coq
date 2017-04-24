@@ -215,7 +215,6 @@ val clenv_unify_concl : env -> evar_map ->
                         evar_map * clause
 
 val clenv_advance : evar_map -> clause -> clause
-val clenv_advance_clear : evar_map -> clause -> clause
 val clenv_map : (constr -> constr) -> clause -> clause
 
 val clenv_map_concl : (constr -> constr) -> clause -> clause
