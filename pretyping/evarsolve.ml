@@ -812,6 +812,7 @@ let rec do_projection_effects conv_algo define_fun env ty evd = function
   | ProjectVar -> evd
   | ProjectEvar ((evk,argsv),evi,id,p) ->
       let evd = check_evar_instance evd evk (mkVar id) conv_algo in
+      let evd = Evd.define evk (mkVar id) evd in
       (* TODO: simplify constraints involving evk *)
       let evd = do_projection_effects conv_algo define_fun env ty evd p in
       let ty = whd_all env evd (Lazy.force ty) in
