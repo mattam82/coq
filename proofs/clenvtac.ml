@@ -206,7 +206,8 @@ let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=
     let concl = Proofview.Goal.concl gl in
     let glev = Proofview.Goal.goal gl in
     let sigma = Sigma.to_evar_map sigma in
-    let concl = Reductionops.nf_betaiota (* For compatibility *) sigma concl in
+    (* For compatibility: beta iota reduction *)
+    let concl = Reductionops.clos_norm_flags CClosure.betaiota env sigma concl in
     let evi = Evd.find sigma glev in
     let sigma = Evd.add sigma glev { evi with evar_concl = concl } in
     Proofview.Unsafe.tclEVARS sigma
