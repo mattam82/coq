@@ -517,6 +517,13 @@ exception Depends of Id.t
 let restrict_evar evd evk filter candidates =
   let evd = Sigma.to_evar_map evd in
   let evd, evk' = Evd.restrict evk filter ?candidates evd in
+  (** Mark previous evar as cleared *)
+  let evi = Evd.find evd evk in
+  let extra = evi.evar_extra in
+  let extra' = Store.set extra cleared true in
+  let evi' = { evi with evar_extra = extra' } in
+  let evd = Evd.add evd evk evi' in
+  (** Add new evar *)
   let evi = Evd.find_undefined evd evk' in
   let evi' = { evi with evar_concl = nf_evar evd evi.evar_concl } in
   let evd = Evd.add evd evk' evi' in
