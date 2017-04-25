@@ -247,8 +247,10 @@ type inference_flags = {
   expand_evars : bool
 }
 
-let frozen_holes (sigma, sigma') =
-  (); fun ev -> Evar.Map.mem ev (Evd.undefined_map sigma)
+let frozen_holes (sigma, sigma') = Evar.Map.domain (Evd.undefined_map sigma)
+
+let filter_frozen frozen =
+  (); fun ev -> Evar.Set.mem ev frozen
 
 let pending_holes (sigma, sigma') =
   let fold evk _ accu =
@@ -257,7 +259,7 @@ let pending_holes (sigma, sigma') =
   Evd.fold_undefined fold sigma' Evar.Set.empty
 
 let apply_typeclasses env evdref frozen fail_evar =
-  let filter_frozen = frozen in
+  let filter_frozen = filter_frozen frozen in
   evdref := Typeclasses.resolve_typeclasses
      ~filter:(if Flags.is_program_mode () 
 	      then (fun evk evi -> Typeclasses.no_goals_or_obligations evk evi && not (filter_frozen evk))
@@ -290,10 +292,28 @@ let check_typeclasses_instances_are_solved env current_sigma frozen =
   (* Naive way, call resolution again with failure flag *)
   apply_typeclasses env (ref current_sigma) frozen true
 
-let check_extra_evars_are_solved env current_sigma pending =
+let reachable_from_frozen current_sigma frozen evk =
+  let rec search evk' visited =
+    if Evar.Set.mem evk' visited then visited
+    else
+      let visited = Evar.Set.add evk' visited in
+      if Evd.is_defined current_sigma evk' then
+        let evars = evars_of_filtered_evar_info (Evd.find current_sigma evk') in
+        if Evar.Set.mem evk evars then raise Exit
+        else
+          Evar.Set.fold (fun evk visited -> search evk visited) evars visited
+      else Evar.Set.add evk' visited
+  in
+  try
+    let _ = Evar.Set.fold (fun evk' visited -> search evk' visited) frozen Evar.Set.empty in
+    false
+  with Exit -> true
+
+let check_extra_evars_are_solved env current_sigma frozen pending =
   Evar.Set.iter
     (fun evk ->
-      if not (Evd.is_defined current_sigma evk) then
+      if not (Evd.is_defined current_sigma evk)
+       && not (reachable_from_frozen current_sigma frozen evk) then
         let (loc,k) = evar_source evk current_sigma in
 	match k with
 	| Evar_kinds.ImplicitArg (gr, (i, id), false) -> ()
@@ -320,7 +340,7 @@ let check_evars env initial_sigma sigma c =
 let check_evars_are_solved env current_sigma frozen pending =
   check_typeclasses_instances_are_solved env current_sigma frozen;
   check_problems_are_solved env current_sigma;
-  check_extra_evars_are_solved env current_sigma pending
+  check_extra_evars_are_solved env current_sigma frozen pending
 
 (* Try typeclasses, hooks, unification heuristics ... *)
 
