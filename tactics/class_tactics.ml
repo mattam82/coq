@@ -1031,7 +1031,7 @@ module Search = struct
     Proofview.Goal.enter { enter = fun gl ->
       let gl = Proofview.Goal.assume gl in
       let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
-      if is_class_type sigma (Proofview.Goal.concl gl) then
+      if is_class_type sigma (Proofview.Goal.concl gl) == Proofview.Unknown then
         Proofview.tclUNIT ()
       else (if !typeclasses_debug > 1 then
               Feedback.msg_debug (pr_depth info.search_depth ++
@@ -1129,7 +1129,7 @@ module Search = struct
             try
               let evi = Evd.find_undefined sigma ev in
               if info.search_only_classes then
-                Some (ev, not (is_class_type sigma (Evd.evar_concl evi)))
+                Some (ev, not (is_class_type sigma (Evd.evar_concl evi) == Proofview.IsClass))
               else Some (ev, true)
             with Not_found -> None
           in

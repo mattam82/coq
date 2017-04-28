@@ -608,7 +608,7 @@ let make_evar_clause env sigma ?len t =
     else match kind_of_term t with
     | Cast (t, _, _) -> clrec (sigma, holes) n t
     | Prod (na, t1, t2) ->
-      let store = Typeclasses.set_resolvable Evd.Store.empty false in
+      let store = Typeclasses.set_unknown_resolvable Evd.Store.empty false in
       let sigma = Sigma.Unsafe.of_evar_map sigma in
       let Sigma (ev, sigma, _) = new_evar ~store env sigma t1 in
       let sigma = Sigma.to_evar_map sigma in

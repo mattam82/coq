@@ -72,8 +72,18 @@ val return : proofview -> Evd.evar_map
 val partial_proof : entry -> proofview -> constr list
 val initial_goals : entry -> (constr * types) list
 
+(** {6 Interaction with typeclasses} *)
 
+type typeclass_is_class =
+  | Unknown
+  | IsClass
+  | NotClass
+  
+type typeclass_state = {
+  typeclass_is_class : typeclass_is_class;
+  typeclass_resolvable : bool }
 
+val typeclass_state : typeclass_state Evd.Store.field
 (** {6 Focusing commands} *)
 
 (** A [focus_context] represents the part of the proof view which has
@@ -442,9 +452,7 @@ module Unsafe : sig
       into [g']). It returns [None] if [g] has been (partially)
       solved. *)
   val advance : Evd.evar_map -> Evar.t -> Evar.t option
-
-  val typeclass_resolvable : unit Evd.Store.field
-
+    
 end
 
 (** This module gives access to the innards of the monad. Its use is

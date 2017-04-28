@@ -1665,7 +1665,7 @@ let solve_remaining_apply_goals =
       let env = Proofview.Goal.env gl in
       let evd = Sigma.to_evar_map sigma in
       let concl = Proofview.Goal.concl gl in
-      if Typeclasses.is_class_type evd concl then
+      if Typeclasses.is_class_type evd concl == Proofview.IsClass then
         let evd', c' = Typeclasses.resolve_one_typeclass env evd concl in
         let tac = Refine.refine ~unsafe:true { run = fun h -> Sigma.here c' h } in
         Sigma.Unsafe.of_pair (tac, evd')

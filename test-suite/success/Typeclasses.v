@@ -1,3 +1,17 @@
+
+Module EvarEvar.
+
+
+  Class A := {}.
+  Instance a:A.
+  Set Typeclasses Debug Verbosity 2.
+  Check fun H:?[x]=a :> id A => f_equal (fun x:A => x) H.
+  (* fun H : a = a => f_equal (fun x : A => x) H *)
+  Check fun H:?[x]=a :> A => f_equal (fun x:id A => x) H.
+  (* fun H : ?x = a => f_equal (fun x : id A => x) H *)
+
+  Goal id A.
+    typeclasses eauto.
 Module onlyclasses.
 
 (* In 8.6 we still allow non-class subgoals *)

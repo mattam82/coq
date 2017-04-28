@@ -272,7 +272,7 @@ let v_ind_pack = v_tuple "mutual_inductive_body"
     Int;
     v_rctxt;
     v_bool;
-    v_context;
+    v_tuple "universes" v_context v_context;
     Opt v_bool;
     v_typing_flags|]
 

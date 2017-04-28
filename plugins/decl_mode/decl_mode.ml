@@ -53,7 +53,7 @@ type stack_info =
 
 type pm_info =
     { pm_stack : stack_info list}
-let info = Store.field ()
+let info = Store.field Store.default_merge_field
 
 
 (* Current proof mode *)

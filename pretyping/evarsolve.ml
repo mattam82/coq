@@ -1177,19 +1177,25 @@ let check_evar_instance evd evk1 body conv_algo =
   | Success evd -> evd
   | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
 
-let update_evar_source ev1 ev2 evd =
-  let loc, evs2 = evar_source ev2 evd in
-  match evs2 with
-  | (Evar_kinds.QuestionMark _ | Evar_kinds.ImplicitArg (_, _, false)) ->
-     let evi = Evd.find evd ev1 in
-     Evd.add evd ev1 {evi with evar_source = loc, evs2}
-  | _ -> evd
-  
+let update_evar_info ev1 ev2 evd =
+  let evi = find evd ev2 in
+  let loc, evs2 = evi.evar_source in
+  let evi = Evd.find evd ev1 in
+  let evi' =
+    match evs2 with
+    | (Evar_kinds.QuestionMark _ | Evar_kinds.ImplicitArg (_, _, false)) ->
+       {evi with evar_source = loc, evs2}
+    | _ -> evi
+  in
+  Printf.printf "merging store\n%!";
+  let evi' = { evi with evar_extra = Evd.Store.merge evi.evar_extra evi'.evar_extra } in
+  Evd.add evd ev1 evi'
+
 let solve_evar_evar_l2r force f g env evd aliases pbty ev1 (evk2,_ as ev2) =
   try
     let evd,body = project_evar_on_evar force g env evd aliases 0 pbty ev1 ev2 in
     let evd' = Evd.define evk2 body evd in
-    let evd' = update_evar_source (fst (destEvar body)) evk2 evd' in
+    let evd' = update_evar_info (fst (destEvar body)) evk2 evd' in
       check_evar_instance evd' evk2 body g
   with EvarSolvedOnTheFly (evd,c) ->
     f env evd pbty ev2 c

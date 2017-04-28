@@ -56,12 +56,45 @@ type telescope =
   | TNil of Evd.evar_map
   | TCons of Environ.env * Evd.evar_map * Term.types * (Evd.evar_map -> Term.constr -> telescope)
 
-let typeclass_resolvable = Evd.Store.field ()
+type typeclass_is_class =
+  | Unknown
+  | IsClass
+  | NotClass
 
+type typeclass_state = {
+  typeclass_is_class : typeclass_is_class;
+  typeclass_resolvable : bool }
+
+let merge_typeclass_is_class x y =
+  match x, y with
+  | Unknown, IsClass -> IsClass
+  | IsClass, Unknown -> IsClass
+  | IsClass, NotClass -> assert false
+  | NotClass, IsClass -> assert false
+  | NotClass, Unknown -> NotClass
+  | Unknown, NotClass -> NotClass
+  | x, _ -> x (* Only diagonal x, x cases left *)
+
+(** This will be called in evar-evar unifications to set the resolvable flag 
+    of the undefined evar, given the resolvable flag of the "to be defined" evar first.
+    If one of those is marked [resolvable] then the undefined evar becomes resolvable. *)
+let merge_typeclass_state x y =
+  match x, y with
+  | None, None -> None
+  | Some {typeclass_is_class = st; typeclass_resolvable = b},
+    Some {typeclass_is_class = st'; typeclass_resolvable = b'} ->
+     Some ({typeclass_is_class = merge_typeclass_is_class st st';
+            typeclass_resolvable = b || b })
+  | Some _, None -> x
+  | None, Some _ -> y
+  
+let typeclass_state = Evd.Store.field merge_typeclass_state
+                    
 let dependent_init =
   (* Goals are created with a store which marks them as unresolvable
      for type classes. *)
-  let store = Evd.Store.set Evd.Store.empty typeclass_resolvable () in
+  let tc_state = { typeclass_is_class = Unknown; typeclass_resolvable = false} in
+  let store = Evd.Store.set Evd.Store.empty typeclass_state tc_state in
   (* Goals don't have a source location. *)
   let src = (Loc.ghost,Evar_kinds.GoalEvar) in
   (* Main routine *)
@@ -670,9 +703,14 @@ let mark_in_evm ~goal evd content =
             | loc,_ -> loc,Evar_kinds.GoalEvar }
     else info
   in
-  let info = match Evd.Store.get info.Evd.evar_extra typeclass_resolvable with
-  | None -> { info with Evd.evar_extra = Evd.Store.set info.Evd.evar_extra typeclass_resolvable () }
-  | Some () -> info
+  let info = match Evd.Store.get info.Evd.evar_extra typeclass_state with
+  | None ->
+     let st = { typeclass_is_class = Unknown; typeclass_resolvable = false } in
+     { info with Evd.evar_extra = Evd.Store.set info.Evd.evar_extra typeclass_state st }
+  | Some ({ typeclass_resolvable = true } as st) ->
+     let st = { st with typeclass_resolvable = false } in
+     { info with Evd.evar_extra = Evd.Store.set info.Evd.evar_extra typeclass_state st }
+  | Some _ -> info
   in
   Evd.add evd content info
 
@@ -946,7 +984,7 @@ module Unsafe = struct
   let mark_as_unresolvable p gl =
     { p with solution = mark_in_evm ~goal:false p.solution gl }
 
-  let typeclass_resolvable = typeclass_resolvable
+  let typeclass_state = typeclass_state
 
 end
 

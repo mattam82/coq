@@ -951,7 +951,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb 
 	     try (* Ensure we call conversion on terms of the same type *)
 	       let tyM = get_type_of curenv ~lax:true sigma m1 in
 	       let tyN = get_type_of curenv ~lax:true sigma n1 in
-	       check_compatibility curenv CUMUL flags substn tyM tyN
+	       ignore(check_compatibility curenv CUMUL flags substn tyM tyN); sigma
 	     with RetypeError _ ->
 	       (* Renounce, maybe metas/evars prevents typing *) sigma
 	   else sigma

@@ -506,7 +506,14 @@ type clear_dependency_error =
 
 exception ClearDependencyError of Id.t * clear_dependency_error
 
-let cleared = Store.field ()
+(** This will be called in evar-evar unifications to set the cleared flag 
+    of the defined evar, given the clear flag of the "to be defined" evar first.
+    Only defined evars can have the clear flag, so this returns None. *)
+let merge_cleared x y =
+  assert(Option.is_empty x && Option.is_empty y);
+  None
+                                
+let cleared = Store.field merge_cleared
 
 exception Depends of Id.t
 

@@ -158,16 +158,15 @@ let is_class_constr c =
   with Not_found -> false
 
 let rec is_class_type evd c =
+  let open Proofview in
   let c, args = decompose_app c in
     match kind_of_term c with
     | Prod (_, _, t) -> is_class_type evd t
     | Evar (e, _) when Evd.is_defined evd e ->
-      is_class_type evd (Evarutil.whd_head_evar evd c)
-    | _ -> is_class_constr c
+       is_class_type evd (Evarutil.whd_head_evar evd c)
+    | Evar _ -> Unknown
+    | _ -> if is_class_constr c then IsClass else NotClass
       
-let is_class_evar evd evi =
-  is_class_type evd evi.Evd.evar_concl
-
 (*
  * classes persistent object
  *)
@@ -488,21 +487,45 @@ let is_instance = function
    Nota: we will only check the resolvability status of undefined evars.
  *)
 
-let resolvable = Proofview.Unsafe.typeclass_resolvable
+let tc_state = Proofview.typeclass_state
 
-let set_resolvable s b =
-  if b then Store.remove s resolvable
-  else Store.set s resolvable ()
+let set_resolvable s st =
+  Store.set s tc_state st
+
+let set_unknown_resolvable s b =
+  let open Proofview in
+  let st = { typeclass_is_class = Unknown; typeclass_resolvable = b } in
+  set_resolvable s st
+
+let set_class_resolvable s b =
+  let open Proofview in
+  let st = { typeclass_is_class = IsClass; typeclass_resolvable = b } in
+  set_resolvable s st
+  
+let get_tc_state evi =
+  assert (match evi.evar_body with Evar_empty -> true | _ -> false);
+  Store.get evi.evar_extra tc_state
 
 let is_resolvable evi =
-  assert (match evi.evar_body with Evar_empty -> true | _ -> false);
-  Option.is_empty (Store.get evi.evar_extra resolvable)
-
+  let state = get_tc_state evi in
+  match state with
+  | None -> true
+  | Some st -> st.Proofview.typeclass_resolvable
+  
 let mark_resolvability_undef b evi =
-  if is_resolvable evi == (b : bool) then evi
-  else
-    let t = set_resolvable evi.evar_extra b in
-    { evi with evar_extra = t }
+  let state = get_tc_state evi in
+  match state with
+  | None ->
+     if b then evi else
+     let st = Proofview.{typeclass_is_class = Unknown; typeclass_resolvable = b} in
+     let evar_extra = set_resolvable evi.evar_extra st in
+     { evi with evar_extra }
+  | Some st ->
+     if st.Proofview.typeclass_resolvable == b then evi
+     else
+       let st = { st with Proofview.typeclass_resolvable = b } in
+       let evar_extra = set_resolvable evi.evar_extra st in
+       { evi with evar_extra }
 
 let mark_resolvability b evi =
   assert (match evi.evar_body with Evar_empty -> true | _ -> false);
@@ -531,9 +554,27 @@ let mark_resolvability filter b sigma =
 let mark_unresolvables ?(filter=all_evars) sigma = mark_resolvability filter false sigma
 let mark_resolvables ?(filter=all_evars) sigma = mark_resolvability filter true sigma
 
+let is_resolvable_class_evar evd evi =
+  let open Proofview in
+  let state = get_tc_state evi in
+  match state with
+  | None -> false
+  | Some st ->
+     match st.typeclass_is_class with
+     | Unknown -> false
+     | IsClass -> st.typeclass_resolvable
+     | NotClass -> false
+
+let is_class_evar evd evi =
+  let open Proofview in
+  let state = get_tc_state evi in
+  match state with
+  | None -> false
+  | Some st -> st.typeclass_is_class == IsClass
+                 
 let has_typeclasses filter evd =
   let check ev evi =
-    filter ev (snd evi.evar_source) && is_resolvable evi && is_class_evar evd evi
+    filter ev (snd evi.evar_source) && is_resolvable_class_evar evd evi
   in
   Evar.Map.exists check (Evd.undefined_map evd)
 
@@ -542,11 +583,34 @@ let get_solve_all_instances, solve_all_instances_hook = Hook.make ()
 let solve_all_instances env evd filter unique split fail =
   Hook.get get_solve_all_instances env evd filter unique split fail
 
+let update_typeclasses_states sigma =
+  let open Proofview in
+  let map ev evi =
+    let state = get_tc_state evi in
+    match state with
+    | None ->
+       let iscl = is_class_type sigma evi.Evd.evar_concl in
+       let st = { typeclass_is_class = iscl; typeclass_resolvable = true } in
+       let evar_extra = Store.set evi.evar_extra typeclass_state st in
+       { evi with evar_extra }
+    | Some st ->
+       if st.typeclass_is_class == Unknown then
+         let iscl = is_class_type sigma evi.Evd.evar_concl in
+         if iscl == Unknown then evi
+         else
+           let st = { st with typeclass_is_class = iscl } in
+           let evar_extra = Store.set evi.evar_extra typeclass_state st in
+           {evi with evar_extra}
+       else evi
+  in
+  Evd.raw_map_undefined map sigma
+  
 (** Profiling resolution of typeclasses *)
 (* let solve_classeskey = Profile.declare_profile "solve_typeclasses" *)
 (* let solve_problem = Profile.profile5 solve_classeskey solve_problem *)
 
 let resolve_typeclasses ?(fast_path = true) ?(filter=no_goals) ?(unique=get_typeclasses_unique_solutions ())
     ?(split=true) ?(fail=true) env evd =
+  let evd = update_typeclasses_states evd in
   if fast_path && not (has_typeclasses filter evd) then evd
   else solve_all_instances env evd filter unique split fail

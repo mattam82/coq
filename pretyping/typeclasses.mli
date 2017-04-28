@@ -92,14 +92,16 @@ val no_goals_or_obligations : evar_filter
 (** Resolvability.
     Only undefined evars can be marked or checked for resolvability. *)
 
-val set_resolvable : Evd.Store.t -> bool -> Evd.Store.t
+val set_unknown_resolvable : Evd.Store.t -> bool -> Evd.Store.t
+val set_class_resolvable : Evd.Store.t -> bool -> Evd.Store.t
 val is_resolvable : evar_info -> bool
 val mark_unresolvable : evar_info -> evar_info
 val mark_unresolvables : ?filter:evar_filter -> evar_map -> evar_map
 val mark_resolvables   : ?filter:evar_filter -> evar_map -> evar_map
 val mark_resolvable : evar_info -> evar_info
+val is_resolvable_class_evar : evar_map -> evar_info -> bool
 val is_class_evar : evar_map -> evar_info -> bool
-val is_class_type : evar_map -> types -> bool
+val is_class_type : evar_map -> types -> Proofview.typeclass_is_class
 
 val resolve_typeclasses : ?fast_path:bool -> ?filter:evar_filter -> ?unique:bool ->
   ?split:bool -> ?fail:bool -> env -> evar_map -> evar_map

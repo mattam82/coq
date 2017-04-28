@@ -302,11 +302,17 @@ Set Printing Universes.
 
 Axiom admit : forall A, A.
 Record R := {O : Type}.
-
-Definition RL (x : R@{i}) : ltac:(let u := constr:(Type@{i}:Type@{j}) in exact (R@{j}) ) := {|O := @O x|}.
+Section F.
+  Universes i j.
+  Constraint i < j.
+  Definition RL (x : R@{i}) : R@{j} := {|O := @O x|}.
+End F.
 Definition RLRL : forall x : R, RL x = RL (RL x) := fun x => eq_refl.
+Definition RLRL@{i j k} : forall x : R@{i}, RL@{i k} x = RL@{j k} (RL@{i j} x) := fun x => eq_refl.
 Definition RLRL' : forall x : R, RL x = RL (RL x).
-  intros. apply eq_refl.
+  intros.
+  unfold RL.
+  simpl.  apply eq_refl.
 Qed.
 
 End eta.

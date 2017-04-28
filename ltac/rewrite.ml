@@ -90,7 +90,7 @@ let goalevars evars = fst evars
 let cstrevars evars = snd evars
 
 let new_cstr_evar (evd,cstrs) env t =
-  let s = Typeclasses.set_resolvable Evd.Store.empty false in
+  let s = Typeclasses.set_class_resolvable Evd.Store.empty false in
   let evd = Sigma.Unsafe.of_evar_map evd in
   let Sigma (t, evd', _) = Evarutil.new_evar ~store:s env evd t in
   let evd' = Sigma.to_evar_map evd' in

@@ -55,3 +55,8 @@ module Search : sig
     (** The list of hint databases to use *)
     unit Proofview.tactic
 end
+
+val evars_to_goals :            (Evd.evar_map ->
+            Evar.Map.key -> Evd.evar_info -> Evd.evar_info * bool) ->
+           Evd.evar_map -> (Evd.evar_info Evar.Map.t * Evd.evar_map) option
+     
