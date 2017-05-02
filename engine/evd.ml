@@ -679,7 +679,7 @@ let restrict evk filter ?candidates evd =
   let evar_info' =
     { evar_info with evar_filter = filter;
       evar_candidates = candidates;
-      evar_extra = Store.empty } in
+      evar_extra = evar_info.evar_extra } in
   let last_mods = match evd.conv_pbs with
   | [] ->  evd.last_mods
   | _ -> Evar.Set.add evk evd.last_mods in

@@ -142,10 +142,10 @@ let name_vfun appl vle =
 
 module TacStore = Geninterp.TacStore
 
-let f_avoid_ids : Id.t list TacStore.field = TacStore.field ()
+let f_avoid_ids : Id.t list TacStore.field = TacStore.field TacStore.default_merge_field
 (* ids inherited from the call context (needed to get fresh ids) *)
-let f_debug : debug_info TacStore.field = TacStore.field ()
-let f_trace : ltac_trace TacStore.field = TacStore.field ()
+let f_debug : debug_info TacStore.field = TacStore.field TacStore.default_merge_field
+let f_trace : ltac_trace TacStore.field = TacStore.field TacStore.default_merge_field
 
 (* Signature for interpretation: val_interp and interpretation functions *)
 type interp_sign = Geninterp.interp_sign = {
