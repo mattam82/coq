@@ -726,28 +726,28 @@ let is_eq_abs t =
   | _ -> false
 
 	 
-let keyed_unify env evd kop = 
-  match kop with 
-  | None -> fun _ -> true
-  | Some kop ->
-     fun cl ->
-       let kc = Keys.constr_key cl in
-       match kc with
-       | None -> false
-       | Some kc -> Keys.equiv_keys kop kc
+(* let keyed_unify env evd kop =  *)
+(*   match kop with  *)
+(*   | None -> fun _ -> true *)
+(*   | Some kop -> *)
+(*      fun cl -> *)
+(*        let kc = Keys.constr_key cl in *)
+(*        match kc with *)
+(*        | None -> false *)
+(*        | Some kc -> Keys.equiv_keys kop kc *)
 
-let unify flags env sigma l r =
-  let kop = Keys.constr_key l in
-  if Unification.is_keyed_unification () then
-    if keyed_unify env sigma kop r then
-      let f1, l1 = decompose_app_vect l in
-      let f2, l2 = decompose_app_vect r in
-      let f1, l1, f2, l2 = adjust_app_array_size f1 l1 f2 l2 in
-      let sigma = Unification.w_unify ~flags env sigma CONV f1 f2 in
-      Array.fold_left2 (fun sigma -> Unification.w_unify ~flags env sigma CONV) sigma l1 l2
-    else raise Reduction.NotConvertible
-  else
-    Unification.w_unify ~flags env sigma CONV l r
+(* let unify flags env sigma l r = *)
+(*   let kop = Keys.constr_key l in *)
+(*   if Unification.is_keyed_unification () then *)
+(*     if keyed_unify env sigma kop r then *)
+(*       let f1, l1 = decompose_app_vect l in *)
+(*       let f2, l2 = decompose_app_vect r in *)
+(*       let f1, l1, f2, l2 = adjust_app_array_size f1 l1 f2 l2 in *)
+(*       let sigma = Unification.w_unify ~flags env sigma CONV f1 f2 in *)
+(*       Array.fold_left2 (fun sigma -> Unification.w_unify ~flags env sigma CONV) sigma l1 l2 *)
+(*     else raise Reduction.NotConvertible *)
+(*   else *)
+(*     Unification.w_unify ~flags env sigma CONV l r *)
 					      
 (* Matching/unifying the rewriting rule against [t] *)
 let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) by t =
@@ -757,7 +757,7 @@ let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) 
     (* 			   (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma left)) *)
     (* 			   (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) *)
     (* in *)
-    let sigma = unify flags env sigma left t in
+    let sigma = Unification.w_unify ~flags env sigma CONV left t in
     let sigma = Typeclasses.resolve_typeclasses ~filter:(no_constraints cstrs)
       ~fail:true env sigma in
     let evd = solve_remaining_by env sigma holes by in
