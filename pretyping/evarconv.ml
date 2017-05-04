@@ -497,7 +497,71 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	  end
       | _ -> default evd
   in
-  let flex_rigid on_left ev (termF, skF as apprF) (termR, skR as apprR) =
+  let rec first_order flexrigid env i t1 t2 sk1 sk2 =
+    (* Try first-order unification *)
+    match ise_stack2 false env i (evar_conv_x flags) sk1 sk2 with
+    | None, Success i' ->
+       (* We do have sk1[] = sk2[]: we now unify ?ev1 and ?ev2 *)
+       (* Note that ?ev1 and ?ev2, may have been instantiated in the meantime *)
+       let ev1' = whd_evar i' t1 in
+       if isEvar ev1' then
+         solve_simple_eqn (conv_fun evar_conv_x flags) env i'
+		          (position_problem true pbty,destEvar ev1',term2)
+       else
+         evar_eqappr_x flags env evd pbty
+		       ((ev1', sk1), csts1) ((term2, sk2), csts2)
+    | Some (r,[]), Success i' ->
+       (* We have sk1'[] = sk2[] for some sk1' s.t. sk1[]=sk1'[r[]] *)
+       (* we now unify r[?ev1] and ?ev2 *)
+       let ev2' = whd_evar i' t2 in
+       if isEvar ev2' then
+         solve_simple_eqn (conv_fun evar_conv_x flags) env i'
+		          (position_problem false pbty,destEvar ev2',Stack.zip(term1,r))
+       else
+         evar_eqappr_x flags env evd pbty
+		       ((ev2', sk1), csts1) ((term2, sk2), csts2)
+    | Some ([],r), Success i' ->
+       (* Symmetrically *)
+       (* We have sk1[] = sk2'[] for some sk2' s.t. sk2[]=sk2'[r[]] *)
+       (* we now unify ?ev1 and r[?ev2] *)
+       let ev1' = whd_evar i' t1 in
+       if isEvar ev1' then
+         solve_simple_eqn (conv_fun evar_conv_x flags) env i'
+	                  (position_problem true pbty,destEvar ev1',Stack.zip(term2,r))
+       else evar_eqappr_x flags env evd pbty
+		          ((ev1', sk1), csts1) ((term2, sk2), csts2)
+    | None, (UnifFailure _ as x) ->
+       (* sk1 and sk2 have no common outer part *)
+       if flexrigid then x else
+       if Stack.not_purely_applicative sk2 then
+         (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
+         flex_rigid true (destEvar t1) appr1 appr2
+       else
+         if Stack.not_purely_applicative sk1 then
+           (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
+           flex_rigid false (destEvar t2) appr2 appr1
+         else
+           (* We could instead try Miller unification, then
+              postpone to see if other equations help, as in:
+              [Check fun a b : unit => (eqᵣefl : _ a = _ a b)] *)
+           x
+    | Some _, Success _ ->
+       if flexrigid then UnifFailure (i, NotSameArgSize) else
+       (* sk1 and sk2 have a common outer part *)
+       if Stack.not_purely_applicative sk2 then
+         (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
+         flex_rigid true (destEvar t1) appr1 appr2
+       else
+         if Stack.not_purely_applicative sk1 then
+           (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
+           flex_rigid false (destEvar t2) appr2 appr1
+         else
+           (* We could instead try Miller unification, then
+              postpone to see if other equations help, as in:
+              [Check fun a b c : unit => (eqᵣefl : _ a b = _ c a b)] *)
+           UnifFailure (i,NotSameArgSize)
+    | _, _ -> anomaly (Pp.str "Unexpected result from ise_stack2.")
+  and flex_rigid on_left ev (termF, skF as apprF) (termR, skR as apprR) =
     let switch f a b = if on_left then f a b else f b a in
     let eta evd =
       match kind_of_term termR with
@@ -515,6 +579,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	    (fun () ->
 	      ise_try evd 
 	        [eta;(* Postpone the use of an heuristic *)
+                 (* (fun i -> first_order true env i termF termR skF skR); *)
 		 (fun i -> 
 		   if not (occur_rigidly (fst ev) i tR) then
                      let i,tF =
@@ -538,71 +603,9 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 		 ++ fnl ()) in
   match (flex_kind_of_term flags.open_ts env evd term1 sk1,
 	 flex_kind_of_term flags.open_ts env evd term2 sk2) with
-    | Flexible (sp1,al1 as ev1), Flexible (sp2,al2 as ev2) ->
+    | Flexible (sp1,al1), Flexible (sp2,al2) ->
         (* sk1[?ev1] =? sk2[?ev2] *)
-	let f1 i =
-          (* Try first-order unification *)
-	  match ise_stack2 false env i (evar_conv_x flags) sk1 sk2 with
-	  | None, Success i' ->
-            (* We do have sk1[] = sk2[]: we now unify ?ev1 and ?ev2 *)
-            (* Note that ?ev1 and ?ev2, may have been instantiated in the meantime *)
-	    let ev1' = whd_evar i' (mkEvar ev1) in
-	      if isEvar ev1' then
-		solve_simple_eqn (conv_fun evar_conv_x flags) env i'
-		  (position_problem true pbty,destEvar ev1',term2)
-	      else 
-                evar_eqappr_x flags env evd pbty
-		  ((ev1', sk1), csts1) ((term2, sk2), csts2)
-	  | Some (r,[]), Success i' ->
-            (* We have sk1'[] = sk2[] for some sk1' s.t. sk1[]=sk1'[r[]] *)
-            (* we now unify r[?ev1] and ?ev2 *)
-	    let ev2' = whd_evar i' (mkEvar ev2) in
-	      if isEvar ev2' then
-		solve_simple_eqn (conv_fun evar_conv_x flags) env i'
-		  (position_problem false pbty,destEvar ev2',Stack.zip(term1,r))
-	      else 
-                evar_eqappr_x flags env evd pbty
-		  ((ev2', sk1), csts1) ((term2, sk2), csts2)
-	  | Some ([],r), Success i' ->
-            (* Symmetrically *)
-            (* We have sk1[] = sk2'[] for some sk2' s.t. sk2[]=sk2'[r[]] *)
-            (* we now unify ?ev1 and r[?ev2] *)
-	    let ev1' = whd_evar i' (mkEvar ev1) in
-	      if isEvar ev1' then
-		solve_simple_eqn (conv_fun evar_conv_x flags) env i'
-	          (position_problem true pbty,destEvar ev1',Stack.zip(term2,r))
-              else evar_eqappr_x flags env evd pbty
-		((ev1', sk1), csts1) ((term2, sk2), csts2)
-	  | None, (UnifFailure _ as x) ->
-             (* sk1 and sk2 have no common outer part *)
-             if Stack.not_purely_applicative sk2 then
-               (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
-               flex_rigid true ev1 appr1 appr2
-             else
-             if Stack.not_purely_applicative sk1 then
-               (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
-               flex_rigid false ev2 appr2 appr1
-             else
-               (* We could instead try Miller unification, then
-                  postpone to see if other equations help, as in:
-                  [Check fun a b : unit => (eqᵣefl : _ a = _ a b)] *)
-               x
-	  | Some _, Success _ ->
-             (* sk1 and sk2 have a common outer part *)
-             if Stack.not_purely_applicative sk2 then
-               (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
-               flex_rigid true ev1 appr1 appr2
-             else
-             if Stack.not_purely_applicative sk1 then
-               (* Ad hoc compatibility with 8.4 which treated non-app as rigid *)
-               flex_rigid false ev2 appr2 appr1
-             else
-               (* We could instead try Miller unification, then
-                  postpone to see if other equations help, as in:
-                  [Check fun a b c : unit => (eqᵣefl : _ a b = _ c a b)] *)
-               UnifFailure (i,NotSameArgSize)
-          | _, _ -> anomaly (Pp.str "Unexpected result from ise_stack2.")
-
+	let f1 i = first_order false env i term1 term2 sk1 sk2
 	and f2 i =
           if Evar.equal sp1 sp2 then
 	    match ise_stack2 false env i (evar_conv_x flags) sk1 sk2 with
@@ -1096,7 +1099,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   try
   let evi = Evd.find_undefined evd evk in
   let evi = nf_evar_info evd evi in
-  let env_evar_unf = evar_env evi in
+  let _env_evar_unf = evar_env evi in
   let env_evar = evar_filtered_env evi in
   let sign = named_context_val env_evar in
   let ctxt = evar_filtered_context evi in
