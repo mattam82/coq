@@ -770,10 +770,10 @@ let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) 
     let () = if not (convertible env evd ty2 ty1) then raise Reduction.NotConvertible in
     let rew_evars = evd, cstrs in
     let rew_prf =
-      let hd, args = decompose_app rel in
-      if is_global (Lazy.force Coqlib.coq_eq_ref) hd then
-        RewEq (mkVar eq_abs_id, rew_car, c1, c2, prf, hd, List.hd args)
-      else RewPrf (rel, prf) in
+      (* let hd, args = decompose_app rel in *)
+      (* if is_global (Lazy.force Coqlib.coq_eq_ref) hd then *)
+      (*   RewEq (mkVar eq_abs_id, rew_car, c1, c2, prf, hd, List.hd args) *)
+      (* else *) RewPrf (rel, prf) in
     let rew = { rew_evars; rew_prf; rew_car; rew_from = c1; rew_to = c2; rew_decls = []} in
     let rew = if l2r then rew else symmetry env sort rew in
     Some rew
