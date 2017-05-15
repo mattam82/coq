@@ -83,7 +83,7 @@ Success tests
     success/ROmega2.v...Ok
     success/ROmegaPre.v...Ok
     success/RecTutorial.v...Error! (should be accepted)
-    success/Record.v...Error! (should be accepted)
+    success/Record.v...Ok
     success/Reg.v...Ok
     success/Remark.v...Ok
     success/Rename.v...Ok
@@ -98,7 +98,7 @@ Success tests
     success/Tauto.v...Ok
     success/TestRefine.v...Ok
     success/Try.v...Ok
-    success/Typeclasses.v...Error! (should be accepted)
+    success/Typeclasses.v...Ok
     success/apply.v...Ok
     success/applyTC.v...Ok
     success/auto.v...Ok
@@ -160,7 +160,7 @@ Success tests
     success/refine.v...Ok
     success/remember.v...Ok
     success/replace.v...Ok
-    success/rewrite.v...Error! (should be accepted)
+    success/rewrite.v...Ok
     success/rewrite_dep.v...Ok
     success/rewrite_evars.v...Ok
     success/rewrite_in.v...Ok
@@ -186,12 +186,12 @@ Success tests
     success/tryif.v...Ok
     success/unfold.v...Ok
     success/unicode_utf8.v...Ok
-    success/unification.v...Error! (should be accepted)
+    success/unification.v...Ok
     success/univers.v...Ok
     success/universes-coercion.v...Ok
     success/univnames.v...Ok
     success/univscompute.v...Ok
-    success/unshelve.v...Error! (should be accepted)
+    success/unshelve.v...Ok
     success/vm_univ_poly.v...Ok
     success/vm_univ_poly_match.v...Ok
 Failure tests
@@ -301,8 +301,8 @@ Bugs tests
     bugs/closed/1754.v...Ok
     bugs/closed/1773.v...Ok
     bugs/closed/1774.v...Ok
-    bugs/closed/1775.v...Ok
-    bugs/closed/1776.v...Error! (bug seems to be opened, please check)
+    bugs/closed/1775.v...Error! (bug seems to be opened, please check)
+    bugs/closed/1776.v...Ok
     bugs/closed/1779.v...Ok
     bugs/closed/1780.v...Ok
     bugs/closed/1784.v...Ok
@@ -320,7 +320,7 @@ Bugs tests
     bugs/closed/1907.v...Ok
     bugs/closed/1912.v...Ok
     bugs/closed/1915.v...Ok
-    bugs/closed/1918.v...Error! (bug seems to be opened, please check)
+    bugs/closed/1918.v...Ok
     bugs/closed/1925.v...Ok
     bugs/closed/1931.v...Ok
     bugs/closed/1935.v...Ok
@@ -336,7 +336,7 @@ Bugs tests
     bugs/closed/2006.v...Ok
     bugs/closed/2016.v...Ok
     bugs/closed/2017.v...Ok
-    bugs/closed/2021.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2021.v...Ok
     bugs/closed/2027.v...Ok
     bugs/closed/2083.v...Ok
     bugs/closed/2089.v...Ok
@@ -359,7 +359,7 @@ Bugs tests
     bugs/closed/2230.v...Ok
     bugs/closed/2231.v...Ok
     bugs/closed/2243.v...Ok
-    bugs/closed/2244.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2244.v...Ok
     bugs/closed/2250.v...Ok
     bugs/closed/2251.v...Ok
     bugs/closed/2255.v...Ok
@@ -379,7 +379,7 @@ Bugs tests
     bugs/closed/2350.v...Ok
     bugs/closed/2353.v...Ok
     bugs/closed/2360.v...Ok
-    bugs/closed/2362.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2362.v...Ok
     bugs/closed/2375.v...Ok
     bugs/closed/2378.v...Ok
     bugs/closed/2388.v...Ok
@@ -405,7 +405,7 @@ Bugs tests
     bugs/closed/2668.v...Ok
     bugs/closed/2670.v...Ok
     bugs/closed/2680.v...Ok
-    bugs/closed/2713.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2713.v...Ok
     bugs/closed/2729.v...Ok
     bugs/closed/2732.v...Ok
     bugs/closed/2733.v...Ok
@@ -470,11 +470,11 @@ Bugs tests
     bugs/closed/3093.v...Ok
     bugs/closed/3142.v...Ok
     bugs/closed/3164.v...Ok
-    bugs/closed/3188.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3188.v...Ok
     bugs/closed/3199.v...Ok
     bugs/closed/3205.v...Ok
     bugs/closed/3210.v...Ok
-    bugs/closed/3212.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3212.v...Ok
     bugs/closed/3217.v...Ok
     bugs/closed/3228.v...Ok
     bugs/closed/3242.v...Ok
@@ -598,7 +598,7 @@ Bugs tests
     bugs/closed/3596.v...Ok
     bugs/closed/3612.v...Ok
     bugs/closed/3616.v...Ok
-    bugs/closed/3618.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3618.v...Ok
     bugs/closed/3623.v...Ok
     bugs/closed/3624.v...Ok
     bugs/closed/3625.v...Ok
@@ -668,7 +668,7 @@ Bugs tests
     bugs/closed/3848.v...Ok
     bugs/closed/3849.v...Ok
     bugs/closed/3854.v...Ok
-    bugs/closed/3881.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3881.v...Ok
     bugs/closed/3886.v...Ok
     bugs/closed/3892.v...Ok
     bugs/closed/3895.v...Ok
@@ -683,7 +683,7 @@ Bugs tests
     bugs/closed/3938.v...Ok
     bugs/closed/3944.v...Ok
     bugs/closed/3948.v...Ok
-    bugs/closed/3953.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3953.v...Ok
     bugs/closed/3956.v...Ok
     bugs/closed/3957.v...Ok
     bugs/closed/3960.v...Ok
@@ -857,7 +857,7 @@ Bugs tests
     bugs/closed/HoTT_coq_043.v...Ok
     bugs/closed/HoTT_coq_044.v...Ok
     bugs/closed/HoTT_coq_045.v...Ok
-    bugs/closed/HoTT_coq_047.v...Error! (bug seems to be opened, please check)
+    bugs/closed/HoTT_coq_047.v...Ok
     bugs/closed/HoTT_coq_048.v...Ok
     bugs/closed/HoTT_coq_049.v...Ok
     bugs/closed/HoTT_coq_050.v...Ok
@@ -955,7 +955,7 @@ Bugs tests
     bugs/opened/3889.v...still active
     bugs/opened/3890.v...still active
     bugs/opened/3916.v...still active
-    bugs/opened/3926.v...still active
+    bugs/opened/3926.v...Error! (bug seems to be closed, please check)
     bugs/opened/3938.v...still active
     bugs/opened/3946.v...still active
     bugs/opened/3948.v...still active
@@ -1093,4 +1093,4 @@ Coqchk tests
     coqchk/primproj.v...Ok
     coqchk/univ.v...Ok
 
-    1023 tests passed over 1080, i.e. 94 %
+    1039 tests passed over 1080, i.e. 96 %
