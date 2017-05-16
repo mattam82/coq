@@ -537,7 +537,7 @@ struct
      [["Coq" ; "micromega" ; "Tauto"];["Tauto"]]  "N")
   let coq_Atom = lazy
    (gen_constant_in_modules "ZMicromega"
-     [["Coq" ; "micromega" ; "Tauto"];["Tauto"]]  "A")
+     [["Coq" ; "micromega" ; "Tauto"];["Tauto"]]  "At")
   let coq_X = lazy
    (gen_constant_in_modules "ZMicromega"
      [["Coq" ; "micromega" ; "Tauto"];["Tauto"]]  "X")
