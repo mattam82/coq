@@ -116,10 +116,6 @@ let e_new_evar env evdref ?src ?naming typ =
   evdref := Sigma.to_evar_map sigma;
   e
 
-let push_rec_types sigma (lna,typarray,_) env =
-  let ctxt = Array.map2_i (fun i na t -> Context.Rel.Declaration.LocalAssum (na, lift i t)) lna typarray in
-  Array.fold_left (fun e assum -> push_rel sigma assum e) env ctxt
-
 end
 
 open ExtraEnv
@@ -573,7 +569,6 @@ let (f_genarg_interp, genarg_interp_hook) = Hook.make ()
 (* the type constraint tycon *)
 
 let nf_evar_context sigma ctx =
-  let open EConstr in
   Context.Rel.map (Evarutil.nf_evar sigma) ctx
 
 let reset_with_named_context nctx env sigma =

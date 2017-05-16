@@ -999,16 +999,6 @@ let map_const_entry_body (f:Term.constr->Term.constr) (x: 'a Entries.const_entry
     (f b , ctx) , fx
   end
 
-let type_kind_of_constant_entry centry = match centry with
-  | DefinitionEntry dentry ->
-     begin
-       match dentry.const_entry_type with
-       | Some typ -> typ, true
-       | None -> anomaly (Pp.str "bli.")
-     end
-  | ParameterEntry (_, _, (typ, _), _) -> typ, false
-  | ProjectionEntry _ -> anomaly (Pp.str "Blah.")
-               
 type 'a is_fix = IsFix of fixpoint * 'a definition_entry
               | IsParam of parameter_entry
                              
