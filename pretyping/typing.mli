@@ -43,7 +43,7 @@ val check_allowed_sort : env -> evar_map -> pinductive -> constr -> constr ->
   unit
 
 (** Raise an error message if bodies have types not unifiable with the
-    expected ones *)
+    expected ones. *)
 val check_type_fixpoint : Loc.t -> env -> evar_map ref ->
   Names.Name.t array -> types array -> unsafe_judgment array -> unit
 

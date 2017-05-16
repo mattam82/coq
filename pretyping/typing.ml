@@ -23,11 +23,6 @@ open Arguments_renaming
 open Pretype_errors
 open Context.Rel.Declaration
 
-let push_rec_types pfix env =
-  let (i, c, t) = pfix in
-  let inj c = EConstr.Unsafe.to_constr c in
-  push_rec_types (i, Array.map inj c, Array.map inj t) env
-
 let meta_type evd mv =
   let ty =
     try Evd.meta_ftype evd mv
@@ -153,12 +148,14 @@ let e_judge_of_case env evdref ci pj cj lfj =
     uj_type = rslty }
 
 let check_type_fixpoint loc env evdref lna lar vdefj =
+  let open Context.Rel.Declaration in
   let lt = Array.length vdefj in
     if Int.equal (Array.length lar) lt then
+    let env = ref env in
       for i = 0 to lt-1 do
-        if not (Evarconv.e_cumul env evdref (vdefj.(i)).uj_type lar.(i)) then
-          error_ill_typed_rec_body ~loc env !evdref
-            i lna vdefj lar
+        if not (Evarconv.e_cumul !env evdref (vdefj.(i)).uj_type (lift (lt - i) lar.(i))) then
+          error_ill_typed_rec_body ~loc !env !evdref i lna vdefj lar
+        else env := push_rel (LocalAssum (lna.(i), lar.(i))) !env
       done
 
 (* FIXME: might depend on the level of actual parameters!*)
@@ -179,14 +176,6 @@ let e_judge_of_cast env evdref cj k tj =
   { uj_val = mkCast (cj.uj_val, k, expected_type);
     uj_type = expected_type }
 
-let e_type_fixpoint env evdref lna lar vdefj =
-  let lt = Array.length vdefj in
-  assert (Int.equal (Array.length lar) lt);
-  for i = 0 to Array.length lar - 1 do
-    if not (Evarconv.e_cumul env evdref vdefj.(i).uj_type lar.(i)) then
-      error_ill_typed_rec_body env !evdref i lna vdefj lar
-  done
-    
 let enrich_env env evdref =
   let penv = Environ.pre_env env in
   let penv' = Pre_env.({ penv with env_stratification =
@@ -362,15 +351,16 @@ let rec execute env evdref cstr =
         e_judge_of_cast env evdref cj k tj
 
 and execute_recdef env evdref (names,lar,vdef) =
-  (* MS: FIXME adapt to new way of typechecking fix *)
-  let larj = execute_array env evdref lar in
-  let lara = Array.map (e_assumption_of_judgment env evdref) larj in
-  let env1 = push_rec_types (names,lara,vdef) env in
+  let lara, env1 =
+    Array.fold_map2' (fun na t env ->
+        let tj = execute env evdref t in
+        let ar = e_assumption_of_judgment env evdref tj in
+        ar, push_rel (LocalAssum (na, ar)) env)
+    names lar env
+  in
   let vdefj = execute_array env1 evdref vdef in
   let vdefv = Array.map j_val vdefj in
-  let _ = check_type_fixpoint Loc.ghost env1 evdref names lara vdefj in
-  (* (names,lara,vdefv) *)
-  (* MS: needed ? *)
+  let _ = check_type_fixpoint Loc.ghost env evdref names lara vdefj in
   (names,Array.smartmap (nf_evar !evdref) lara,
    Array.smartmap (nf_evar !evdref) vdefv)
 

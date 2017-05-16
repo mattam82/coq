@@ -388,18 +388,6 @@ let process_inference_flags flags env initial_sigma (sigma,c) =
 (* Allow references to syntactically nonexistent variables (i.e., if applied on an inductive) *)
 let allow_anonymous_refs = ref false
 
-let evar_type_fixpoint loc env evdref lna lar vdefj =
-  let open Context.Rel.Declaration in
-  let lt = Array.length vdefj in
-  if Int.equal (Array.length lar) lt then
-    let env = ref env in
-      for i = 0 to lt-1 do
-        if not (e_cumul !env.ExtraEnv.env evdref (vdefj.(i)).uj_type
-		  lar.(i)) then
-          error_ill_typed_rec_body ~loc !env.ExtraEnv.env !evdref i lna vdefj lar
-        else env := push_rel !evdref (LocalAssum (lna.(i), lar.(i))) !env
-      done
-
 (* coerce to tycon if any *)
 let inh_conv_coerce_to_tycon resolve_tc loc env evdref j = function
   | None -> j
@@ -745,8 +733,6 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
           let uj_val = it_mkLambda_or_LetIn j.uj_val ctxt in
           let uj_type = it_mkProd_or_LetIn j.uj_type ctxt in
           (* env, f_i : F_i |- uj_val, uj_type *)
-          let uj_type = lift (i - nbfix) uj_type in
-          (* env, f_0..f_i-1 |- uj_type *)
           let _, inst, _, _, _ =
             push_rel_context_to_named_context env_ar.ExtraEnv.env !evdref uj_val in
           let () = evdref := Evd.define (fst bodies.(i)) (EConstr.Unsafe.to_constr inst) !evdref in

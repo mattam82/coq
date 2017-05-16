@@ -623,8 +623,6 @@ let adjust_app_array_size f1 l1 f2 l2 =
    (co-)fixpoint) *)
 
 let fold_rec_types g (lna,typarray,_) f e =
-  let open EConstr in
-  let open Vars in
   Array.fold_map2' (fun na t e ->
     let t' = f e t in
     let decl = RelDecl.LocalAssum (na, t') in
