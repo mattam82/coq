@@ -76,7 +76,7 @@ let print_usage_channel co command =
 \n  -impredicative-set     set sort Set impredicative\
 \n  -indices-matter        levels of indices (and nonuniform parameters) contribute to the level of inductives\
 \n  -type-in-type          disable universe consistency checking\
-\n  -no-positivity-check   disable the positivity checker
+\n  -no-positivity-check   disable the positivity checker\
 \n  -xml                   export XML files either to the hierarchy rooted in\
 \n                         the directory $COQ_XML_LIBRARY_ROOT (if set) or to\
 \n                         stdout (if unset)\
