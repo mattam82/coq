@@ -332,7 +332,7 @@ let fail_quick_unif_flags = {
 }
 
 (* let unifyTerms m n = walking (fun wc -> fst (w_Unify CONV m n [] wc)) *)
-let unify ?(flags=fail_quick_unif_flags) m =
+let unify ?(flags=fail_quick_unif_flags) ?(with_ho=true) m =
   Proofview.Goal.enter { enter = begin fun gl ->
     let env = Tacmach.New.pf_env gl in
     let n = Tacmach.New.pf_concl (Proofview.Goal.assume gl) in
@@ -340,7 +340,7 @@ let unify ?(flags=fail_quick_unif_flags) m =
     try
       let sigma = Evd.add_conv_pb (CONV,env,m,n) sigma in
       let flags = Clenv.flags_of flags in
-      let sigma = Evarconv.consider_remaining_unif_problems ~flags ~with_ho:true env sigma in
+      let sigma = Evarconv.consider_remaining_unif_problems ~flags ~with_ho env sigma in
 	Proofview.Unsafe.tclEVARSADVANCE sigma
     with e when CErrors.noncritical e -> Proofview.tclZERO e
   end }
