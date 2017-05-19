@@ -3,7 +3,6 @@ Preparing tests
     prerequisite/make_local.v...correctly prepared
     prerequisite/make_notation.v...correctly prepared
 Success tests
-    success/4416.v...Error! (should be accepted)
     success/Abstract.v...Ok
     success/AdvancedCanonicalStructure.v...Ok
     success/AdvancedTypeClasses.v...Ok
@@ -48,7 +47,7 @@ Success tests
     success/Funind.v...Ok
     success/Generalization.v...Ok
     success/Generalize.v...Ok
-    success/Hints.v...Ok
+    success/Hints.v...Error! (should be accepted)
     success/ImplicitArguments.v...Ok
     success/ImplicitTactic.v...Ok
     success/Import.v...Ok
@@ -99,7 +98,7 @@ Success tests
     success/TestRefine.v...Ok
     success/Try.v...Ok
     success/Typeclasses.v...Ok
-    success/apply.v...Ok
+    success/apply.v...Error! (should be accepted)
     success/applyTC.v...Ok
     success/auto.v...Ok
     success/autointros.v...Ok
@@ -301,7 +300,7 @@ Bugs tests
     bugs/closed/1754.v...Ok
     bugs/closed/1773.v...Ok
     bugs/closed/1774.v...Ok
-    bugs/closed/1775.v...Error! (bug seems to be opened, please check)
+    bugs/closed/1775.v...Ok
     bugs/closed/1776.v...Ok
     bugs/closed/1779.v...Ok
     bugs/closed/1780.v...Ok
@@ -320,7 +319,7 @@ Bugs tests
     bugs/closed/1907.v...Ok
     bugs/closed/1912.v...Ok
     bugs/closed/1915.v...Ok
-    bugs/closed/1918.v...Ok
+    bugs/closed/1918.v...Error! (bug seems to be opened, please check)
     bugs/closed/1925.v...Ok
     bugs/closed/1931.v...Ok
     bugs/closed/1935.v...Ok
@@ -359,7 +358,7 @@ Bugs tests
     bugs/closed/2230.v...Ok
     bugs/closed/2231.v...Ok
     bugs/closed/2243.v...Ok
-    bugs/closed/2244.v...Ok
+    bugs/closed/2244.v...Error! (bug seems to be opened, please check)
     bugs/closed/2250.v...Ok
     bugs/closed/2251.v...Ok
     bugs/closed/2255.v...Ok
@@ -405,7 +404,7 @@ Bugs tests
     bugs/closed/2668.v...Ok
     bugs/closed/2670.v...Ok
     bugs/closed/2680.v...Ok
-    bugs/closed/2713.v...Ok
+    bugs/closed/2713.v...Error! (bug seems to be opened, please check)
     bugs/closed/2729.v...Ok
     bugs/closed/2732.v...Ok
     bugs/closed/2733.v...Ok
@@ -470,7 +469,7 @@ Bugs tests
     bugs/closed/3093.v...Ok
     bugs/closed/3142.v...Ok
     bugs/closed/3164.v...Ok
-    bugs/closed/3188.v...Ok
+    bugs/closed/3188.v...Error! (bug seems to be opened, please check)
     bugs/closed/3199.v...Ok
     bugs/closed/3205.v...Ok
     bugs/closed/3210.v...Ok
@@ -624,7 +623,7 @@ Bugs tests
     bugs/closed/3665.v...Ok
     bugs/closed/3666.v...Ok
     bugs/closed/3667.v...Ok
-    bugs/closed/3668.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3668.v...Ok
     bugs/closed/3670.v...Ok
     bugs/closed/3672.v...Ok
     bugs/closed/3675.v...Ok
@@ -691,7 +690,7 @@ Bugs tests
     bugs/closed/3975.v...Ok
     bugs/closed/3978.v...Ok
     bugs/closed/3993.v...Ok
-    bugs/closed/3998.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3998.v...Ok
     bugs/closed/4001.v...Ok
     bugs/closed/4012.v...Ok
     bugs/closed/4016.v...Ok
@@ -763,7 +762,7 @@ Bugs tests
     bugs/closed/4400.v...Ok
     bugs/closed/4404.v...Ok
     bugs/closed/4412.v...Ok
-    bugs/closed/4413.v...Error! (bug seems to be opened, please check)
+    bugs/closed/4413.v...Ok
     bugs/closed/4420.v...Ok
     bugs/closed/4429.v...Ok
     bugs/closed/4433.v...Ok
@@ -838,7 +837,7 @@ Bugs tests
     bugs/closed/HoTT_coq_010.v...Ok
     bugs/closed/HoTT_coq_012.v...Ok
     bugs/closed/HoTT_coq_013.v...Ok
-    bugs/closed/HoTT_coq_014.v...Error! (bug seems to be opened, please check)
+    bugs/closed/HoTT_coq_014.v...Ok
     bugs/closed/HoTT_coq_016.v...Ok
     bugs/closed/HoTT_coq_020.v...Ok
     bugs/closed/HoTT_coq_023.v...Ok
@@ -1093,4 +1092,4 @@ Coqchk tests
     coqchk/primproj.v...Ok
     coqchk/univ.v...Ok
 
-    1039 tests passed over 1080, i.e. 96 %
+    1038 tests passed over 1079, i.e. 96 %
