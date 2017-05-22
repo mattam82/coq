@@ -109,6 +109,10 @@ val is_ground_env  :  evar_map -> env -> bool
     its (partial) definition. *)
 val gather_dependent_evars : evar_map -> evar list -> (Evar.Set.t option) Evar.Map.t
 
+(** [reachable_from_evars sigma seeds ev] computes if [ev] is a descendent
+    of an evar of [seeds] by restriction or evar-evar unifications in [sigma]. *)
+val reachable_from_evars : evar_map -> Evar.Set.t -> existential_key -> bool
+
 (** The following functions return the set of undefined evars
     contained in the object, the defined evars being traversed.
     This is roughly a combination of the previous functions and

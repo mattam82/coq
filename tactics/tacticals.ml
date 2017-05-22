@@ -483,28 +483,10 @@ module New = struct
     | Tacexpr.SelectId id -> Proofview.tclFOCUSID id
     | Tacexpr.SelectAll -> fun tac -> tac
 
-
-  let reachable_from_evars current_sigma sigma evk =
-    let rec search evk' visited =
-      if Evar.Set.mem evk' visited then visited
-      else
-        let visited = Evar.Set.add evk' visited in
-        match Evd.evar_body (Evd.find current_sigma evk') with
-        | Evd.Evar_empty -> visited
-        | Evd.Evar_defined c ->
-           match Term.kind_of_term c with
-           | Term.Evar (evk',l) -> if Evar.equal evk' evk then raise Exit
-                                  else search evk' visited
-           | _ -> visited
-    in
-    try
-      let _ = Evar.Map.fold (fun evk' _ visited -> search evk' visited) (Evd.undefined_map sigma) Evar.Set.empty in
-      false
-    with Exit -> true
-
   (* Check that holes in arguments have been resolved *)
 
   let check_evars env sigma extsigma origsigma =
+    let origevars = Evar.Map.domain (Evd.undefined_map origsigma) in
     let rec is_undefined_up_to_restriction sigma evk =
       let evi = Evd.find sigma evk in
       match Evd.evar_body evi with
@@ -520,7 +502,7 @@ module New = struct
       Evd.fold_undefined (fun evk evi acc ->
         match is_undefined_up_to_restriction sigma evk with
         | Some (evk',evi) when not (Evd.mem origsigma evk)
-                             && not (reachable_from_evars sigma origsigma evk) ->
+                             && not (Evarutil.reachable_from_evars sigma origevars evk) ->
            (evk',evi)::acc
         | _ -> acc)
         extsigma []

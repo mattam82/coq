@@ -292,28 +292,11 @@ let check_typeclasses_instances_are_solved env current_sigma frozen =
   (* Naive way, call resolution again with failure flag *)
   apply_typeclasses env (ref current_sigma) frozen true
 
-let reachable_from_frozen current_sigma frozen evk =
-  let rec search evk' visited =
-    if Evar.Set.mem evk' visited then visited
-    else
-      let visited = Evar.Set.add evk' visited in
-      if Evd.is_defined current_sigma evk' then
-        let evars = evars_of_filtered_evar_info (Evd.find current_sigma evk') in
-        if Evar.Set.mem evk evars then raise Exit
-        else
-          Evar.Set.fold (fun evk visited -> search evk visited) evars visited
-      else Evar.Set.add evk' visited
-  in
-  try
-    let _ = Evar.Set.fold (fun evk' visited -> search evk' visited) frozen Evar.Set.empty in
-    false
-  with Exit -> true
-
 let check_extra_evars_are_solved env current_sigma frozen pending =
   Evar.Set.iter
     (fun evk ->
       if not (Evd.is_defined current_sigma evk)
-       && not (reachable_from_frozen current_sigma frozen evk) then
+       && not (Evarutil.reachable_from_evars current_sigma frozen evk) then
         let (loc,k) = evar_source evk current_sigma in
 	match k with
 	| Evar_kinds.ImplicitArg (gr, (i, id), false) -> ()
