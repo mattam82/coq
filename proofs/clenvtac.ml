@@ -103,12 +103,22 @@ let debug_print_goal =
 let holes_goals holes =
   List.map (fun h -> fst (destEvar h.hole_evar)) holes
 
-let clenv_check_dep_holes with_evars sigma clenv =
+let clenv_check_dep_holes with_evars sigma ?origsigma clenv =
   let holes = clenv_dep_holes clenv in
-  if not with_evars && not (List.is_empty holes) then
-    Proofview.tclZERO
-      (Logic.RefinerError (Logic.UnresolvedBindings
-                             (List.map (fun h -> h.hole_name) holes)))
+  if not with_evars then
+    let holes' =
+      match origsigma with
+      | None -> holes
+      | Some origsigma ->
+         let origevars = Evar.Map.domain (Evd.undefined_map origsigma) in
+         let filter h = not (Evarutil.reachable_from_evars sigma origevars (fst (destEvar h.hole_evar))) in
+         List.filter filter holes
+    in
+     if not (List.is_empty holes') then
+       Proofview.tclZERO
+         (Logic.RefinerError (Logic.UnresolvedBindings
+                                (List.map (fun h -> h.hole_name) holes')))
+     else Proofview.tclUNIT (holes_goals holes)
   else Proofview.tclUNIT (holes_goals holes)
 
 let rec rename_evar_concl ctxt t =
@@ -170,7 +180,7 @@ let debug_print_shelf s =
      List.iter (print_goal env sigma) (Evd.future_goals sigma);
      tclUNIT ())
 
-let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
+let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true) ?origsigma
                      flags (sigma, clenv) =
   let open Proofview in
   let open Proofview.Notations in
@@ -212,21 +222,11 @@ let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=
     let sigma = Evd.add sigma glev { evi with evar_concl = concl } in
     Proofview.Unsafe.tclEVARS sigma
   in
-  (* debug_print_shelf "before tclEVARS" <*> *)
   Proofview.Unsafe.tclEVARS sigma <*>
-  (* debug_print_shelf "after tclEVARS" <*> *)
-    clenv_check_dep_holes with_evars sigma clenv >>= (fun deps ->
+    clenv_check_dep_holes with_evars sigma ?origsigma clenv >>= (fun deps ->
   (Refine.refine ~unsafe:true { Sigma.run = run }) <*>
-  (* debug_print_shelf "before shelve_subgoals" <*> *)
   (if shelve_subgoals then shelve_goals deps else tclUNIT ()) <*>
-  
-  (* clenv_refresh_deps clenv >>= fun clenv -> *)
-  (* debug_print_shelf "after refine and shelve" *)
-  (*   (if shelve_subgoals then Proofview.shelve_goals (holes_goals (clenv_dep_holes clenv)) else tclUNIT ()) <*> *)
-  (* debug_print_shelf "after shelve_subgoals" <*> debug_print_goal <*> *)
-      Proofview.Goal.nf_enter { enter = reduce_goal })
-                                                       (* <*>       debug_print_shelf "after reduce_goal"  *)
-(* <*> debug_print_goal *)
+    Proofview.Goal.nf_enter { enter = reduce_goal })
   end }
 
 open Unification
@@ -235,10 +235,10 @@ let dft = default_unify_flags
 
 let clenv_refine_no_check
       ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-      ?(flags=dft ()) clenv =
+      ?(flags=dft ()) ?origsigma clenv =
   let flags = flags_of flags in
   Proofview.tclEVARMAP >>= fun sigma ->
-  clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
+  clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals ?origsigma
                    flags (sigma, clenv)
 
 let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
@@ -262,12 +262,12 @@ let clenv_refine_bindings
   let flags = flags_of flags in
   Proofview.Goal.enter { enter = fun gl ->
     let env = Proofview.Goal.env gl in
-    let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
+    let origsigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
     let sigma, clenv, bindings =
       if delay_bindings then
-        sigma, clenv, Some b
+        origsigma, clenv, Some b
       else
-        let sigma, clenv = Clenv.solve_evar_clause env sigma ~hyps_only clenv b in
+        let sigma, clenv = Clenv.solve_evar_clause env origsigma ~hyps_only clenv b in
         sigma, clenv, None
     in
     let tac = clenv_unify_concl flags clenv in
@@ -283,7 +283,7 @@ let clenv_refine_bindings
              Clenv.solve_evar_clause env sigma ~hyps_only:false clenv b
           | None -> sigma, clenv_recompute_deps sigma ~hyps_only:false clenv
         in
-        clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
+        clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals ~origsigma
                          flags (sigma, clenv))) }
 
 let res_pf ?(with_evars=false) ?(with_classes=true) ?(flags=dft ()) clenv =

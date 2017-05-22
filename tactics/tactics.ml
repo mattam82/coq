@@ -1282,7 +1282,7 @@ let clenvtac_advance clenv =
    [id] is replaced by P using the proof given by [tac] *)
 
 let clenv_refine_in ?(sidecond_first=false) with_evars ?(with_classes=true) flags
-                    targetid id env sigma clenv tac =
+                    targetid id env sigma origsigma clenv tac =
   let sigma = 
     if with_classes then
       Typeclasses.resolve_typeclasses ~fail:false env sigma
@@ -1293,7 +1293,7 @@ let clenv_refine_in ?(sidecond_first=false) with_evars ?(with_classes=true) flag
   let exact_tac =
     clenvtac_advance clenv >>= fun clenv ->
     Clenvtac.clenv_refine_no_check ~with_evars ~with_classes ~flags
-                                   ~shelve_subgoals:true clenv in
+                                   ~shelve_subgoals:true ~origsigma clenv in
   let new_hyp_typ = clenv_concl clenv in
   let naming = NamingMustBe (dloc,targetid) in
   let with_clear = do_replace (Some id) naming in
@@ -1588,7 +1588,8 @@ let elimination_in_clause_scheme with_evars holes_order ?(flags=elim_flags ())
     (Clenvtac.clenv_solve_clause_constraints ~flags ~with_ho:true elimclause'' >>=
        fun elimclause'' ->
        Proofview.tclEVARMAP >>= fun sigma ->
-       clenv_refine_in with_evars flags id id env sigma elimclause''
+       clenv_refine_in with_evars flags id id env sigma
+                       sigma0 elimclause''
                        (fun id -> Proofview.tclUNIT ()))
   end }
 
@@ -1896,14 +1897,14 @@ let apply_in_once sidecond_first with_delta with_destruct with_evars naming
   let rec aux idstoclear with_destruct c =
     Proofview.Goal.enter { enter = begin fun gl ->
     let env = Proofview.Goal.env gl in
-    let sigma = Tacmach.New.project gl in
+    let origsigma = Tacmach.New.project gl in
     try
-      let sigma, clause = apply_in_once_main flags env sigma innerclause (c,lbind) in
+      let sigma, clause = apply_in_once_main flags env origsigma innerclause (c,lbind) in
       Proofview.Unsafe.tclEVARS sigma <*>
         (Clenvtac.clenv_solve_clause_constraints ~flags ~with_ho:true clause >>=
            fun clause ->
            Proofview.tclEVARMAP >>= fun sigma ->
-      clenv_refine_in ~sidecond_first with_evars flags targetid id env sigma clause
+      clenv_refine_in ~sidecond_first with_evars flags targetid id env sigma origsigma clause
         (fun id ->
           Tacticals.New.tclTHENLIST [
             apply_clear_request clear_flag false c;

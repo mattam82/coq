@@ -28,7 +28,7 @@ val clenv_refine2 :
 
 val clenv_refine_no_check :
   ?with_evars:evars_flag -> ?with_classes:bool -> ?shelve_subgoals:bool ->
-  ?flags:unify_flags -> 
+  ?flags:unify_flags -> ?origsigma:Evd.evar_map ->
   clause -> unit Proofview.tactic
                                                                              
 val clenv_refine_bindings :
@@ -40,7 +40,8 @@ val clenv_refine_bindings :
 val clenv_solve_clause_constraints :
   ?flags:unify_flags -> with_ho:bool -> clause -> clause Proofview.tactic
 
-val clenv_check_dep_holes : evars_flag -> Evd.evar_map -> clause -> Goal.goal list Proofview.tactic
+val clenv_check_dep_holes : evars_flag -> Evd.evar_map -> ?origsigma:Evd.evar_map ->
+                            clause -> Goal.goal list Proofview.tactic
        
 (** Assumes the clause is typable in the focused tactic's sigma *)
 val clenv_unify_concl : Evarconv.unify_flags -> Clenv.clause ->
