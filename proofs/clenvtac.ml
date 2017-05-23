@@ -257,17 +257,17 @@ let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=tru
   
 let clenv_refine_bindings
     ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-    ?(flags=dft ()) ~hyps_only ~delay_bindings b clenv =
+    ?(flags=dft ()) ~hyps_only ~delay_bindings b ?origsigma clenv =
   let open Proofview in
   let flags = flags_of flags in
   Proofview.Goal.enter { enter = fun gl ->
     let env = Proofview.Goal.env gl in
-    let origsigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
+    let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
     let sigma, clenv, bindings =
       if delay_bindings then
-        origsigma, clenv, Some b
+        sigma, clenv, Some b
       else
-        let sigma, clenv = Clenv.solve_evar_clause env origsigma ~hyps_only clenv b in
+        let sigma, clenv = Clenv.solve_evar_clause env sigma ~hyps_only clenv b in
         sigma, clenv, None
     in
     let tac = clenv_unify_concl flags clenv in
@@ -283,7 +283,7 @@ let clenv_refine_bindings
              Clenv.solve_evar_clause env sigma ~hyps_only:false clenv b
           | None -> sigma, clenv_recompute_deps sigma ~hyps_only:false clenv
         in
-        clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals ~origsigma
+        clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals ?origsigma
                          flags (sigma, clenv))) }
 
 let res_pf ?(with_evars=false) ?(with_classes=true) ?(flags=dft ()) clenv =

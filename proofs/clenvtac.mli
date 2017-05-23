@@ -35,7 +35,7 @@ val clenv_refine_bindings :
   ?with_evars:evars_flag -> ?with_classes:bool -> ?shelve_subgoals:bool ->
   ?flags:unify_flags ->
   hyps_only:bool -> delay_bindings:bool -> Constr.constr Misctypes.bindings ->
-  clause -> unit Proofview.tactic
+  ?origsigma:Evd.evar_map -> clause -> unit Proofview.tactic
 
 val clenv_solve_clause_constraints :
   ?flags:unify_flags -> with_ho:bool -> clause -> clause Proofview.tactic

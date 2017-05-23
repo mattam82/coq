@@ -1737,13 +1737,13 @@ let general_apply ~with_delta ~with_destruct ~with_evars ~delay_bindings ~clear_
       try
         let n = nb_prod_modulo_zeta thm_ty - nprod in
         if n<0 then error "Applied theorem has not enough premisses.";
-        let sigma, clause =
+        let sigma', clause =
           make_clenv_from_env env sigma ~len:n (c, thm_ty)
         in
-        Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+        Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma')
                           (Clenvtac.clenv_refine_bindings
                            ~with_evars ~flags ~hyps_only:true
-                           ~delay_bindings lbind clause)
+                           ~delay_bindings ~origsigma:sigma lbind clause)
       with exn when catchable_exception exn ->
         Proofview.tclZERO exn
     in
