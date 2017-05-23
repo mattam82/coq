@@ -188,6 +188,9 @@ let matches_core env sigma convert allow_partial_app allow_bound_rels
 
       | PMeta None, m -> subst
 
+      | PEvar (ev, arg1), Evar (ev', arg2) when Evar.equal ev ev' ->
+         Array.fold_left2 (sorec ctx env) subst arg1 arg2
+
       | PRef (VarRef v1), Var v2 when Id.equal v1 v2 -> subst
 
       | PVar v1, Var v2 when Id.equal v1 v2 -> subst
