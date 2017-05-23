@@ -50,3 +50,25 @@
   requiring explicit simplifications instead.
 
 - When checking which arguments are dependent or not for apply/exists/transitivity etc...
+  with bindings.
+  The current strategy is hard to reproduce.
+
+  - Most of the time, the bindings are resolved before the tactic does
+  anything with its argument. e.g. in apply, with bindings are processed
+  before unification of the conclusion happens
+
+  - For [exists t] however, t is passed as an ImplicitBinding and [t]
+  must be provided _after_ unifiying with the conclusion to have enought
+  type information.
+
+  - With metas, the clenv could postpone an unification that failed to
+  be tried again _after_ the unification with the conclusion. However the
+  criterion was fuzzy: see bug #4813.
+
+
+  bug 2830: with not done at the right time, should be delayed.
+
+
+- Open bugs:
+
+  2830: cannot define evar twice in rewrite.
