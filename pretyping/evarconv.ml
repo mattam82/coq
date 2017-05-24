@@ -448,28 +448,33 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
                   (fun i -> exact_ise_stack2 env i (evar_conv_x flags) sk sk')]
       else UnifFailure (evd,NotSameHead)
   in
-  let flex_maybeflex on_left ev ((termF,skF as apprF),cstsF) ((termM, skM as apprM),cstsM) vM =
+  let consume on_left (_, skF as apprF) (_,skM as apprM) i =
+    if not (Stack.is_empty skF && Stack.is_empty skM) then
+      consume_stack on_left apprF apprM i
+    else quick_fail i
+  in
+  let miller on_left ev (termF,skF as apprF) (termM, skM as apprM) i =
     let switch f a b = if on_left then f a b else f b a in
     let not_only_app = Stack.not_purely_applicative skM in
-    let f1 i =
-      match Stack.list_of_app_stack skF with
-      | None -> quick_fail evd
-      | Some lF -> 
-        let tM = Stack.zip apprM in
-	  miller_pfenning on_left
+    match Stack.list_of_app_stack skF with
+    | None -> quick_fail evd
+    | Some lF ->
+       let tM = Stack.zip apprM in
+       miller_pfenning on_left
 	    (fun () -> if not_only_app then (* Postpone the use of an heuristic *)
 	      switch (fun x y -> Success (add_conv_pb (pbty,env,x,y) i)) (Stack.zip apprF) tM
 	    else quick_fail i)
-	  ev lF tM i
-    and consume (termF,skF as apprF) (termM,skM as apprM) i = 
-      if not (Stack.is_empty skF && Stack.is_empty skM) then
-        consume_stack on_left apprF apprM i
-      else quick_fail i
-    and delta i =
+	    ev lF tM i
+  in
+  let flex_maybeflex on_left ev ((termF,skF as apprF),cstsF) ((termM, skM as apprM),cstsM) vM =
+    let switch f a b = if on_left then f a b else f b a in
+    let delta i =
       switch (evar_eqappr_x flags env i pbty) (apprF,cstsF)
 	(whd_betaiota_deltazeta_for_iota_state flags.open_ts env i cstsM (vM,skM))
     in    
-    let default i = ise_try i [f1; consume apprF apprM; delta]
+    let default i = ise_try i [miller on_left ev apprF apprM;
+                               consume on_left apprF apprM;
+                               delta]
     in
       match kind_of_term termM with
       | Proj (p, c) when not (Stack.is_empty skF) ->
@@ -489,7 +494,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 		  let delta' i = 
                     switch (evar_eqappr_x flags env i pbty) (apprF,cstsF) (apprM',cstsM')
 		  in
-		    fun i -> ise_try i [f1; consume apprF apprM'; delta']
+		  fun i -> ise_try i [miller on_left ev apprF apprM';
+                                   consume on_left apprF apprM'; delta']
 		with Retyping.RetypeError _ ->
 		(* Happens thanks to w_unify building ill-typed terms *) 
 		  default
@@ -617,8 +623,10 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	    |_, (UnifFailure _ as x) -> x
             |Some _, _ -> UnifFailure (i,NotSameArgSize)
           else UnifFailure (i,NotSameHead)
-	in
-	ise_try evd [f1; f2]
+        and f3 i = miller true (sp1,al1) appr1 appr2 i
+        and f4 i = miller false (sp2,al2) appr2 appr1 i
+        and f5 i = consume true appr1 appr2 i in
+	ise_try evd [f1; f2; f3; f4; f5]
 
     | Flexible ev1, MaybeFlexible v2 ->
       flex_maybeflex true ev1 (appr1,csts1) (appr2,csts2) v2
