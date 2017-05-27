@@ -41,7 +41,7 @@ val start_proof_com :
 val start_proof_with_initialization : 
   goal_kind -> Evd.evar_map ->
   (bool * lemma_possible_guards * unit Proofview.tactic list option) option ->
-  ((Id.t (* name of thm *) * universe_binders option) *
+  ((Id.t (* name of thm *) * Univdecls.universe_decl) *
      (types (* type of thm *) * (Name.t list (* names to pre-introduce *) * Impargs.manual_explicitation list))) list
   -> int list option -> unit declaration_hook -> unit
 

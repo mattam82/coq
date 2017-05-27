@@ -97,8 +97,8 @@ let binders_of_decls = List.map binder_of_decl
 
 let typecheck_params_and_fields def id pl t ps nots fs =
   let env0 = Global.env () in
-  let ctx = Evd.make_evar_universe_context env0 pl in
-  let evars = ref (Evd.from_ctx ctx) in
+  let evd, decl = Univdecls.interp_univ_decl_opt env0 pl in
+  let evars = ref evd in
   let _ = 
     let error bk (loc, name) = 
       match bk, name with
@@ -167,9 +167,10 @@ let typecheck_params_and_fields def id pl t ps nots fs =
   let newps = Context.Rel.map nf newps in
   let newfs = Context.Rel.map nf newfs in
   let ce t = Pretyping.check_evars env0 Evd.empty evars (EConstr.of_constr t) in
-    List.iter (iter_constr ce) (List.rev newps);
-    List.iter (iter_constr ce) (List.rev newfs);
-    Evd.universe_context ?names:pl evars, nf arity, template, imps, newps, impls, newfs
+  let univs = Univdecls.check_univ_decl evars decl in
+  List.iter (iter_constr ce) (List.rev newps);
+  List.iter (iter_constr ce) (List.rev newfs);
+  univs, nf arity, template, imps, newps, impls, newfs
 
 let degenerate_decl decl =
   let id = match RelDecl.get_name decl with
