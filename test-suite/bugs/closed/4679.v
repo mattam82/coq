@@ -6,9 +6,9 @@ Goal forall (T : nat -> Set -> Set) (U : Set)
                                       end (nat = nat)) = U),
     T 0 (nat = nat) = U.
 Proof.
-  intros.
+  intros. 
   let H := match goal with H : forall _, eq _ _ |- _ => H end in
-  rewrite H || fail 0 "too early".
+  rewrite [T _ _]H || fail 0 "too early".
   Undo.
   let H := match goal with H : forall _, eq _ _ |- _ => H end in
   setoid_rewrite (H 0) || fail 0 "too early".
