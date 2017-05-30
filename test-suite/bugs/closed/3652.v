@@ -46,7 +46,7 @@ Ltac name_evars id :=
 Lemma Twoto0 : 2^0 = 1.
 Proof. compute. reflexivity. Qed.
 
-Ltac ring_simplify' := rewrite ?Twoto0; ring_simplify.
+Ltac ring_simplify' := rewrite ?[2^0]Twoto0; ring_simplify.
 
 Definition mp2a1s(x : Z)(n : nat) := x * 2^n + (2^n-1).
 
