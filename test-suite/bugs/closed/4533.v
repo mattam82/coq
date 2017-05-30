@@ -218,9 +218,9 @@ v = _) r,
           @ eissect (to O A) (g x) = r.
     intros.
     cbv zeta.
-    rewrite concat_p_pp.
+    rewrite [_ @ (_ @ _)]concat_p_pp.
     match goal with
     | [ |- p2 @ p0 @ p1 @ eissect (to O A) (g x) = r ] => idtac "good"
     | [ |- ?G ] => fail 1 "bad" G
     end.
-    Fail rewrite concat_p_pp.
+    Fail rewrite [_ @ (_ @ _)]concat_p_pp.
