@@ -317,10 +317,10 @@ Section Adjointify.
     unfold issect'.
     apply moveR_M1.
     repeat rewrite ap_pp, concat_p_pp; rewrite <- ap_compose.
-    rewrite (concat_pA1 (fun b => (isretr b)^) (ap f (issect a)^)).
+    rewrite [_](concat_pA1 (fun b => (isretr b)^) (ap f (issect a)^)).
     repeat rewrite concat_pp_p; rewrite ap_V; apply moveL_Vp; rewrite concat_p1.
     rewrite concat_p_pp, <- ap_compose.
-    rewrite (concat_pA1 (fun b => (isretr b)^) (isretr (f a))).
+    rewrite [_](concat_pA1 (fun b => (isretr b)^) (isretr (f a))).
     rewrite concat_pV, concat_1p; reflexivity.
   Qed.
 
@@ -1001,7 +1001,7 @@ Proof.
           = loops_functor (group_loops_functor
                                  (pmap_compose psi phi)) g).
   rewrite <- p.
-  Fail Timeout 1 Time rewrite !loops_functor_group.
+  Fail Timeout 1 Time rewrite ![_]loops_functor_group.
   (* 0.004 s in 8.5rc1, 8.677 s in 8.5 *)
   Timeout 1 do 3 rewrite loops_functor_group.
 Abort.
