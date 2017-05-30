@@ -71,7 +71,7 @@ Proof.
             (fun s d m => F (fst d) _1 (snd m) o (@morphism_of _ _ F _ _ (fst m)) (snd s))
             _).
   intros.
-  rewrite identity_of.
+  rewrite [_]identity_of.
   cbn.
   rewrite (identity_of _ _ F (fst x)).
   Undo.
