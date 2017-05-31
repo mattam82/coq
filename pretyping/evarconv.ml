@@ -1034,7 +1034,9 @@ let apply_on_subterm env evdref frozen fixedref f test c t =
 	      (fun d (env,(k,c)) -> (push_rel d env, (k+1,lift 1 c)))
 	      applyrec acc t
     else
-      let b, evd = try test env !evdref k c t with e -> assert false in
+      let b, evd =
+        try test env !evdref k c t
+        with e when CErrors.noncritical e -> assert false in
       if b then (evdref := evd; f k t)
       else
          match kind_of_term t with
