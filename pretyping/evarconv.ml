@@ -1095,10 +1095,15 @@ let set_solve_evars f = solve_evars := f
 let check_selected_occs env sigma c occ occs =
   let notfound =
     match occs with
-    | Locus.AllOccurrences atleast -> atleast && occ == 1
-    | Locus.AllOccurrencesBut l -> List.last l > occ
-    | Locus.OnlyOccurrences l -> List.last l > occ
-    | Locus.NoOccurrences -> false
+    | AtOccurrences occs ->
+       (match occs with
+       | Locus.AllOccurrences atleast -> atleast && occ == 1
+       | Locus.AllOccurrencesBut l -> List.last l > occ
+       | Locus.OnlyOccurrences l -> List.last l > occ
+       | Locus.NoOccurrences -> false)
+    | Unspecified abstract ->
+       if abstract then occ == 1
+       else false
   in if notfound then
      raise (PretypeError (env,sigma,NoOccurrenceFound (c,None)))
      else ()
@@ -1183,10 +1188,8 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
       if !debug_ho_unification then
         Feedback.msg_debug Pp.(str"abstracted: " ++ print_constr_env env_rhs rhs');
       let () =
-        match occs with
-        | AtOccurrences occs -> check_selected_occs env_rhs !evdref c !occ occs
-        | Unspecified _ -> () in
-      set_holes evdref rhs' subst
+        check_selected_occs env_rhs !evdref c !occ occs
+      in set_holes evdref rhs' subst
   | [] -> rhs in
 
   let subst = make_subst (ctxt,Array.to_list args,argoccs) in
