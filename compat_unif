@@ -71,12 +71,16 @@
 
 - Open bugs:
 
+  1956: program patch at beginning of branch.
+  2467: in fsetdec...  
+  2848: unif difference with Add Relation.
   2830: cannot define evar twice in rewrite.
-
+  3258: typeclass resolution issue
+  
   3513: canonical structure creates an unsolvable typeclass constraint that makes a latter proof-search
   diverge. Creating the evar with unresolvable store during unification does not help...
   Actually this uses w_unify_to_subterm which uses the old w_unify code. Need to adapt this.
   
-  4782: with done too early, needing conclusion's unification.
-  4813: with done too early, needing conclusion's unification.
+  4782: with done too early, needing conclusion's unification -> now backtracking
+  4813: with done too early, needing conclusion's unification -> now backtracking
   HoTT_coq_091: HO unif failing eliminating a dependent equality.
