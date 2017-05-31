@@ -156,6 +156,7 @@ val ise_pretype_gen :
   inference_flags -> env -> evar_map ->
   ltac_var_map -> typing_constraint -> glob_constr -> evar_map * constr
 
+val check_extra_evars_are_solved : env -> evar_map -> Evar.Set.t -> Evar.Set.t -> unit
 (**/**)
 
 (** To embed constr in glob_constr *)
