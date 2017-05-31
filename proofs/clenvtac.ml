@@ -267,10 +267,11 @@ let clenv_refine_bindings
     let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
     let sigma, clenv, bindings =
       if delay_bindings then
-        sigma, clenv, Some b
+        sigma, clenv, Some (None, b)
       else
-        let sigma, clenv = Clenv.solve_evar_clause env sigma ~hyps_only clenv b in
-        sigma, clenv, None
+        try let sigma, clenv = Clenv.solve_evar_clause env sigma ~hyps_only clenv b in
+            sigma, clenv, None
+        with e -> sigma, clenv, Some (Some e, b)
     in
     let tac = clenv_unify_concl flags clenv in
     (Unsafe.tclEVARS sigma) <*>
@@ -278,7 +279,7 @@ let clenv_refine_bindings
       (fun (sigma, clenv) ->
         let sigma, clenv =
           match bindings with
-          | Some b ->
+          | Some (exn, b) ->
              (* Hack to make [exists 0] on [Σ x : nat, True] work, we
                 use implicit bindings for a hole that's not dependent
                 after unification, but reuse the typing information. *)
