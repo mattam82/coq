@@ -564,3 +564,12 @@ split.
 - (* clear b:True *) match goal with H:_ |- _ => clear H end.
   (* use a:0=0 *) match goal with H:_ |- _ => exact H end.
 Qed.
+
+(* Test pattern unification in evar-evar problems *)
+Variable pair : nat -> nat -> Prop.
+Goal forall x, exists p (q : nat -> nat -> Prop), p x = q (fst x) (snd x).
+Proof.
+  unshelve eexists. clear x. shelve. unshelve eexists. clear x. shelve.
+  apply eq_refl.
+  Unshelve. exact pair.
+Qed.
