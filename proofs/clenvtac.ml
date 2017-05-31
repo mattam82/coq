@@ -221,6 +221,7 @@ let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=
     (* For compatibility: beta iota reduction *)
     let concl = Reductionops.clos_norm_flags CClosure.betaiota env sigma concl in
     let evi = Evd.find sigma glev in
+    let evi = Typeclasses.mark_unresolvable evi in
     let sigma = Evd.add sigma glev { evi with evar_concl = concl } in
     Proofview.Unsafe.tclEVARS sigma
   in
@@ -267,27 +268,28 @@ let clenv_refine_bindings
     let sigma = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
     let sigma, clenv, bindings =
       if delay_bindings then
-        sigma, clenv, Some (None, b)
+        sigma, clenv, Some (None, false, b)
       else
         try let sigma, clenv = Clenv.solve_evar_clause env sigma ~hyps_only clenv b in
             sigma, clenv, None
-        with e -> sigma, clenv, Some (Some e, b)
+        with e -> sigma, clenv, Some (Some e, hyps_only, b)
     in
     let tac = clenv_unify_concl flags clenv in
     (Unsafe.tclEVARS sigma) <*>
     (Ftactic.run tac
       (fun (sigma, clenv) ->
-        let sigma, clenv =
+        try let sigma, clenv =
           match bindings with
-          | Some (exn, b) ->
+          | Some (exn, hyps_only, b) ->
              (* Hack to make [exists 0] on [Σ x : nat, True] work, we
                 use implicit bindings for a hole that's not dependent
                 after unification, but reuse the typing information. *)
-             Clenv.solve_evar_clause env sigma ~hyps_only:false clenv b
+             Clenv.solve_evar_clause env sigma ~hyps_only clenv b
           | None -> sigma, clenv_recompute_deps sigma ~hyps_only:false clenv
         in
         clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals ?origsigma
-                         flags (sigma, clenv))) }
+                         flags (sigma, clenv)
+     with e when Pretype_errors.precatchable_exception e -> Proofview.tclZERO e)) }
 
 let res_pf ?(with_evars=false) ?(with_classes=true) ?(flags=dft ()) clenv =
   Proofview.Goal.enter { enter = begin fun gl ->
