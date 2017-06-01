@@ -1176,7 +1176,15 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
                                    str" of type: " ++ print_constr_env env_evar evty ++
                                    str " for " ++ print_constr_env env_rhs c);
         let instance = Filter.filter_list filter instance in
-        let evd = Sigma.Unsafe.of_evar_map !evdref in
+        (** Allow any type lower than the variable's type as the
+            abstracted subterm might have a smaller type, which could be
+            crucial to make the surrounding context typecheck. *)
+        let evd, evty =
+          if isArity evty then
+            refresh_universes ~status:Evd.univ_flexible (Some true)
+                              env_evar_unf !evdref evty
+          else !evdref, evty in
+        let evd = Sigma.Unsafe.of_evar_map evd in
         let Sigma (ev, evd, _) = new_evar_instance sign evd evty ~filter instance in
         let evd = Sigma.to_evar_map evd in
         let evk = fst (destEvar ev) in
