@@ -1114,7 +1114,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   try
   let evi = Evd.find_undefined evd evk in
   let evi = nf_evar_info evd evi in
-  let _env_evar_unf = evar_env evi in
+  let env_evar_unf = evar_env evi in
   let env_evar = evar_filtered_env evi in
   let sign = named_context_val env_evar in
   let ctxt = evar_filtered_context evi in
@@ -1149,7 +1149,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   | _, _, [] -> []
   | _ -> anomaly (Pp.str "Signature or instance are shorter than the occurrences list") in
   let fixed = ref flags.frozen_evars in
-  let rec set_holes evdref rhs = function
+  let rec set_holes env_rhs evdref rhs = function
   | (id,idty,c,cty,evsref,filter,occs)::subst ->
      let c = nf_evar !evdref c in
      if !debug_ho_unification then
@@ -1168,8 +1168,8 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
        | Unspecified prefer_abstraction ->
           if !debug_ho_unification then
             Feedback.msg_debug Pp.(str"Found one occurrence");
-        (* Feedback.msg_debug Pp.(str"idty: " ++ print_constr_env env_evar idty); *)
-          let evty = set_holes evdref cty subst in
+          (* Feedback.msg_debug Pp.(str"cty: " ++ print_constr_env env_evar cty); *)
+          let evty = set_holes env_evar_unf evdref cty subst in
           let evty = nf_evar !evdref evty in
         if !debug_ho_unification then
           Feedback.msg_debug Pp.(str"abstracting one occurrence " ++ print_constr_env env_rhs inst ++
@@ -1183,18 +1183,20 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
         evdref := evd;
         evsref := (evk,evty,prefer_abstraction)::!evsref;
         fixed := Evar.Set.add evk !fixed;
-        ev in
-      let rhs' = apply_on_subterm env_rhs evdref flags.frozen_evars fixed set_var test c rhs in
-      if !debug_ho_unification then
-        Feedback.msg_debug Pp.(str"abstracted: " ++ print_constr_env env_rhs rhs');
-      let () =
-        check_selected_occs env_rhs !evdref c !occ occs
-      in set_holes evdref rhs' subst
+        ev
+     in
+     let rhs' = apply_on_subterm env_rhs evdref flags.frozen_evars fixed set_var test c rhs in
+     if !debug_ho_unification then
+       Feedback.msg_debug Pp.(str"abstracted: " ++ print_constr_env env_rhs rhs');
+     let () =
+       check_selected_occs env_rhs !evdref c !occ occs
+     in set_holes (push_named (Context.Named.Declaration.LocalAssum (id,idty)) env_rhs)
+                  evdref rhs' subst
   | [] -> rhs in
 
   let subst = make_subst (ctxt,Array.to_list args,argoccs) in
 
-  let rhs' = set_holes evdref rhs subst in
+  let rhs' = set_holes env_rhs evdref rhs subst in
   let evd = !evdref in
   let rhs' = nf_evar evd rhs' in
   (* We instantiate the evars of which the value is forced by typing *)
