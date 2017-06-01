@@ -19,6 +19,7 @@ type unify_flags = {
   open_ts : transparent_state;
   closed_ts : transparent_state;
   frozen_evars : Evar.Set.t;
+  allow_K_at_toplevel : bool;
   with_cs : bool }
 
 val default_flags_of : transparent_state -> unify_flags

@@ -30,6 +30,7 @@ type unify_flags = {
   open_ts : transparent_state;
   closed_ts : transparent_state;
   frozen_evars : Evar.Set.t;
+  allow_K_at_toplevel : bool;
   with_cs : bool }
 
 type unify_fun = unify_flags ->
@@ -40,7 +41,8 @@ let default_transparent_state env = full_transparent_state
 
 let default_flags_of ts =
   { open_ts = ts; closed_ts = ts;
-    frozen_evars = Evar.Set.empty; with_cs = true }
+    frozen_evars = Evar.Set.empty; with_cs = true;
+    allow_K_at_toplevel = true }
 
 let default_flags env =
   let ts = default_transparent_state env in
@@ -1101,9 +1103,7 @@ let check_selected_occs env sigma c occ occs =
        | Locus.AllOccurrencesBut l -> List.last l > occ
        | Locus.OnlyOccurrences l -> List.last l > occ
        | Locus.NoOccurrences -> false)
-    | Unspecified abstract ->
-       if abstract then occ == 1
-       else false
+    | Unspecified abstract -> false
   in if notfound then
      raise (PretypeError (env,sigma,NoOccurrenceFound (c,None)))
      else ()
@@ -1303,11 +1303,14 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   evd, true
   with TypingFailed evd -> evd, false
 
-let default_evar_selection evd (ev,args) =
+let default_evar_selection flags evd (ev,args) =
   let evi = Evd.find_undefined evd ev in
   let rec aux args abs =
     match args, abs with
-    | _ :: args, a :: abs -> Unspecified a :: aux args abs
+    | _ :: args, a :: abs ->
+       let spec = if not flags.allow_K_at_toplevel then AtOccurrences (Locus.AllOccurrences a)
+                  else Unspecified a in
+       spec :: aux args abs
     | l, [] -> List.map (fun _ -> default_occurrence_selection) l
     | [], _ :: _ -> assert false
   in aux (Array.to_list args) evi.evar_abstraction
@@ -1315,7 +1318,7 @@ let default_evar_selection evd (ev,args) =
 let second_order_matching_with_args flags env evd with_ho pbty ev l t =
   if with_ho then
     let evd,ev = evar_absorb_arguments env evd ev (Array.to_list l) in
-    let argoccs = default_evar_selection evd ev in
+    let argoccs = default_evar_selection flags evd ev in
     let test = default_occurrence_test in
     let evd, b = second_order_matching flags env evd ev (test,argoccs) t in
     if b then Success evd
