@@ -1017,7 +1017,7 @@ type occurrences_selection =
 let default_occurrence_selection = Unspecified false
 
 let default_occurrence_test _ _ _ env sigma _ c pat =
-  let flags = default_flags_of empty_transparent_state in
+  let flags = default_flags_of var_full_transparent_state in
   match evar_conv_x flags env sigma CONV c pat with
   | Success sigma -> true, sigma
   | UnifFailure _ -> false, sigma

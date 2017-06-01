@@ -540,9 +540,9 @@ Abort.
    compatibility while finding a more uniform way to proceed. *)
 
 Goal forall f:nat->nat, (forall P x, P (f x)) -> let x:=f 0 in x = 0.
-intros f H x. 
-eapply H. (* MS: different solution here *)
-Abort.
+intros f H x.
+eapply H.
+Qed.
 
 (* Test that occur-check is not too restrictive (see comments of #3141) *)
 Lemma bar (X: nat -> nat -> Prop) (foo:forall x, X x x) (a: unit) (H: tt = a):
