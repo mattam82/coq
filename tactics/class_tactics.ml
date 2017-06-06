@@ -976,29 +976,16 @@ module Search = struct
       search_dep : bool;
       search_only_classes : bool;
       search_cut : hints_path;
-      search_hints : hint_db; }
+      search_hints : hint_db;
+    }
 
   (** Local hints *)
-  let autogoal_cache = ref (DirPath.empty, true, Context.Named.empty,
-                            Hint_db.empty full_transparent_state true)
-
   let make_autogoal_hints only_classes ?(st=full_transparent_state) g =
     let open Proofview in
     let open Tacmach.New in
     let sign = Goal.hyps g in
-    let (dir, onlyc, sign', cached_hints) = !autogoal_cache in
-    let cwd = Lib.cwd () in
-    let eq c1 c2 = EConstr.eq_constr (project g) c1 c2 in
-    if DirPath.equal cwd dir &&
-         (onlyc == only_classes) &&
-           Context.Named.equal eq sign sign' &&
-             Hint_db.transparent_state cached_hints == st
-    then cached_hints
-    else
-      let hints = make_hints {it = Goal.goal (Proofview.Goal.assume g); sigma = project g}
-                             st only_classes sign
-      in
-      autogoal_cache := (cwd, only_classes, sign, hints); hints
+    make_hints {it = Goal.goal (Proofview.Goal.assume g); sigma = project g}
+               st only_classes sign
 
   let make_autogoal ?(st=full_transparent_state) only_classes dep cut i g =
     let hints = make_autogoal_hints only_classes ~st g in
