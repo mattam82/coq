@@ -1,0 +1,36 @@
+Guidelines for contributing to the Coq project.
+
+Repositories:
+
+The main Coq codebase is available at gforge.inria.fr and mirrored on http://github.com/coq/coq.git
+
+Pull-requests:
+
+Contributing to the Coq system works by submitting pull-requests to the
+Coq repository on github, where the contributions are discussed,
+reviewed, integrated or rejected. PRs to be integrated have to pass the
+tests on travis, be documented if applicable, and tests have to be
+included for any new feature or bug fix.
+
+Reviews, approvals:
+
+Depending on the impact and complexity of the contribution, the PR
+author, release manager or any core team member might require reviews on
+independently of the integration dissussion. By policy, we require at
+least one other developer to give its ok before a PR is merged.
+
+Roadmap, releases:
+
+Coq is developed according to a time-based release schedule, which is
+announced shortly after each release. It consists in 6 to 10 months
+cycles approximately including: 5-month merge window ended by a feature
+freeze and branching for the beta release, plus a 2-3 month beta cycle
+involving minor changes only.
+
+The team tries to maintain a roadmap of the features being worked on or wished for
+(on the Coq wiki?)
+
+PRs not considered for merging in a version are automatically regargeted
+to a later version. The core development team reserves the right to
+revert any contribution.
+
