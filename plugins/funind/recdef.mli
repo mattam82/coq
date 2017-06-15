@@ -12,9 +12,9 @@ bool ->
            Constrintern.internalization_env ->
            Constrexpr.constr_expr ->
            Constrexpr.constr_expr ->
-           int -> Constrexpr.constr_expr -> (Term.pconstant ->
+           int -> Constrexpr.constr_expr -> (Names.Constant.t -> Decl_kinds.polymorphic ->
             Indfun_common.tcc_lemma_value ref ->
-            Term.pconstant ->
-            Term.pconstant -> int -> EConstr.types -> int -> EConstr.constr -> 'a) -> Constrexpr.constr_expr list -> unit
+            Names.Constant.t ->
+            Names.Constant.t -> int -> EConstr.types -> int -> EConstr.constr -> 'a) -> Constrexpr.constr_expr list -> unit
 
 

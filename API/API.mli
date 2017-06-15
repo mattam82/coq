@@ -1853,6 +1853,8 @@ sig
     val compare : t -> t -> int
   end
 
+  val destConstRef : Globnames.global_reference -> Names.Constant.t
+
   val pop_global_reference : global_reference -> global_reference
   val eq_gr : global_reference -> global_reference -> bool
   val destIndRef : global_reference -> Names.inductive

@@ -23,7 +23,7 @@
 #directory "+camlp4";; (* lazy solution: add both of camlp4/5 so that *)
 #directory "+camlp5";; (* Gramext is found in top_printers.ml *)
 
-#load "API.cma";;
+(* #load "API.cma";;*)
 #use "top_printers.ml";;
 #use "vm_printers.ml";;
 
@@ -58,8 +58,8 @@
 
 (* Open main files *)
 
-open API
-open Grammar_API
+(* open API
+open Grammar_API *)
 open Names
 open Term
 open Vars
@@ -233,7 +233,7 @@ let pf_e gl s =
 let _ = Flags.in_debugger := false
 let _ = Flags.in_toplevel := true
 let _ = Constrextern.set_extern_reference
-  (fun loc _ r -> Libnames.Qualid (loc,Nametab.shortest_qualid_of_global Idset.empty r));;
+  (fun ?loc _ r -> Libnames.Qualid (loc,Nametab.shortest_qualid_of_global Idset.empty r));;
 
 open Coqloop
 let go = loop

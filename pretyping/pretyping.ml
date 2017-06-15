@@ -207,18 +207,22 @@ let interp_universe_level_name ~anon_rigidity evd (loc, s) =
 	    with UGraph.AlreadyDeclared -> evd
 	  in evd, level
      else
-       try
-	 let level = Evd.universe_of_name evd s in
-	 evd, level
-       with Not_found ->
-	 try
-	   let id = try Id.of_string s with _ -> raise Not_found in
-           evd, snd (Idmap.find id names)
-	 with Not_found ->
-	   if not (is_strict_universe_declarations ()) then
-  	     new_univ_level_variable ?loc ~name:s univ_rigid evd
-	   else user_err ?loc ~hdr:"interp_universe_level_name"
-		  (Pp.(str "Undeclared universe: " ++ str s))
+       match s with
+       | "Set" -> evd, Univ.Level.set
+       | "Prop" -> evd, Univ.Level.prop
+       | _ -> 
+          try
+	    let level = Evd.universe_of_name evd s in
+	    evd, level
+          with Not_found ->
+	    try
+	      let id = try Id.of_string s with _ -> raise Not_found in
+              evd, snd (Idmap.find id names)
+	    with Not_found ->
+	      if not (is_strict_universe_declarations ()) then
+  	        new_univ_level_variable ?loc ~name:s univ_rigid evd
+	      else user_err ?loc ~hdr:"interp_universe_level_name"
+		            (Pp.(str "Undeclared universe: " ++ str s))
 
 let interp_universe ?loc evd = function
   | [] -> let evd, l = new_univ_level_variable ?loc univ_rigid evd in

@@ -241,10 +241,12 @@ let noccur_evar env evd evk c =
      if not (Int.Set.mem (i-k) !cache) then
        let decl = Environ.lookup_rel i env in
        if check_types then
-         (cache := Int.Set.add (i-k) !cache; occur_rec false acc (lift i (EConstr.of_constr (get_type decl))));
+         (cache := Int.Set.add (i-k) !cache;
+          occur_rec false acc (lift i (EConstr.of_constr (get_type decl))));
        (match decl with
         | LocalAssum _ -> ()
-        | LocalDef (_,b,_) -> cache := Int.Set.add (i-k) !cache; occur_rec false acc (lift i (EConstr.of_constr b)))
+        | LocalDef (_,b,_) -> cache := Int.Set.add (i-k) !cache;
+                             occur_rec false acc (lift i (EConstr.of_constr b)))
   | Proj (p,c) -> occur_rec true acc c
   | _ -> iter_with_full_binders evd (fun rd (k,env) -> (succ k, push_rel rd env))
     (occur_rec check_types) acc c

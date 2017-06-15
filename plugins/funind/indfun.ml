@@ -486,10 +486,10 @@ let register_wf ?(is_mes=false) fname rec_impls wf_rel_expr wf_arg using_lemmas 
 		    [(f_app_args,None);(body,None)])
   in
   let eq = Constrexpr_ops.mkCProdN args unbounded_eq in
-  let hook ((f_ref,_) as fconst) tcc_lemma_ref (functional_ref,_) (eq_ref,_) rec_arg_num rec_arg_type
+  let hook f_ref poly tcc_lemma_ref functional_ref eq_ref rec_arg_num rec_arg_type
       nb_args relation =
     try
-      pre_hook [fconst]
+      pre_hook [f_ref]
 	(generate_correction_proof_wf f_ref tcc_lemma_ref is_mes
 	   functional_ref eq_ref rec_arg_num rec_arg_type nb_args relation
 	);
@@ -653,9 +653,16 @@ let do_generate_principle pconstants on_error register_built interactive_proof
 	  let recdefs,rec_impls = build_newrecursive fixpoint_exprl in
 	  let using_lemmas = [] in 
 	  let pre_hook pconstants =
+            let env = (Global.env ()) in
+            let evd = (ref (Evd.from_env env)) in
+            let pconstants =
+              List.map (fun c -> let evm, c = Evd.fresh_global env !evd (ConstRef c) in
+                               let c, u = destConst evm (EConstr.of_constr c) in
+                               evd := evm; (c, EInstance.kind evm u))
+                        pconstants
+            in
 	    generate_principle
-	      (ref (Evd.from_env (Global.env ())))
-	      pconstants
+	      evd pconstants
 	      on_error
 	      true
 	      register_built
@@ -677,9 +684,15 @@ let do_generate_principle pconstants on_error register_built interactive_proof
 	  let using_lemmas = [] in
 	  let body = match body with | Some body -> body | None -> user_err ~hdr:"Function" (str "Body of Function must be given") in 
 	  let pre_hook pconstants =
-	    generate_principle
-	      (ref (Evd.from_env (Global.env ())))
-	      pconstants
+            let env = (Global.env ()) in
+            let evd = (ref (Evd.from_env env)) in
+            let pconstants =
+              List.map (fun c -> let evm, c = Evd.fresh_global env !evd (ConstRef c) in
+                               let c, u = destConst evm (EConstr.of_constr c) in
+                               evd := evm; (c, EInstance.kind evm u))
+                        pconstants
+            in
+	    generate_principle evd pconstants
 	      on_error
 	      true
 	      register_built

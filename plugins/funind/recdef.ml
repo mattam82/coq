@@ -63,8 +63,8 @@ let find_reference sl s =
   let dp = Names.DirPath.make (List.rev_map Id.of_string sl) in
   locate (make_qualid dp (Id.of_string s))
 
-let declare_fun f_id kind ?(ctx=Univ.UContext.empty) value =
-  let ce = definition_entry ~univs:ctx value (*FIXME *) in
+let declare_fun f_id kind poly ?(ctx=Univ.UContext.empty) value =
+  let ce = definition_entry ~univs:ctx value ~poly (*FIXME *) in
     ConstRef(declare_constant f_id (DefinitionEntry ce, kind));;
 
 let defined () = Lemmas.save_proof (Vernacexpr.(Proved (Transparent,None)))
@@ -89,10 +89,11 @@ let type_of_const sigma t =
       Typeops.type_of_constant_in (Global.env()) (sp, u)
     |_ -> assert false
 
-let constr_of_global x = 
-  fst (Universes.unsafe_constr_of_global x)
+let constr_of_global env evd x = 
+  let evm, c = Evd.fresh_global env !evd x in
+  evd := evm; c
 
-let constant sl s = constr_of_global (find_reference sl s)
+let constant env evd sl s = constr_of_global env evd (find_reference sl s)
 
 let const_of_ref = function
     ConstRef kn -> kn
@@ -140,9 +141,9 @@ let nat = function () -> (coq_init_constant "nat")
 let iter_ref () =  
   try find_reference ["Recdef"] "iter" 
   with Not_found -> user_err Pp.(str "module Recdef not loaded")
-let iter = function () -> (constr_of_global (delayed_force iter_ref))
+let iter = function () -> (constr_of_global (Global.env ()) (ref Evd.empty) (delayed_force iter_ref))
 let eq = function () -> (coq_init_constant "eq")
-let le_lt_SS = function () -> (constant ["Recdef"] "le_lt_SS")
+let le_lt_SS = function () -> (constant  (Global.env ()) (ref Evd.empty) ["Recdef"] "le_lt_SS")
 let le_lt_n_Sm = function () -> (coq_constant arith_Lt "le_lt_n_Sm")
 let le_trans = function () -> (coq_constant arith_Nat "le_trans")
 let le_lt_trans = function () -> (coq_constant arith_Nat "le_lt_trans")
@@ -153,7 +154,7 @@ let coq_O = function () -> (coq_init_constant "O")
 let coq_S = function () -> (coq_init_constant "S")
 let lt_n_O = function () -> (coq_constant arith_Nat "nlt_0_r")
 let max_ref = function () -> (find_reference ["Recdef"] "max")
-let max_constr = function () -> EConstr.of_constr (constr_of_global (delayed_force max_ref))
+let max_constr = function () -> EConstr.of_constr (constr_of_global  (Global.env ()) (ref Evd.empty) (delayed_force max_ref))
 let coq_conj = function () -> find_reference Coqlib.logic_module_name "conj"
 
 let f_S t = mkApp(delayed_force coq_S, [|t|]);;
@@ -172,9 +173,9 @@ let simpl_iter clause =
     clause
 
 (* Others ugly things ... *)
-let (value_f:Term.constr list -> global_reference -> Term.constr) =
+let value_f =
   let open Term in
-  fun al fterm ->
+  fun evd al fterm ->
     let rev_x_id_l =
       (
 	List.fold_left
@@ -194,19 +195,20 @@ let (value_f:Term.constr list -> global_reference -> Term.constr) =
       CAst.make @@
        GCases
 	(RegularStyle,None,
-	 [CAst.make @@ GApp(CAst.make @@ GRef(fterm,None), List.rev_map (fun x_id -> CAst.make @@ GVar x_id) rev_x_id_l),
+	 [CAst.make @@ GApp(CAst.make @@ GRef(ConstRef (fst (destConst fterm)),None), List.rev_map (fun x_id -> CAst.make @@ GVar x_id) rev_x_id_l),
 	  (Anonymous,None)],
 	 [Loc.tag ([v_id], [CAst.make @@ PatCstr ((destIndRef (delayed_force coq_sig_ref),1),
 			   [CAst.make @@ PatVar(Name v_id); CAst.make @@ PatVar Anonymous],
                            Anonymous)],
 	    CAst.make @@ GVar v_id)])
     in
-    let body = fst (understand env (Evd.from_env env) glob_body)(*FIXME*) in
-    it_mkLambda_or_LetIn body context
+    let body, ctx = understand env evd glob_body in
+    it_mkLambda_or_LetIn body context, ctx
 
-let (declare_f : Id.t -> logical_kind -> Term.constr list -> global_reference -> global_reference) =
-  fun f_id kind input_type fterm_ref ->
-    declare_fun f_id kind (value_f input_type fterm_ref);;
+let (declare_f : Evd.evar_map -> Id.t -> logical_kind -> polymorphic -> Term.constr list -> Term.constr -> global_reference) =
+  fun evd f_id kind poly input_type fterm ->
+  let term, ctx = value_f evd input_type fterm in
+    declare_fun ~ctx:(UState.context ctx) f_id kind poly term;;
 
 
 
@@ -1034,16 +1036,17 @@ let prove_eq = travel equation_info
 (* wrappers *)
 (* [compute_terminate_type] computes the type of the Definition f_terminate from the type of f_F
 *)
-let compute_terminate_type nb_args func =
+let compute_terminate_type env evd nb_args func =
   let open Term in
   let open CVars in
-  let _,a_arrow_b,_ = destLambda(def_of_const (constr_of_global func)) in
+  let funcc = constr_of_global env evd func in
+  let _,a_arrow_b,_ = destLambda(def_of_const funcc) in
   let rev_args,b = decompose_prod_n nb_args a_arrow_b in
   let left =
     mkApp(delayed_force iter,
 	  Array.of_list
 	    (lift 5 a_arrow_b:: mkRel 3::
-	       constr_of_global func::mkRel 1::
+	       funcc::mkRel 1::
 	       List.rev (List.map_i (fun i _ -> mkRel (6+i)) 0 rev_args)
 	    )
 	 )
@@ -1062,10 +1065,10 @@ let compute_terminate_type nb_args func =
 		  delayed_force nat,
 		  (mkProd (Name k_id, delayed_force nat,
 			   mkArrow cond result))))|])in
-  let value = mkApp(constr_of_global (Util.delayed_force coq_sig_ref),
+  let value = mkApp(constr_of_global env evd (Util.delayed_force coq_sig_ref),
 		    [|b;
 		      (mkLambda (Name v_id, b, nb_iter))|]) in
-  compose_prod rev_args value
+  funcc, compose_prod rev_args value
 
 
 let termination_proof_header is_mes input_type ids args_id relation
@@ -1153,12 +1156,12 @@ let rec instantiate_lambda sigma t l =
       let (_, _, body) = destLambda sigma t in
       instantiate_lambda sigma (subst1 a body) l
 
-let whole_start (concl_tac:tactic) nb_args is_mes func input_type relation rec_arg_num  : tactic =
+let whole_start (concl_tac:tactic) nb_args is_mes func funcc input_type relation rec_arg_num  : tactic =
   begin
     fun g ->
       let sigma = project g in
       let ids = Termops.ids_of_named_context (pf_hyps g) in
-      let func_body = (def_of_const (constr_of_global func)) in
+      let func_body = (def_of_const funcc) in
       let func_body = EConstr.of_constr func_body in
       let (f_name, _, body1) = destLambda sigma func_body in
       let f_id =
@@ -1250,7 +1253,7 @@ let build_and_l sigma l =
 	let c,tac,nb = f pl in
 	mk_and p1 c,
 	tclTHENS
-	  (Proofview.V82.of_tactic (apply (EConstr.of_constr (constr_of_global conj_constr))))
+	  (Proofview.V82.of_tactic (apply (EConstr.of_constr (Universes.constr_of_global conj_constr))))
 	  [tclIDTAC;
 	   tac
 	  ],nb+1
@@ -1293,7 +1296,7 @@ let is_opaque_constant c =
     | Declarations.Undef _ -> Vernacexpr.Opaque None
     | Declarations.Def _ -> Vernacexpr.Transparent
 
-let open_new_goal build_proof sigma using_lemmas ref_ goal_name (gls_type,decompose_and_tac,nb_goal)   =
+let open_new_goal build_proof sigma using_lemmas ref_ goal_name poly (gls_type,decompose_and_tac,nb_goal)   =
   (* Pp.msgnl (str "gls_type := " ++ Printer.pr_lconstr gls_type); *)
   let current_proof_name = get_current_proof_name () in
   let name = match goal_name with
@@ -1368,7 +1371,7 @@ let open_new_goal build_proof sigma using_lemmas ref_ goal_name (gls_type,decomp
   in
   Lemmas.start_proof
     na
-    (Decl_kinds.Global, false (* FIXME *), Decl_kinds.Proof Decl_kinds.Lemma)
+    (Decl_kinds.Global, poly, Decl_kinds.Proof Decl_kinds.Lemma)
     sigma gls_type
     (Lemmas.mk_hook hook);
   if Indfun_common.is_strict_tcc  ()
@@ -1410,16 +1413,18 @@ let com_terminate
     relation
     rec_arg_num
     thm_name using_lemmas
-    nb_args ctx
+    nb_args poly ctx
     hook =
   let start_proof ctx (tac_start:tactic) (tac_end:tactic) =
     let (evmap, env) = Lemmas.get_current_context() in
+    let evd = ref evmap in
+    let funcb, ty = compute_terminate_type env evd nb_args fonctional_ref in
     Lemmas.start_proof thm_name
-      (Global, false (* FIXME *), Proof Lemma) ~sign:(Environ.named_context_val env)
-      ctx (EConstr.of_constr (compute_terminate_type nb_args fonctional_ref)) hook;
-
+      (Global, poly, Proof Lemma) ~sign:(Environ.named_context_val env)
+      !evd (EConstr.of_constr ty) hook;
+    
     ignore (by (Proofview.V82.tactic (observe_tac (str "starting_tac") tac_start)));
-    ignore (by (Proofview.V82.tactic (observe_tac (str "whole_start") (whole_start tac_end nb_args is_mes fonctional_ref
+    ignore (by (Proofview.V82.tactic (observe_tac (str "whole_start") (whole_start tac_end nb_args is_mes fonctional_ref funcb
     				   input_type relation rec_arg_num ))))
   in
   start_proof ctx tclIDTAC tclIDTAC;
@@ -1428,7 +1433,7 @@ let com_terminate
     let sigma = Evd.from_ctx (Evd.evar_universe_context sigma) in
     open_new_goal start_proof sigma
       using_lemmas tcc_lemma_ref
-      (Some tcc_lemma_name)
+      (Some tcc_lemma_name) poly
       (new_goal_type);
   with EmptySubgoals ->
     (* a non recursive function declared with measure ! *)
@@ -1443,8 +1448,7 @@ let start_equation (f:global_reference) (term_f:global_reference)
   (cont_tactic:Id.t list -> tactic) g =
   let sigma = project g in
   let ids = pf_ids_of_hyps g in
-  let terminate_constr = constr_of_global term_f in
-  let terminate_constr = EConstr.of_constr terminate_constr in
+  pf_constr_of_global term_f (fun terminate_constr ->
   let nargs = nb_prod (project g) (EConstr.of_constr (type_of_const sigma terminate_constr)) in
   let x = n_x_id ids nargs in
   observe_tac (str "start_equation") (observe_tclTHENLIST (str "start_equation") [
@@ -1453,7 +1457,7 @@ let start_equation (f:global_reference) (term_f:global_reference)
     observe_tac (str "simplest_case")
       (Proofview.V82.of_tactic (simplest_case (mkApp (terminate_constr,
                              Array.of_list (List.map mkVar x)))));
-    observe_tac (str "prove_eq") (cont_tactic x)]) g;;
+    observe_tac (str "prove_eq") (cont_tactic x)])) g;;
 
 let (com_eqn : int -> Id.t ->
        global_reference -> global_reference -> global_reference
@@ -1467,8 +1471,11 @@ let (com_eqn : int -> Id.t ->
     in
     let (evmap, env) = Lemmas.get_current_context() in
     let evmap = Evd.from_ctx (Evd.evar_universe_context evmap) in
-    let f_constr = constr_of_global f_ref in
+    let evd = ref evmap in
+    let f_constr = constr_of_global env evd f_ref in
     let equation_lemma_type = subst1 f_constr equation_lemma_type in
+    let functional_constr = constr_of_global env evd functional_ref in
+    let terminate_constr = constr_of_global env evd terminate_ref in
     (Lemmas.start_proof eq_name (Global, false, Proof Lemma)
        ~sign:(Environ.named_context_val env)
        evmap
@@ -1479,12 +1486,12 @@ let (com_eqn : int -> Id.t ->
 	  (fun  x ->
 	     prove_eq (fun _ -> tclIDTAC)
 	       {nb_arg=nb_arg;
-		f_terminate = EConstr.of_constr (constr_of_global terminate_ref); 
+		f_terminate = EConstr.of_constr (terminate_constr); 
 	        f_constr = EConstr.of_constr f_constr; 
 		concl_tac = tclIDTAC;
 		func=functional_ref;
 		info=(instantiate_lambda Evd.empty
-	       		(EConstr.of_constr (def_of_const (constr_of_global functional_ref)))
+	       		(EConstr.of_constr (def_of_const (functional_constr)))
 	       		(EConstr.of_constr f_constr::List.map mkVar x)
 		);
 		is_main_branch = true;
@@ -1514,6 +1521,7 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
   let open CVars in
   let env = Global.env() in
   let evd = ref (Evd.from_env env) in
+  let poly = Flags.use_polymorphic_flag () in
   let function_type = interp_type_evars env evd type_of_f in
   let function_type = EConstr.Unsafe.to_constr function_type in
   let env = push_named (Context.Named.Declaration.LocalAssum (function_name,function_type)) env in
@@ -1540,11 +1548,11 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
   in
   let pre_rec_args,function_type_before_rec_arg = decompose_prod_n (rec_arg_num - 1) function_type in
   let (_, rec_arg_type, _) = destProd function_type_before_rec_arg in
-  let arg_types = List.rev_map snd (fst (decompose_prod_n (List.length res_vars) function_type)) in
   let equation_id = add_suffix function_name "_equation" in
   let functional_id =  add_suffix function_name "_F" in
   let term_id = add_suffix function_name "_terminate" in
-  let functional_ref = declare_fun functional_id (IsDefinition Decl_kinds.Definition) ~ctx:(snd (Evd.universe_context evm)) res in
+  let ctx = snd (Evd.universe_context evm) in
+  let functional_ref = declare_fun functional_id (IsDefinition Decl_kinds.Definition) poly ~ctx res in
   (* Refresh the global universes, now including those of _F *)
   let evm = Evd.from_env (Global.env ()) in
   let env_with_pre_rec_args = push_rel_context(List.map (function (x,t) -> LocalAssum (x,t)) pre_rec_args) env in
@@ -1557,7 +1565,16 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
   (* let _ = Pp.msgnl (str "relation := " ++ Printer.pr_lconstr_env env_with_pre_rec_args relation) in *)
   let hook _ _ = 
     let term_ref = Nametab.locate (qualid_of_ident term_id) in
-    let f_ref = declare_f function_name (IsProof Lemma) arg_types term_ref in
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let sigma, term_f, arg_types =
+      let sigma, f = Evd.fresh_global env sigma term_ref in 
+      let function_type =
+        EConstr.Unsafe.to_constr (Retyping.get_type_of env sigma (EConstr.of_constr f) ) in
+      let arg_types = List.rev_map snd (fst (decompose_prod_n (List.length res_vars) function_type)) in
+      sigma, f, arg_types
+    in
+    let f_ref = declare_f sigma function_name (IsProof Lemma) poly arg_types term_f in
     let _ = Extraction_plugin.Table.extraction_inline true [Ident (Loc.tag term_id)] in
     (*     message "start second proof"; *)
     let stop = 
@@ -1577,10 +1594,10 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
     if not stop
     then
       let eq_ref = Nametab.locate (qualid_of_ident equation_id ) in
-      let f_ref = destConst (constr_of_global f_ref)
-      and functional_ref = destConst (constr_of_global functional_ref)
-      and eq_ref = destConst (constr_of_global eq_ref) in
-      generate_induction_principle f_ref tcc_lemma_constr
+      let f_ref = Globnames.destConstRef f_ref
+      and functional_ref = destConstRef functional_ref
+      and eq_ref = destConstRef eq_ref in
+      generate_induction_principle f_ref poly tcc_lemma_constr
 	functional_ref eq_ref rec_arg_num (EConstr.of_constr rec_arg_type) (nb_prod evm (EConstr.of_constr res)) (EConstr.of_constr relation);
       Flags.if_verbose
         msgnl (h 1 (Ppconstr.pr_id function_name ++
@@ -1599,5 +1616,5 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
       term_id
       using_lemmas
       (List.length res_vars)
-      evm (Lemmas.mk_hook hook))
+      poly evm (Lemmas.mk_hook hook))
     ()
