@@ -154,7 +154,7 @@ let mk_list univ typ l =
   loop l
 
 let mk_plist = 
-  let type1lev = Universes.new_univ_level (Global.current_dirpath ()) in
+  let type1lev = Universes.new_univ_level () in
     fun l -> mk_list type1lev Term.mkProp l
 
 let mk_list = mk_list Univ.Level.set

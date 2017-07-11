@@ -1620,6 +1620,53 @@ end
 (* Modules from intf/                                                   *)
 (************************************************************************)
 
+module Libnames :
+sig
+
+  open Util
+  open Names
+
+  type full_path
+  val pr_path : full_path -> Pp.t
+  val make_path : Names.DirPath.t -> Names.Id.t -> full_path
+  val eq_full_path : full_path -> full_path -> bool
+  val dirpath : full_path -> Names.DirPath.t
+  val path_of_string : string -> full_path
+
+  type qualid
+  val make_qualid : Names.DirPath.t -> Names.Id.t -> qualid
+  val qualid_eq : qualid -> qualid -> bool
+  val repr_qualid : qualid -> Names.DirPath.t * Names.Id.t
+  val pr_qualid : qualid -> Pp.t
+  val string_of_qualid : qualid -> string
+  val qualid_of_string : string -> qualid
+  val qualid_of_path : full_path -> qualid
+  val qualid_of_dirpath : Names.DirPath.t -> qualid
+  val qualid_of_ident : Names.Id.t -> qualid
+
+  type reference =
+    | Qualid of qualid Loc.located
+    | Ident of Names.Id.t Loc.located
+  val loc_of_reference : reference -> Loc.t option
+  val qualid_of_reference : reference -> qualid Loc.located
+  val pr_reference : reference -> Pp.t
+
+  val is_dirpath_prefix_of : Names.DirPath.t -> Names.DirPath.t -> bool
+  val split_dirpath : Names.DirPath.t -> Names.DirPath.t * Names.Id.t
+  val dirpath_of_string : string -> Names.DirPath.t
+  val pr_dirpath : Names.DirPath.t -> Pp.t
+
+  val string_of_path : full_path -> string
+  val basename : full_path -> Names.Id.t
+
+  type object_name = full_path * Names.KerName.t
+  type object_prefix = Names.DirPath.t * (Names.ModPath.t * Names.DirPath.t)
+
+  module Dirset : Set.S with type elt = DirPath.t
+  module Dirmap : Map.ExtS with type key = DirPath.t and module Set := Dirset
+  module Spmap  : CSig.MapS with type key = full_path
+end
+
 module Misctypes :
 sig
   type evars_flag = bool
@@ -1642,10 +1689,15 @@ sig
     | GSet  (** representation of [Set] literal *)
     | GType of 'a (** representation of [Type] literal *)
 
-  type level_info = Names.Name.t Loc.located option
+  type 'a universe_kind =
+    | UAnonymous
+    | UUnknown
+    | UNamed of 'a
+
+  type level_info = Libnames.reference universe_kind
   type glob_level = level_info glob_sort_gen
 
-  type sort_info = Names.Name.t Loc.located list
+  type sort_info = (Libnames.reference * int) option list
   type glob_sort = sort_info glob_sort_gen
 
   type ('a, 'b) gen_universe_decl = {
@@ -1783,53 +1835,6 @@ sig
     val get_id : t -> Names.Id.t
     val fold_right : (Names.Id.t -> 'a -> 'a) -> t -> 'a -> 'a
   end
-end
-
-module Libnames :
-sig
-
-  open Util
-  open Names
-
-  type full_path
-  val pr_path : full_path -> Pp.t
-  val make_path : Names.DirPath.t -> Names.Id.t -> full_path
-  val eq_full_path : full_path -> full_path -> bool
-  val dirpath : full_path -> Names.DirPath.t
-  val path_of_string : string -> full_path
-
-  type qualid
-  val make_qualid : Names.DirPath.t -> Names.Id.t -> qualid
-  val qualid_eq : qualid -> qualid -> bool
-  val repr_qualid : qualid -> Names.DirPath.t * Names.Id.t
-  val pr_qualid : qualid -> Pp.t
-  val string_of_qualid : qualid -> string
-  val qualid_of_string : string -> qualid
-  val qualid_of_path : full_path -> qualid
-  val qualid_of_dirpath : Names.DirPath.t -> qualid
-  val qualid_of_ident : Names.Id.t -> qualid
-
-  type reference =
-    | Qualid of qualid Loc.located
-    | Ident of Names.Id.t Loc.located
-  val loc_of_reference : reference -> Loc.t option
-  val qualid_of_reference : reference -> qualid Loc.located
-  val pr_reference : reference -> Pp.t
-
-  val is_dirpath_prefix_of : Names.DirPath.t -> Names.DirPath.t -> bool
-  val split_dirpath : Names.DirPath.t -> Names.DirPath.t * Names.Id.t
-  val dirpath_of_string : string -> Names.DirPath.t
-  val pr_dirpath : Names.DirPath.t -> Pp.t
-
-  val string_of_path : full_path -> string
-  val basename : full_path -> Names.Id.t
-
-  type object_name = full_path * Names.KerName.t
-  type object_prefix = Names.DirPath.t * (Names.ModPath.t * Names.DirPath.t)
-
-  module Dirset : Set.S with type elt = DirPath.t
-  module Dirmap : Map.ExtS with type key = DirPath.t and module Set := Dirset
-  module Spmap  : CSig.MapS with type key = full_path
 end
 
 module Globnames :
@@ -2138,10 +2143,10 @@ sig
   type universe_binders
   type universe_opt_subst
   val fresh_inductive_instance : Environ.env -> Names.inductive -> Term.pinductive Univ.in_universe_context_set
-  val new_Type : Names.DirPath.t -> Term.types
+  val new_Type : unit -> Term.types
   val type_of_global : Globnames.global_reference -> Term.types Univ.in_universe_context_set
   val constr_of_global : Globnames.global_reference -> Constr.t
-  val new_univ_level : Names.DirPath.t -> Univ.Level.t
+  val new_univ_level : unit -> Univ.Level.t
   val new_sort_in_family : Sorts.family -> Sorts.t
   val pr_with_global_universes : Univ.Level.t -> Pp.t
   val pr_universe_opt_subst : universe_opt_subst -> Pp.t

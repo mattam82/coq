@@ -457,28 +457,54 @@ let input_universe_context : universe_context_decl -> Libobject.obj =
 let declare_universe_context poly ctx =
   Lib.add_anonymous_leaf (input_universe_context (poly, ctx))
 
-(* Discharged or not *)
-type universe_decl = polymorphic * (Id.t * Univ.universe_level) list
+(** Global universes are not substitutive objects but global objects
+   bound at the *library* or *module* level. The polymorphic flag is
+   used to distinguish universes declared in polymorphic sections, which
+   are discharged and do not remain in scope. *)
 
-let cache_universes (p, l) =
-  let glob = Global.global_universe_names () in
-  let glob', ctx =
-    List.fold_left (fun ((idl,lid),ctx) (id, lev) ->
-        ((Idmap.add id (p, lev) idl,
-          Univ.LMap.add lev id lid),
-         Univ.ContextSet.add_universe lev ctx))
-      (glob, Univ.ContextSet.empty) l
-  in
-  cache_universe_context (p, ctx);
-  Global.set_global_universe_names glob'
+type universe_decl = polymorphic * Nametab.universe_id
 
-let input_universes : universe_decl -> Libobject.obj =
+open Nametab
+
+let universe_map = (ref UnivIdMap.empty : bool UnivIdMap.t ref)
+
+let add_universe p (dp, i) =
+  let ctx = Univ.ContextSet.add_universe (Univ.Level.make dp i) Univ.ContextSet.empty in
+  Global.push_context_set p ctx;
+  universe_map := UnivIdMap.add (dp, i) p !universe_map;
+  if p then Lib.add_section_context ctx
+
+let check_exists sp =
+  let depth = sections_depth () in
+  let sp = Libnames.make_path (pop_dirpath_n depth (dirpath sp)) (basename sp) in
+  if Nametab.exists_universe sp then alreadydeclared (pr_id (basename sp) ++ str " already exists")
+  else ()
+  
+let cache_universe ((sp, _), (poly, id)) =
+  let () = check_exists sp in
+  let () = Nametab.push_universe (Until 1) sp id in
+    add_universe poly id
+
+let load_universe i ((sp, _), (poly, id)) =
+  let () = Nametab.push_universe (Until i) sp id in
+  add_universe poly id
+
+let open_universe i ((sp, _), (poly, id)) =
+  let () = Nametab.push_universe (Exactly i) sp id in
+  ()(** add_universe p id Necessary ? *)
+
+let input_universe : universe_decl -> Libobject.obj =
   declare_object
     { (default_object "Global universe name state") with
-      cache_function = (fun (na, pi) -> cache_universes pi);
-      load_function = (fun _ (_, pi) -> cache_universes pi);
+      cache_function = cache_universe;
+      load_function = load_universe;
+      open_function = open_universe;
       discharge_function = (fun (_, (p, _ as x)) -> if p then None else Some x);
-      classify_function = (fun a -> Keep a) }
+      subst_function = (fun (subst, a) -> (** Actually the name is generated once and for all. *) a);
+      classify_function = (fun a -> Substitute a) }
+
+let add_universe poly (id, lev) =
+  ignore(Lib.add_leaf id (input_universe (poly, lev)))
 
 let do_universe poly l =
   let in_section = Lib.sections_are_opened () in
@@ -489,10 +515,10 @@ let do_universe poly l =
   in
   let l =
     List.map (fun (l, id) ->
-	      let lev = Universes.new_univ_level (Global.current_dirpath ()) in
-	      (id, lev)) l
+    let lev = Universes.new_univ_id () in
+    (id, lev)) l
   in
-    Lib.add_anonymous_leaf (input_universes (poly, l))
+  List.iter (add_universe poly) l
 
 type constraint_decl = polymorphic * Univ.constraints
 
@@ -520,14 +546,16 @@ let do_constraint poly l =
     match x with
     | GProp -> Loc.tag (false, Univ.Level.prop)
     | GSet  -> Loc.tag (false, Univ.Level.set)
-    | GType None | GType (Some (_, Anonymous)) ->
+    | GType (UAnonymous | UUnknown) ->
        user_err ~hdr:"Constraint"
                      (str "Cannot declare constraints on anonymous universes")
-    | GType (Some (loc, Name id)) ->
-       let names, _ = Global.global_universe_names () in
-       try loc, Idmap.find id names
+    | GType (UNamed r) ->
+       let loc, qid = qualid_of_reference r in
+       try let (univ, k as u) = Nametab.locate_universe qid in
+           let poly = try UnivIdMap.find u !universe_map with Not_found -> false in
+           loc, (poly, Univ.Level.make univ k)
        with Not_found ->
-         user_err ?loc ~hdr:"Constraint" (str "Undeclared universe " ++ pr_id id)
+         user_err ?loc ~hdr:"Constraint" (str "Undeclared universe " ++ pr_qualid qid)
   in
   let in_section = Lib.sections_are_opened () in
   let () =

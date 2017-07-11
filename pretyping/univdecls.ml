@@ -7,7 +7,6 @@
 (************************************************************************)
 
 open Names
-open Nameops
 open CErrors
 open Pp
 
@@ -28,13 +27,22 @@ let interp_univ_constraints env evd cstrs =
     match x with
     | Misctypes.GProp -> Loc.tag Univ.Level.prop
     | GSet  -> Loc.tag Univ.Level.set
-    | GType None | GType (Some (_, Anonymous)) ->
+    | GType (UAnonymous | UUnknown) ->
        user_err ~hdr:"interp_constraint"
                      (str "Cannot declare constraints on anonymous universes")
-    | GType (Some (loc, Name id)) ->
-       try loc, Evd.universe_of_name evd (Id.to_string id)
+    | GType (UNamed r) ->
+       let loc, qid = Libnames.qualid_of_reference r in
+       try
+         match r with
+         | Libnames.Ident (loc, id) -> loc, Evd.universe_of_name evd (Id.to_string id)
+         | Libnames.Qualid _ -> raise Not_found
        with Not_found ->
-         user_err ?loc ~hdr:"interp_constraint" (str "Undeclared universe " ++ pr_id id)
+         try 
+           let univ, k = Nametab.locate_universe qid in
+           loc, Univ.Level.make univ k
+         with Not_found ->
+           user_err ?loc ~hdr:"interp_constraint"
+                    (str "Undeclared universe " ++ Libnames.pr_qualid qid)
   in
   let interp (evd,cstrs) (u, d, u') =
     let lloc, ul = u_of_id u and rloc, u'l = u_of_id u' in

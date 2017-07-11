@@ -18,23 +18,27 @@ val is_set_minimization : unit -> bool
 (** Universes *)
 
 val pr_with_global_universes : Level.t -> Pp.t
+val reference_of_level : Level.t -> Libnames.reference
 
 (** Local universe name <-> level mapping *)
 
 type universe_binders = (Id.t * Univ.universe_level) list
-					   
+
 val register_universe_binders : Globnames.global_reference -> universe_binders -> unit
 val universe_binders_of_global : Globnames.global_reference -> universe_binders
 
 (** The global universe counter *)
-val set_remote_new_univ_level : universe_level RemoteCounter.installer
+type universe_id = DirPath.t * int
+
+val set_remote_new_univ_id : universe_id RemoteCounter.installer
 
 (** Side-effecting functions creating new universe levels. *)
 
-val new_univ_level : Names.dir_path -> universe_level
-val new_univ : Names.dir_path -> universe
-val new_Type : Names.dir_path -> types
-val new_Type_sort : Names.dir_path -> sorts
+val new_univ_id : unit -> universe_id
+val new_univ_level : unit -> universe_level
+val new_univ : unit -> universe
+val new_Type : unit -> types
+val new_Type_sort : unit -> sorts
 
 val new_global_univ : unit -> universe in_universe_context_set
 val new_sort_in_family : sorts_family -> sorts

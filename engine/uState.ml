@@ -249,13 +249,15 @@ let constrain_variables diff ctx =
   in
   { ctx with uctx_local = (univs, local); uctx_univ_variables = vars }
   
-
-let pr_uctx_level uctx = 
+let reference_of_level uctx =
   let map, map_rev = uctx.uctx_names in 
     fun l ->
-      try str (Option.get (Univ.LMap.find l map_rev).uname)
+      try Libnames.Ident (Loc.tag @@ (Id.of_string (Option.get (Univ.LMap.find l map_rev).uname)))
       with Not_found | Option.IsNone ->
-        Universes.pr_with_global_universes l
+        Universes.reference_of_level l
+
+let pr_uctx_level uctx l =
+  Libnames.pr_reference (reference_of_level uctx l)
 
 type universe_decl =
   (Names.Id.t Loc.located list, Univ.Constraint.t) Misctypes.gen_universe_decl
@@ -380,7 +382,7 @@ let emit_side_effects eff u =
 
 let new_univ_variable ?loc rigid name
   ({ uctx_local = ctx; uctx_univ_variables = uvars; uctx_univ_algebraic = avars} as uctx) =
-  let u = Universes.new_univ_level (Global.current_dirpath ()) in
+  let u = Universes.new_univ_level () in
   let ctx' = Univ.ContextSet.add_universe u ctx in
   let uctx', pred =
     match rigid with

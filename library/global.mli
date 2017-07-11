@@ -102,13 +102,6 @@ val body_of_constant : constant -> (Term.constr * Univ.AUContext.t) option
 val body_of_constant_body : Declarations.constant_body -> (Term.constr * Univ.AUContext.t) option
 (** Same as {!body_of_constant} but on {!Declarations.constant_body}. *)
 
-(** Global universe name <-> level mapping *)
-type universe_names = 
-  (Decl_kinds.polymorphic * Univ.universe_level) Idmap.t * Id.t Univ.LMap.t
-
-val global_universe_names : unit -> universe_names
-val set_global_universe_names : universe_names -> unit
-
 (** {6 Compiled libraries } *)
 
 val start_library : DirPath.t -> module_path
