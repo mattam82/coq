@@ -122,7 +122,7 @@ let abstract_list_all_with_dependencies env evd typ c l =
   let argoccs = set_occurrences_of_last_arg (Array.sub (snd ev') 0 n) in
   let evd,b =
     Evarconv.second_order_matching (Evarconv.default_flags_of empty_transparent_state)
-    env evd ev' (Evarconv.default_occurrence_test, argoccs) c in
+    env evd ev' (Evarconv.default_occurrence_test empty_transparent_state, argoccs) c in
   if b then
     let p = nf_evar evd (existential_value evd (destEvar ev)) in
       evd, p
@@ -1940,9 +1940,10 @@ let w_unify2 env evd flags dep cv_pb ty1 ty2 =
 let w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 =
   let open_ts = flags.core_unify_flags.modulo_delta in
   let closed_ts = Option.default open_ts flags.core_unify_flags.modulo_conv_on_closed_terms in
+  let subterm_ts = flags.subterm_unify_flags.modulo_delta in
   let frozen_evars = flags.core_unify_flags.frozen_evars in
   let allow_K_at_toplevel = flags.allow_K_in_toplevel_higher_order_unification in
-  let flags = Evarconv.{ open_ts; closed_ts; frozen_evars; allow_K_at_toplevel; with_cs = true } in
+  let flags = Evarconv.{ open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true } in
   let res = Evarconv.evar_conv_x flags env evd cv_pb ty1 ty2 in
   match res with
   | Success evd ->

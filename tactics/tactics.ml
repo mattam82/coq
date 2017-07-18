@@ -1449,7 +1449,7 @@ let general_elim with_evars ~holes_order clear_flag (c, lbindc) elim =
 
 let default_occurrences env ind dep =
   let elim_args = inductive_nrealargs_env env ind + if dep then 1 else 0 in
-  Some (Evarconv.default_occurrences_selection elim_args)
+  Some (Evarconv.default_occurrences_selection empty_transparent_state elim_args)
 
 let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
@@ -4118,7 +4118,8 @@ let get_eliminator elim dep s gl =
                  (List.rev s.branches)
       in
       let occs = Evarconv.default_occurrences_selection
-                   (s.nargs + if s.indarg_in_concl then 1 else 0) in
+               empty_transparent_state
+                 (s.nargs + if s.indarg_in_concl then 1 else 0) in
       let elim =
         {elimindex = None; elimbody = elimc;
          elimrename = Some (isrec, Array.of_list branchlengthes);
@@ -4193,7 +4194,7 @@ let induction_tac with_evars params indvars elim toclear =
   (** The remaining holes are predicates and methods/branches, make them independent
       sof the destructed variable if not an explicit pattern. *)
   let rest = clenv_holes elimclause' in
-  let clear clear_ids = 
+  let _clear clear_ids =
     let make_indep sigma h =
       let sigma, ev = clear_evar_hyps sigma (destEvar h.hole_evar) clear_ids in
       sigma
@@ -4206,7 +4207,8 @@ let induction_tac with_evars params indvars elim toclear =
     (* let clear_ids = List.filter (fun f -> Array.exists (isVarId f) args) toclear in *)
     (* let sigma, clenv' = clear clear_ids in *)
     (* let occs = Evarconv.default_occurrences_selection (Array.length args) in *)
-    let occs = (Evarconv.default_occurrence_test, List.init (Array.length args) (fun _ -> Evarconv.Unspecified true)) in
+    let occs = (Evarconv.default_occurrence_test empty_transparent_state,
+                List.init (Array.length args) (fun _ -> Evarconv.Unspecified true)) in
     sigma, { elimclause' with cl_concl_occs = Some occs }
   in
   let flags = Unification.default_unify_flags () in

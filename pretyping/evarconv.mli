@@ -18,11 +18,13 @@ open Locus
 type unify_flags = {
   open_ts : transparent_state;
   closed_ts : transparent_state;
+  subterm_ts : transparent_state;
   frozen_evars : Evar.Set.t;
   allow_K_at_toplevel : bool;
   with_cs : bool }
 
-val default_flags_of : transparent_state -> unify_flags
+(** The default subterm transparent state is no unfoldings *)
+val default_flags_of : ?subterm_ts:transparent_state -> transparent_state -> unify_flags
 
 type unify_fun = unify_flags ->
   env -> evar_map -> conv_pb -> constr -> constr -> Evarsolve.unification_result
@@ -87,11 +89,11 @@ val default_occurrence_selection : occurrence_selection
 type occurrences_selection =
   occurrence_match_test * occurrence_selection list
 
-val default_occurrence_test : occurrence_match_test
+val default_occurrence_test : transparent_state -> occurrence_match_test
 
 (** [default_occurrence_selection n]
     Gives the default test and occurrences for [n] arguments *)
-val default_occurrences_selection : int -> occurrences_selection
+val default_occurrences_selection : transparent_state -> int -> occurrences_selection
 
 val second_order_matching : unify_flags -> env -> evar_map ->
   existential -> occurrences_selection -> constr -> evar_map * bool

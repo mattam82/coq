@@ -247,7 +247,7 @@ let rewrite_keyed_core_unif_flags = {
 let rewrite_keyed_unif_flags = {
   core_unify_flags = rewrite_keyed_core_unif_flags;
   merge_unify_flags = rewrite_keyed_core_unif_flags;
-  subterm_unify_flags = rewrite_keyed_core_unif_flags;
+  subterm_unify_flags = rewrite_conv_closed_core_unif_flags; (* empty delta *)
   allow_K_in_toplevel_higher_order_unification = false;
   resolve_evars = false
 }

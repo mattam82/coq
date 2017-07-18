@@ -29,6 +29,7 @@ open Context.Rel.Declaration
 type unify_flags = {
   open_ts : transparent_state;
   closed_ts : transparent_state;
+  subterm_ts : transparent_state;
   frozen_evars : Evar.Set.t;
   allow_K_at_toplevel : bool;
   with_cs : bool }
@@ -39,8 +40,8 @@ type unify_fun = unify_flags ->
 let default_transparent_state env = full_transparent_state
 (* Conv_oracle.get_transp_state (Environ.oracle env) *)
 
-let default_flags_of ts =
-  { open_ts = ts; closed_ts = ts;
+let default_flags_of ?(subterm_ts=empty_transparent_state) ts =
+  { open_ts = ts; closed_ts = ts; subterm_ts;
     frozen_evars = Evar.Set.empty; with_cs = true;
     allow_K_at_toplevel = true }
 
@@ -1016,14 +1017,14 @@ type occurrences_selection =
 
 let default_occurrence_selection = Unspecified false
 
-let default_occurrence_test _ _ _ env sigma _ c pat =
-  let flags = default_flags_of var_full_transparent_state in
+let default_occurrence_test ts _ _ _ env sigma _ c pat =
+  let flags = default_flags_of ~subterm_ts:ts ts in
   match evar_conv_x flags env sigma CONV c pat with
   | Success sigma -> true, sigma
   | UnifFailure _ -> false, sigma
 
-let default_occurrences_selection n =
-  (default_occurrence_test, List.init n (fun _ -> default_occurrence_selection))
+let default_occurrences_selection ts n =
+  (default_occurrence_test ts, List.init n (fun _ -> default_occurrence_selection))
 
 open Context.Named.Declaration
 let apply_on_subterm env evdref frozen fixedref f test c t =
@@ -1327,7 +1328,7 @@ let second_order_matching_with_args flags env evd with_ho pbty ev l t =
   if with_ho then
     let evd,ev = evar_absorb_arguments env evd ev (Array.to_list l) in
     let argoccs = default_evar_selection flags evd ev in
-    let test = default_occurrence_test in
+    let test = default_occurrence_test flags.subterm_ts in
     let evd, b = second_order_matching flags env evd ev (test,argoccs) t in
     if b then Success evd
     else
