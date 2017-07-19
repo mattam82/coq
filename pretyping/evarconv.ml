@@ -1120,8 +1120,8 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
   let sign = named_context_val env_evar in
   let ctxt = evar_filtered_context evi in
   if !debug_ho_unification then
-    (Feedback.msg_debug Pp.(str"env rhs: " ++ print_named_context env_rhs);
-     Feedback.msg_debug Pp.(str"env evars: " ++ print_named_context env_evar));
+    (Feedback.msg_debug Pp.(str"env rhs: " ++ print_env env_rhs);
+     Feedback.msg_debug Pp.(str"env evars: " ++ print_env env_evar));
   let args = Array.map (nf_evar evd) args in
   let vars = List.map get_id ctxt in
   let argsubst = List.map2 (fun id c -> (id, c)) vars (Array.to_list args) in
@@ -1144,6 +1144,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
       let (id,_,t) = to_tuple decl' in
       let evs = ref [] in
       let c = nf_evar evd c in
+      (* ty is in env_rhs now *)
       let ty = replace_vars argsubst t in
       let filter' = filter_possible_projections c (nf_evar evd ty) ctxt args in
       (id,t,c,ty,evs,Filter.make filter',occs) :: make_subst (ctxt',l,occsl)
@@ -1168,9 +1169,9 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
 	  else c
        | Unspecified prefer_abstraction ->
           if !debug_ho_unification then
-            Feedback.msg_debug Pp.(str"Found one occurrence");
-          (* Feedback.msg_debug Pp.(str"cty: " ++ print_constr_env env_evar cty); *)
-          let evty = set_holes env_evar_unf evdref cty subst in
+            (Feedback.msg_debug Pp.(str"Found one occurrence");
+             Feedback.msg_debug Pp.(str"cty: " ++ print_constr_env env_rhs cty));
+          let evty = set_holes env_rhs evdref cty subst in
           let evty = nf_evar !evdref evty in
         if !debug_ho_unification then
           Feedback.msg_debug Pp.(str"abstracting one occurrence " ++ print_constr_env env_rhs inst ++
