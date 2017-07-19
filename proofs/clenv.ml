@@ -702,11 +702,11 @@ let evar_of_binder holes = function
 | NamedHyp s -> evar_with_name holes s
 | AnonHyp n -> nth_anonymous holes n
 
-let define_with_type sigma env ev c =
+let define_with_type env sigma ?flags ev c =
   let t = Retyping.get_type_of env sigma ev in
   let ty = Retyping.get_type_of env sigma c in
   let j = Environ.make_judge c ty in
-  let (sigma, j) = Coercion.inh_conv_coerce_to true (Loc.ghost) env sigma j t in
+  let (sigma, j) = Coercion.inh_conv_coerce_to true (Loc.ghost) env sigma ?flags j t in
   let (ev, _) = destEvar ev in
   let sigma = Evd.define ev j.Environ.uj_val sigma in
   sigma
@@ -769,7 +769,7 @@ let solve_evar_clause env sigma ~hyps_only clause b =
   let evs, holes' = List.split_with (fun h -> h.hole_deps) clause.cl_holes in
   let len = List.length evs in
   if Int.equal len (List.length largs) then
-    let fold sigma ev arg = define_with_type sigma env ev.hole_evar arg in
+    let fold sigma ev arg = define_with_type env sigma ev.hole_evar arg in
     let sigma = List.fold_left2 fold sigma evs largs in
     let clause = { clause with cl_holes = holes' } in
     sigma, clenv_advance sigma clause
@@ -781,7 +781,7 @@ let solve_evar_clause env sigma ~hyps_only clause b =
     let ev = evar_of_binder clause.cl_holes binder in
     let rem ev' = Constr.equal ev ev'.hole_evar in
     let holes = List.remove_first rem holes in
-    define_with_type sigma env ev c, holes
+    define_with_type env sigma ev c, holes
   in
   let sigma, holes = List.fold_left fold (sigma,clause.cl_holes) lbind in
   let clause = { clause with cl_holes = holes } in
@@ -936,7 +936,7 @@ let clenv_chain ?(holes_order=true) ?(flags=fchain_flags ()) ?occs
                 env sigma h cl nextcl =
   let sigma, cl =
     match occs with
-    | None -> define_with_type sigma env h.hole_evar nextcl.cl_val, cl (* TODO: flags *)
+    | None -> define_with_type env sigma ~flags:(flags_of flags) h.hole_evar nextcl.cl_val, cl
     | Some _ ->
        let ty = hole_type sigma h in
        let ty' = nextcl.cl_concl in
