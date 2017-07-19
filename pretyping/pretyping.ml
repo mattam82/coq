@@ -370,7 +370,7 @@ let evar_type_fixpoint loc env evdref lna lar vdefj =
 let inh_conv_coerce_to_tycon resolve_tc loc env evdref j = function
   | None -> j
   | Some t ->
-      evd_comb2 (Coercion.inh_conv_coerce_to resolve_tc loc env.ExtraEnv.env) evdref j t
+      evd_comb2 (fun evd uj -> Coercion.inh_conv_coerce_to resolve_tc loc env.ExtraEnv.env evd uj) evdref j t
 
 let check_instance loc subst = function
   | [] -> ()

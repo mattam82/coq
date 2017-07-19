@@ -390,7 +390,7 @@ let adjust_tomatch_to_pattern pb ((current,typ),deps,dep) =
 		let _ = e_cumul pb.env pb.evdref indt typ in
 		current
 	      else
-		(evd_comb2 (Coercion.inh_conv_coerce_to true Loc.ghost pb.env)
+		(evd_comb2 (fun evd uj -> Coercion.inh_conv_coerce_to true Loc.ghost pb.env evd uj)
 		  pb.evdref (make_judge current typ) indt).uj_val in
 	    let sigma =  !(pb.evdref) in
 	    (current,try_find_ind pb.env sigma indt names))
