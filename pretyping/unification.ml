@@ -1050,7 +1050,7 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst) conv_at_top env cv_pb 
       let app = mkApp (c, Array.rev_of_list ks) in
       (* let substn = unirec_rec curenvnb pb b false substn t cN in *)
 	unirec_rec curenvnb pb opt' substn c1 app
-      with Invalid_argument "Reductionops.Stack.fold2" ->
+      with Invalid_argument _ ->
 	error_cannot_unify (fst curenvnb) sigma (cM,cN)
     else error_cannot_unify (fst curenvnb) sigma (cM,cN)
   in
@@ -1947,7 +1947,7 @@ let w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 =
   let res = Evarconv.evar_conv_x flags env evd cv_pb ty1 ty2 in
   match res with
   | Success evd ->
-     Evarconv.consider_remaining_unif_problems ~flags ~with_ho:true env evd
+     Evarconv.consider_remaining_unif_problems ~flags ~with_ho:false env evd
   | UnifFailure (evd, reason) ->
      raise (PretypeError (env, evd, CannotUnify (ty1, ty2, Some reason)))
 
