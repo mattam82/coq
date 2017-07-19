@@ -39,10 +39,15 @@ exception UnableToUnify of evar_map * Pretype_errors.unification_error
 val the_conv_x     : env -> ?ts:transparent_state -> constr -> constr -> evar_map -> evar_map
 val the_conv_x_leq : env -> ?ts:transparent_state -> constr -> constr -> evar_map -> evar_map
 
+(** Allows to pass arbitrary flags to the unifier *)
+val unify : unify_flags -> env -> evar_map -> constr -> constr -> evar_map
+val unify_leq : unify_flags -> env -> evar_map -> constr -> constr -> evar_map
+
 (** The same function resolving evars by side-effect and
    catching the exception *)
 val e_conv  : env -> ?ts:transparent_state -> evar_map ref -> constr -> constr -> bool
 val e_cumul : env -> ?ts:transparent_state -> evar_map ref -> constr -> constr -> bool
+
 
 (** {6 Unification heuristics. } *)
 
@@ -89,11 +94,12 @@ val default_occurrence_selection : occurrence_selection
 type occurrences_selection =
   occurrence_match_test * occurrence_selection list
 
-val default_occurrence_test : transparent_state -> occurrence_match_test
+val default_occurrence_test : frozen_evars:Evar.Set.t -> transparent_state -> occurrence_match_test
 
 (** [default_occurrence_selection n]
     Gives the default test and occurrences for [n] arguments *)
-val default_occurrences_selection : transparent_state -> int -> occurrences_selection
+val default_occurrences_selection : ?frozen_evars:Evar.Set.t (* By default, none *) ->
+                                    transparent_state -> int -> occurrences_selection
 
 val second_order_matching : unify_flags -> env -> evar_map ->
   existential -> occurrences_selection -> constr -> evar_map * bool

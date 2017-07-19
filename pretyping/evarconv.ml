@@ -110,12 +110,16 @@ type flex_kind_of_term =
   | MaybeFlexible of Constr.t (* reducible but not necessarily reduced *)
   | Flexible of existential
 
-let flex_kind_of_term ts env evd c sk =
+let is_frozen flags (evk, _) = Evar.Set.mem evk flags.frozen_evars
+
+let flex_kind_of_term flags env evd c sk =
   match kind_of_term c with
     | LetIn _ | Rel _ | Const _ | Var _ | Proj _ ->
-      Option.cata (fun x -> MaybeFlexible x) Rigid (eval_flexible_term ts env evd c)
+      Option.cata (fun x -> MaybeFlexible x) Rigid (eval_flexible_term flags.open_ts env evd c)
     | Lambda _ when not (Option.is_empty (Stack.decomp sk)) -> MaybeFlexible c
-    | Evar ev -> Flexible ev
+    | Evar ev ->
+       if is_frozen flags ev then Rigid
+       else Flexible ev
     | Lambda _ | Prod _ | Sort _ | Ind _ | Construct _ | CoFix _ -> Rigid
     | Meta _ -> Rigid
     | Fix _ -> Rigid (* happens when the fixpoint is partially applied *)
@@ -388,13 +392,13 @@ let rec evar_conv_x flags env evd pbty term1 term2 =
             (whd_nored_state evd (term2,Stack.empty), Cst_stack.empty)
 	in
           begin match kind_of_term term1, kind_of_term term2 with
-          | Evar ev, _ when Evd.is_undefined evd (fst ev) ->
+          | Evar ev, _ when Evd.is_undefined evd (fst ev) && not (is_frozen flags ev) ->
             (match solve_simple_eqn (conv_fun evar_conv_x flags) env evd
               (position_problem true pbty,ev,term2) with
 	      | UnifFailure (_,OccurCheck _) -> 
 		(* Eta-expansion might apply *) default ()
 	      | x -> x)
-          | _, Evar ev when Evd.is_undefined evd (fst ev) ->
+          | _, Evar ev when Evd.is_undefined evd (fst ev) && not (is_frozen flags ev) ->
             (match solve_simple_eqn (conv_fun evar_conv_x flags) env evd
               (position_problem false pbty,ev,term1) with
 	      | UnifFailure (_, OccurCheck _) ->
@@ -610,8 +614,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	     let open Pp in
 	     Feedback.msg_notice (v 0 (pr_state appr1 ++ cut () ++ pr_state appr2 ++ cut ()) 
 		 ++ fnl ()) in
-  match (flex_kind_of_term flags.open_ts env evd term1 sk1,
-	 flex_kind_of_term flags.open_ts env evd term2 sk2) with
+  match (flex_kind_of_term flags env evd term1 sk1,
+	 flex_kind_of_term flags env evd term2 sk2) with
     | Flexible (sp1,al1), Flexible (sp2,al2) ->
         (* sk1[?ev1] =? sk2[?ev2] *)
 	let f1 i = first_order false env i term1 term2 sk1 sk2
@@ -839,7 +843,20 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	| Const _, Const _
 	| Ind _, Ind _ 
 	| Construct _, Construct _ ->
-	  rigids env evd sk1 term1 sk2 term2
+	   rigids env evd sk1 term1 sk2 term2
+
+        | Evar (sp1,al1), Evar (sp2,al2) -> (** Frozen evars *)
+          if Evar.equal sp1 sp2 then
+	    match ise_stack2 false env evd (evar_conv_x flags) sk1 sk2 with
+	    |None, Success i' ->
+              (** FIXME: solve_refl can restrict the evar, do we want to allow that? *)
+              Success (solve_refl (fun p env i pbty a1 a2 ->
+                let flags = if p then default_flags env else flags in
+                is_success (evar_conv_x flags env i pbty a1 a2))
+                env i' (position_problem true pbty) sp1 al1 al2)
+	    |_, (UnifFailure _ as x) -> x
+            |Some _, _ -> UnifFailure (evd,NotSameArgSize)
+          else UnifFailure (evd,NotSameHead)
 
 	| Construct u, _ ->
 	  eta_constructor flags env evd sk1 u sk2 term2
@@ -874,13 +891,13 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	  |Some (sk1',sk2'), Success i' -> evar_conv_x flags env i' CONV (Stack.zip (term1,sk1')) (Stack.zip (term2,sk2'))
 	  end
 
-	| (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _), _ ->
+	| (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _ | Evar _), _ ->
 	  UnifFailure (evd,NotSameHead)
-	| _, (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _) ->
+	| _, (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _ | Evar _) ->
 	  UnifFailure (evd,NotSameHead)
 
 	| (App _ | Cast _ | Case _ | Proj _), _ -> assert false
-	| (LetIn _| Evar _), _ -> assert false
+	| LetIn _, _ -> assert false
 	| (Lambda _), _ -> assert false
 
       end
@@ -1017,14 +1034,15 @@ type occurrences_selection =
 
 let default_occurrence_selection = Unspecified false
 
-let default_occurrence_test ts _ _ _ env sigma _ c pat =
-  let flags = default_flags_of ~subterm_ts:ts ts in
+let default_occurrence_test ~frozen_evars ts _ origsigma _ env sigma _ c pat =
+  let flags = { (default_flags_of ~subterm_ts:ts ts) with frozen_evars } in
   match evar_conv_x flags env sigma CONV c pat with
   | Success sigma -> true, sigma
   | UnifFailure _ -> false, sigma
 
-let default_occurrences_selection ts n =
-  (default_occurrence_test ts, List.init n (fun _ -> default_occurrence_selection))
+let default_occurrences_selection ?(frozen_evars=Evar.Set.empty) ts n =
+  (default_occurrence_test ~frozen_evars ts,
+   List.init n (fun _ -> default_occurrence_selection))
 
 open Context.Named.Declaration
 let apply_on_subterm env evdref frozen fixedref f test c t =
@@ -1329,7 +1347,7 @@ let second_order_matching_with_args flags env evd with_ho pbty ev l t =
   if with_ho then
     let evd,ev = evar_absorb_arguments env evd ev (Array.to_list l) in
     let argoccs = default_evar_selection flags evd ev in
-    let test = default_occurrence_test flags.subterm_ts in
+    let test = default_occurrence_test ~frozen_evars:flags.frozen_evars flags.subterm_ts in
     let evd, b = second_order_matching flags env evd ev (test,argoccs) t in
     if b then Success evd
     else
@@ -1527,3 +1545,13 @@ let e_cumul env ?(ts=default_transparent_state env) evdref t1 t2 =
   match evar_conv_x flags env !evdref CUMUL t1 t2 with
   | Success evd' -> evdref := evd'; true
   | _ -> false
+
+let unify flags env evd t1 t2 =
+  match evar_conv_x flags env evd CONV t1 t2 with
+  | Success evd' -> evd'
+  | UnifFailure (evd',e) -> raise (UnableToUnify (evd',e))
+
+let unify_leq flags env evd t1 t2 =
+  match evar_conv_x flags env evd CUMUL t1 t2 with
+  | Success evd' -> evd'
+  | UnifFailure (evd',e) -> raise (UnableToUnify (evd',e))
