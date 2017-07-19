@@ -122,7 +122,7 @@ let abstract_list_all_with_dependencies env evd typ c l =
   let argoccs = set_occurrences_of_last_arg (Array.sub (snd ev') 0 n) in
   let evd,b =
     Evarconv.second_order_matching (Evarconv.default_flags_of empty_transparent_state)
-    env evd ev' (Evarconv.default_occurrence_test empty_transparent_state, argoccs) c in
+    env evd ev' (Evarconv.default_occurrence_test ~frozen_evars:Evar.Set.empty empty_transparent_state, argoccs) c in
   if b then
     let p = nf_evar evd (existential_value evd (destEvar ev)) in
       evd, p

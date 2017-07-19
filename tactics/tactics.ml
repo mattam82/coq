@@ -1436,7 +1436,7 @@ let general_elim with_evars ~holes_order clear_flag (c, lbindc) elim =
   let sigma = Tacmach.New.project gl in
   let ct = Retyping.get_type_of env sigma c in
   let t = try snd (reduce_to_quantified_ind env sigma ct) with UserError _ -> ct in
-  let elimtac = elimination_clause_scheme with_evars holes_order in
+  let elimtac = elimination_clause_scheme ~flags:(elim_flags_evars sigma) with_evars holes_order in
   let sigma, indclause =
     make_clenv_bindings env sigma ~hyps_only:false (c, t) lbindc in
   Proofview.Unsafe.tclEVARS sigma <*>
@@ -1447,15 +1447,16 @@ let general_elim with_evars ~holes_order clear_flag (c, lbindc) elim =
 
 (* Case analysis tactics *)
 
-let default_occurrences env ind dep =
+let default_occurrences env frozen_evars ind dep =
   let elim_args = inductive_nrealargs_env env ind + if dep then 1 else 0 in
-  Some (Evarconv.default_occurrences_selection empty_transparent_state elim_args)
+  Some (Evarconv.default_occurrences_selection ~frozen_evars empty_transparent_state elim_args)
 
 let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
   let sigma = Proofview.Goal.sigma gl in
   let env = Proofview.Goal.env gl in
   let concl = Proofview.Goal.concl gl in
+  let frozen_evars = Evar.Map.domain (Evd.undefined_map (Sigma.to_evar_map sigma)) in
   let t = Retyping.get_type_of env (Sigma.to_evar_map sigma) c in
   let (mind,_) = reduce_to_quantified_ind env (Sigma.to_evar_map sigma) t in
   let sort = Tacticals.New.elimination_sort_of_goal gl in
@@ -1468,7 +1469,7 @@ let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   (general_elim with_evars false clear_flag (c,lbindc)
    {elimindex = None; elimbody = (elim,NoBindings);
     elimrename = Some (false, constructors_nrealdecls (fst mind));
-    elimoccs = default_occurrences env (fst mind) dep})
+    elimoccs = default_occurrences env frozen_evars (fst mind) dep})
   in
   Sigma (tac, sigma, p)
   end }
@@ -1502,7 +1503,7 @@ let find_eliminator c gl =
   let evd, c = find_ind_eliminator ind (Tacticals.New.elimination_sort_of_goal gl) gl in
     evd, {elimindex = None; elimbody = (c,NoBindings);
           elimrename = Some (true, constructors_nrealdecls ind);
-          elimoccs = default_occurrences (Tacmach.New.pf_env gl) ind true}
+          elimoccs = default_occurrences (Tacmach.New.pf_env gl) Evar.Set.empty ind true}
 
 let default_elim with_evars clear_flag (c,_ as cx) =
   Proofview.tclORELSE
@@ -4207,7 +4208,7 @@ let induction_tac with_evars params indvars elim toclear =
     (* let clear_ids = List.filter (fun f -> Array.exists (isVarId f) args) toclear in *)
     (* let sigma, clenv' = clear clear_ids in *)
     (* let occs = Evarconv.default_occurrences_selection (Array.length args) in *)
-    let occs = (Evarconv.default_occurrence_test empty_transparent_state,
+    let occs = (Evarconv.default_occurrence_test ~frozen_evars:frozen empty_transparent_state,
                 List.init (Array.length args) (fun _ -> Evarconv.Unspecified true)) in
     sigma, { elimclause' with cl_concl_occs = Some occs }
   in
