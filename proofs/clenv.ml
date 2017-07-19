@@ -884,9 +884,15 @@ let clenv_unify_type env sigma flags hole occs ty =
        Pretype_errors.error_cannot_unify env sigma ~reason (hole, ty)
      else sigma
   | _ ->
-     let sigma = Evd.add_conv_pb (CUMUL,env,hole,ty) sigma in
-     Evarconv.consider_remaining_unif_problems
-       ~flags ~with_ho:true env sigma
+     (** Try normal unification first, if that fails use heuristics + higher-order unif *)
+     let open Evarsolve in
+     match Evarconv.evar_conv_x flags env sigma CUMUL hole ty with
+     | Success sigma -> sigma
+     | UnifFailure _ ->
+        let sigma = Evd.add_conv_pb (CUMUL,env,hole,ty) sigma in
+        Evarconv.consider_remaining_unif_problems
+          ~flags ~with_ho:true env sigma
+
 
 let clenv_unify_concl env sigma flags ty clenv =
   let concl, occs = clenv.cl_concl, clenv.cl_concl_occs in
