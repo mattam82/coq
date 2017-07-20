@@ -882,16 +882,24 @@ let clenv_unify_type env sigma flags hole occs ty =
      if not b then
        let reason = ConversionFailed (env,hole,ty) in
        Pretype_errors.error_cannot_unify env sigma ~reason (hole, ty)
-     else sigma
+     else
+       (** Ensure we did actually find a solution *)
+       Evarconv.consider_remaining_unif_problems
+         ~flags ~with_ho:true env sigma
   | _ ->
-     (** Try normal unification first, if that fails use heuristics + higher-order unif *)
-     let open Evarsolve in
-     match Evarconv.evar_conv_x flags env sigma CUMUL hole ty with
-     | Success sigma -> sigma
-     | UnifFailure _ ->
+     let ho () =
         let sigma = Evd.add_conv_pb (CUMUL,env,hole,ty) sigma in
         Evarconv.consider_remaining_unif_problems
           ~flags ~with_ho:true env sigma
+     in
+     (** Try normal unification first, if that fails use heuristics + higher-order unif *)
+     let open Evarsolve in
+     match Evarconv.evar_conv_x flags env sigma CUMUL hole ty with
+     | Success sigma ->
+        (try Evarconv.consider_remaining_unif_problems
+               ~flags ~with_ho:false env sigma
+         with e -> ho ())
+     | UnifFailure _ -> ho ()
 
 
 let clenv_unify_concl env sigma flags ty clenv =
@@ -906,7 +914,7 @@ let flags_of flags =
   let subterm_ts = Unification.(flags.subterm_unify_flags.modulo_delta) in
   let frozen_evars = Unification.(flags.core_unify_flags.frozen_evars) in
   let allow_K_at_toplevel = flags.allow_K_in_toplevel_higher_order_unification in
-  Evarconv.{ open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true }
+  Evarsolve.{ open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true }
 
 (* [clenv_fchain mv clenv clenv']
  *
