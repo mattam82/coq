@@ -199,6 +199,9 @@ val clenv_chain : ?holes_order:bool -> (* true = holes of the first clause first
                   ?flags:unify_flags -> ?occs:Evarconv.occurrences_selection ->
                   env -> evar_map -> hole ->
                   clause -> clause -> evar_map * clause
+
+val clenv_chain_last : ?flags:unify_flags ->
+                       env -> evar_map -> constr -> clause -> evar_map * clause
                                  
 val clenv_concl : clause -> types
 val clenv_val : clause -> constr

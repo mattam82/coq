@@ -961,7 +961,12 @@ let clenv_chain ?(holes_order=true) ?(flags=fchain_flags ()) ?occs
   in
   let cl = { cl with cl_holes = holes' } in
   sigma, clenv_advance sigma cl
-                       
+
+let clenv_chain_last ?(flags=fchain_flags ()) env sigma c cl =  
+  let h = try List.last cl.cl_holes with Failure _ -> raise NoSuchBinding in
+  let sigma = define_with_type env sigma ~flags:(flags_of flags) h.hole_evar c in
+  sigma, clenv_advance sigma cl
+  
 let refresh_clenv subst cl =
   match kind_of_term cl.cl_val with
   | Var _ -> cl
