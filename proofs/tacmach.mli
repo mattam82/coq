@@ -134,4 +134,5 @@ module New : sig
 
   val pf_nf_evar : ('a, 'r) Proofview.Goal.t -> constr -> constr
 
+  val pf_undefined_evars : ([ `NF ], 'r) Proofview.Goal.t -> Evar.Set.t
 end
