@@ -78,6 +78,18 @@ let clenv_refine with_evars ?(with_classes=true) clenv =
     (refine_no_check (clenv_cast_meta clenv (clenv_value clenv))) gl
   end
 
+let with_clause (c, t) kont =
+  let open Proofview in
+  Proofview.Goal.enter { enter = fun gl ->
+  let sigma, cl = Tacmach.New.pf_apply (fun env sigma c -> make_clenv_from_env env sigma c) gl (c, t) in
+  Unsafe.tclEVARS sigma <*> kont cl }
+
+let clenv_chain_last c cl =
+  let open Proofview in
+  Proofview.Goal.enter { enter = fun gl ->
+  let sigma, cl = Tacmach.New.pf_apply clenv_chain_last gl c cl in
+  Unsafe.tclEVARS sigma }
+
 let clenv_unify_concl flags clenv =
   let open Ftactic.Notations in
   Ftactic.enter { enter = begin fun gl ->
