@@ -186,8 +186,11 @@ let clenv_refine_gen ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=
   let open Proofview.Notations in
   Proofview.Goal.enter { enter = begin fun gl ->
   let env = Tacmach.New.pf_env gl in
-  let sigma =
-    try Evarconv.consider_remaining_unif_problems ~flags env sigma with _ -> sigma in
+  let sigma, clenv =
+    try
+      let sigma = Evarconv.consider_remaining_unif_problems ~flags env sigma in
+      sigma, clenv_advance sigma clenv
+    with _ -> sigma, clenv in
   let sigma =
     if with_classes then
       let sigma = Typeclasses.resolve_typeclasses ~filter:Typeclasses.all_evars
