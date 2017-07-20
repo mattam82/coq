@@ -130,6 +130,20 @@ let position_problem l2r = function
   | CONV -> None
   | CUMUL -> Some l2r
 
+(* [occur_rigidly ev evd t] tests if the evar ev occurs in a rigid
+   context in t 
+
+  That function should be an over approximation of occur-check, it can
+  return true even if the occur-check would fail on the normal form, as
+  otherwise we will postpone unsolvable constraints while maybe a
+  reduction would have allowed unification (see bug 3539 for example). 
+
+  The boolean indicates if the term is a rigid head. For applications,
+  this means than an occurrence of the evar in arguments should be looked
+  at to find an occur-check.
+
+  TODO: replace with a test on the normal form and evaluate performance.
+ *)
 let occur_rigidly ev evd t = 
   let rec aux t =
     match kind_of_term (whd_evar evd t) with
@@ -138,7 +152,8 @@ let occur_rigidly ev evd t =
     | Proj (p, c) -> not (aux c)
     | Evar (ev',_) -> if Evar.equal ev ev' then raise Occur else false
     | Cast (p, _, _) -> aux p
-    | Lambda _ | LetIn _ -> false
+    | Lambda (na, t, b) -> aux b
+    | LetIn (na, _, _, b) -> aux b
     | Const _ -> false
     | Prod (_, b, t) -> ignore(aux b || aux t); true
     | Rel _ | Var _ -> false
