@@ -508,7 +508,7 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
   let evd = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
   let ts = Hints.Hint_db.transparent_state (Hints.searchtable_map Hints.rewrite_db) in
-  let frozen_evars = Tacmach.New.pf_undefined_evars gl in
+  let frozen_evars = if frzevars then Tacmach.New.pf_undefined_evars gl else Evar.Set.empty in
   let flags = Evarsolve.{ (Evarconv.default_flags_of ts) with frozen_evars } in
   let isatomic = isProd (whd_zeta evd hdcncl) in
   let dep_fun = if isatomic then dependent else dependent_no_evar in
