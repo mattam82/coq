@@ -4672,7 +4672,7 @@ let elim_scheme_type elim t =
   let flags = Clenv.flags_of (elim_flags ()) in
   let sigma =
     (* t is inductive, then CUMUL or CONV is irrelevant *)
-    Evarconv.the_conv_x ~ts:flags.Evarconv.open_ts env t (hole_type sigma h) sigma in
+    Evarconv.the_conv_x ~ts:flags.Evarsolve.open_ts env t (hole_type sigma h) sigma in
   let clause = clenv_advance sigma clause in
   let tac = Clenvtac.clenv_unify_concl flags clause in
   Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)

@@ -658,7 +658,7 @@ module New = struct
       match predicate with
       | None   -> sigma
       | Some p ->
-         let sigma = Evarconv.the_conv_x ~ts:flags.Evarconv.open_ts env pmv p sigma in
+         let sigma = Evarconv.the_conv_x ~ts:flags.Evarsolve.open_ts env pmv p sigma in
          sigma
     in
     let concl = Proofview.Goal.concl gl in
