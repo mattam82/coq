@@ -90,5 +90,8 @@
   Also setoid_rewrite still calls w_unify which was allowing HO matching of the redex with the
   subterm, too strong as well.
 
+  3485: proper treatment of frozen_evars, necessary when we move from metas
+  which did much less instantiation of evars. Propagate frozen_evars everywhere.
+
 HoTT_coq_091: HO unif failing eliminating a dependent equality, due to cumulativity, now fixed.
   		
