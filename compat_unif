@@ -36,6 +36,13 @@
   produce a dummy beta-redex changed to use explicit with bindings
   instead.
 
+- sometimes the user writes an explicit pattern for HO unification,
+  which we obey instead of resorting to ho unification even if the
+  tactic explicitly uses it, e.g. elim. This ambiguity is a source of
+  non-uniform behavior. We use a heuristic to decide if the user
+  provided a pattern himself, and sometimes this is not the intention of
+  the user, see failure/rewrite_in_hyp2.
+
 - simple apply's unification does conversion only on closed subterms,
   but these are not recognized the same way in evarconv (unification.ml
   can solve subproblems f ?X = g t using conversion on f and g but not
@@ -65,21 +72,21 @@
   be tried again _after_ the unification with the conclusion. However the
   criterion was fuzzy: see bug #4813.
 
+
 - Open bugs:
 
   1956: program patch at beginning of branch.
+
   2467: in fsetdec...  
-  2848: unif difference with Add Relation.
   2830: cannot define evar twice in rewrite still happening (test with EConstr).
 
+  2848: unif difference with Add Relation.
+  
   3263: suddenly back to the very slow behaviors of before
 
   3513: canonical structure creates an unsolvable typeclass constraint that makes a latter proof-search
   diverge. Creating the evar with unresolvable store during unification does not help...
   Actually this uses w_unify_to_subterm which uses the old w_unify code. Need to adapt this.
-
-  4782: with done too early, needing conclusion's unification -> now backtracking
-  4813: with done too early, needing conclusion's unification -> now backtracking
 
 - Closed bugs:
   bug 2830: with not done at the right time, should be delayed. Actually no,
@@ -93,5 +100,10 @@
   3485: proper treatment of frozen_evars, necessary when we move from metas
   which did much less instantiation of evars. Propagate frozen_evars everywhere.
 
+  3539: required improvement of occur_rigidly, to avoid postponing an impossible constraint.
+
+  4782: with done too early, needing conclusion's unification -> now backtracking
+  4813: with done too early, needing conclusion's unification -> now backtracking
+  
 HoTT_coq_091: HO unif failing eliminating a dependent equality, due to cumulativity, now fixed.
   		
