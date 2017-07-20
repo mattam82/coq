@@ -482,17 +482,16 @@ let rec decompose_unif_pat env sigma unif pat t u =
      else b, sigma
   | _ -> unif env sigma t u
 
-let pattern_occurrence_test pat env sigma c =
-  let ts = Hints.Hint_db.transparent_state (Hints.searchtable_map Hints.rewrite_db) in
+let pattern_occurrence_test flags pat env sigma c =
   let unif env sigma t u =
-    test_unification (Evarconv.default_flags_of ts) env sigma t u
+    test_unification flags env sigma t u
   in
   let pat, unif =
     match pat with
     | Some pat -> pat, unif
     | None ->
        let pat = Patternops.pattern_of_constr env sigma c in
-       let pat = simplify_pat env ts pat in
+       let pat = simplify_pat env flags.Evarsolve.open_ts pat in
        let unif env sigma t u =
          decompose_unif_pat env sigma unif pat t u
        in pat, unif
@@ -508,6 +507,9 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
   c t l with_evars frzevars dep_proof_ok hdcncl =
   Proofview.Goal.nf_s_enter { s_enter = begin fun gl ->
   let evd = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
+  let ts = Hints.Hint_db.transparent_state (Hints.searchtable_map Hints.rewrite_db) in
+  let frozen_evars = Tacmach.New.pf_undefined_evars gl in
+  let flags = Evarsolve.{ (Evarconv.default_flags_of ts) with frozen_evars } in
   let isatomic = isProd (whd_zeta evd hdcncl) in
   let dep_fun = if isatomic then dependent else dependent_no_evar in
   let type_of_cls = type_of_clause cls gl in
@@ -522,7 +524,7 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
       general_elim_clause with_evars frzevars tac cls c t l
       (match lft2rgt with None -> false | Some b -> b)
       {elimindex = None; elimbody = (elim,NoBindings); elimrename = None;
-       elimoccs = Some (pattern_occurrence_test pat, occs)}
+       elimoccs = Some (pattern_occurrence_test flags pat, occs)}
   in
   Sigma (tac, sigma, p)
   end }
