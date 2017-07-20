@@ -1265,7 +1265,7 @@ let order_metas metas =
 (* Solve an equation ?n[x1=u1..xn=un] = t where ?n is an evar *)
 
 let solve_simple_evar_eqn ts env evd ev rhs =
-  match solve_simple_eqn (Evarconv.conv_fun Evarconv.evar_conv_x ts) env evd (None,ev,rhs) with
+  match solve_simple_eqn ts (Evarconv.conv_fun Evarconv.evar_conv_x ts) env evd (None,ev,rhs) with
   | UnifFailure (evd,reason) ->
       error_cannot_unify env evd ~reason (mkEvar ev,rhs);
   | Success evd ->

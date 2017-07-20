@@ -26,13 +26,7 @@ open Pretype_errors
 open Sigma.Notations
 open Context.Rel.Declaration
 
-type unify_flags = {
-  open_ts : transparent_state;
-  closed_ts : transparent_state;
-  subterm_ts : transparent_state;
-  frozen_evars : Evar.Set.t;
-  allow_K_at_toplevel : bool;
-  with_cs : bool }
+type unify_flags = Evarsolve.unify_flags
 
 type unify_fun = unify_flags ->
   env -> evar_map -> conv_pb -> constr -> constr -> Evarsolve.unification_result
@@ -393,13 +387,13 @@ let rec evar_conv_x flags env evd pbty term1 term2 =
 	in
           begin match kind_of_term term1, kind_of_term term2 with
           | Evar ev, _ when Evd.is_undefined evd (fst ev) && not (is_frozen flags ev) ->
-            (match solve_simple_eqn (conv_fun evar_conv_x flags) env evd
+            (match solve_simple_eqn flags (conv_fun evar_conv_x flags) env evd
               (position_problem true pbty,ev,term2) with
 	      | UnifFailure (_,OccurCheck _) -> 
 		(* Eta-expansion might apply *) default ()
 	      | x -> x)
           | _, Evar ev when Evd.is_undefined evd (fst ev) && not (is_frozen flags ev) ->
-            (match solve_simple_eqn (conv_fun evar_conv_x flags) env evd
+            (match solve_simple_eqn flags (conv_fun evar_conv_x flags) env evd
               (position_problem false pbty,ev,term1) with
 	      | UnifFailure (_, OccurCheck _) ->
 		(* Eta-expansion might apply *) default () 
@@ -418,7 +412,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
       | Some l1' -> (* Miller-Pfenning's patterns unification *)
 	let t2 = nf_evar evd tM in
 	let t2 = solve_pattern_eqn env l1' t2 in
-	  solve_simple_eqn (conv_fun evar_conv_x flags) env evd
+	  solve_simple_eqn flags (conv_fun evar_conv_x flags) env evd
 	    (position_problem on_left pbty,ev,t2) 
   in
   let consume_stack on_left (termF,skF) (termO,skO) evd =
@@ -518,7 +512,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
        (* Note that ?ev1 and ?ev2, may have been instantiated in the meantime *)
        let ev1' = whd_evar i' t1 in
        if isEvar ev1' then
-         solve_simple_eqn (conv_fun evar_conv_x flags) env i'
+         solve_simple_eqn flags (conv_fun evar_conv_x flags) env i'
 		          (position_problem true pbty,destEvar ev1',term2)
        else
          evar_eqappr_x flags env evd pbty
@@ -528,7 +522,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
        (* we now unify r[?ev1] and ?ev2 *)
        let ev2' = whd_evar i' t2 in
        if isEvar ev2' then
-         solve_simple_eqn (conv_fun evar_conv_x flags) env i'
+         solve_simple_eqn flags (conv_fun evar_conv_x flags) env i'
 		          (position_problem false pbty,destEvar ev2',Stack.zip(term1,r))
        else
          evar_eqappr_x flags env evd pbty
@@ -539,7 +533,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
        (* we now unify ?ev1 and r[?ev2] *)
        let ev1' = whd_evar i' t1 in
        if isEvar ev1' then
-         solve_simple_eqn (conv_fun evar_conv_x flags) env i'
+         solve_simple_eqn flags (conv_fun evar_conv_x flags) env i'
 	                  (position_problem true pbty,destEvar ev1',Stack.zip(term2,r))
        else evar_eqappr_x flags env evd pbty
 		          ((ev1', sk1), csts1) ((term2, sk2), csts2)
@@ -623,7 +617,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
           if Evar.equal sp1 sp2 then
 	    match ise_stack2 false env i (evar_conv_x flags) sk1 sk2 with
 	    |None, Success i' ->
-              Success (solve_refl (fun p env i pbty a1 a2 ->
+              Success (solve_refl flags (fun p env i pbty a1 a2 ->
                 let flags = if p then default_flags env else flags in
                 is_success (evar_conv_x flags env i pbty a1 a2))
                 env i' (position_problem true pbty) sp1 al1 al2)
@@ -850,7 +844,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	    match ise_stack2 false env evd (evar_conv_x flags) sk1 sk2 with
 	    |None, Success i' ->
               (** FIXME: solve_refl can restrict the evar, do we want to allow that? *)
-              Success (solve_refl (fun p env i pbty a1 a2 ->
+              Success (solve_refl flags (fun p env i pbty a1 a2 ->
                 let flags = if p then default_flags env else flags in
                 is_success (evar_conv_x flags env i pbty a1 a2))
                 env i' (position_problem true pbty) sp1 al1 al2)
@@ -1009,7 +1003,7 @@ let first_order_unification flags env evd (ev1,l1) (term2,l2) =
 	evar_conv_x flags env i CONV t2 (mkEvar ev1)
       else
         solve_simple_eqn ~choose:true ~imitate_defs:false
-                         (conv_fun evar_conv_x flags) env i (None,ev1,t2))]
+                         flags (conv_fun evar_conv_x flags) env i (None,ev1,t2))]
 
 let choose_less_dependent_instance evk evd term args =
   let evi = Evd.find_undefined evd evk in
@@ -1045,12 +1039,12 @@ let default_occurrences_selection ?(frozen_evars=Evar.Set.empty) ts n =
    List.init n (fun _ -> default_occurrence_selection))
 
 open Context.Named.Declaration
-let apply_on_subterm env evdref frozen fixedref f test c t =
+let apply_on_subterm env evdref fixedref f test c t =
   let test = test env !evdref c in
   let rec applyrec (env,(k,c) as acc) t =
     if Evar.Set.exists (fun fixed -> occur_evar fixed t) !fixedref then
       match kind_of_term t with
-      | Evar (ev, args) when Evar.Set.mem ev !fixedref && not (Evar.Set.mem ev frozen) -> t
+      | Evar (ev, args) when Evar.Set.mem ev !fixedref -> t
       | _ -> map_constr_with_binders_left_to_right
 	      (fun d (env,(k,c)) -> (push_rel d env, (k+1,lift 1 c)))
 	      applyrec acc t
@@ -1168,7 +1162,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
       (id,t,c,ty,evs,Filter.make filter',occs) :: make_subst (ctxt',l,occsl)
   | _, _, [] -> []
   | _ -> anomaly (Pp.str "Signature or instance are shorter than the occurrences list") in
-  let fixed = ref flags.frozen_evars in
+  let fixed = ref Evar.Set.empty in
   let rec set_holes env_rhs evdref rhs = function
   | (id,idty,c,cty,evsref,filter,occs)::subst ->
      let c = nf_evar !evdref c in
@@ -1213,7 +1207,7 @@ let second_order_matching flags env_rhs evd (evk,args) (test,argoccs) rhs =
         fixed := Evar.Set.add evk !fixed;
         ev
      in
-     let rhs' = apply_on_subterm env_rhs evdref flags.frozen_evars fixed set_var test c rhs in
+     let rhs' = apply_on_subterm env_rhs evdref fixed set_var test c rhs in
      if !debug_ho_unification then
        Feedback.msg_debug Pp.(str"abstracted: " ++ print_constr_env env_rhs rhs');
      let () =
@@ -1360,6 +1354,7 @@ let is_beyond_capabilities = function
   | CannotSolveConstraint (pb,ProblemBeyondCapabilities) -> true
   | _ -> false
 
+(* TODO frozen *)
 let apply_conversion_problem_heuristic flags env evd with_ho pbty t1 t2 =
   let t1 = apprec_nohdbeta flags.open_ts env evd (whd_head_evar evd t1) in
   let t2 = apprec_nohdbeta flags.open_ts env evd (whd_head_evar evd t2) in
@@ -1391,11 +1386,11 @@ let apply_conversion_problem_heuristic flags env evd with_ho pbty t1 t2 =
      let f ontype env evd pbty x y =
        let reds = if ontype then full_transparent_state else flags.open_ts in
        is_fconv ~reds pbty env evd x y in
-      Success (solve_refl ~can_drop:true f env evd
+      Success (solve_refl ~can_drop:true flags f env evd
                  (position_problem true pbty) evk1 args1 args2)
   | Evar ev1, Evar ev2 ->
       Success (solve_evar_evar ~force:true
-        (evar_define (conv_fun evar_conv_x flags) ~choose:true) (conv_fun evar_conv_x flags) env evd
+        flags (evar_define flags (conv_fun evar_conv_x flags) ~choose:true) (conv_fun evar_conv_x flags) env evd
         (position_problem true pbty) ev1 ev2)
   | Evar ev1,_ when Array.length l1 <= Array.length l2 ->
       (* On "?n t1 .. tn = u u1 .. u(n+p)", try first-order unification *)

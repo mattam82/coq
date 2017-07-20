@@ -10,6 +10,14 @@ open Term
 open Evd
 open Environ
 
+type unify_flags = {
+  open_ts : Names.transparent_state;
+  closed_ts : Names.transparent_state;
+  subterm_ts : Names.transparent_state;
+  frozen_evars : Evar.Set.t;
+  allow_K_at_toplevel : bool;
+  with_cs : bool }
+
 type unification_result =
   | Success of evar_map
   | UnifFailure of evar_map * Pretype_errors.unification_error
@@ -33,8 +41,8 @@ type conv_fun = types_or_terms ->
 type conv_fun_bool = types_or_terms ->
   env ->  evar_map -> conv_pb -> constr -> constr -> bool
 
-val evar_define : conv_fun -> ?choose:bool -> ?imitate_defs:bool -> env -> evar_map -> 
-  bool option -> existential -> constr -> evar_map
+val evar_define : unify_flags -> conv_fun -> ?choose:bool -> ?imitate_defs:bool ->
+  env -> evar_map -> bool option -> existential -> constr -> evar_map
 
 val refresh_universes :
   ?status:Evd.rigid ->
@@ -45,15 +53,15 @@ val refresh_universes :
   bool option (* direction: true for levels lower than the existing levels *) ->
   env -> evar_map -> types -> evar_map * types
 
-val solve_refl : ?can_drop:bool -> conv_fun_bool -> env ->  evar_map ->
+val solve_refl : ?can_drop:bool -> unify_flags -> conv_fun_bool -> env ->  evar_map ->
   bool option -> existential_key -> constr array -> constr array -> evar_map
 
-val solve_evar_evar : ?force:bool ->
+val solve_evar_evar : ?force:bool -> unify_flags ->
   (env -> evar_map -> bool option -> existential -> constr -> evar_map) ->
   conv_fun ->
   env ->  evar_map -> bool option -> existential -> existential -> evar_map
 
-val solve_simple_eqn : conv_fun -> ?choose:bool -> ?imitate_defs:bool -> env ->  evar_map ->
+val solve_simple_eqn : unify_flags -> conv_fun -> ?choose:bool -> ?imitate_defs:bool -> env ->  evar_map ->
   bool option * existential * constr -> unification_result
 
 val reconsider_conv_pbs : conv_fun -> evar_map -> unification_result
@@ -87,7 +95,7 @@ val recheck_applications :            (bool ->
             Term.types -> Term.types -> unification_result) ->
            Environ.env -> Evd.evar_map ref -> Term.constr -> unit
 
-val invert_definition :            (bool ->
+val invert_definition : unify_flags ->           (bool ->
             Environ.env ->
             Evd.evar_map ->
             Reduction.conv_pb ->

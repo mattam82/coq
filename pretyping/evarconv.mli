@@ -15,13 +15,7 @@ open Locus
 
 (** {4 Unification for type inference. } *)
 
-type unify_flags = {
-  open_ts : transparent_state;
-  closed_ts : transparent_state;
-  subterm_ts : transparent_state;
-  frozen_evars : Evar.Set.t;
-  allow_K_at_toplevel : bool;
-  with_cs : bool }
+type unify_flags = Evarsolve.unify_flags
 
 (** The default subterm transparent state is no unfoldings *)
 val default_flags_of : ?subterm_ts:transparent_state -> transparent_state -> unify_flags
@@ -124,7 +118,6 @@ val evar_eqappr_x : ?rhs_is_already_stuck:bool -> unify_flags ->
 val apply_on_subterm :
              Environ.env ->
            Evd.evar_map ref ->
-           Evar.Set.t ->
            Evar.Set.t ref ->
            (int -> Term.types -> Term.constr) ->
            (Environ.env ->

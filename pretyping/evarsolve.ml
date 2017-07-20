@@ -21,6 +21,14 @@ open Evarutil
 open Pretype_errors
 open Sigma.Notations
 
+type unify_flags = {
+  open_ts : transparent_state;
+  closed_ts : transparent_state;
+  subterm_ts : transparent_state;
+  frozen_evars : Evar.Set.t;
+  allow_K_at_toplevel : bool;
+  with_cs : bool }
+
 let normalize_evar evd ev =
   match kind_of_term (whd_evar evd (mkEvar ev)) with
   | Evar (evk,args) -> (evk,args)
@@ -1166,7 +1174,8 @@ let update_evar_source ev1 ev2 evd =
      let evi = Evd.find evd ev1 in
      Evd.add evd ev1 {evi with evar_source = loc, evs2}
   | _ -> evd
-  
+
+(** ev2 is defined as ev1 *)
 let solve_evar_evar_l2r force f g env evd aliases pbty ev1 (evk2,_ as ev2) =
   try
     let evd,body = project_evar_on_evar force g env evd aliases 0 pbty ev1 ev2 in
@@ -1187,22 +1196,27 @@ let preferred_orientation evd evk1 evk2 =
   | _, (Evar_kinds.QuestionMark _ | Evar_kinds.ImplicitArg (_, _, false)) -> false
   | _ -> true
 
-let solve_evar_evar_aux force f g env evd pbty (evk1,args1 as ev1) (evk2,args2 as ev2) =
+(** Precondition evk1 is not frozen, evk2 might be. *)
+let solve_evar_evar_aux force flags f g env evd pbty (evk1,args1 as ev1) (evk2,args2 as ev2) =
   let aliases = make_alias_map env in
+  let frozen_ev2 = Evar.Set.mem evk2 flags.frozen_evars in
   if preferred_orientation evd evk1 evk2 then
     try solve_evar_evar_l2r force f g env evd aliases (opp_problem pbty) ev2 ev1
-    with CannotProject (evd,ev2) ->
+    with CannotProject (evd,ev2) when not frozen_ev2 ->
     try solve_evar_evar_l2r force f g env evd aliases pbty ev1 ev2
     with CannotProject (evd,ev1) ->
     add_conv_oriented_pb ~tail:true (pbty,env,mkEvar ev1,mkEvar ev2) evd
   else
-    try solve_evar_evar_l2r force f g env evd aliases pbty ev1 ev2
+    try if not frozen_ev2 then
+          solve_evar_evar_l2r force f g env evd aliases pbty ev1 ev2
+        else raise (CannotProject (evd,ev1))
     with CannotProject (evd,ev1) ->
     try solve_evar_evar_l2r force f g env evd aliases (opp_problem pbty) ev2 ev1
     with CannotProject (evd,ev2) ->
     add_conv_oriented_pb ~tail:true (pbty,env,mkEvar ev1,mkEvar ev2) evd
 
-let solve_evar_evar ?(force=false) f g env evd pbty (evk1,args1 as ev1) (evk2,args2 as ev2) =
+(** Precondition: evk1 is not frozen *)
+let solve_evar_evar ?(force=false) flags f g env evd pbty (evk1,args1 as ev1) (evk2,args2 as ev2) =
   let pbty = if force then None else pbty in
   let evi = Evd.find evd evk1 in
   let evd =
@@ -1232,7 +1246,7 @@ let solve_evar_evar ?(force=false) f g env evd pbty (evk1,args1 as ev1) (evk2,ar
           downcast evk2 t2 (downcast evk1 t1 evd)
     with Reduction.NotArity -> 
       evd in
-  solve_evar_evar_aux force f g env evd pbty ev1 ev2
+  solve_evar_evar_aux force flags f g env evd pbty ev1 ev2
 
 type types_or_terms = bool
 
@@ -1247,7 +1261,7 @@ type conv_fun_bool =
  * that don't unify are discarded (i.e. ?e is redefined so that it does not
  * depend on these args). *)
 
-let solve_refl ?(can_drop=false) conv_algo env evd pbty evk argsv1 argsv2 =
+let solve_refl ?(can_drop=false) flags conv_algo env evd pbty evk argsv1 argsv2 =
   let evdref = ref evd in
   if Array.equal (e_eq_constr_univs evdref) argsv1 argsv2 then !evdref else
   (* Filter and restrict if needed *)
@@ -1340,7 +1354,7 @@ exception NotEnoughInformationEvarEvar of constr
 exception OccurCheckIn of evar_map * constr
 exception MetaOccurInBodyInternal
 
-let rec invert_definition conv_algo choose imitate_defs
+let rec invert_definition flags conv_algo choose imitate_defs
                           env evd pbty (evk,argsv as ev) rhs =
   let aliases = make_alias_map env in
   let evdref = ref evd in
@@ -1360,7 +1374,7 @@ let rec invert_definition conv_algo choose imitate_defs
             if choose then (mkVar id, p) else raise (NotUniqueInType sols)
       in
       let ty = lazy (Retyping.get_type_of env !evdref t) in
-      let evd = do_projection_effects conv_algo (evar_define conv_algo ~choose) env ty !evdref p in
+      let evd = do_projection_effects conv_algo (evar_define flags conv_algo ~choose) env ty !evdref p in
       evdref := evd;
       c
     with
@@ -1373,7 +1387,7 @@ let rec invert_definition conv_algo choose imitate_defs
           let ty = find_solution_type (evar_filtered_env evi) sols in
           let ty' = instantiate_evar_array evi ty argsv in
           let (evd,evar,(evk',argsv' as ev')) =
-            materialize_evar (evar_define conv_algo ~choose) env !evdref 0 ev ty' in
+            materialize_evar (evar_define flags conv_algo ~choose) env !evdref 0 ev ty' in
           let ts = expansions_of_var aliases t in
           let test c = isEvar c || List.mem_f Constr.equal c ts in
           let filter = restrict_upon_filter evd evk test argsv' in
@@ -1426,7 +1440,7 @@ let rec invert_definition conv_algo choose imitate_defs
           (* Make the virtual left evar real *)
           let ty = get_type_of env' evd t in
           let (evd,evar'',ev'') =
-             materialize_evar (evar_define conv_algo ~choose) env' evd k ev ty in
+             materialize_evar (evar_define flags conv_algo ~choose) env' evd k ev ty in
           (* materialize_evar may instantiate ev' by another evar; adjust it *)
           let (evk',args' as ev') = normalize_evar evd ev' in
           let evd =
@@ -1470,7 +1484,7 @@ let rec invert_definition conv_algo choose imitate_defs
             | [x] -> x
             | _ ->
               let (evd,evar'',ev'') =
-                materialize_evar (evar_define conv_algo ~choose) env' !evdref k ev ty in
+                materialize_evar (evar_define flags conv_algo ~choose) env' !evdref k ev ty in
               evdref := restrict_evar evd (fst ev'') None (UpdateWith candidates);
               evar'')
         | None ->
@@ -1509,24 +1523,25 @@ let rec invert_definition conv_algo choose imitate_defs
  * [define] tries to find an instance lhs such that
  * "lhs [hyps:=args]" unifies to rhs. The term "lhs" must be closed in
  * context "hyps" and not referring to itself.
+ * ev is assumed not to be frozen.
  *)
 
-and evar_define conv_algo ?(choose=false) ?(imitate_defs=true)
+and evar_define flags conv_algo ?(choose=false) ?(imitate_defs=true)
                 env evd pbty (evk,argsv as ev) rhs =
   match kind_of_term rhs with
   | Evar (evk2,argsv2 as ev2) ->
       if Evar.equal evk evk2 then
-        solve_refl ~can_drop:choose
+        solve_refl ~can_drop:choose flags
           (test_success conv_algo) env evd pbty evk argsv argsv2
       else
-        solve_evar_evar ~force:choose
-          (evar_define conv_algo) conv_algo env evd pbty ev ev2
+        solve_evar_evar ~force:choose flags
+          (evar_define flags conv_algo) conv_algo env evd pbty ev ev2
   | _ ->
   try solve_candidates conv_algo env evd ev rhs
   with NoCandidates ->
   try
-    let (evd',body) = invert_definition conv_algo choose imitate_defs
-                                        env evd pbty ev rhs in
+    let (evd',body) = invert_definition flags conv_algo choose imitate_defs
+       env evd pbty ev rhs in
     if occur_meta body then raise MetaOccurInBodyInternal;
     (* invert_definition may have instantiate some evars of rhs with evk *)
     (* so we recheck acyclicity *)
@@ -1563,8 +1578,8 @@ and evar_define conv_algo ?(choose=false) ?(imitate_defs=true)
         let c = whd_all env evd rhs in
         match kind_of_term c with
         | Evar (evk',argsv2) when Evar.equal evk evk' ->
-	    solve_refl (fun _b env sigma pb c c' -> is_fconv pb env sigma c c')
-              env evd pbty evk argsv argsv2
+	    solve_refl flags (fun _b env sigma pb c c' -> is_fconv pb env sigma c c')
+                       env evd pbty evk argsv argsv2
         | _ ->
 	    raise (OccurCheckIn (evd,rhs))
 
@@ -1617,11 +1632,11 @@ let reconsider_conv_pbs conv_algo evd =
  * if the problem couldn't be solved. *)
 
 (* Rq: uncomplete algorithm if pbty = CONV_X_LEQ ! *)
-let solve_simple_eqn conv_algo ?(choose=false) ?(imitate_defs=true)
+let solve_simple_eqn flags conv_algo ?(choose=false) ?(imitate_defs=true)
                      env evd (pbty,(evk1,args1 as ev1),t2) =
   try
     let t2 = whd_betaiota evd t2 in (* includes whd_evar *)
-    let evd = evar_define conv_algo ~choose ~imitate_defs env evd pbty ev1 t2 in
+    let evd = evar_define flags conv_algo ~choose ~imitate_defs env evd pbty ev1 t2 in
       reconsider_conv_pbs conv_algo evd
   with
     | NotInvertibleUsingOurAlgorithm t ->
