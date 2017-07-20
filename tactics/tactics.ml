@@ -1456,7 +1456,7 @@ let general_case_analysis_in_context with_evars clear_flag (c,lbindc) =
   let sigma = Proofview.Goal.sigma gl in
   let env = Proofview.Goal.env gl in
   let concl = Proofview.Goal.concl gl in
-  let frozen_evars = Evar.Map.domain (Evd.undefined_map (Sigma.to_evar_map sigma)) in
+  let frozen_evars = Tacmach.New.pf_undefined_evars gl in
   let t = Retyping.get_type_of env (Sigma.to_evar_map sigma) c in
   let (mind,_) = reduce_to_quantified_ind env (Sigma.to_evar_map sigma) t in
   let sort = Tacticals.New.elimination_sort_of_goal gl in
@@ -4187,7 +4187,7 @@ let induction_tac with_evars params indvars elim toclear =
   let elimc = mkCast (elimc, DEFAULTcast, elimt) in
   let env = Tacmach.New.pf_env gl in
   let sigma = Tacmach.New.project gl in
-  let frozen = Evar.Map.domain (Evd.undefined_map sigma) in
+  let frozen = Tacmach.New.pf_undefined_evars gl in
   let sigma, elimclause = 
     make_clenv_bindings ~hyps_only:true env sigma (elimc,elimt) ?occs lbindelimc in
   (* elimclause' is built from elimclause by instanciating all args and params. *)
