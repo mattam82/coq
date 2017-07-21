@@ -490,11 +490,21 @@ let pattern_occurrence_test flags pat env sigma c =
     match pat with
     | Some pat -> pat, unif
     | None ->
-       let pat = Patternops.pattern_of_constr env sigma c in
-       let pat = simplify_pat env flags.Evarsolve.open_ts pat in
-       let unif env sigma t u =
-         decompose_unif_pat env sigma unif pat t u
-       in pat, unif
+       if is_keyed_unification () then
+         let ch = head_of_constr c in
+         let k = Keys.constr_key ch in
+         let unif env sigma t u =
+           let uh, ul = decompose_app u in
+           if keyed_unify env sigma k uh then
+             test_unification (Evarconv.default_flags_of full_transparent_state) env sigma t u
+           else false, sigma
+         in Pattern.PMeta None, unif
+       else
+         let pat = Patternops.pattern_of_constr env sigma c in
+         let pat = simplify_pat env flags.Evarsolve.open_ts pat in
+         let unif env sigma t u =
+           decompose_unif_pat env sigma unif pat t u
+         in pat, unif
   in
   fun env sigma k t u ->
   (** Cut search in terms with are not closed, we can't rewrite them. *)
