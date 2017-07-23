@@ -1917,7 +1917,9 @@ let subst_all ?(flags=default_subst_tactic_flags ()) () =
         let eq = Universes.constr_of_global_univ (lbeq.eq,u) in
         if flags.only_leibniz then restrict_to_eq_and_identity eq;
         match kind_of_term x, kind_of_term y with
-        | Var z, _ | _, Var z when not (is_evaluable env (EvalVarRef z))  ->
+        | Var z, _ when not (is_evaluable env (EvalVarRef z))  ->
+            Some (get_id decl)
+        | _, Var z when not (is_evaluable env (EvalVarRef z))  ->
             Some (get_id decl)
         | _ ->
             None
