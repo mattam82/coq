@@ -517,7 +517,6 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
   let evd = Sigma.to_evar_map (Proofview.Goal.sigma gl) in
   let ts = Hints.Hint_db.transparent_state (Hints.searchtable_map Hints.rewrite_db) in
   let frozen_evars = if frzevars then Tacmach.New.pf_undefined_evars gl else Evar.Set.empty in
-  let flags = Evarsolve.{ (Evarconv.default_flags_of ts) with frozen_evars } in
   let isatomic = isProd (whd_zeta evd hdcncl) in
   let dep_fun = if isatomic then dependent else dependent_no_evar in
   let type_of_cls = type_of_clause cls gl in
@@ -527,12 +526,23 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
     let open Evarconv in
     if dep then [AtOccurrences (AllOccurrences true); AtOccurrences occs]
     else [AtOccurrences occs] in
-  let tac =
-      Proofview.tclEFFECTS effs <*>
-      general_elim_clause with_evars frzevars tac cls c t l
+  let flags = Evarsolve.{ (Evarconv.default_flags_of ts) with frozen_evars } in
+  let delta_closed_flags =
+    Evarsolve.{ flags with modulo_betaiota = false;
+                           open_ts = empty_transparent_state;
+                           closed_ts = full_transparent_state;
+                           subterm_ts = empty_transparent_state }
+  in
+  let onetac flags =
+    general_elim_clause with_evars frzevars tac cls c t l
       (match lft2rgt with None -> false | Some b -> b)
       {elimindex = None; elimbody = (elim,NoBindings); elimrename = None;
        elimoccs = Some (pattern_occurrence_test flags pat, occs)}
+  in
+  let tac =
+    Proofview.tclEFFECTS effs <*>
+      (** First try with selection of subterms without conversion, then with conversion *)
+      Tacticals.New.tclFIRST [onetac delta_closed_flags; onetac flags]
   in
   Sigma (tac, sigma, p)
   end }
