@@ -64,7 +64,7 @@ Success tests
     success/NatRing.v...Ok
     success/Notations.v...Ok
     success/Notations2.v...Ok
-    success/Nsatz.v...Error! (should be accepted)
+    success/Nsatz.v...Ok
     success/NumberScopes.v...Ok
     success/Omega.v...Ok
     success/Omega0.v...Ok
@@ -81,7 +81,7 @@ Success tests
     success/ROmega0.v...Ok
     success/ROmega2.v...Ok
     success/ROmegaPre.v...Ok
-    success/RecTutorial.v...Error! (should be accepted)
+    success/RecTutorial.v...Ok
     success/Record.v...Ok
     success/Reg.v...Ok
     success/Remark.v...Ok
@@ -137,7 +137,7 @@ Success tests
     success/inds_type_sec.v...Ok
     success/induct.v...Ok
     success/intros.v...Ok
-    success/keyedrewrite.v...Error! (should be accepted)
+    success/keyedrewrite.v...Ok
     success/letproj.v...Ok
     success/ltac.v...Ok
     success/ltac_plus.v...Ok
@@ -306,6 +306,7 @@ Bugs tests
     bugs/closed/1784.v...Ok
     bugs/closed/1787.v...Ok
     bugs/closed/1791.v...Ok
+    bugs/closed/1811.v...Ok
     bugs/closed/1834.v...Ok
     bugs/closed/1844.v...Ok
     bugs/closed/1850.v...Ok
@@ -385,7 +386,7 @@ Bugs tests
     bugs/closed/2406.v...Ok
     bugs/closed/2447.v...Ok
     bugs/closed/2464.v...Ok
-    bugs/closed/2467.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2467.v...Ok
     bugs/closed/2473.v...Ok
     bugs/closed/2584.v...Ok
     bugs/closed/2586.v...Ok
@@ -414,7 +415,7 @@ Bugs tests
     bugs/closed/2817.v...Ok
     bugs/closed/2818.v...Ok
     bugs/closed/2828.v...Ok
-    bugs/closed/2830.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2830.v...Ok
     bugs/closed/2834.v...Ok
     bugs/closed/2836.v...Ok
     bugs/closed/2837.v...Ok
@@ -478,7 +479,7 @@ Bugs tests
     bugs/closed/3249.v...Ok
     bugs/closed/3251.v...Ok
     bugs/closed/3257.v...Ok
-    bugs/closed/3258.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3258.v...Ok
     bugs/closed/3259.v...Ok
     bugs/closed/3260.v...Ok
     bugs/closed/3262.v...Ok
@@ -566,7 +567,7 @@ Bugs tests
     bugs/closed/3482.v...Ok
     bugs/closed/3483.v...Ok
     bugs/closed/3484.v...Ok
-    bugs/closed/3485.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3485.v...Ok
     bugs/closed/3487.v...Ok
     bugs/closed/3490.v...Ok
     bugs/closed/3491.v...Ok
@@ -575,9 +576,9 @@ Bugs tests
     bugs/closed/3510.v...Ok
     bugs/closed/3513.v...Error! (bug seems to be opened, please check)
     bugs/closed/3520.v...Ok
-    bugs/closed/3531.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3531.v...Ok
     bugs/closed/3537.v...Ok
-    bugs/closed/3539.v...Error! (bug seems to be opened, please check)
+    bugs/closed/3539.v...Ok
     bugs/closed/3542.v...Ok
     bugs/closed/3546.v...Ok
     bugs/closed/3554.v...Ok
@@ -760,6 +761,7 @@ Bugs tests
     bugs/closed/4400.v...Ok
     bugs/closed/4404.v...Ok
     bugs/closed/4412.v...Ok
+    bugs/closed/4413.v...Ok
     bugs/closed/4420.v...Ok
     bugs/closed/4429.v...Ok
     bugs/closed/4433.v...Ok
@@ -1089,4 +1091,4 @@ Coqchk tests
     coqchk/primproj.v...Ok
     coqchk/univ.v...Ok
 
-    1054 tests passed over 1076, i.e. 97 %
+    1065 tests passed over 1078, i.e. 98 %
