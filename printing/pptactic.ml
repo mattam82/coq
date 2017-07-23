@@ -137,9 +137,8 @@ module Make
 
   let pr_with_occurrences pr (occs,c) =
     match occs with
-      | AllOccurrences atleast ->
-        (if atleast then str "!" else mt ()) ++
-        pr c
+      | AllOccurrences atleast -> (* FIXME, which syntax to use? *)
+         pr c
       | NoOccurrences ->
         failwith "pr_with_occurrences: no occurrences"
       | OnlyOccurrences nl ->
