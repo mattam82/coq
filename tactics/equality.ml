@@ -176,9 +176,7 @@ let instantiate_lemma_all frzevars gl c ty l l2r concl =
   List.map (fun (sigma, c) -> sigma, eqclause) occs
 
 let instantiate_lemma gl c ty l l2r concl =
-  let sigma, ct = pf_type_of gl c in
-  let t = try snd (reduce_to_quantified_ind (pf_env gl) sigma ct) with UserError _ -> ct in
-  let eqclause = Clenv.make_clenv_bindings (pf_env gl) sigma ~hyps_only:false (c,t) l in
+  let eqclause = Clenv.make_clenv_bindings (pf_env gl) (project gl) ~hyps_only:false (c,ty) l in
   [eqclause]
 
 let rewrite_conv_closed_core_unif_flags = {
