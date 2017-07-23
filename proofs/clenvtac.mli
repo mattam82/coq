@@ -26,7 +26,7 @@ val clenv_chain_last : constr -> clause -> unit Proofview.tactic
 
 val clenv_refine2 :
   ?with_evars:evars_flag -> ?with_classes:bool -> ?shelve_subgoals:bool ->
-  ?flags:unify_flags -> 
+  ?flags:unify_flags -> ?origsigma:Evd.evar_map ->
   clause -> unit Proofview.tactic
 
 val clenv_refine_no_check :

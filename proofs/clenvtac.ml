@@ -260,12 +260,11 @@ let clenv_refine_no_check
                    flags (sigma, clenv)
 
 let clenv_refine2 ?(with_evars=false) ?(with_classes=true) ?(shelve_subgoals=true)
-                  ?(flags=dft ()) clenv =
+                  ?(flags=dft ()) ?origsigma clenv =
   let flags = flags_of flags in
   let tac = clenv_unify_concl flags clenv in
   Ftactic.run tac
-              (clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals
-                                flags)
+   (clenv_refine_gen ~with_evars ~with_classes ~shelve_subgoals ?origsigma flags)
 
 (** The dependent holes turned into subgoals are 
     
