@@ -1943,7 +1943,8 @@ let w_unify env evd cv_pb ?(flags=default_unify_flags ()) ty1 ty2 =
   let subterm_ts = flags.subterm_unify_flags.modulo_delta in
   let frozen_evars = flags.core_unify_flags.frozen_evars in
   let allow_K_at_toplevel = flags.allow_K_in_toplevel_higher_order_unification in
-  let flags = Evarconv.{ open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true } in
+  let modulo_betaiota = flags.core_unify_flags.modulo_betaiota in
+  let flags = Evarconv.{ modulo_betaiota; open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true } in
   let res = Evarconv.evar_conv_x flags env evd cv_pb ty1 ty2 in
   match res with
   | Success evd ->

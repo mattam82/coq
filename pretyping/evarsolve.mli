@@ -11,12 +11,13 @@ open Evd
 open Environ
 
 type unify_flags = {
+  modulo_betaiota : bool;
   open_ts : Names.transparent_state;
   closed_ts : Names.transparent_state;
   subterm_ts : Names.transparent_state;
   frozen_evars : Evar.Set.t;
   allow_K_at_toplevel : bool;
-  with_cs : bool }
+  with_cs : bool}
 
 type unification_result =
   | Success of evar_map

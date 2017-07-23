@@ -35,7 +35,8 @@ let default_transparent_state env = full_transparent_state
 (* Conv_oracle.get_transp_state (Environ.oracle env) *)
 
 let default_flags_of ?(subterm_ts=empty_transparent_state) ts =
-  { open_ts = ts; closed_ts = ts; subterm_ts;
+  { modulo_betaiota = true;
+    open_ts = ts; closed_ts = ts; subterm_ts;
     frozen_evars = Evar.Set.empty; with_cs = true;
     allow_K_at_toplevel = true }
 
@@ -119,11 +120,11 @@ let flex_kind_of_term flags env evd c sk =
     | Fix _ -> Rigid (* happens when the fixpoint is partially applied *)
     | Cast _ | App _ | Case _ -> assert false
 
-let apprec_nohdbeta ts env evd c =
+let apprec_nohdbeta flags env evd c =
   let (t,sk as appr) = Reductionops.whd_nored_state evd (c, []) in
-  if Stack.not_purely_applicative sk
+  if (* flags.modulo_betaiota &&  *)Stack.not_purely_applicative sk
   then Stack.zip (fst (whd_betaiota_deltazeta_for_iota_state
-		   ts env evd Cst_stack.empty appr))
+		   flags.open_ts env evd Cst_stack.empty appr))
   else c
 
 let position_problem l2r = function
@@ -393,8 +394,8 @@ let rec evar_conv_x flags env evd pbty term1 term2 =
     | None ->
 	(* Until pattern-unification is used consistently, use nohdbeta to not
 	   destroy beta-redexes that can be used for 1st-order unification *)
-        let term1 = apprec_nohdbeta flags.open_ts env evd term1 in
-        let term2 = apprec_nohdbeta flags.open_ts env evd term2 in
+        let term1 = apprec_nohdbeta flags env evd term1 in
+        let term2 = apprec_nohdbeta flags env evd term2 in
 	let default () = 
           evar_eqappr_x flags env evd pbty
             (whd_nored_state evd (term1,Stack.empty), Cst_stack.empty)
@@ -1371,8 +1372,8 @@ let is_beyond_capabilities = function
 
 (* TODO frozen *)
 let apply_conversion_problem_heuristic flags env evd with_ho pbty t1 t2 =
-  let t1 = apprec_nohdbeta flags.open_ts env evd (whd_head_evar evd t1) in
-  let t2 = apprec_nohdbeta flags.open_ts env evd (whd_head_evar evd t2) in
+  let t1 = apprec_nohdbeta flags env evd (whd_head_evar evd t1) in
+  let t2 = apprec_nohdbeta flags env evd (whd_head_evar evd t2) in
   let (term1,l1 as appr1) = try destApp t1 with DestKO -> (t1, [||]) in
   let (term2,l2 as appr2) = try destApp t2 with DestKO -> (t2, [||]) in
   let app_empty = Array.is_empty l1 && Array.is_empty l2 in

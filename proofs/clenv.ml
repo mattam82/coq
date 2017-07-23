@@ -912,12 +912,13 @@ let clenv_unify_concl env sigma flags ty clenv =
 
 
 let flags_of flags =
+  let modulo_betaiota = Unification.(flags.core_unify_flags.modulo_betaiota) in
   let open_ts = Unification.(flags.core_unify_flags.modulo_delta) in
   let closed_ts = Option.default open_ts Unification.(flags.core_unify_flags.modulo_conv_on_closed_terms) in
   let subterm_ts = Unification.(flags.subterm_unify_flags.modulo_delta) in
   let frozen_evars = Unification.(flags.core_unify_flags.frozen_evars) in
   let allow_K_at_toplevel = flags.allow_K_in_toplevel_higher_order_unification in
-  Evarsolve.{ open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true }
+  Evarsolve.{ modulo_betaiota; open_ts; closed_ts; subterm_ts; frozen_evars; allow_K_at_toplevel; with_cs = true }
 
 (* [clenv_fchain mv clenv clenv']
  *

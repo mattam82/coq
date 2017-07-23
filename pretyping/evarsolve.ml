@@ -22,6 +22,7 @@ open Pretype_errors
 open Sigma.Notations
 
 type unify_flags = {
+  modulo_betaiota: bool;
   open_ts : transparent_state;
   closed_ts : transparent_state;
   subterm_ts : transparent_state;
