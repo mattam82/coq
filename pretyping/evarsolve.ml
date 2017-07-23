@@ -1549,24 +1549,10 @@ and evar_define flags conv_algo ?(choose=false) ?(imitate_defs=true)
     if occur_evar_upto_types evd' evk body then raise (OccurCheckIn (evd',body));
     (* needed only if an inferred type *)
     let evd', body = refresh_universes pbty env evd' body in
-(* Cannot strictly type instantiations since the unification algorithm
- * does not unify applications from left to right.
- * e.g problem f x == g y yields x==y and f==g (in that order)
- * Another problem is that type variables are evars of type Type
-   let _ =
-      try
-        let env = evar_filtered_env evi in
-        let ty = evi.evar_concl in
-        Typing.check env evd' body ty
-      with e ->
-        msg_info
-          (str "Ill-typed evar instantiation: " ++ fnl() ++
-           pr_evar_map evd' ++ fnl() ++
-           str "----> " ++ int ev ++ str " := " ++
-           print_constr body);
-        raise e in*)
-    let evd' = check_evar_instance evd' evk body conv_algo in
-    Evd.define evk body evd'
+    let evd' = Evd.define evk body evd' in
+    (** Check after definition, as checking could involve the same
+        evar definition problem again otherwise *)
+    check_evar_instance evd' evk body conv_algo
   with
     | NotEnoughInformationToProgress sols ->
         postpone_non_unique_projection env evd pbty ev sols rhs
