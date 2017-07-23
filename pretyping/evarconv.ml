@@ -111,7 +111,9 @@ let flex_kind_of_term flags env evd c sk =
   match kind_of_term c with
     | LetIn _ | Rel _ | Const _ | Var _ | Proj _ ->
       Option.cata (fun x -> MaybeFlexible x) Rigid (eval_flexible_term flags.open_ts env evd c)
-    | Lambda _ when not (Option.is_empty (Stack.decomp sk)) -> MaybeFlexible c
+    | Lambda _ when not (Option.is_empty (Stack.decomp sk)) ->
+       if flags.modulo_betaiota then MaybeFlexible c
+       else Rigid
     | Evar ev ->
        if is_frozen flags ev then Rigid
        else Flexible ev
@@ -122,7 +124,7 @@ let flex_kind_of_term flags env evd c sk =
 
 let apprec_nohdbeta flags env evd c =
   let (t,sk as appr) = Reductionops.whd_nored_state evd (c, []) in
-  if (* flags.modulo_betaiota &&  *)Stack.not_purely_applicative sk
+  if flags.modulo_betaiota && Stack.not_purely_applicative sk
   then Stack.zip (fst (whd_betaiota_deltazeta_for_iota_state
 		   flags.open_ts env evd Cst_stack.empty appr))
   else c
@@ -773,13 +775,14 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
     | Rigid, Rigid when isLambda term1 && isLambda term2 ->
         let (na1,c1,c'1) = destLambda term1 in
         let (na2,c2,c'2) = destLambda term2 in
-        assert app_empty;
         ise_and evd
           [(fun i -> evar_conv_x flags env i CONV c1 c2);
            (fun i ->
 	     let c = nf_evar i c1 in
              let na = Nameops.name_max na1 na2 in
-	     evar_conv_x flags (push_rel (LocalAssum (na,c)) env) i CONV c'1 c'2)]
+	     evar_conv_x flags (push_rel (LocalAssum (na,c)) env) i CONV c'1 c'2);
+           (** When in modulo_betaiota = false case, lambda's are not reduced *)
+           (fun i -> exact_ise_stack2 env i (evar_conv_x flags) sk1 sk2)]
 
     | Flexible ev1, Rigid -> flex_rigid true ev1 appr1 appr2
     | Rigid, Flexible ev2 -> flex_rigid false ev2 appr2 appr1
@@ -901,15 +904,14 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 	  |Some (sk1',sk2'), Success i' -> evar_conv_x flags env i' CONV (Stack.zip (term1,sk1')) (Stack.zip (term2,sk2'))
 	  end
 
-	| (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _ | Evar _), _ ->
+	| (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _ | Evar _ | Lambda _), _ ->
 	  UnifFailure (evd,NotSameHead)
-	| _, (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _ | Evar _) ->
+	| _, (Ind _ | Sort _ | Prod _ | CoFix _ | Fix _ | Rel _ | Var _ | Const _ | Evar _ | Lambda _) ->
 	  UnifFailure (evd,NotSameHead)
-
-	| (App _ | Cast _ | Case _ | Proj _), _ -> assert false
+        | Case _, _ -> UnifFailure (evd,NotSameHead)
+        | Proj _, _ -> UnifFailure (evd,NotSameHead)
+	| (App _ | Cast _), _ -> assert false
 	| LetIn _, _ -> assert false
-	| (Lambda _), _ -> assert false
-
       end
 
 and conv_record flags env evd (ctx,(h,h2),c,bs,(params,params1),(us,us2),(sk1,sk2),c1,(n,t2)) =
