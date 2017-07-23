@@ -1004,4 +1004,7 @@ Proof.
   Fail Timeout 1 Time rewrite ![_]loops_functor_group.
   (* 0.004 s in 8.5rc1, 8.677 s in 8.5 *)
   Timeout 1 do 3 rewrite loops_functor_group.
+  Unset Keyed Unification.
+  do 3 rewrite loops_functor_group.
+  Fail rewrite loops_functor_group.
 Abort.
