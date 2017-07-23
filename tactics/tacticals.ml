@@ -662,6 +662,8 @@ module New = struct
          sigma
     in
     let concl = Proofview.Goal.concl gl in
+    (** If the predicate is given we definitely needs this. *)
+    let flags = Evarsolve.{ flags with modulo_betaiota = true } in
     let sigma, clenv' = clenv_unify_concl env sigma flags concl elimclause' in
     let after_tac i =
       let (hd,largs) = decompose_app (clenv_concl clenv') in
