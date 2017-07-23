@@ -944,11 +944,23 @@ let flags_of flags =
    In particular, it assumes that [env'] and [sigma'] extend [env] and [sigma].
 *)
 
+let hole_def sigma h =
+  match h.hole_name with
+  | Name id ->
+     let res = nf_evar sigma h.hole_evar in
+     if isEvar res then
+       Some (fst (destEvar res), id)
+     else None
+  | Anonymous -> None
+
+let hole_goal h = fst (destEvar h.hole_evar)
+
 let clenv_chain ?(holes_order=true) ?(flags=fchain_flags ()) ?occs
                 env sigma h cl nextcl =
   let sigma, cl =
     match occs with
-    | None -> define_with_type env sigma ~flags:(flags_of flags) h.hole_evar nextcl.cl_val (Some nextcl.cl_concl), cl
+    | None -> define_with_type env sigma ~flags:(flags_of flags)
+                 h.hole_evar nextcl.cl_val (Some nextcl.cl_concl), cl
     | Some _ ->
        let ty = hole_type sigma h in
        let ty' = nextcl.cl_concl in
@@ -956,12 +968,22 @@ let clenv_chain ?(holes_order=true) ?(flags=fchain_flags ()) ?occs
        let (ev, _) = destEvar h.hole_evar in
        let sigma = Evd.define ev nextcl.cl_val sigma in
        sigma, cl
-  in 
+  in
+  let sigma, clholes =
+    let nextclholes =
+      List.map_filter (fun h -> hole_def sigma h) nextcl.cl_holes
+    in
+    List.fold_map (fun sigma h ->
+        try
+          let id = List.assoc_f Evar.equal (hole_goal h) nextclholes in
+          Evd.rename (hole_goal h) id sigma, { h with hole_name = Name id }
+        with Not_found -> sigma, h) sigma cl.cl_holes
+  in
   let holes' =
     if holes_order then
-      cl.cl_holes @ nextcl.cl_holes
+      clholes @ nextcl.cl_holes
     else
-      nextcl.cl_holes @ cl.cl_holes
+      nextcl.cl_holes @ clholes
   in
   let cl = { cl with cl_holes = holes' } in
   sigma, clenv_advance sigma cl

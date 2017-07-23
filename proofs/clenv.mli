@@ -195,6 +195,13 @@ val clenv_dest_prod : env -> evar_map -> clause -> evar_map * clause
     hyps_only flag that was used during its construction. *)
 val clenv_indep : clause -> hole list
 
+
+(** [clenv_chain env sigma hole first next] chains two clauses.  The
+    first clause must contain the undefined hole which is filled by the
+    next clauses body. Note that holes from the next clause which are
+    unified with holes of the first clause always remain with their name
+    in the resulting clause. This ensures that evar names are always
+    preserved from the next clause to the resulting clause.  *)
 val clenv_chain : ?holes_order:bool -> (* true = holes of the first clause first *)
                   ?flags:unify_flags -> ?occs:Evarconv.occurrences_selection ->
                   env -> evar_map -> hole ->
