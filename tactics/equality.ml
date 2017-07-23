@@ -542,7 +542,7 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac pat occs
   let tac =
     Proofview.tclEFFECTS effs <*>
       (** First try with selection of subterms without conversion, then with conversion *)
-      Tacticals.New.tclFIRST [onetac delta_closed_flags; onetac flags]
+      Tacticals.New.tclORELSE (onetac delta_closed_flags) (onetac flags)
   in
   Sigma (tac, sigma, p)
   end }
