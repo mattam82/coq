@@ -1723,7 +1723,15 @@ let general_apply ~with_delta ~with_destruct ~with_evars ~delay_bindings ~clear_
   Proofview.Goal.nf_enter { enter = begin fun gl ->
   let concl = Proofview.Goal.concl gl in
   let flags =
-    if with_delta then default_unify_flags () else default_no_delta_unify_flags () in
+    if with_delta then
+      let flags = default_unify_flags () in
+      (** When applying higher-order lemmas, we don't necessarily want to
+          find an abstraction for all the arguments of the metavariable. *)
+      { flags with allow_K_in_toplevel_higher_order_unification = true }
+    else
+      (** In the "simple apply" case we want to avoid applications of higher-order
+          lemmas finding trivial predicates. *)
+      default_no_delta_unify_flags () in
   (* The actual type of the theorem. It will be matched against the
   goal. If this fails, then the head constant will be unfolded step by
   step. *)
