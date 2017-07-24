@@ -1,3 +1,21 @@
+Unification compatibility.
+
+TODO:
+
+  1 - Reorder commits to have changes to evarconv/clenv/clenvtac first.
+  2 - First apply changes
+  3 - Tactic changes
+  4 - rewrite changes.
+
+  5 - Rebase on current master.
+
+  6 - Copy old code in a plugin for compat and dispatch based on version.
+  
+  7 - Cleanup intf of new code, removing unification.ml and
+    metas (some thinking needed for patterns).
+
+  8 - Profit.
+
 - eapply could shelve subgoals before.
 
   Two cases: forall e : Equiv, Reflexive (equiv e) applied to Reflexive ?X
@@ -72,16 +90,18 @@
   be tried again _after_ the unification with the conclusion. However the
   criterion was fuzzy: see bug #4813.
 
+  We now do a kind of best effort, trying the unification of bindings
+  before the unification with the conclusion, and if that fails, also after.
 
-- Open bugs:
+- Closed bugs:
 
-  1956: program patch at beginning of branch.
+ 
 
-  2467: in fsetdec...  
-  2830: cannot define evar twice in rewrite still happening (test with EConstr).
+- Closed bugs which required some work:
 
-  2848: unif difference with Add Relation.
-  
+  2830: cannot define evar twice: due to evar_define doing the check_evar_instance
+  before the Evd.define, now inverted.
+
   3263: suddenly back to the very slow behaviors of before
 
   3513: canonical structure creates an unsolvable typeclass constraint that makes a latter proof-search
@@ -95,7 +115,6 @@
   and check unresolvability in goals created by application of a hint during resolution.
   Phew !
 
-- Closed bugs:
   bug 2830: with not done at the right time, should be delayed. Actually no,
   it was the use of higher-order before regular unification.
 
@@ -112,5 +131,5 @@
   4782: with done too early, needing conclusion's unification -> now backtracking
   4813: with done too early, needing conclusion's unification -> now backtracking
   
-HoTT_coq_091: HO unif failing eliminating a dependent equality, due to cumulativity, now fixed.
+  HoTT_coq_091: HO unif failing eliminating a dependent equality, due to cumulativity, now fixed.
   		
