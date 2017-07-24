@@ -16,6 +16,13 @@ TODO:
 
   8 - Profit.
 
+Tactic refinements:
+
+  - apply should have two variants: one for triggering higher-order unification
+  and one without. apply_ho is much more powerful but can also produce meaningless
+  abstractions.
+
+
 - eapply could shelve subgoals before.
 
   Two cases: forall e : Equiv, Reflexive (equiv e) applied to Reflexive ?X
