@@ -87,6 +87,13 @@
   3513: canonical structure creates an unsolvable typeclass constraint that makes a latter proof-search
   diverge. Creating the evar with unresolvable store during unification does not help...
   Actually this uses w_unify_to_subterm which uses the old w_unify code. Need to adapt this.
+  
+  Previously, unification through w_unify.ml created a meta during the canonical structure resolution,
+  which prevented the simple apply of typeclass resolution from succeeding, as there was an unsolved
+  dependent meta. This is not the case currently, unless we make the evar unresolvable in evarconv
+  during canonical structure resolution, and propagate unresolvability in Evd.restrict as well,
+  and check unresolvability in goals created by application of a hint during resolution.
+  Phew !
 
 - Closed bugs:
   bug 2830: with not done at the right time, should be delayed. Actually no,
