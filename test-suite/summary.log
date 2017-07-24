@@ -421,7 +421,7 @@ Bugs tests
     bugs/closed/2837.v...Ok
     bugs/closed/2839.v...Ok
     bugs/closed/2846.v...Ok
-    bugs/closed/2848.v...Error! (bug seems to be opened, please check)
+    bugs/closed/2848.v...Ok
     bugs/closed/2850.v...Ok
     bugs/closed/2854.v...Ok
     bugs/closed/2876.v...Ok
@@ -574,7 +574,6 @@ Bugs tests
     bugs/closed/3505.v...Ok
     bugs/closed/3509.v...Ok
     bugs/closed/3510.v...Ok
-    bugs/closed/3513.v...Error! (bug seems to be opened, please check)
     bugs/closed/3520.v...Ok
     bugs/closed/3531.v...Ok
     bugs/closed/3537.v...Ok
@@ -703,6 +702,7 @@ Bugs tests
     bugs/closed/4069.v...Ok
     bugs/closed/4078.v...Ok
     bugs/closed/4089.v...Ok
+    bugs/closed/4095.v...Ok
     bugs/closed/4097.v...Ok
     bugs/closed/4101.v...Ok
     bugs/closed/4103.v...Ok
@@ -945,6 +945,7 @@ Bugs tests
     bugs/opened/3395.v...still active
     bugs/opened/3459.v...still active
     bugs/opened/3463.v...still active
+    bugs/opened/3513.v...still active
     bugs/opened/3626.v...still active
     bugs/opened/3655.v...still active
     bugs/opened/3753.v...still active
@@ -999,11 +1000,11 @@ Output tests
     output/TranspModtype.v...Ok
     output/ZSyntax.v...Ok
     output/inference.v...Ok
-    output/ltac.v...Error! (unexpected output)
+    output/ltac.v...Ok
     output/names.v...Ok
     output/onlyprinting.v...Ok
     output/reduction.v...Ok
-    output/rewrite-2172.v...Error! (unexpected output)
+    output/rewrite-2172.v...Ok
     output/set.v...Ok
     output/simpl.v...Ok
     output/subst.v...Ok
@@ -1091,4 +1092,4 @@ Coqchk tests
     coqchk/primproj.v...Ok
     coqchk/univ.v...Ok
 
-    1065 tests passed over 1078, i.e. 98 %
+    1070 tests passed over 1079, i.e. 99 %
