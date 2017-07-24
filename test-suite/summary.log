@@ -644,6 +644,7 @@ Bugs tests
     bugs/closed/3736.v...Ok
     bugs/closed/3743.v...Ok
     bugs/closed/3746.v...Ok
+    bugs/closed/3754.v...Ok
     bugs/closed/3755.v...Ok
     bugs/closed/3777.v...Ok
     bugs/closed/3779.v...Ok
@@ -676,6 +677,7 @@ Bugs tests
     bugs/closed/3916.v...Ok
     bugs/closed/3922.v...Ok
     bugs/closed/3923.v...Ok
+    bugs/closed/3926.v...Ok
     bugs/closed/3929.v...Ok
     bugs/closed/3938.v...Ok
     bugs/closed/3944.v...Ok
@@ -919,7 +921,7 @@ Bugs tests
     bugs/opened/1501.v...still active
     bugs/opened/1596.v...still active
     bugs/opened/1671.v...still active
-    bugs/opened/1811.v...Error! (bug seems to be closed, please check)
+    bugs/opened/1811.v...still active
     bugs/opened/2456.v...still active
     bugs/opened/2814.v...still active
     bugs/opened/3092.v...still active
@@ -938,7 +940,7 @@ Bugs tests
     bugs/opened/3312.v...still active
     bugs/opened/3320.v...still active
     bugs/opened/3343.v...still active
-    bugs/opened/3345.v...Error! (bug seems to be closed, please check)
+    bugs/opened/3345.v...still active
     bugs/opened/3357.v...still active
     bugs/opened/3363.v...still active
     bugs/opened/3370.v...still active
@@ -949,12 +951,10 @@ Bugs tests
     bugs/opened/3626.v...still active
     bugs/opened/3655.v...still active
     bugs/opened/3753.v...still active
-    bugs/opened/3754.v...Error! (bug seems to be closed, please check)
     bugs/opened/3794.v...still active
     bugs/opened/3889.v...still active
     bugs/opened/3890.v...still active
     bugs/opened/3916.v...still active
-    bugs/opened/3926.v...Error! (bug seems to be closed, please check)
     bugs/opened/3938.v...still active
     bugs/opened/3946.v...still active
     bugs/opened/3948.v...still active
@@ -1092,4 +1092,4 @@ Coqchk tests
     coqchk/primproj.v...Ok
     coqchk/univ.v...Ok
 
-    1070 tests passed over 1079, i.e. 99 %
+    1074 tests passed over 1079, i.e. 99 %
