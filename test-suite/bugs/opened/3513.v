@@ -69,8 +69,4 @@ Goal forall (T : Type) (O0 : T -> OPred) (O1 : T -> PointedOPred)
     pose P;
     refine (P _ _)
   end; unfold Basics.flip.
-  2: solve [ apply reflexivity ].
-  Undo.
-  2: reflexivity. (* Toplevel input, characters 18-29:
-Error:
-Tactic failure: The relation lentails is not a declared reflexive relation. Maybe you need to require the Setoid library. *)
+  Fail Timeout 1 2: solve [ apply reflexivity ].
