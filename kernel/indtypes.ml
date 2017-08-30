@@ -532,8 +532,8 @@ let rec ienv_decompose_prod (env,_,_,_ as ienv) n c =
 	  ienv_decompose_prod ienv' (n-1) b
       | _ -> assert false
 
-let array_min nmr a = if Int.equal nmr 0 then 0 else
-  Array.fold_left (fun k (nmri,_) -> min k nmri) nmr a
+let array_min (r,nmr) a = if Int.equal nmr 0 then Array.exists (fun (x,_) -> fst x) a, 0 else
+  Array.fold_left (fun (r,k) ((recursive,nmri),_) -> r || recursive, min k nmri) (r,nmr) a
 
 (** [check_positivity_one ienv paramsctxt (mind,i) nnonrecargs lcnames indlc]
     checks the positivity of the [i]-th member of the mutually
@@ -547,7 +547,7 @@ let array_min nmr a = if Int.equal nmr 0 then 0 else
     If [chkpos] is [false] then positivity is assumed, and
     [check_positivity_one] computes the subterms occurrences in a
     best-effort fashion. *)
-let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (_,i as ind) nnonrecargs lcnames indlc =
+let check_positivity_one ~chkpos (env,_,ntypes,_ as ienv) paramsctxt (_,i as ind) nnonrecargs lcnames indlc =
   let nparamsctxt = Context.Rel.length paramsctxt in
   let nmr = Context.Rel.nhyps paramsctxt in
   (** Positivity of one argument [c] of a constructor (i.e. the
@@ -575,7 +575,7 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
             let largs = List.map (whd_all env) largs in
 	    let nmr1 =
 	      (match ra with
-                  Mrec _ -> compute_rec_par ienv paramsctxt nmr largs
+                  Mrec _ -> true, compute_rec_par ienv paramsctxt (snd nmr) largs
 		|  _ -> nmr)
 	    in
               (** The case where one of the inductives of the mutually
@@ -667,8 +667,6 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
 
           | Prod (na,b,d) ->
 	      let () = assert (List.is_empty largs) in
-	      if not recursive && not (noccur_between n ntypes b) then
-	        raise (InductiveError BadEntry);
               let nmr',recarg = check_pos ienv nmr b in
               let ienv' = ienv_push_var ienv (na,b,mk_norec) in
                 check_constr_rec ienv' nmr' (recarg::lrec) d
@@ -693,13 +691,13 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
       (fun id c ->
         let _,rawc = mind_extract_params nparamsctxt c in
           try
-	    check_constructors ienv true nmr rawc
+	    check_constructors ienv true (false,nmr) rawc
           with IllFormedInd err ->
 	    explain_ind_err id (ntypes-i) env nparamsctxt c err)
       (Array.of_list lcnames) indlc
   in
   let irecargs = Array.map snd irecargs_nmr
-  and nmr' = array_min nmr irecargs_nmr
+  and nmr' = array_min (false,nmr) irecargs_nmr
   in (nmr', mk_paths (Mrec ind) irecargs)
 
 (** [check_positivity ~chkpos kn env_ar paramsctxt inds] checks that the mutually
@@ -708,9 +706,8 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
     If [chkpos] is [false] then positivity is assumed, and
     [check_positivity_one] computes the subterms occurrences in a
     best-effort fashion. *)
-let check_positivity ~chkpos kn env_ar_par paramsctxt finite inds =
+let check_positivity ~chkpos kn env_ar_par paramsctxt finite record inds =
   let ntypes = Array.length inds in
-  let recursive = finite != Decl_kinds.BiFinite in
   let rc = Array.mapi (fun j t -> (Mrec (kn,j),t)) (Rtree.mk_rec_calls ntypes) in
   let ra_env_ar = Array.rev_to_list rc in
   let nparamsctxt = Context.Rel.length paramsctxt in
@@ -720,12 +717,26 @@ let check_positivity ~chkpos kn env_ar_par paramsctxt finite inds =
       List.init nparamsctxt (fun _ -> (Norec,mk_norec)) @ ra_env_ar in
     let ienv = (env_ar_par, 1+nparamsctxt, ntypes, ra_env_ar_par) in
     let nnonrecargs = Context.Rel.nhyps sign - nmr in
-    check_positivity_one ~chkpos recursive ienv paramsctxt (kn,i) nnonrecargs lcnames lc
+    check_positivity_one ~chkpos ienv paramsctxt (kn,i) nnonrecargs lcnames lc
   in
   let irecargs_nmr = Array.mapi check_one inds in
   let irecargs = Array.map snd irecargs_nmr
-  and nmr' = array_min nmr irecargs_nmr
-  in (nmr',Rtree.mk_rec irecargs)
+  and (recursive,nmr') = array_min (false,nmr) irecargs_nmr
+  in
+  let recursive = 
+    if not recursive then
+      match record with
+      | Some (Some _) -> 
+         (** Non-recursive primitive records are always declared as BiFinite to
+          enjoy dependent elimination *)
+         Decl_kinds.BiFinite
+      | _ -> finite
+    else
+      if finite == Decl_kinds.BiFinite then
+        raise (InductiveError BadEntry)
+      else finite
+  in
+  (recursive,nmr',Rtree.mk_rec irecargs)
 
 
 (************************************************************************)
@@ -1000,8 +1011,10 @@ let check_inductive env kn mie =
   let (env_ar, env_ar_par, paramsctxt, inds) = typecheck_inductive env mie in
   (* Then check positivity conditions *)
   let chkpos = (Environ.typing_flags env).check_guarded in
-  let (nmr,recargs) = check_positivity ~chkpos kn env_ar_par paramsctxt mie.mind_entry_finite inds in
+  let (finite,nmr,recargs) =
+    check_positivity ~chkpos kn env_ar_par paramsctxt
+                     mie.mind_entry_finite mie.mind_entry_record inds in
   (* Build the inductive packets *)
     build_inductive env mie.mind_entry_private mie.mind_entry_universes
-      env_ar paramsctxt kn mie.mind_entry_record mie.mind_entry_finite
+      env_ar paramsctxt kn mie.mind_entry_record finite
       inds nmr recargs

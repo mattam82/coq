@@ -92,3 +92,14 @@ Record R : Type := {
 (* This is used in a couple of development such as UniMatch *)
 
 Record S {A:Type} := { a : A; b : forall A:Type, A }.
+
+Module Kinds.
+  Fail Record R := { proj : R }.
+  Inductive R := { proj : R }.
+End Kinds.
+
+Module Kinds2.
+  Set Primitive Projections.
+  Fail Record R := { proj : R }.
+  Inductive R := { proj : R }.
+End Kinds2.
