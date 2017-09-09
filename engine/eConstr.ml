@@ -476,7 +476,7 @@ let map_with_binders sigma g f l c0 = match kind sigma c0 with
     if p' == p && c' == c && bl' == bl then c0
     else mkCase (ci, p', c', bl')
   | Fix (ln, (lna, tl, bl)) ->
-    let tl' = CArray.Fun1.smartmap f l tl in
+    let tl' = CArray.smartmapi (fun i -> f (iterate g i l)) tl in
     let l' = iterate g (Array.length tl) l in
     let bl' = CArray.Fun1.smartmap f l' bl in
     if tl' == tl && bl' == bl then c0
@@ -515,8 +515,7 @@ let iter_with_full_binders sigma g f n c =
   | Case (_,p,c,bl) -> f n p; f n c; CArray.Fun1.iter f n bl
   | Proj (p,c) -> f n c
   | Fix (_,(lna,tl,bl)) ->
-    Array.iter (f n) tl;
-    let n' = Array.fold_left2 (fun n na t -> g (LocalAssum (na,t)) n) n lna tl in
+    let n' = Array.fold_left2 (fun n na t -> f n t; g (LocalAssum (na,t)) n) n lna tl in
     Array.iter (f n') bl
   | CoFix (_,(lna,tl,bl)) ->
     Array.iter (f n) tl;
