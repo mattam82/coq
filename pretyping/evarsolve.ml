@@ -688,7 +688,7 @@ let materialize_evar define_fun env evd k (evk1,args1) ty_in_env =
       let evd,t_in_sign =
         let s = Retyping.get_sort_of env evd t_in_env in
         let evd,ty_t_in_sign = refresh_universes
-	 ~status:univ_flexible (Some false) env evd (mkSort s) in
+	 ~status:univ_flexible_alg (Some false) env evd (mkSort s) in
         define_evar_from_virtual_equation define_fun env evd src t_in_env
           ty_t_in_sign sign filter inst_in_env in
       let evd,d' = match d with
@@ -707,7 +707,7 @@ let materialize_evar define_fun env evd k (evk1,args1) ty_in_env =
   let evd,ev2ty_in_sign =
     let s = Retyping.get_sort_of env evd ty_in_env in
     let evd,ty_t_in_sign = refresh_universes
-     ~status:univ_flexible (Some false) env evd (mkSort s) in
+     ~status:univ_flexible_alg (Some false) env evd (mkSort s) in
     define_evar_from_virtual_equation define_fun env evd src ty_in_env
       ty_t_in_sign sign2 filter2 inst2_in_env in
   let (evd, ev2_in_sign) =
