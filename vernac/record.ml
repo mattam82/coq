@@ -93,9 +93,9 @@ let binder_of_decl = function
 
 let binders_of_decls = List.map binder_of_decl
 
-let typecheck_params_and_fields finite def id pl t ps nots fs =
+let typecheck_params_and_fields finite def poly id pl t ps nots fs =
   let env0 = Global.env () in
-  let evd, decl = Univdecls.interp_univ_decl_opt env0 pl in
+  let evd, decl = Univdecls.interp_univ_decl_opt env0 poly pl in
   let evars = ref evd in
   let _ = 
     let error bk (loc, name) = 
@@ -606,7 +606,7 @@ let definition_structure (kind,cum,poly,finite,(is_coe,((loc,idstruc),pl)),ps,cf
   (* Now, younger decl in params and fields is on top *)
   let (pl, ctx), arity, template, implpars, params, implfs, fields =
     States.with_state_protection (fun () ->
-      typecheck_params_and_fields finite (kind = Class true) idstruc pl s ps notations fs) () in
+      typecheck_params_and_fields finite (kind = Class true) poly idstruc pl s ps notations fs) () in
   let sign = structure_signature (fields@params) in
   let gr = match kind with
   | Class def ->
@@ -633,5 +633,5 @@ let definition_structure (kind,cum,poly,finite,(is_coe,((loc,idstruc),pl)),ps,cf
 	  fields is_coe (List.map (fun coe -> not (Option.is_empty coe)) coers) sign in
 	IndRef ind
   in
-  Universes.register_universe_binders gr pl;
+  Declare.declare_univ_binders gr pl;
   gr

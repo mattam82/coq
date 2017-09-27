@@ -161,11 +161,9 @@ Module binders.
 
   Definition mynat@{|} := nat.
 
-  Definition foo@{i j | i < j, i < j} (A : Type@{i}) : Type@{j}.
-    exact A.
-  Defined.
+  Definition foo@{i j | i < j, i < j} (A : Type@{i}) : Type@{j} := A.
 
-  Definition nomoreu@{i j | i < j +} (A : Type@{i}) : Type@{j}.
+  Definition nomoreu@{i' j' | i' < j' +} (A : Type@{i'}) : Type@{j'}.
     pose(foo:=Type).
     exact A.
     Fail Defined.
@@ -178,28 +176,32 @@ Module binders.
 
   Check moreu@{_ _ _ _}.
   
-  Fail Definition morec@{i j|} (A : Type@{i}) : Type@{j} := A.
+  Fail Definition morec@{i' j'|} (A : Type@{i'}) : Type@{j'} := A.
 
   (* By default constraints are extensible *)
   Polymorphic Definition morec@{i j} (A : Type@{i}) : Type@{j} := A.
   Check morec@{_ _}.
 
   (* Handled in proofs as well *)
-  Lemma bar@{i j | } : Type@{i}.
-    exact Type@{j}.
+  Lemma bar@{k l | } : Type@{k}.
+    exact Type@{l}.
     Fail Defined.
   Abort.
 
-  Lemma bar@{i j| i < j} : Type@{j}.
+  Polymorphic Lemma bar@{i j| j < i} : Type@{i}.
+  Proof.
+    exact Type@{j}.
+  Qed.
+
+  Polymorphic Lemma barext@{i j|+} : Type@{j}.
   Proof.
     exact Type@{i}.
   Qed.
 
-  Lemma barext@{i j|+} : Type@{j}.
-  Proof.
-    exact Type@{i}.
-  Qed.
+  Universe glob.
 
+  Lemma foo_glob@{| i < glob} : Type@{glob}.
+  Proof. exact Type@{i}. Defined.
 End binders.
     
 Section cats.

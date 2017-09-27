@@ -80,9 +80,10 @@ val recursive_message : bool (** true = fixpoint *) ->
 
 val exists_name : Id.t -> bool
 
-
-
 (** Global universe contexts, names and constraints *)
+val declare_universe : polymorphic -> (Id.t * Nametab.universe_id) -> unit
+
+val declare_univ_binders : Globnames.global_reference -> Universes.universe_binders -> unit
 
 val declare_universe_context : polymorphic -> Univ.universe_context_set -> unit
 

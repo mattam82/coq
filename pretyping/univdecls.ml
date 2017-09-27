@@ -55,9 +55,17 @@ let interp_univ_constraints env evd cstrs =
   in
   List.fold_left interp (evd,Univ.Constraint.empty) cstrs
 
-let interp_univ_decl env decl = 
+let interp_univ_decl env poly decl =
   let open Misctypes in
   let pl = decl.univdecl_instance in
+  let () =
+    if not poly then (* Check local declarations do not conflict with global ones *)
+      List.iter (fun (loc, id) ->
+          try ignore(Nametab.locate_universe (Libnames.qualid_of_ident id));
+              user_err ?loc ~hdr:"interp_univ_decl"
+                       (str "Global universe " ++ Nameops.pr_id id ++ str" already exists")
+          with Not_found -> ()) pl
+  in
   let evd = Evd.from_ctx (Evd.make_evar_universe_context env (Some pl)) in
   let evd, cstrs = interp_univ_constraints env evd decl.univdecl_constraints in
   let decl = { univdecl_instance = pl;
@@ -66,7 +74,7 @@ let interp_univ_decl env decl =
     univdecl_extensible_constraints = decl.univdecl_extensible_constraints }
   in evd, decl
 
-let interp_univ_decl_opt env l =
+let interp_univ_decl_opt env poly l =
   match l with
   | None -> Evd.from_env env, default_univ_decl
-  | Some decl -> interp_univ_decl env decl
+  | Some decl -> interp_univ_decl env poly decl

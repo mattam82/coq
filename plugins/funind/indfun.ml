@@ -616,7 +616,7 @@ let rebuild_bl aux bl typ = rebuild_bl aux bl typ
 
 let recompute_binder_list (fixpoint_exprl : (Vernacexpr.fixpoint_expr * Vernacexpr.decl_notation list) list) = 
   let fixl,ntns = Command.extract_fixpoint_components false fixpoint_exprl in
-  let ((_,_,typel),_,ctx,_) = Command.interp_fixpoint fixl ntns in
+  let ((_,_,typel),_,ctx,_) = Command.interp_fixpoint false fixl ntns in
   let constr_expr_typel = 
     with_full_print (List.map (fun c -> Constrextern.extern_constr false (Global.env ()) (Evd.from_ctx ctx) (EConstr.of_constr c))) typel in
   let fixpoint_exprl_with_new_bl = 

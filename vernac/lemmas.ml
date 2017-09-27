@@ -194,7 +194,7 @@ let save ?export_seff id const cstrs pl do_guard (locality,poly,kind) hook =
            declare_constant ?export_seff id ~local (DefinitionEntry const, k) in
           (locality, ConstRef kn) in
     definition_message id;
-    Option.iter (Universes.register_universe_binders r) pl;
+    Option.iter (Declare.declare_univ_binders r) pl;
     call_hook (fun exn -> exn) hook l r
   with e when CErrors.noncritical e ->
     let e = CErrors.push e in
@@ -213,7 +213,7 @@ let compute_proof_name locality = function
   | None ->
       next_global_ident_away default_thm_id (Proof_global.get_all_proof_names ())
 
-let save_remaining_recthms (locality,p,kind) norm ctx binders body opaq i (id,(t_i,(_,imps))) =
+let save_remaining_recthms (locality,p,kind) norm ctx body opaq i (id,(t_i,(_,imps))) =
   let t_i = norm t_i in
   match body with
   | None ->
@@ -294,7 +294,7 @@ let admit (id,k,e) pl hook () =
   | Local, _, _ | Discharge, _, _ -> warn_let_as_axiom id
   in
   let () = assumption_message id in
-  Option.iter (Universes.register_universe_binders (ConstRef kn)) pl;
+  Option.iter (Declare.declare_univ_binders (ConstRef kn)) pl;
   call_hook (fun exn -> exn) hook Global (ConstRef kn)
 
 (* Starting a goal *)
@@ -409,19 +409,20 @@ let start_proof_with_initialization kind ctx decl recguard thms snl hook =
         | None -> Evd.empty_evar_universe_context
         | Some ctx -> ctx
         in
+	let binders, uctx = Evd.check_univ_decl (Evd.from_ctx ctx) decl in
         let other_thms_data =
           if List.is_empty other_thms then [] else
             (* there are several theorems defined mutually *)
             let body,opaq = retrieve_first_recthm ctx ref in
             let subst = Evd.evar_universe_context_subst ctx in
             let norm c = Universes.subst_opt_univs_constr subst c in
-	    let binders, ctx = Evd.check_univ_decl (Evd.from_ctx ctx) decl in
 	    let body = Option.map norm body in
-            List.map_i (save_remaining_recthms kind norm ctx binders body opaq) 1 other_thms in
+            List.map_i (save_remaining_recthms kind norm uctx body opaq) 1 other_thms in
         let thms_data = (strength,ref,imps)::other_thms_data in
         List.iter (fun (strength,ref,imps) ->
-	  maybe_declare_manual_implicits false ref imps;
-	  call_hook (fun exn -> exn) hook strength ref) thms_data in
+	    maybe_declare_manual_implicits false ref imps;
+            Declare.declare_univ_binders ref binders;
+	    call_hook (fun exn -> exn) hook strength ref) thms_data in
       start_proof_univs id ~pl:decl kind ctx (EConstr.of_constr t) ?init_tac (fun ctx -> mk_hook (hook ctx)) ~compute_guard:guard
 
 let start_proof_com ?inference_hook kind thms hook =
@@ -431,7 +432,7 @@ let start_proof_com ?inference_hook kind thms hook =
     match decl with
     | None -> Evd.from_env env0, Univdecls.default_univ_decl
     | Some decl ->
-       Univdecls.interp_univ_decl_opt env0 (snd decl) in
+       Univdecls.interp_univ_decl_opt env0 (pi2 kind) (snd decl) in
   let evdref = ref evd in
   let thms = List.map (fun (sopt,(bl,t)) ->
     let impls, ((env, ctx), imps) = interp_context_evars env0 evdref bl in

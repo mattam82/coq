@@ -483,10 +483,9 @@ let declare_definition prg =
   let () = progmap_remove prg in
   let cst =
     DeclareDef.declare_definition prg.prg_name
-     prg.prg_kind ce [] prg.prg_implicits
+     prg.prg_kind ce pl prg.prg_implicits
      (Lemmas.mk_hook (fun l r -> Lemmas.call_hook fix_exn prg.prg_hook l r prg.prg_ctx; r))
   in
-  Universes.register_universe_binders cst pl;
   cst
 
 let rec lam_index n t acc =

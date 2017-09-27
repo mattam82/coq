@@ -4104,9 +4104,10 @@ sig
   type universe_decl =
     (Names.Id.t Loc.located list, Univ.Constraint.t) Misctypes.gen_universe_decl
 
-  val interp_univ_decl : Environ.env -> Vernacexpr.universe_decl_expr ->
+  val interp_univ_decl : Environ.env -> Decl_kinds.polymorphic -> Vernacexpr.universe_decl_expr ->
                          Evd.evar_map * universe_decl
-  val interp_univ_decl_opt : Environ.env -> Vernacexpr.universe_decl_expr option ->
+  val interp_univ_decl_opt : Environ.env -> Decl_kinds.polymorphic ->
+                             Vernacexpr.universe_decl_expr option ->
                              Evd.evar_map * universe_decl
   val default_univ_decl : universe_decl
 end
@@ -5679,7 +5680,7 @@ sig
     (Vernacexpr.fixpoint_expr * Vernacexpr.decl_notation list) list ->
     structured_fixpoint_expr list * Vernacexpr.decl_notation list
 
-  val interp_fixpoint :
+  val interp_fixpoint : Decl_kinds.polymorphic ->
     structured_fixpoint_expr list -> Vernacexpr.decl_notation list ->
     recursive_preentry * Univdecls.universe_decl * UState.t *
       (EConstr.rel_context * Impargs.manual_implicits * int option) list

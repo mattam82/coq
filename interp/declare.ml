@@ -477,7 +477,8 @@ let add_universe p (dp, i) =
 let check_exists sp =
   let depth = sections_depth () in
   let sp = Libnames.make_path (pop_dirpath_n depth (dirpath sp)) (basename sp) in
-  if Nametab.exists_universe sp then alreadydeclared (pr_id (basename sp) ++ str " already exists")
+  if Nametab.exists_universe sp then
+    alreadydeclared (str "Universe " ++ pr_id (basename sp) ++ str " already exists")
   else ()
   
 let cache_universe ((sp, _), (poly, id)) =
@@ -505,6 +506,20 @@ let input_universe : universe_decl -> Libobject.obj =
 
 let add_universe poly (id, lev) =
   ignore(Lib.add_leaf id (input_universe (poly, lev)))
+
+let declare_universe = add_universe
+
+let declare_global_univs pl =
+  List.iter (fun (id, lev) ->
+      match Univ.Level.name lev with
+      | Some na -> declare_universe false (id, na)
+      | None -> assert false) pl
+
+let declare_univ_binders gr pl =
+  if Global.is_polymorphic gr then
+    Universes.register_universe_binders gr pl
+  else
+    declare_global_univs pl
 
 let do_universe poly l =
   let in_section = Lib.sections_are_opened () in

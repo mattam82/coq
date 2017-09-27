@@ -125,7 +125,7 @@ let declare_instance_constant k info global imps ?hook id decl poly evm term ter
   let cdecl = (DefinitionEntry entry, kind) in
   let kn = Declare.declare_constant id cdecl in
     Declare.definition_message id;
-    Universes.register_universe_binders (ConstRef kn) pl;
+    Declare.declare_univ_binders (ConstRef kn) pl;
     instance_hook k info global imps ?hook (ConstRef kn);
     id
 
@@ -134,7 +134,7 @@ let new_instance ?(abstract=false) ?(global=false) ?(refine= !refine_instance)
   ?(tac:unit Proofview.tactic option) ?hook pri =
   let env = Global.env() in
   let ((loc, instid), pl) = instid in
-  let evd, decl = Univdecls.interp_univ_decl_opt env pl in
+  let evd, decl = Univdecls.interp_univ_decl_opt env poly pl in
   let evars = ref evd in
   let tclass, ids =
     match bk with
@@ -207,7 +207,7 @@ let new_instance ?(abstract=false) ?(global=false) ?(refine= !refine_instance)
 	  (ParameterEntry 
             (None,poly,(termtype,ctx),None), Decl_kinds.IsAssumption Decl_kinds.Logical)
 	in
-	  Universes.register_universe_binders (ConstRef cst) pl;
+	  Declare.declare_univ_binders (ConstRef cst) pl;
 	  instance_hook k pri global imps ?hook (ConstRef cst); id
       end
     else (

@@ -37,7 +37,7 @@ let declare_global_definition ident ce local k pl imps =
   let kn = declare_constant ident ~local (DefinitionEntry ce, IsDefinition k) in
   let gr = ConstRef kn in
   let () = maybe_declare_manual_implicits false gr imps in
-  let () = Universes.register_universe_binders gr pl in
+  let () = Declare.declare_univ_binders gr pl in
   let () = definition_message ident in
   gr
 

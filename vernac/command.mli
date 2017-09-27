@@ -126,12 +126,12 @@ type recursive_preentry =
   Id.t list * constr option list * types list
 
 val interp_fixpoint :
-  structured_fixpoint_expr list -> decl_notation list ->
+  polymorphic -> structured_fixpoint_expr list -> decl_notation list ->
     recursive_preentry * Univdecls.universe_decl * Evd.evar_universe_context *
     (EConstr.rel_context * Impargs.manual_implicits * int option) list
 
 val interp_cofixpoint :
-  structured_fixpoint_expr list -> decl_notation list ->
+  polymorphic -> structured_fixpoint_expr list -> decl_notation list ->
     recursive_preentry * Univdecls.universe_decl * Evd.evar_universe_context *
     (EConstr.rel_context * Impargs.manual_implicits * int option) list
 
