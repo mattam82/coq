@@ -95,7 +95,7 @@ Ce qui fait que si la conclusion ne matche pas le pattern, Auto échoue, même
 si après Intros la conclusion matche le pattern.
 *)
 
-(* conclPattern doit échouer avec error car il est rattraper par tclFIRST *)
+(* conclPattern doit échouer avec error car il est rattrapé par tclFIRST *)
 
 let conclPattern concl pat tac =
   let constr_bindings env sigma =
@@ -370,7 +370,7 @@ and tac_of_hint dbg db_list local_db concl (flags, h) =
          let info = Exninfo.reify () in
          Tacticals.New.tclFAIL ~info 0 (str"Unbound reference")
        end
-    | Extern (p, tacast) ->
+    | Extern (p, tacast, thentacast) ->
       conclPattern concl p tacast
   in
   let pr_hint env sigma =

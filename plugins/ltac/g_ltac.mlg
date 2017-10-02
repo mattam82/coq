@@ -335,10 +335,16 @@ GRAMMAR EXTEND Gram
         "with"; ta = Pltac.tactic ->
           { Vernacexpr.VernacProof (Some (in_tac ta),Some l) } ] ]
   ;
+  extern_body:
+    [ [ "=>"; tac = Pltac.tactic ->
+        { (in_tac tac, None) }
+      | IDENT "If"; iftac = Pltac.tactic; "=>"; thentac = Pltac.tactic ->
+        { (in_tac iftac, Some (in_tac thentac)) } ] ]
+  ;
   hint:
-    [ [ IDENT "Extern"; n = natural; c = OPT Constr.constr_pattern ; "=>";
-        tac = Pltac.tactic ->
-        { Vernacexpr.HintsExtern (n,c, in_tac tac) } ] ]
+    [ [ IDENT "Extern"; n = natural; c = OPT Constr.constr_pattern ;
+        tacs = extern_body ->
+        { Vernacexpr.HintsExtern (n,c, fst tacs, snd tacs) } ] ]
   ;
   term: LEVEL "0"
     [ [ IDENT "ltac"; ":"; "("; tac = Pltac.ltac_expr; ")" ->
