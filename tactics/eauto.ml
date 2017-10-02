@@ -126,7 +126,7 @@ and e_my_find_search env sigma db_list local_db secvars concl =
         Tacticals.New.tclTHEN (unify_e_resolve st h)
           (e_trivial_fail_db db_list local_db)
       | Unfold_nth c -> reduce (Unfold [AllOccurrences,c]) onConcl
-      | Extern (pat, tacast) -> conclPattern concl pat tacast
+      | Extern (pat, tacast, thenatcast) -> (* FIXME *) conclPattern concl pat tacast
       in
       let tac = FullHint.run h tac in
       (tac, b, lazy (FullHint.print env sigma h))

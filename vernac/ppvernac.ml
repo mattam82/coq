@@ -310,10 +310,16 @@ let pr_hints db h pr_c pr_pat =
     | HintsConstructors c ->
       keyword "Constructors"
       ++ spc() ++ prlist_with_sep spc pr_qualid c
-    | HintsExtern (n,c,tac) ->
+    | HintsExtern (n,c,tac,thentac) ->
       let pat = match c with None -> mt () | Some pat -> pr_pat pat in
-      keyword "Extern" ++ spc() ++ int n ++ spc() ++ pat ++ str" =>" ++
-      spc() ++ pr_gen tac
+      let tacmsg = spc() ++ pr_gen tac in
+      let thentacmsg = match thentac with
+        | None -> str " =>" ++ tacmsg
+        | Some thentac ->
+          keyword " If" ++ spc () ++ tacmsg ++ str" =>" ++
+          pr_gen thentac
+      in
+      keyword "Extern" ++ spc() ++ int n ++ spc() ++ pat ++ thentacmsg
   in
   hov 2 (keyword "Hint "++ pph ++ opth)
 

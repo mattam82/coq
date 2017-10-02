@@ -38,6 +38,7 @@ type 'a hint_ast =
   | Res_pf_THEN_trivial_fail of 'a (* Hint Immediate *)
   | Unfold_nth of Tacred.evaluable_global_reference       (* Hint Unfold *)
   | Extern     of Pattern.constr_pattern option * Genarg.glob_generic_argument       (* Hint Extern *)
+      * Genarg.glob_generic_argument option
 
 type hint = private {
   hint_term : constr;
@@ -176,7 +177,7 @@ type hints_entry =
   | HintsUnfoldEntry of Tacred.evaluable_global_reference list
   | HintsTransparencyEntry of Tacred.evaluable_global_reference hints_transparency_target * bool
   | HintsModeEntry of GlobRef.t * hint_mode list
-  | HintsExternEntry of hint_info * Genarg.glob_generic_argument
+  | HintsExternEntry of hint_info * Genarg.glob_generic_argument * Genarg.glob_generic_argument option
 
 val searchtable_map : hint_db_name -> hint_db
 

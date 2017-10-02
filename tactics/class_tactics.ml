@@ -285,7 +285,7 @@ let rec e_trivial_fail_db only_classes db_list local_db secvars =
     begin fun gl ->
     let tacs = e_trivial_resolve db_list local_db secvars only_classes
                                  (pf_env gl) (project gl) (pf_concl gl) in
-      tclFIRST (List.map (fun (x,_,_,_,_) -> x) tacs)
+      tclFIRST (List.map (fun (x,_,_,_,_,_) -> x) tacs)
     end
   in
   let tacl =
@@ -358,7 +358,7 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
          Tacticals.New.tclTHEN fst snd
       | Unfold_nth c ->
          Proofview.tclPROGRESS (unfold_in_concl [AllOccurrences,c])
-      | Extern (p, tacast) -> conclPattern concl p tacast
+      | Extern (p, tacast, thenopt) -> conclPattern concl p tacast
       in
       let tac = FullHint.run h tac in
       let tac = if complete then Tacticals.New.tclCOMPLETE tac else tac in
@@ -369,8 +369,21 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
         | _ -> mt ()
       in
         match FullHint.repr h with
-        | Extern _ -> (tac, b, true, name, lazy (FullHint.print env sigma h ++ pp))
-        | _ -> (tac, b, false, name, lazy (FullHint.print env sigma h ++ pp))
+        | Extern (_, _, thenopt) ->
+          let thentac =
+            match thenopt with
+            | Some arg ->
+              let open Genarg in
+              let open Geninterp in
+              (* XXX poly??? *)
+              let ist = { lfun = Id.Map.empty; extra = TacStore.empty; poly = false } in
+              (match arg with
+               | GenArg (Glbwit wit, thentac) ->
+                 Some (Ftactic.run (Geninterp.interp wit ist thentac) (fun _ -> Proofview.tclUNIT ())))
+            | None -> None
+          in
+          (tac, b, true, thentac, name, lazy (FullHint.print env sigma h ++ pp))
+        | _ -> (tac, b, false, None, name, lazy (FullHint.print env sigma h ++ pp))
   in
   let hint_of_db = hintmap_of env sigma hdc secvars concl in
   let hintl = List.map_filter (fun db -> match hint_of_db db with
@@ -601,7 +614,7 @@ module Search = struct
     let ortac = if backtrack then Proofview.tclOR else Proofview.tclORELSE in
     let idx = ref 1 in
     let foundone = ref false in
-    let rec onetac e (tac, pat, b, name, pp) tl =
+    let rec onetac e (tac, pat, extern, thentac, name, pp) tl =
       let derivs = path_derivate info.search_cut name in
       let pr_error ie =
         if !typeclasses_debug > 1 then
@@ -635,7 +648,7 @@ module Search = struct
                pr_ev sigma' (Proofview.Goal.goal gl'));
         let eq c1 c2 = EConstr.eq_constr sigma' c1 c2 in
         let hints' =
-          if b && not (Context.Named.equal eq (Goal.hyps gl') (Goal.hyps gl))
+          if extern && not (Context.Named.equal eq (Goal.hyps gl') (Goal.hyps gl))
           then
             let st = Hint_db.transparent_state info.search_hints in
             let modes = Hint_db.modes info.search_hints in
@@ -650,7 +663,11 @@ module Search = struct
             search_only_classes = info.search_only_classes;
             search_hints = hints';
             search_cut = derivs }
-        in kont info' end
+        in
+        match thentac with
+        | None -> kont info'
+        | Some _ -> tclUNIT ()
+        end
       in
       let rec result (shelf, ()) i k =
         foundone := true;
@@ -712,11 +729,19 @@ module Search = struct
       in
       if path_matches derivs [] then aux e tl
       else
-        ortac
-             (with_shelf tac >>= fun s ->
-              let i = !idx in incr idx; result s i None)
-             (fun e' ->
-                (pr_error e'; aux (merge_exceptions e e') tl))
+        let iftac =
+          with_shelf tac >>= fun s ->
+          let i = !idx in
+          incr idx;
+          result s i None
+        in
+        let elsetac e' =
+          pr_error e';
+          aux (merge_exceptions e e') tl
+        in
+        match thentac with
+        | Some thentac -> tclIFCATCH iftac (fun () -> tclTHEN (thentac) (kont info)) elsetac
+        | None -> ortac iftac elsetac
     and aux e = function
       | x :: xs -> onetac e x xs
       | [] ->
