@@ -369,7 +369,7 @@ sig
       trivial subtyping relation. *)
   val from_universe_context : universe_context -> universe_instance -> t
 
-  val subtyping_susbst : t -> universe_level_subst
+  val subtyping_subst : t -> universe_level_subst
 
 end
 
