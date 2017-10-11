@@ -158,7 +158,7 @@ let typecheck_params_and_fields finite def id pl t ps nots fs =
 	   (* We can assume that the level in aritysort is not constrained
 	       and clear it, if it is flexible *)
 	  EConstr.mkSort (Sorts.sort_of_univ univ),
-	  Evd.set_eq_sort env_ar evars (Prop Pos) sort
+          Evd.set_eq_sort env_ar evars Set sort
 	else typ, evars
   in
   let evars, nf = Evarutil.nf_evars_and_universes evars in

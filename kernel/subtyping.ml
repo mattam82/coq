@@ -155,8 +155,8 @@ let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2
     let s1,s2 =
       match s1, s2 with
       | Type _, Type _ -> (* shortcut here *) Sorts.prop, Sorts.prop
-      | (Prop _, Type _) | (Type _,Prop _) ->
-	error (NotConvertibleInductiveField name)
+      | (Prop | Set), Type _ | Type _,(Prop | Set) ->
+        error (NotConvertibleInductiveField name)
       | _ -> (s1, s2) in
     check_conv (NotConvertibleInductiveField name)
       cst (inductive_is_polymorphic mib1) infer_conv_leq env (mkArity (ctx1,s1)) (mkArity (ctx2,s2))
@@ -274,7 +274,7 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
               (* Both types are inferred, no need to recheck them. We
                  cheat and collapse the types to Prop *)
                 mkArity (ctx1,Sorts.prop), mkArity (ctx2,Sorts.prop)
-            | Prop _ ->
+            | Prop | Set ->
               (* The type in the interface is inferred, it may be the case
                  that the type in the implementation is smaller because
                  the body is more reduced. We safely collapse the upper

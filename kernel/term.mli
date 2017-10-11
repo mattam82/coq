@@ -436,11 +436,8 @@ type constr = Constr.constr
 type types = Constr.types
 [@@ocaml.deprecated "Alias for Constr.types"]
 
-type contents = Sorts.contents = Pos | Null
-[@@ocaml.deprecated "Alias for Sorts.contents"]
-
 type sorts = Sorts.t =
-  | Prop of Sorts.contents   (** Prop and Set *)
+  | Prop | Set
   | Type of Univ.Universe.t  (** Type *)
 [@@ocaml.deprecated "Alias for Sorts.t"]
 

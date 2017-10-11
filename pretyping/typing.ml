@@ -201,10 +201,6 @@ let judge_of_set =
   { uj_val = EConstr.mkSet;
     uj_type = EConstr.mkSort Sorts.type1 }
 
-let judge_of_prop_contents = function
-  | Null -> judge_of_prop
-  | Pos -> judge_of_set
-
 let judge_of_type u =
   let uu = Univ.Universe.super u in
     { uj_val = EConstr.mkType u;
@@ -293,8 +289,10 @@ let rec execute env evdref cstr =
 
     | Sort s ->
       begin match ESorts.kind !evdref s with
-      | Prop c ->
-        judge_of_prop_contents c
+      | Prop ->
+        judge_of_prop
+      | Set ->
+        judge_of_set
       | Type u ->
         judge_of_type u
       end

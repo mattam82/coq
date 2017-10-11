@@ -472,10 +472,10 @@ end
 
 module Sorts :
 sig
-  type contents = Pos | Null
   type t =
-         | Prop of contents
-         | Type of Univ.Universe.t
+    | Prop
+    | Set
+    | Type of Univ.Universe.t
   val is_prop : t -> bool
   val hash : t -> int
 
@@ -859,11 +859,9 @@ sig
   type sorts_family = Sorts.family = InProp | InSet | InType
   [@@ocaml.deprecated "Alias of Sorts.family"]
 
-  type contents = Sorts.contents = Pos | Null
-  [@@ocaml.deprecated "Alias of Sorts.contents"]
-
   type sorts = Sorts.t =
-    | Prop of contents
+    | Prop
+    | Set
     | Type of Univ.Universe.t
   [@@ocaml.deprecated "alias of API.Sorts.t"]
 

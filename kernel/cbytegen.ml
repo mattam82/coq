@@ -621,7 +621,7 @@ let rec compile_constr reloc c sz cont =
 	   (Univ.Instance.to_array u)
 	   sz
 	   cont
-  | Sort (Sorts.Prop _) | Construct _ ->
+  | Sort (Sorts.Prop | Sorts.Set) | Construct _ ->
       compile_str_cst reloc (str_const c) sz cont
   | Sort (Sorts.Type u) ->
      (* We separate global and local universes in [u]. The former will be part

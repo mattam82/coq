@@ -16,11 +16,10 @@ open Vars
 (**         Redeclaration of types from module Constr                 *)
 (**********************************************************************)
 
-type contents = Sorts.contents = Pos | Null
-
 type sorts = Sorts.t =
-  | Prop of contents       (** Prop and Set *)
-  | Type of Univ.Universe.t  (** Type *)
+  | Prop
+  | Set
+  | Type of Univ.Universe.t
 
 type sorts_family = Sorts.family = InProp | InSet | InType
 
@@ -197,17 +196,17 @@ let destSort c = match kind_of_term c with
   | _ -> raise DestKO
 
 let rec isprop c = match kind_of_term c with
-  | Sort (Prop _) -> true
+  | Sort (Prop | Set) -> true
   | Cast (c,_,_) -> isprop c
   | _ -> false
 
 let rec is_Prop c = match kind_of_term c with
-  | Sort (Prop Null) -> true
+  | Sort Prop -> true
   | Cast (c,_,_) -> is_Prop c
   | _ -> false
 
 let rec is_Set c = match kind_of_term c with
-  | Sort (Prop Pos) -> true
+  | Sort Set -> true
   | Cast (c,_,_) -> is_Set c
   | _ -> false
 
