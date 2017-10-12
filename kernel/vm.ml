@@ -7,7 +7,6 @@
 (************************************************************************)
 
 open Names
-open Sorts
 open Constr
 open Cbytecodes
 
@@ -252,7 +251,7 @@ let rec whd_accu a stk =
 	for i = 0 to nargs args - 1 do
 	  u := Univ.Universe.sup !u (Univ.Universe.make (uni_lvl_val (arg args i)))
 	done;
-	Vsort (Type !u)
+        Vsort (Sorts.sort_of_univ !u)
      | _ -> assert false
      end
   | i when i <= max_atom_tag ->

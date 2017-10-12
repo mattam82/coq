@@ -203,7 +203,7 @@ let fresh_level () = new_univ_level (Global.current_dirpath ())
 (* TODO: remove *)
 let new_univ dp = Univ.Universe.make (new_univ_level dp)
 let new_Type dp = mkType (new_univ dp)
-let new_Type_sort dp = Type (new_univ dp)
+let new_Type_sort dp = Sorts.sort_of_univ (new_univ dp)
 
 let fresh_universe_instance ctx =
   let init _ = new_univ_level (Global.current_dirpath ()) in
@@ -395,7 +395,7 @@ let fresh_sort_in_family env = function
   | InSet -> Sorts.set, ContextSet.empty
   | InType -> 
     let u = fresh_level () in
-      Type (Univ.Universe.make u), ContextSet.singleton u
+      Sorts.sort_of_univ (Univ.Universe.make u), ContextSet.singleton u
 
 let new_sort_in_family sf =
   fst (fresh_sort_in_family (Global.env ()) sf)

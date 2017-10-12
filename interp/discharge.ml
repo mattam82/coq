@@ -76,7 +76,7 @@ let refresh_polymorphic_type_of_inductive (_,mip) =
   | RegularArity s -> s.mind_user_arity, false
   | TemplateArity ar ->
     let ctx = List.rev mip.mind_arity_ctxt in
-      mkArity (List.rev ctx, Type ar.template_level), true
+      mkArity (List.rev ctx, Sorts.sort_of_univ ar.template_level), true
 
 let process_inductive (section_decls,_,_ as info) modlist mib =
   let section_decls = Lib.named_of_variable_context section_decls in

@@ -641,7 +641,7 @@ let rec compile_constr reloc c sz cont =
 	LSet.fold (fun lvl u -> Universe.sup u (Universe.make lvl)) global_levels Universe.type0m
       in
       if local_levels = [] then
-	compile_str_cst reloc (Bstrconst (Const_sorts (Sorts.Type uglob))) sz cont
+        compile_str_cst reloc (Bstrconst (Const_sorts (Sorts.sort_of_univ uglob))) sz cont
       else
 	let compile_get_univ reloc idx sz cont =
           set_max_stack_size sz;

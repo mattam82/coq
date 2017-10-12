@@ -492,16 +492,16 @@ let inductive_levels env evdref poly arities inds =
 	   (** "Polymorphic" type constraint and more than one constructor, 
 	       should not land in Prop. Add constraint only if it would
 	       land in Prop directly (no informative arguments as well). *)
-            Evd.set_leq_sort env evd Set du
+            Evd.set_leq_sort env evd Sorts.set du
 	  else evd
 	in
 	let duu = Sorts.univ_of_sort du in
 	let evd =
 	  if not (Univ.is_small_univ duu) && Univ.Universe.equal cu duu then
 	    if is_flexible_sort evd duu && not (Evd.check_leq evd Univ.type0_univ duu) then
-              Evd.set_eq_sort env evd Prop du
+              Evd.set_eq_sort env evd Sorts.prop du
 	    else evd
-	  else Evd.set_eq_sort env evd (Type cu) du
+          else Evd.set_eq_sort env evd (Sorts.sort_of_univ cu) du
 	in
 	  (evd, arity :: arities))
     (!evdref,[]) (Array.to_list levels') destarities sizes

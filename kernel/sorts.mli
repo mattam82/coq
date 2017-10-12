@@ -10,7 +10,7 @@
 
 type family = InProp | InSet | InType
 
-type t =
+type t = private
   | Prop
   | Set
   | Type of Univ.Universe.t

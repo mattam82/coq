@@ -472,7 +472,7 @@ end
 
 module Sorts :
 sig
-  type t =
+  type t = private
     | Prop
     | Set
     | Type of Univ.Universe.t
@@ -859,7 +859,7 @@ sig
   type sorts_family = Sorts.family = InProp | InSet | InType
   [@@ocaml.deprecated "Alias of Sorts.family"]
 
-  type sorts = Sorts.t =
+  type sorts = Sorts.t = private
     | Prop
     | Set
     | Type of Univ.Universe.t

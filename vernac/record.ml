@@ -152,13 +152,13 @@ let typecheck_params_and_fields finite def id pl t ps nots fs =
 	(Sorts.is_set sort && is_impredicative_set env0)) then
 	typ, evars
       else
-	let evars = Evd.set_leq_sort env_ar evars (Type univ) sort in
+        let evars = Evd.set_leq_sort env_ar evars (Sorts.sort_of_univ univ) sort in
 	if Univ.is_small_univ univ &&
 	   Option.cata (Evd.is_flexible_level evars) false (Evd.is_sort_variable evars sort) then
 	   (* We can assume that the level in aritysort is not constrained
 	       and clear it, if it is flexible *)
 	  EConstr.mkSort (Sorts.sort_of_univ univ),
-          Evd.set_eq_sort env_ar evars Set sort
+          Evd.set_eq_sort env_ar evars Sorts.set sort
 	else typ, evars
   in
   let evars, nf = Evarutil.nf_evars_and_universes evars in

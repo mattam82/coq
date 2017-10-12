@@ -521,7 +521,7 @@ let pretype_ref ?loc evdref env ref us =
 let judge_of_Type ?loc evd s =
   let evd, s = interp_universe ?loc evd s in
   let judge = 
-    { uj_val = mkSort (Type s); uj_type = mkSort (Type (Univ.super s)) }
+    { uj_val = mkType s; uj_type = mkType (Univ.super s) }
   in
     evd, judge
 

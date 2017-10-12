@@ -16,7 +16,7 @@ open Vars
 (**         Redeclaration of types from module Constr                 *)
 (**********************************************************************)
 
-type sorts = Sorts.t =
+type sorts = Sorts.t = private
   | Prop
   | Set
   | Type of Univ.Universe.t

@@ -436,7 +436,7 @@ type constr = Constr.constr
 type types = Constr.types
 [@@ocaml.deprecated "Alias for Constr.types"]
 
-type sorts = Sorts.t =
+type sorts = Sorts.t = private
   | Prop | Set
   | Type of Univ.Universe.t  (** Type *)
 [@@ocaml.deprecated "Alias for Sorts.t"]

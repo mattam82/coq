@@ -9,7 +9,6 @@
 open CErrors
 open Util
 open Names
-open Term
 open Constr
 open Termops
 open Namegen
@@ -710,7 +709,7 @@ let occur_evar_upto sigma n c =
 let judge_of_new_Type evd =
   let open EConstr in
   let (evd', s) = new_univ_variable univ_rigid evd in
-  (evd', { uj_val = mkSort (Type s); uj_type = mkSort (Type (Univ.super s)) })
+  (evd', { uj_val = mkType s; uj_type = mkType (Univ.super s) })
 
 let subterm_source evk (loc,k) =
   let evk = match k with
