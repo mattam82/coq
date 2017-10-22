@@ -22,7 +22,8 @@ type t
 
 val empty : t
 
-val make : UGraph.t -> t
+(** The name is the seed for fresh universe names *)  
+val make : UGraph.t -> Id.t option -> t
 
 val is_empty : t -> bool
 

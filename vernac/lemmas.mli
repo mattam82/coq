@@ -34,7 +34,7 @@ val start_proof_univs : Id.t -> ?pl:Univdecls.universe_decl -> goal_kind -> Evd.
 
 val start_proof_com :
   ?inference_hook:Pretyping.inference_hook ->
-  goal_kind -> Vernacexpr.proof_expr list ->
+  Id.t -> goal_kind -> Vernacexpr.proof_expr list ->
   unit declaration_hook -> unit
 
 val start_proof_with_initialization : 

@@ -29,9 +29,9 @@ open Pp
 (* Registering schemes in the environment *)
 
 type mutual_scheme_object_function =
-  internal_flag -> mutual_inductive -> constr array Evd.in_evar_universe_context * Safe_typing.private_constants
+  Id.t -> internal_flag -> mutual_inductive -> constr array Evd.in_evar_universe_context * Safe_typing.private_constants
 type individual_scheme_object_function =
-  internal_flag -> inductive -> constr Evd.in_evar_universe_context * Safe_typing.private_constants
+  Id.t -> internal_flag -> inductive -> constr Evd.in_evar_universe_context * Safe_typing.private_constants
 
 type 'a scheme_kind = string
 
@@ -147,11 +147,11 @@ let define internal id c p univs =
   kn
 
 let define_individual_scheme_base kind suff f mode idopt (mind,i as ind) =
-  let (c, ctx), eff = f mode ind in
   let mib = Global.lookup_mind mind in
   let id = match idopt with
     | Some id -> id
     | None -> add_suffix mib.mind_packets.(i).mind_typename suff in
+  let (c, ctx), eff = f id mode ind in
   let const = define mode id c (Declareops.inductive_is_polymorphic mib) ctx in
   declare_scheme kind [|ind,const|];
   const, Safe_typing.add_private
@@ -164,11 +164,11 @@ let define_individual_scheme kind mode names (mind,i as ind) =
       define_individual_scheme_base kind s f mode names ind
 
 let define_mutual_scheme_base kind suff f mode names mind =
-  let (cl, ctx), eff = f mode mind in
   let mib = Global.lookup_mind mind in
   let ids = Array.init (Array.length mib.mind_packets) (fun i ->
       try Int.List.assoc i names
       with Not_found -> add_suffix mib.mind_packets.(i).mind_typename suff) in
+  let (cl, ctx), eff = f (Array.hd ids) mode mind in
   let consts = Array.map2 (fun id cl -> 
      define mode id cl (Declareops.inductive_is_polymorphic mib) ctx) ids cl in
   let schemes = Array.mapi (fun i cst -> ((mind,i),cst)) consts in

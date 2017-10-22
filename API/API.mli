@@ -2281,7 +2281,7 @@ sig
       | Clval of Names.Name.t * (Constr.t freelisted * instance_status) * Constr.t freelisted
 
     val empty : evar_map
-    val from_env : Environ.env -> evar_map
+    val from_env : ?id:Names.Id.t -> Environ.env -> evar_map
     val find : evar_map -> Evar.t -> evar_info
     val find_undefined : evar_map -> evar -> evar_info
     val is_defined : evar_map -> Evar.t -> bool
@@ -4104,11 +4104,11 @@ sig
   type universe_decl =
     (Names.Id.t Loc.located list, Univ.Constraint.t) Misctypes.gen_universe_decl
 
-  val interp_univ_decl : Environ.env -> Decl_kinds.polymorphic -> Vernacexpr.universe_decl_expr ->
-                         Evd.evar_map * universe_decl
-  val interp_univ_decl_opt : Environ.env -> Decl_kinds.polymorphic ->
+  val interp_univ_decl : Names.Id.t -> Vernacexpr.universe_decl_expr ->
+                         Environ.env * Evd.evar_map * universe_decl
+  val interp_univ_decl_opt : Names.Id.t -> 
                              Vernacexpr.universe_decl_expr option ->
-                             Evd.evar_map * universe_decl
+                             Environ.env * Evd.evar_map * universe_decl
   val default_univ_decl : universe_decl
 end
 

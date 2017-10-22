@@ -425,14 +425,15 @@ let start_proof_with_initialization kind ctx decl recguard thms snl hook =
 	    call_hook (fun exn -> exn) hook strength ref) thms_data in
       start_proof_univs id ~pl:decl kind ctx (EConstr.of_constr t) ?init_tac (fun ctx -> mk_hook (hook ctx)) ~compute_guard:guard
 
-let start_proof_com ?inference_hook kind thms hook =
-  let env0 = Global.env () in
+let start_proof_com ?inference_hook id kind thms hook =
   let decl = fst (List.hd thms) in
-  let evd, decl =
+  let env0, evd, decl =
     match decl with
-    | None -> Evd.from_env env0, Univdecls.default_univ_decl
+    | None ->
+       let env0 = Global.env () in
+       env0, Evd.from_env env0, Univdecls.default_univ_decl
     | Some decl ->
-       Univdecls.interp_univ_decl_opt env0 (pi2 kind) (snd decl) in
+       Univdecls.interp_univ_decl_opt id (snd decl) in
   let evdref = ref evd in
   let thms = List.map (fun (sopt,(bl,t)) ->
     let impls, ((env, ctx), imps) = interp_context_evars env0 evdref bl in

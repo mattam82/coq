@@ -88,9 +88,8 @@ let warn_implicits_in_term =
           strbrk "Implicit arguments declaration relies on type." ++ spc () ++
             strbrk "The term declares more implicits than the type here.")
         
-let interp_definition pl bl poly red_option c ctypopt =
-  let env = Global.env() in
-  let evd, decl = Univdecls.interp_univ_decl_opt env poly pl in
+let interp_definition ident pl bl poly red_option c ctypopt =
+  let env, evd, decl = Univdecls.interp_univ_decl_opt ident pl in
   let evdref = ref evd in
   let impls, ((env_bl, ctx), imps1) = interp_context_evars env evdref bl in
   let ctx = List.map (fun d -> map_rel_decl EConstr.Unsafe.to_constr d) ctx in
@@ -145,7 +144,7 @@ let check_definition (ce, evd, _, _, imps) =
 
 let do_definition ident k univdecl bl red_option c ctypopt hook =
   let (ce, evd, univdecl, pl', imps as def) =
-    interp_definition univdecl bl (pi2 k) red_option c ctypopt
+    interp_definition ident univdecl bl (pi2 k) red_option c ctypopt
   in
     if Flags.is_program_mode () then
       let env = Global.env () in
@@ -267,8 +266,7 @@ let do_assumptions_unbound_univs (_, poly, _ as kind) nl l =
      Univ.ContextSet.empty)) ([],true,ctx) l)
 
 let do_assumptions_bound_univs coe kind nl id pl c =
-  let env = Global.env () in
-  let evd, decl = Univdecls.interp_univ_decl_opt env (pi2 kind) pl in
+  let env, evd, decl = Univdecls.interp_univ_decl_opt (snd id) pl in
   let evdref = ref evd in
   let ty, impls = interp_type_evars_impls env evdref c in
   let nf, subst = Evarutil.e_nf_evars_and_universes evdref in
@@ -522,9 +520,9 @@ let check_param = function
 let interp_mutual_inductive (paramsl,indl) notations cum poly prv finite =
   check_all_names_different indl;
   List.iter check_param paramsl;
-  let env0 = Global.env() in
   let pl = (List.hd indl).ind_univs in
-  let evd, decl = Univdecls.interp_univ_decl_opt env0 poly pl in
+  let id = (List.hd indl).ind_name in
+  let env0, evd, decl = Univdecls.interp_univ_decl_opt id pl in
   let evdref = ref evd in
   let impls, ((env_params, ctx_params), userimpls) =
     interp_context_evars env0 evdref paramsl
@@ -914,8 +912,7 @@ let build_wellfounded (recname,pl,n,bl,arityc,body) poly r measure notation =
   let open Vars in
   let lift_rel_context n l = Termops.map_rel_context_with_binders (liftn n) l in
   Coqlib.check_required_library ["Coq";"Program";"Wf"];
-  let env = Global.env() in
-  let evd, decl = Univdecls.interp_univ_decl_opt env poly pl in
+  let env, evd, decl = Univdecls.interp_univ_decl_opt recname pl in
   let evdref = ref evd in
   let _, ((env', binders_rel), impls) = interp_context_evars env evdref bl in
   let len = List.length binders_rel in
@@ -1058,7 +1055,6 @@ let build_wellfounded (recname,pl,n,bl,arityc,body) poly r measure notation =
 let interp_recursive isfix poly fixl notations =
   let open Context.Named.Declaration in
   let open EConstr in
-  let env = Global.env() in
   let fixnames = List.map (fun fix -> fix.fix_name) fixl in
 
   (* Interp arities allowing for unresolved types *)
@@ -1072,7 +1068,7 @@ let interp_recursive isfix poly fixl notations =
 	   if not (CList.for_all2eq (fun x y -> Id.equal (snd x) (snd y)) lsu usu) then
 	     user_err Pp.(str "(co)-recursive definitions should all have the same universe binders");
 	   Some us) fixl None in
-  let evd, decl = Univdecls.interp_univ_decl_opt env poly all_universes in
+  let env, evd, decl = Univdecls.interp_univ_decl_opt (List.hd fixnames) all_universes in
   let evdref = ref evd in
   let fixctxs, fiximppairs, fixannots =
     List.split3 (List.map (interp_fix_context env evdref isfix) fixl) in

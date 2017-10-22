@@ -596,8 +596,8 @@ let empty = {
   extras = Store.empty;
 }
 
-let from_env e = 
-  { empty with universes = UState.make (Environ.universes e) }
+let from_env ?id e = 
+  { empty with universes = UState.make (Environ.universes e) id }
 
 let from_ctx ctx = { empty with universes = ctx }
 
@@ -787,8 +787,8 @@ let make_flexible_variable evd ~algebraic u =
   { evd with universes =
       UState.make_flexible_variable evd.universes ~algebraic u }
 
-let make_evar_universe_context e l =
-  let uctx = UState.make (Environ.universes e) in
+let make_evar_universe_context e ?id l =
+  let uctx = UState.make (Environ.universes e) id in
   match l with
   | None -> uctx
   | Some us ->

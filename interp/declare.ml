@@ -518,9 +518,7 @@ let declare_global_univs pl =
 let declare_univ_binders gr pl =
   if Global.is_polymorphic gr then
     Universes.register_universe_binders gr pl
-  else
-    declare_global_univs pl
-
+  else declare_global_univs pl
 let do_universe poly l =
   let in_section = Lib.sections_are_opened () in
   let () =

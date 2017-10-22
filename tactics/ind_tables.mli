@@ -20,9 +20,9 @@ type individual
 type 'a scheme_kind
 
 type mutual_scheme_object_function =
-  internal_flag -> mutual_inductive -> constr array Evd.in_evar_universe_context * Safe_typing.private_constants
+  Id.t -> internal_flag -> mutual_inductive -> constr array Evd.in_evar_universe_context * Safe_typing.private_constants
 type individual_scheme_object_function =
-  internal_flag -> inductive -> constr Evd.in_evar_universe_context * Safe_typing.private_constants
+  Id.t -> internal_flag -> inductive -> constr Evd.in_evar_universe_context * Safe_typing.private_constants
 
 (** Main functions to register a scheme builder *)
 

@@ -215,7 +215,7 @@ let build_sym_scheme env ind =
 
 let sym_scheme_kind =
   declare_individual_scheme_object "_sym_internal"
-  (fun _ ind ->
+  (fun id _ ind ->
     let c, ctx = build_sym_scheme (Global.env() (* side-effect! *)) ind in
       (c, ctx), Safe_typing.empty_private_constants)
 
@@ -286,8 +286,8 @@ let build_sym_involutive_scheme env ind =
 
 let sym_involutive_scheme_kind =
   declare_individual_scheme_object "_sym_involutive"
-  (fun _ ind ->
-    build_sym_involutive_scheme (Global.env() (* side-effect! *)) ind)
+  (fun id _ ind ->
+    build_sym_involutive_scheme (Global.env()) (* side-effect! *) ind)
 
 (**********************************************************************)
 (* Build the left-to-right rewriting lemma for conclusion associated  *)
@@ -654,8 +654,8 @@ let fix_r2l_forward_rew_scheme (c, ctx') =
 (*          P b1..bn C -> P a1..an H                                  *)
 (**********************************************************************)
  
-let build_r2l_rew_scheme dep env ind k =
-  let sigma = Evd.from_env env in
+let build_r2l_rew_scheme dep env id ind k =
+  let sigma = Evd.from_env ~id env in
   let (sigma, indu) = Evd.fresh_inductive_instance env sigma ind in
   let (sigma, c) = build_case_analysis_scheme env sigma indu dep k in
     c, Evd.evar_universe_context sigma
@@ -677,7 +677,7 @@ let build_r2l_forward_rew_scheme = build_r2l_forward_rew_scheme
 (**********************************************************************)
 let rew_l2r_dep_scheme_kind =
   declare_individual_scheme_object "_rew_r_dep"
-  (fun _ ind -> build_l2r_rew_scheme true (Global.env()) ind InType)
+  (fun id _ ind -> build_l2r_rew_scheme true (Global.env()) ind InType)
 
 (**********************************************************************)
 (* Dependent rewrite from right-to-left in conclusion                 *)
@@ -687,7 +687,7 @@ let rew_l2r_dep_scheme_kind =
 (**********************************************************************)
 let rew_r2l_dep_scheme_kind =
   declare_individual_scheme_object "_rew_dep"
-  (fun _ ind -> build_r2l_rew_scheme true (Global.env()) ind InType,Safe_typing.empty_private_constants)
+  (fun id _ ind -> build_r2l_rew_scheme true (Global.env()) id ind InType,Safe_typing.empty_private_constants)
 
 (**********************************************************************)
 (* Dependent rewrite from right-to-left in hypotheses                 *)
@@ -697,7 +697,7 @@ let rew_r2l_dep_scheme_kind =
 (**********************************************************************)
 let rew_r2l_forward_dep_scheme_kind =
   declare_individual_scheme_object "_rew_fwd_dep"
-  (fun _ ind -> build_r2l_forward_rew_scheme true (Global.env()) ind InType,Safe_typing.empty_private_constants)
+  (fun id _ ind -> build_r2l_forward_rew_scheme true (Global.env()) ind InType,Safe_typing.empty_private_constants)
 
 (**********************************************************************)
 (* Dependent rewrite from left-to-right in hypotheses                 *)
@@ -707,7 +707,7 @@ let rew_r2l_forward_dep_scheme_kind =
 (**********************************************************************)
 let rew_l2r_forward_dep_scheme_kind =
   declare_individual_scheme_object "_rew_fwd_r_dep"
-  (fun _ ind -> build_l2r_forward_rew_scheme true (Global.env()) ind InType,Safe_typing.empty_private_constants)
+  (fun id _ ind -> build_l2r_forward_rew_scheme true (Global.env()) ind InType,Safe_typing.empty_private_constants)
 
 (**********************************************************************)
 (* Non-dependent rewrite from either left-to-right in conclusion or   *)
@@ -720,7 +720,7 @@ let rew_l2r_forward_dep_scheme_kind =
 (**********************************************************************)
 let rew_l2r_scheme_kind =
   declare_individual_scheme_object "_rew_r"
-  (fun _ ind -> fix_r2l_forward_rew_scheme
+  (fun id _ ind -> fix_r2l_forward_rew_scheme
      (build_r2l_forward_rew_scheme false (Global.env()) ind InType), Safe_typing.empty_private_constants)
 
 (**********************************************************************)
@@ -731,7 +731,7 @@ let rew_l2r_scheme_kind =
 (**********************************************************************)
 let rew_r2l_scheme_kind =
   declare_individual_scheme_object "_rew"
-  (fun _ ind -> build_r2l_rew_scheme false (Global.env()) ind InType, Safe_typing.empty_private_constants)
+  (fun id _ ind -> build_r2l_rew_scheme false (Global.env()) id ind InType, Safe_typing.empty_private_constants)
 
 (* End of rewriting schemes *)
 
@@ -808,7 +808,7 @@ let build_congr env (eq,refl,ctx) ind =
   in c, Evd.evar_universe_context_of ctx
 
 let congr_scheme_kind = declare_individual_scheme_object "_congr"
-  (fun _ ind ->
+  (fun id _ ind ->
      (* May fail if equality is not defined *)
    build_congr (Global.env()) (get_coq_eq Univ.ContextSet.empty) ind,
    Safe_typing.empty_private_constants)

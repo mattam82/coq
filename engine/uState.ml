@@ -32,7 +32,8 @@ type uinfo = {
 
 (* 2nd part used to check consistency on the fly. *)
 type t =
- { uctx_names : Univ.Level.t UNameMap.t * uinfo Univ.LMap.t;
+  { uctx_counter : (DirPath.t * int) option;
+    uctx_names : Univ.Level.t UNameMap.t * uinfo Univ.LMap.t;
    uctx_local : Univ.universe_context_set; (** The local context of variables *)
    uctx_univ_variables : Universes.universe_opt_subst;
    (** The local universes that are unification variables *)
@@ -44,16 +45,23 @@ type t =
  }
   
 let empty =
-  { uctx_names = UNameMap.empty, Univ.LMap.empty;
+  { uctx_counter = None;
+    uctx_names = UNameMap.empty, Univ.LMap.empty;
     uctx_local = Univ.ContextSet.empty;
     uctx_univ_variables = Univ.LMap.empty;
     uctx_univ_algebraic = Univ.LSet.empty;
     uctx_universes = UGraph.initial_universes;
     uctx_initial_universes = UGraph.initial_universes; }
 
-let make u =
-    { empty with 
-      uctx_universes = u; uctx_initial_universes = u}
+let make_counter id =
+  match id with
+  | None -> None
+  | Some id -> Some (DirPath.make (id :: DirPath.repr (Global.current_dirpath ())), 1)
+  
+let make u id =
+  { empty with
+    uctx_counter = make_counter id;
+    uctx_universes = u; uctx_initial_universes = u}
 
 let is_empty ctx =
   Univ.ContextSet.is_empty ctx.uctx_local && 
@@ -72,7 +80,8 @@ let union ctx ctx' =
       Univ.LSet.fold (fun u g -> UGraph.add_universe u false g) newus g
     in
     let names_rev = Univ.LMap.union (snd ctx.uctx_names) (snd ctx'.uctx_names) in
-      { uctx_names = (names, names_rev);
+      { uctx_counter = ctx.uctx_counter;
+        uctx_names = (names, names_rev);
         uctx_local = local;
         uctx_univ_variables = 
           Univ.LMap.subst_union ctx.uctx_univ_variables ctx'.uctx_univ_variables;
@@ -380,9 +389,15 @@ let emit_side_effects eff u =
   let uctxs = Safe_typing.universes_of_private eff in
   List.fold_left (merge true univ_rigid) u uctxs
 
+let next_universe counter =
+  match counter with
+  | Some (dp, i) -> Univ.Level.make dp i, Some (dp, succ i)
+  | None -> Universes.new_univ_level (), counter
+  
 let new_univ_variable ?loc rigid name
-  ({ uctx_local = ctx; uctx_univ_variables = uvars; uctx_univ_algebraic = avars} as uctx) =
-  let u = Universes.new_univ_level () in
+  ({ uctx_counter; 
+     uctx_local = ctx; uctx_univ_variables = uvars; uctx_univ_algebraic = avars} as uctx) =
+  let u, uctx_counter = next_universe uctx_counter in
   let ctx' = Univ.ContextSet.add_universe u ctx in
   let uctx', pred =
     match rigid with
@@ -402,7 +417,8 @@ let new_univ_variable ?loc rigid name
     UGraph.add_universe u false uctx.uctx_initial_universes
   in                                                 
   let uctx' =
-    {uctx' with uctx_names = names; uctx_local = ctx';
+    {uctx' with uctx_counter;
+                uctx_names = names; uctx_local = ctx';
                 uctx_universes = UGraph.add_universe u false uctx.uctx_universes;
                 uctx_initial_universes = initial}
   in uctx', u
@@ -415,8 +431,8 @@ let add_global_univ uctx u =
     UGraph.add_universe u true uctx.uctx_universes
   in
   { uctx with uctx_local = Univ.ContextSet.add_universe u uctx.uctx_local;
-                                     uctx_initial_universes = initial;
-                                     uctx_universes = univs }
+              uctx_initial_universes = initial;
+              uctx_universes = univs }
 
 let make_flexible_variable ctx ~algebraic u =
   let {uctx_local = cstrs; uctx_univ_variables = uvars; uctx_univ_algebraic = avars} = ctx in
@@ -498,7 +514,8 @@ let refresh_undefined_univ_variables uctx =
                                    (Univ.ContextSet.levels ctx') g in
   let initial = declare uctx.uctx_initial_universes in
   let univs = declare UGraph.initial_universes in
-  let uctx' = {uctx_names = uctx.uctx_names;
+  let uctx' = {uctx_counter = uctx.uctx_counter;
+               uctx_names = uctx.uctx_names;
                uctx_local = ctx'; 
                uctx_univ_variables = vars; uctx_univ_algebraic = alg;
                uctx_universes = univs;
@@ -515,7 +532,8 @@ let normalize uctx =
     let us', universes =
       Universes.refresh_constraints uctx.uctx_initial_universes us'
     in
-      { uctx_names = uctx.uctx_names;
+      { uctx_counter = uctx.uctx_counter;
+        uctx_names = uctx.uctx_names;
         uctx_local = us'; 
         uctx_univ_variables = vars'; 
         uctx_univ_algebraic = algs';

@@ -26,7 +26,7 @@ val do_constraint : polymorphic ->
 (** {6 Definitions/Let} *)
 
 val interp_definition :
-  Vernacexpr.universe_decl_expr option -> local_binder_expr list -> polymorphic -> red_expr option -> constr_expr ->
+  Id.t -> Vernacexpr.universe_decl_expr option -> local_binder_expr list -> polymorphic -> red_expr option -> constr_expr ->
   constr_expr option -> Safe_typing.private_constants definition_entry * Evd.evar_map * 
                         Univdecls.universe_decl * Universes.universe_binders * Impargs.manual_implicits
 

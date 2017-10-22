@@ -22,7 +22,7 @@ val rew_l2r_forward_dep_scheme_kind : individual scheme_kind
 val rew_r2l_dep_scheme_kind : individual scheme_kind
 val rew_r2l_scheme_kind : individual scheme_kind
 
-val build_r2l_rew_scheme : bool -> env -> inductive -> sorts_family -> 
+val build_r2l_rew_scheme : bool -> env -> Id.t -> inductive -> sorts_family -> 
   constr Evd.in_evar_universe_context
 val build_l2r_rew_scheme : bool -> env -> inductive -> sorts_family -> 
   constr Evd.in_evar_universe_context * Safe_typing.private_constants

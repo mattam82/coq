@@ -94,8 +94,7 @@ let binder_of_decl = function
 let binders_of_decls = List.map binder_of_decl
 
 let typecheck_params_and_fields finite def poly id pl t ps nots fs =
-  let env0 = Global.env () in
-  let evd, decl = Univdecls.interp_univ_decl_opt env0 poly pl in
+  let env0, evd, decl = Univdecls.interp_univ_decl_opt id pl in
   let evars = ref evd in
   let _ = 
     let error bk (loc, name) = 

@@ -132,9 +132,19 @@ let declare_instance_constant k info global imps ?hook id decl poly evm term ter
 let new_instance ?(abstract=false) ?(global=false) ?(refine= !refine_instance)
   poly ctx (instid, bk, cl) props ?(generalize=true)
   ?(tac:unit Proofview.tactic option) ?hook pri =
-  let env = Global.env() in
   let ((loc, instid), pl) = instid in
-  let evd, decl = Univdecls.interp_univ_decl_opt env poly pl in
+  let id =
+    match instid with
+	Name id ->
+	  let sp = Lib.make_path id in
+	    if Nametab.exists_cci sp then
+	      user_err ~hdr:"new_instance" (Nameops.pr_id id ++ Pp.str " already exists.");
+	    id
+      | Anonymous ->
+	  let i = Id.of_string "typeclass_instance_0" in
+	    Namegen.next_global_ident_away i (Termops.ids_of_context (Global.env ()))
+  in
+  let env, evd, decl = Univdecls.interp_univ_decl_opt id pl in
   let evars = ref evd in
   let tclass, ids =
     match bk with
@@ -173,17 +183,6 @@ let new_instance ?(abstract=false) ?(global=false) ?(refine= !refine_instance)
 	(snd cl.cl_context) (args, [])
     in
       cl, u, c', ctx', ctx, len, imps, args
-  in
-  let id =
-    match instid with
-	Name id ->
-	  let sp = Lib.make_path id in
-	    if Nametab.exists_cci sp then
-	      user_err ~hdr:"new_instance" (Nameops.pr_id id ++ Pp.str " already exists.");
-	    id
-      | Anonymous ->
-	  let i = Nameops.add_suffix (id_of_class k) "_instance_0" in
-	    Namegen.next_global_ident_away i (Termops.ids_of_context env)
   in
   let env' = push_rel_context ctx env in
   evars := Evarutil.nf_evar_map !evars;

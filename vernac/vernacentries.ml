@@ -480,7 +480,7 @@ let vernac_definition locality p (local,k) ((loc,id as lid),pl) def =
   in
   (match def with
     | ProveBody (bl,t) ->   (* local binders, typ *)
-	  start_proof_and_print (local,p,DefinitionBody k)
+	  start_proof_and_print id (local,p,DefinitionBody k)
 	    [Some (lid,pl), (bl,t)] hook
     | DefineBody (bl,red_option,c,typ_opt) ->
  	let red_option = match red_option with
@@ -497,7 +497,8 @@ let vernac_start_proof locality p kind l =
       match id with
 	| Some (lid,_) -> Dumpglob.dump_definition lid false "prf"
 	| None -> ()) l;
-  start_proof_and_print (local, p, Proof kind) l no_hook
+  start_proof_and_print (match l with ((Some (lid,_)),_) :: _ -> snd lid | _ -> Id.of_string "unnamed")
+                        (local, p, Proof kind) l no_hook
 
 let vernac_end_proof ?proof = function
   | Admitted          -> save_proof ?proof Admitted

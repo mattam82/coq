@@ -36,6 +36,7 @@ Local Open Scope program_scope.
 Definition arrow (A B : Type) := A -> B.
 
 (** Logical implication. *)
+Set Printing Universes.
 
 Definition impl (A B : Prop) : Prop := A -> B.
 
