@@ -161,10 +161,12 @@ let safe_repr g u =
   in
   try g, safe_repr_rec g.entries u
   with Not_found ->
+    (* Small universes are manually inserted at the start. *)
+    assert (not (Level.is_small u));
     let can =
       { univ = u;
         ltle = UMap.empty; gtge = LSet.empty;
-        rank = if Level.is_small u then big_rank else 0;
+        rank = 0;
         klvl = 0; ilvl = 0;
         status = NoMark }
     in
@@ -502,6 +504,7 @@ let insert_edge strict ucan vcan g =
     raise e
 
 let add_universe vlev strict g =
+  assert (not (Level.is_sprop vlev));
   try
     let _arcv = UMap.find vlev g.entries in
       raise AlreadyDeclared
@@ -625,7 +628,9 @@ let check_equal g u v =
   let arcu = repr g u and arcv = repr g v in
     arcu == arcv
 
-let check_eq_level g u v = u == v || check_equal g u v
+let check_eq_level g u v =
+  u == v ||
+  (not (Level.is_sprop u || Level.is_sprop v) && check_equal g u v)
 
 let check_smaller g strict u v =
   let arcu = repr g u and arcv = repr g v in
@@ -654,17 +659,20 @@ let exists_bigger g ul l =
 
 let real_check_leq g u v =
   Universe.for_all (fun ul -> exists_bigger g ul v) u
-    
+
 let check_leq g u v =
   Universe.equal u v ||
-    is_type0m_univ u ||
-    real_check_leq g u v
+  (not (is_sprop u || is_sprop v) &&
+    (is_type0m_univ u ||
+     real_check_leq g u v))
 
 let check_eq_univs g l1 l2 =
   real_check_leq g l1 l2 && real_check_leq g l2 l1
 
 let check_eq g u v =
-  Universe.equal u v || check_eq_univs g u v
+  Universe.equal u v ||
+  (not (is_sprop u || is_sprop v) &&
+   check_eq_univs g u v)
 
 (* enforce_univ_eq g u v will force u=v if possible, will fail otherwise *)
 
@@ -728,6 +736,14 @@ let enforce_constraint cst g =
     | (u,Le,v) -> enforce_univ_leq u v g
     | (u,Eq,v) -> enforce_univ_eq u v g
 
+(** Special processing for SProp *)
+let enforce_constraint (u,d,v as c) g =
+  match Level.is_sprop u, d, Level.is_sprop v with
+  | false, _, false -> enforce_constraint c g
+  | true, (Eq | Le), true -> g
+  | true, Lt, true | false, _, true | true, _, false ->
+    error_inconsistency Lt u v None
+
 let merge_constraints c g =
   Constraint.fold enforce_constraint c g
 
@@ -736,6 +752,14 @@ let check_constraint g (l,d,r) =
   | Eq -> check_equal g l r
   | Le -> check_smaller g false l r
   | Lt -> check_smaller g true l r
+
+(** Special processing for SProp *)
+let check_constraint g (u,d,v as c) =
+  match Level.is_sprop u, d, Level.is_sprop v with
+  | false, _, false -> check_constraint g c
+  | true, (Eq | Le), true -> true
+  | true, Lt, true | false, _, true | true, _, false ->
+    false
 
 let check_constraints c g =
   Constraint.for_all (check_constraint g) c

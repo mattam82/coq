@@ -27,6 +27,8 @@ let interp_univ_constraints env evd cstrs =
     match x with
     | Misctypes.GProp -> Loc.tag Univ.Level.prop
     | GSet  -> Loc.tag Univ.Level.set
+    | GSProp ->
+      user_err ~hdr:"interp_constraint" (str "Cannot declare constraints about SProp")
     | GType None | GType (Some (_, Anonymous)) ->
        user_err ~hdr:"interp_constraint"
                      (str "Cannot declare constraints on anonymous universes")

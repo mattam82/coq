@@ -735,9 +735,10 @@ let check_positivity ~chkpos kn env_ar_par paramsctxt finite inds =
 
 (* Allowed eliminations *)
 
-let all_sorts = [InProp;InSet;InType]
-let small_sorts = [InProp;InSet]
-let logical_sorts = [InProp]
+let all_sorts = [InSProp;InProp;InSet;InType]
+let small_sorts = [InSProp;InProp;InSet]
+let logical_sorts = [InSProp;InProp]
+let sprop_sorts = [InSProp]
 
 let allowed_sorts is_smashed s =
   if not is_smashed 
@@ -754,6 +755,7 @@ let allowed_sorts is_smashed s =
     | InSet -> small_sorts
     (* Smashed to Prop, no informative eliminations allowed *)
     | InProp -> logical_sorts
+    | InSProp -> sprop_sorts
     
 (* Previous comment: *)
 (* Unitary/empty Prop: elimination to all sorts are realizable *)

@@ -468,6 +468,7 @@ let pretype_id pretype k0 loc env evdref lvar id =
 (* Main pretyping function                                               *)
 
 let interp_glob_level ?loc evd : Misctypes.glob_level -> _ = function
+  | GSProp -> evd, Univ.Level.sprop
   | GProp -> evd, Univ.Level.prop
   | GSet -> evd, Univ.Level.set
   | GType s -> interp_level_info ?loc evd s
@@ -526,6 +527,7 @@ let judge_of_Type ?loc evd s =
     evd, judge
 
 let pretype_sort ?loc evdref = function
+  | GSProp -> judge_of_sprop
   | GProp -> judge_of_prop
   | GSet -> judge_of_set
   | GType s -> evd_comb1 (judge_of_Type ?loc) evdref s

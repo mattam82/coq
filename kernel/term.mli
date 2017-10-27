@@ -437,11 +437,11 @@ type types = Constr.types
 [@@ocaml.deprecated "Alias for Constr.types"]
 
 type sorts = Sorts.t = private
-  | Prop | Set
+  | SProp | Prop | Set
   | Type of Univ.Universe.t  (** Type *)
 [@@ocaml.deprecated "Alias for Sorts.t"]
 
-type sorts_family = Sorts.family = InProp | InSet | InType
+type sorts_family = Sorts.family = InSProp | InProp | InSet | InType
 [@@ocaml.deprecated "Alias for Sorts.family"]
 
 type 'a puniverses = 'a Constr.puniverses

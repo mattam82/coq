@@ -287,7 +287,8 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
                  constraints of the form "univ <= max(...)" are not
                  expressible in the system of algebraic universes: we fail
                  (the user has to use an explicit type in the interface *)
-                error NoTypeConstraintExpected
+              error NoTypeConstraintExpected
+            | SProp -> CErrors.anomaly Pp.(str "not implemented: Subtyping.check_constant with SProp")
           with NotArity ->
             error err end
         | _ ->

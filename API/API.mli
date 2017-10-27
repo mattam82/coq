@@ -473,13 +473,14 @@ end
 module Sorts :
 sig
   type t = private
+    | SProp
     | Prop
     | Set
     | Type of Univ.Universe.t
   val is_prop : t -> bool
   val hash : t -> int
 
-  type family = InProp | InSet | InType
+  type family = InSProp | InProp | InSet | InType
   val family : t -> family
 end
 
@@ -856,10 +857,11 @@ end
 module Term :
 sig
 
-  type sorts_family = Sorts.family = InProp | InSet | InType
+  type sorts_family = Sorts.family = InSProp | InProp | InSet | InType
   [@@ocaml.deprecated "Alias of Sorts.family"]
 
   type sorts = Sorts.t = private
+    | SProp
     | Prop
     | Set
     | Type of Univ.Universe.t
@@ -1736,6 +1738,7 @@ sig
   type 'a and_short_name = 'a * Names.Id.t Loc.located option
 
   type 'a glob_sort_gen =
+    | GSProp (** representation of [SProp] literal *)
     | GProp (** representation of [Prop] literal *)
     | GSet  (** representation of [Set] literal *)
     | GType of 'a (** representation of [Type] literal *)

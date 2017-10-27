@@ -67,7 +67,7 @@ let type_of_type u =
     mkType uu
 
 let type_of_sort = function
-  | Prop | Set -> type1
+  | SProp | Prop | Set -> type1
   | Type u -> type_of_type u
 
 (*s Type of a de Bruijn index. *)
@@ -175,6 +175,7 @@ let type_of_apply env func funt argsv argstv =
 
 let sort_of_product env domsort rangsort =
   match (domsort, rangsort) with
+    | (_, SProp) | (SProp, _) -> rangsort
     (* Product rule (s,Prop,Prop) *)
     | (_,       Prop)  -> rangsort
     (* Product rule (Prop/Set,Set,Set) *)

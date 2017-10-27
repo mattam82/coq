@@ -8,13 +8,15 @@
 
 (** {6 The sorts of CCI. } *)
 
-type family = InProp | InSet | InType
+type family = InSProp | InProp | InSet | InType
 
 type t = private
+  | SProp
   | Prop
   | Set
   | Type of Univ.Universe.t
 
+val sprop : t
 val set  : t
 val prop : t
 val type1  : t
@@ -23,6 +25,7 @@ val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int
 
+val is_sprop : t -> bool
 val is_set : t -> bool
 val is_prop : t -> bool
 val is_small : t -> bool

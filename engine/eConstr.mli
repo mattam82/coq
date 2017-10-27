@@ -91,6 +91,7 @@ val mkVar : Id.t -> t
 val mkMeta : metavariable -> t
 val mkEvar : t pexistential -> t
 val mkSort : Sorts.t -> t
+val mkSProp : t
 val mkProp : t
 val mkSet  : t
 val mkType : Univ.Universe.t -> t
@@ -111,6 +112,8 @@ val mkCase : case_info * t * t * t array -> t
 val mkFix : (t, t) pfixpoint -> t
 val mkCoFix : (t, t) pcofixpoint -> t
 val mkArrow : t -> t -> t
+
+val type1 : t
 
 val applist : t * t list -> t
 

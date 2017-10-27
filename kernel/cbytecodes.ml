@@ -188,6 +188,7 @@ open Util
 let pp_sort s =
   let open Sorts in
   match family s with
+  | InSProp -> str "SProp"
   | InSet -> str "Set"
   | InProp -> str "Prop"
   | InType -> str "Type"

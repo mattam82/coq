@@ -193,6 +193,10 @@ let check_cofix env sigma pcofix =
 
 (* The typing machine with universes and existential variables. *)
 
+let judge_of_sprop =
+  { uj_val = EConstr.mkSProp;
+    uj_type = EConstr.type1 }
+
 let judge_of_prop =
   { uj_val = EConstr.mkProp;
     uj_type = EConstr.mkSort Sorts.type1 }
@@ -289,6 +293,8 @@ let rec execute env evdref cstr =
 
     | Sort s ->
       begin match ESorts.kind !evdref s with
+        | SProp ->
+          judge_of_sprop
       | Prop ->
         judge_of_prop
       | Set ->

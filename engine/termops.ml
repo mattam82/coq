@@ -23,11 +23,13 @@ module CompactedDecl = Context.Compacted.Declaration
 (* Sorts and sort family *)
 
 let print_sort = function
+  | SProp -> str "SProp"
   | Set -> (str "Set")
   | Prop -> (str "Prop")
   | Type u -> (str "Type(" ++ Univ.Universe.pr u ++ str ")")
 
 let pr_sort_family = function
+  | InSProp -> str "SProp"
   | InSet -> (str "Set")
   | InProp -> (str "Prop")
   | InType -> (str "Type")
@@ -1152,7 +1154,8 @@ let is_template_polymorphic env sigma f =
 
 let base_sort_cmp pb s0 s1 =
   match (s0,s1) with
-  | Prop, Prop | Set, Set | Type _, Type _ -> true
+  | SProp, SProp | Prop, Prop | Set, Set | Type _, Type _ -> true
+  | SProp, _ | _, SProp -> false
   | Prop, Set | Prop, Type _ | Set, Type _ -> pb == Reduction.CUMUL
   | Set, Prop | Type _, Prop | Type _, Set -> false
 

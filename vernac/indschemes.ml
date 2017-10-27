@@ -349,19 +349,23 @@ requested
           match sort_of_ind with
           | InProp ->
               if isdep then (match z with
+              | InSProp -> inds ^ "s_dep"
               | InProp -> inds ^ "_dep"
               | InSet  -> recs ^ "_dep"
               | InType -> recs ^ "t_dep")
               else ( match z with
+              | InSProp -> inds ^ "s"
               | InProp -> inds
               | InSet -> recs
               | InType -> recs ^ "t" )
           | _ ->
               if isdep then (match z with
+              | InSProp -> inds ^ "s"
               | InProp -> inds
               | InSet -> recs
               | InType -> recs ^ "t" )
               else (match z with
+              | InSProp -> inds ^ "s_nodep"
               | InProp -> inds ^ "_nodep"
               | InSet -> recs ^ "_nodep"
               | InType -> recs ^ "t_nodep")

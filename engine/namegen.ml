@@ -122,6 +122,7 @@ let lowercase_first_char id = (* First character of a constr *)
         s ^ Unicode.lowercase_first_char s'
 
 let sort_hdchar = function
+  | SProp -> "P"
   | Prop -> "P"
   | Set -> "S"
   | Type _ -> "T"

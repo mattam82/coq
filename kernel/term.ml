@@ -17,11 +17,12 @@ open Vars
 (**********************************************************************)
 
 type sorts = Sorts.t = private
+  | SProp
   | Prop
   | Set
   | Type of Univ.Universe.t
 
-type sorts_family = Sorts.family = InProp | InSet | InType
+type sorts_family = Sorts.family = InSProp | InProp | InSet | InType
 
 type constr = Constr.t
 (** Alias types, for compatibility. *)

@@ -517,6 +517,7 @@ let do_constraint poly l =
   let open Misctypes in
   let u_of_id x =
     match x with
+    | GSProp -> user_err ~hdr:"Constraint" (str "Cannot declare constraints about SProp!")
     | GProp -> Loc.tag (false, Univ.Level.prop)
     | GSet  -> Loc.tag (false, Univ.Level.set)
     | GType None | GType (Some (_, Anonymous)) ->

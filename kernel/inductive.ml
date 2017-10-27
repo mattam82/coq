@@ -229,7 +229,10 @@ let type_of_inductive_knowing_parameters env ?(polyprop=true) mip args =
 (* The max of an array of universes *)
 
 let cumulate_constructor_univ u = let open Sorts in function
-  | Prop -> u
+  | SProp | Prop ->
+    (* SProp is non cumulative but allowed in constructors of any
+       inductive (except non-sprop primitive records) *)
+    u
   | Set -> Universe.sup Universe.type0 u
   | Type u' -> Universe.sup u u'
 

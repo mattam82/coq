@@ -415,6 +415,7 @@ let detype_case computable detype detype_eqns testdep avoid data p c bl =
       GCases (tag,pred,[tomatch,(alias,aliastyp)],eqnl)
 
 let detype_sort sigma = function
+  | SProp -> GSProp
   | Prop -> GProp
   | Set -> GSet
   | Type u ->

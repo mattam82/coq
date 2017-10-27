@@ -35,6 +35,7 @@ module RawLevel =
 struct
   open Names
   type t =
+    | SProp
     | Prop
     | Set
     | Level of int * DirPath.t
@@ -44,16 +45,20 @@ struct
 
   let equal x y =
     x == y ||
-      match x, y with
-      | Prop, Prop -> true
-      | Set, Set -> true
-      | Level (n,d), Level (n',d') ->
-        Int.equal n n' && DirPath.equal d d'
-      | Var n, Var n' -> Int.equal n n'
-      | _ -> false
+    match x, y with
+    | SProp, SProp -> true
+    | Prop, Prop -> true
+    | Set, Set -> true
+    | Level (n,d), Level (n',d') ->
+      Int.equal n n' && DirPath.equal d d'
+    | Var n, Var n' -> Int.equal n n'
+    | _ -> false
 
   let compare u v =
     match u, v with
+    | SProp, SProp -> 0
+    | SProp, _ -> -1
+    | _, SProp -> 1
     | Prop,Prop -> 0
     | Prop, _ -> -1
     | _, Prop -> 1
@@ -71,6 +76,7 @@ struct
   let hequal x y =
     x == y ||
       match x, y with
+      | SProp, SProp -> true
       | Prop, Prop -> true
       | Set, Set -> true
       | Level (n,d), Level (n',d') ->
@@ -79,6 +85,7 @@ struct
       | _ -> false
 
   let hcons = function
+    | SProp as x -> x
     | Prop as x -> x
     | Set as x -> x
     | Level (n,d) as x -> 
@@ -89,8 +96,9 @@ struct
   open Hashset.Combine
 
   let hash = function
-    | Prop -> combinesmall 1 0
-    | Set -> combinesmall 1 1
+    | SProp -> combinesmall 1 0
+    | Prop -> combinesmall 1 1
+    | Set -> combinesmall 1 2
     | Var n -> combinesmall 2 n
     | Level (n, d) -> combinesmall 3 (combine n (Names.DirPath.hash d))
 
@@ -101,10 +109,11 @@ module Level = struct
   open Names
 
   type raw_level = RawLevel.t =
-  | Prop
-  | Set
-  | Level of int * DirPath.t
-  | Var of int
+    | SProp
+    | Prop
+    | Set
+    | Level of int * DirPath.t
+    | Var of int
 
   (** Embed levels with their hash value *)
   type t = { 
@@ -138,11 +147,13 @@ module Level = struct
 
   let set = make Set
   let prop = make Prop
+  let sprop = make SProp
 
   let is_small x = 
     match data x with
     | Level _ -> false
     | Var _ -> false
+    | SProp -> true
     | Prop -> true
     | Set -> true
  
@@ -154,6 +165,11 @@ module Level = struct
   let is_set x =
     match data x with
     | Set -> true
+    | _ -> false
+
+  let is_sprop x =
+    match data x with
+    | SProp -> true
     | _ -> false
 
   let compare u v =
@@ -169,6 +185,7 @@ module Level = struct
 	    
   let to_string x = 
     match data x with
+    | SProp -> "SProp"
     | Prop -> "Prop"
     | Set -> "Set"
     | Level (n,d) -> Names.DirPath.to_string d^"."^string_of_int n
@@ -178,6 +195,7 @@ module Level = struct
 
   let apart u v =
     match data u, data v with
+    | SProp, _ | _, SProp
     | Prop, Set | Set, Prop -> true
     | _ -> false
 
@@ -294,6 +312,7 @@ struct
 	  if Int.equal n n' then Level.compare x x'
 	  else n - n'
 
+    let sprop = hcons (Level.sprop, 0)
     let prop = hcons (Level.prop, 0)
     let set = hcons (Level.set, 0)
     let type1 = hcons (Level.set, 1)
@@ -312,16 +331,16 @@ struct
       let cmp = Level.compare u v in
 	if Int.equal cmp 0 then n <= n'
 	else if n <= n' then 
-	  (Level.is_prop u && Level.is_small v)
+          (Level.is_prop u && not (Level.is_sprop v))
 	else false
 
     let successor (u,n) =
-      if Level.is_prop u then type1
+      if Level.is_small u then type1
       else (u, n + 1)
 
     let addn k (u,n as x) = 
       if k = 0 then x 
-      else if Level.is_prop u then
+      else if Level.is_small u then
 	(Level.set,n+k)
       else (u,n+k)
 
@@ -339,15 +358,17 @@ struct
        left expression is "smaller" than the right one in both cases. *)
     let super (u,n as x) (v,n' as y) =
       let cmp = Level.compare u v in
-	if Int.equal cmp 0 then SuperSame (n < n')
-	else
-	  match x, y with
-	  | (l,0), (l',0) ->
-	     let open RawLevel in
-	     (match Level.data l, Level.data l' with
-	      | Prop, Prop -> SuperSame false
-	      | Prop, _ -> SuperSame true
-	      | _, Prop -> SuperSame false
+        if Int.equal cmp 0 then SuperSame (n < n')
+        else
+          match x, y with
+          | (l,0), (l',0) ->
+             let open RawLevel in
+             (match Level.data l, Level.data l' with
+              | SProp, SProp | Prop, Prop -> SuperSame false
+              | SProp, Prop -> SuperSame true
+              | Prop, SProp -> SuperSame false
+              | (SProp | Prop), _ -> SuperSame true
+              | _, (SProp | Prop) -> SuperSame false
 	      | _, _ -> SuperDiff cmp)
 	  | _, _ -> SuperDiff cmp
 
@@ -434,6 +455,8 @@ struct
     | [l] -> Expr.is_small l
     | _ -> false
 
+  let sprop = tip Expr.sprop
+
   (* The lower predicative level of the hierarchy that contains (impredicative)
      Prop and singleton inductive types *)
   let type0m = tip Expr.prop
@@ -443,8 +466,9 @@ struct
 
   (* When typing [Prop] and [Set], there is no constraint on the level,
      hence the definition of [type1_univ], the type of [Prop] *)    
-  let type1 = tip (Expr.successor Expr.set)
+  let type1 = tip Expr.type1
 
+  let is_sprop x = equal sprop x
   let is_type0m x = equal type0m x
   let is_type0 x = equal type0 x
 
@@ -647,7 +671,7 @@ let enforce_eq u v c =
 let constraint_add_leq v u c =
   (* We just discard trivial constraints like u<=u *)
   if Expr.equal v u then c
-  else 
+  else
     match v, u with
     | (x,n), (y,m) -> 
     let j = m - n in
@@ -670,12 +694,17 @@ let check_univ_leq u v =
   Universe.for_all (fun u -> check_univ_leq_one u v) u
 
 let enforce_leq u v c =
-  let rec aux acc v =
-  match v with
-  | v :: l ->
-    aux (List.fold_right (fun u -> constraint_add_leq u v) u c) l
-  | [] -> acc
-  in aux c v
+  match is_sprop u, is_sprop v with
+  | true, true -> c
+  | true, false | false, true ->
+    raise (UniverseInconsistency (Le, u, v, None))
+  | false, false ->
+    let rec aux acc v =
+      match v with
+      | v :: l ->
+        aux (List.fold_right (fun u -> constraint_add_leq u v) u c) l
+      | [] -> acc
+    in aux c v
 
 let enforce_leq u v c =
   if check_univ_leq u v then c
@@ -807,7 +836,7 @@ struct
     else Array.append x y
 
   let of_array a =
-    assert(Array.for_all (fun x -> not (Level.is_prop x)) a);
+    assert(Array.for_all (fun x -> not (Level.is_prop x || Level.is_sprop x)) a);
     a
 
   let to_array a = a

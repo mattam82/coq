@@ -391,9 +391,10 @@ let type_of_reference env r =
 let type_of_global t = type_of_reference (Global.env ()) t
 
 let fresh_sort_in_family env = function
+  | InSProp -> Sorts.sprop, ContextSet.empty
   | InProp -> Sorts.prop, ContextSet.empty
   | InSet -> Sorts.set, ContextSet.empty
-  | InType -> 
+  | InType ->
     let u = fresh_level () in
       Sorts.sort_of_univ (Univ.Universe.make u), ContextSet.singleton u
 
@@ -765,6 +766,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       else LSet.remove u ctx', us, LSet.remove u algs, seen, cstrs)
       us (ctx, us, algs, lbounds, cstrs)
 
+(* TODO check is_small/sprop *)
 let normalize_context_set ctx us algs = 
   let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
   let uf = UF.create () in
