@@ -21,6 +21,8 @@ val set  : t
 val prop : t
 val type1  : t
 
+val super : t -> t
+
 val equal : t -> t -> bool
 val compare : t -> t -> int
 val hash : t -> int

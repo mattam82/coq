@@ -33,6 +33,10 @@ let sort_of_univ u =
   else if is_type0_univ u then set
   else Type u
 
+let super = function
+  | SProp | Prop | Set -> type1
+  | Type u -> Type (Universe.super u)
+
 let compare s1 s2 =
   if s1 == s2 then 0 else
     match s1, s2 with

@@ -85,6 +85,7 @@ val mkEvar : existential -> constr
 
 (** Construct a sort *)
 val mkSort : Sorts.t -> types
+val mkSProp : types
 val mkProp : types
 val mkSet  : types
 val mkType : Univ.Universe.t -> types

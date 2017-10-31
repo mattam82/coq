@@ -9,7 +9,7 @@
 open Names
 open Constr
 open Environ
-open Reduction
+open CClosure
 
 (* Type errors. *)
 

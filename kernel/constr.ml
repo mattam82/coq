@@ -132,13 +132,15 @@ let rels =
 let mkRel n = if 0<n && n<=16 then rels.(n-1) else Rel n
 
 (* Construct a type *)
+let mkSProp  = Sort Sorts.sprop
 let mkProp   = Sort Sorts.prop
 let mkSet    = Sort Sorts.set
 let mkType u = Sort (Sorts.sort_of_univ u)
 let mkSort   = function
+  | Sorts.SProp -> mkSProp
   | Sorts.Prop -> mkProp (* Easy sharing *)
   | Sorts.Set -> mkSet
-  | s -> Sort s
+  | Sorts.Type _ as s -> Sort s
 
 (* Constructs the term t1::t2, i.e. the term t1 casted with the type t2 *)
 (* (that means t2 is declared as the type of t1) *)
