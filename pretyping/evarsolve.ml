@@ -1318,7 +1318,7 @@ let solve_evar_evar ?(force=false) f g env evd pbty (evk1,args1 as ev1) (evk2,ar
           let t2 = it_mkProd_or_LetIn (mkSort k) ctx2 in
 	  let evd = Evd.set_leq_sort env (Evd.set_leq_sort env evd k i) k j in
           downcast evk2 t2 (downcast evk1 t1 evd)
-    with Reduction.NotArity -> 
+    with CClosure.NotArity ->
       evd in
   solve_evar_evar_aux force f g env evd pbty ev1 ev2
 

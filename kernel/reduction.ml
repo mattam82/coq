@@ -23,7 +23,22 @@ open Vars
 open Environ
 open CClosure
 open Esubst
-open Context.Rel.Declaration
+
+(* reduction function aliases *)
+let whd_betaiotazeta = whd_betaiotazeta
+let whd_all = whd_all
+let whd_allnolet = whd_allnolet
+
+let whd_betaiota = whd_betaiota
+let nf_betaiota = nf_betaiota
+
+let dest_prod = dest_prod
+let dest_prod_assum = dest_prod_assum
+let dest_lam_assum = dest_lam_assum
+
+let dest_arity = dest_arity
+let is_arity = is_arity
+
 
 let rec is_empty_stack = function
   [] -> true
@@ -101,57 +116,6 @@ let pure_stack lfts stk =
                 (l,Zlcase(ci,l,mk_clos e p,Array.map (mk_clos e) br)::pstk))
   in
   snd (pure_rec lfts stk)
-
-(****************************************************************************)
-(*                   Reduction Functions                                    *)
-(****************************************************************************)
-
-let whd_betaiota env t =
-  match kind t with
-    | (Sort _|Var _|Meta _|Evar _|Const _|Ind _|Construct _|
-       Prod _|Lambda _|Fix _|CoFix _) -> t
-    | App (c, _) ->
-      begin match kind c with
-      | Ind _ | Construct _ | Evar _ | Meta _ | Const _ | LetIn _ -> t
-      | _ -> whd_val (create_clos_infos betaiota env) (inject t)
-      end
-    | _ -> whd_val (create_clos_infos betaiota env) (inject t)
-
-let nf_betaiota env t =
-  norm_val (create_clos_infos betaiota env) (inject t)
-
-let whd_betaiotazeta env x =
-  match kind x with
-    | (Sort _|Var _|Meta _|Evar _|Const _|Ind _|Construct _|
-       Prod _|Lambda _|Fix _|CoFix _) -> x
-    | App (c, _) ->
-      begin match kind c with
-      | Ind _ | Construct _ | Evar _ | Meta _ | Const _ -> x
-      | _ -> whd_val (create_clos_infos betaiotazeta env) (inject x)
-      end
-    | _ -> whd_val (create_clos_infos betaiotazeta env) (inject x)
-
-let whd_all env t =
-  match kind t with
-    | (Sort _|Meta _|Evar _|Ind _|Construct _|
-       Prod _|Lambda _|Fix _|CoFix _) -> t
-    | App (c, _) ->
-      begin match kind c with
-      | Ind _ | Construct _ | Evar _ | Meta _ -> t
-      | _ -> whd_val (create_clos_infos all env) (inject t)
-      end
-    | _ -> whd_val (create_clos_infos all env) (inject t)
-
-let whd_allnolet env t =
-  match kind t with
-    | (Sort _|Meta _|Evar _|Ind _|Construct _|
-       Prod _|Lambda _|Fix _|CoFix _|LetIn _) -> t
-    | App (c, _) ->
-      begin match kind c with
-      | Ind _ | Construct _ | Evar _ | Meta _ | LetIn _ -> t
-      | _ -> whd_val (create_clos_infos allnolet env) (inject t)
-      end
-    | _ -> whd_val (create_clos_infos allnolet env) (inject t)
 
 (********************************************************************)
 (*                         Conversion                               *)
@@ -920,63 +884,3 @@ let hnf_prod_app env t n =
 let hnf_prod_applist env t nl =
   List.fold_left (hnf_prod_app env) t nl
 
-(* Dealing with arities *)
-
-let dest_prod env =
-  let rec decrec env m c =
-    let t = whd_all env c in
-    match kind t with
-      | Prod (n,a,c0) ->
-	  let d = LocalAssum (n,a) in
-	  decrec (push_rel d env) (Context.Rel.add d m) c0
-      | _ -> m,t
-  in
-  decrec env Context.Rel.empty
-
-(* The same but preserving lets in the context, not internal ones. *)
-let dest_prod_assum env =
-  let rec prodec_rec env l ty =
-    let rty = whd_allnolet env ty in
-    match kind rty with
-    | Prod (x,t,c)  ->
-        let d = LocalAssum (x,t) in
-	prodec_rec (push_rel d env) (Context.Rel.add d l) c
-    | LetIn (x,b,t,c) ->
-        let d = LocalDef (x,b,t) in
-	prodec_rec (push_rel d env) (Context.Rel.add d l) c
-    | Cast (c,_,_)    -> prodec_rec env l c
-    | _               ->
-      let rty' = whd_all env rty in
-	if Constr.equal rty' rty then l, rty
-	else prodec_rec env l rty'
-  in
-  prodec_rec env Context.Rel.empty
-
-let dest_lam_assum env =
-  let rec lamec_rec env l ty =
-    let rty = whd_allnolet env ty in
-    match kind rty with
-    | Lambda (x,t,c)  ->
-        let d = LocalAssum (x,t) in
-	lamec_rec (push_rel d env) (Context.Rel.add d l) c
-    | LetIn (x,b,t,c) ->
-        let d = LocalDef (x,b,t) in
-	lamec_rec (push_rel d env) (Context.Rel.add d l) c
-    | Cast (c,_,_)    -> lamec_rec env l c
-    | _               -> l,rty
-  in
-  lamec_rec env Context.Rel.empty
-
-exception NotArity
-
-let dest_arity env c =
-  let l, c = dest_prod_assum env c in
-  match kind c with
-    | Sort s -> l,s
-    | _ -> raise NotArity
-
-let is_arity env c =
-  try
-    let _ = dest_arity env c in
-    true
-  with NotArity -> false

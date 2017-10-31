@@ -12,6 +12,7 @@ open Environ
 (***********************************************************************
   s Reduction functions *)
 
+(* TODO deprecate for CClosure versions *)
 (* None of these functions do eta reduction *)
 
 val whd_betaiotazeta        : env -> constr -> constr
@@ -113,9 +114,7 @@ val dest_prod       : env -> types -> Context.Rel.t * types
 val dest_prod_assum : env -> types -> Context.Rel.t * types
 val dest_lam_assum  : env -> types -> Context.Rel.t * types
 
-exception NotArity
-
-val dest_arity : env -> types -> Term.arity (* raises NotArity if not an arity *)
+val dest_arity : env -> types -> Term.arity (* raises CClosure.NotArity if not an arity *)
 val is_arity   : env -> types -> bool
 
 val warn_bytecode_compiler_failed : ?loc:Loc.t -> unit -> unit

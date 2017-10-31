@@ -371,7 +371,7 @@ let typecheck_inductive env mie =
       let template_polymorphic () =
 	let sign, s =
           try dest_arity env full_arity
-          with NotArity -> raise (InductiveError (NotAnArity (env, full_arity)))
+          with CClosure.NotArity -> raise (InductiveError (NotAnArity (env, full_arity)))
 	in
 	  match s with
 	  | Type u when expltype (* Explicitly polymorphic *) ->

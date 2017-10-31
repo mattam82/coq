@@ -187,7 +187,7 @@ let retype ?(polyprop=true) sigma =
       let mip = lookup_mind_specif env ind in
 	EConstr.of_constr (try Inductive.type_of_inductive_knowing_parameters
 	       ~polyprop env (mip, u) argtyps
-	 with Reduction.NotArity -> retype_error NotAnArity)
+         with CClosure.NotArity -> retype_error NotAnArity)
     | Construct (cstr, u) ->
       let u = EInstance.kind sigma u in
       EConstr.of_constr (type_of_constructor env (cstr, u))

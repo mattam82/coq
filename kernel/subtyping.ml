@@ -289,7 +289,7 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
                  (the user has to use an explicit type in the interface *)
               error NoTypeConstraintExpected
             | SProp -> CErrors.anomaly Pp.(str "not implemented: Subtyping.check_constant with SProp")
-          with NotArity ->
+          with CClosure.NotArity ->
             error err end
         | _ ->
 	  t1,t2

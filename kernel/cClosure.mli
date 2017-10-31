@@ -224,6 +224,30 @@ val unfold_reference : clos_infos -> table_key -> fconstr option
 val eq_table_key : table_key -> table_key -> bool
 
 (***********************************************************************
+  s Reduction functions *)
+
+(* None of these functions do eta reduction *)
+
+val whd_betaiotazeta        : env -> constr -> constr
+val whd_all                 : env -> constr -> constr
+val whd_allnolet : env -> constr -> constr
+
+val whd_betaiota     : env -> constr -> constr
+val nf_betaiota      : env -> constr -> constr
+
+(***********************************************************************
+  s Recognizing products and arities modulo reduction *)
+
+val dest_prod       : env -> types -> Context.Rel.t * types
+val dest_prod_assum : env -> types -> Context.Rel.t * types
+val dest_lam_assum  : env -> types -> Context.Rel.t * types
+
+exception NotArity
+
+val dest_arity : env -> types -> Term.arity (* raises NotArity if not an arity *)
+val is_arity   : env -> types -> bool
+
+(***********************************************************************
   i This is for lazy debug *)
 
 val lift_fconstr      : int -> fconstr -> fconstr
