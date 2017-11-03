@@ -274,7 +274,13 @@ let unfold_projection infos p c =
 
 (* Conversion between  [lft1]term1 and [lft2]term2 *)
 let rec ccnv cv_pb l2r infos lft1 lft2 term1 term2 cuniv =
-  eqappr cv_pb l2r infos (lft1, (term1,[])) (lft2, (term2,[])) cuniv
+  let c1 = term_of_fconstr_lift lft1 term1 in
+  let env = info_env infos in
+  let evars = info_evar_closures infos in
+  if Retypeops.is_irrelevant_term env evars c1
+  then cuniv
+  else
+    eqappr cv_pb l2r infos (lft1, (term1,[])) (lft2, (term2,[])) cuniv
 
 (* Conversion between [lft1](hd1 v1) and [lft2](hd2 v2) *)
 and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
