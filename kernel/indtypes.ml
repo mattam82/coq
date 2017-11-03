@@ -116,30 +116,31 @@ let mind_check_names mie =
 (************************************************************************)
 (************************************************************************)
 
+type onlysprop = OnlySProp | NotOnlySProp
+
 (* Typing the arities and constructor types *)
 
 (* An inductive definition is a "unit" if it has only one constructor
    and that all arguments expected by this constructor are
    logical, this is the case for equality, conjunction of logical properties
 *)
-let is_unit constrsinfos =
-  match constrsinfos with  (* One info = One constructor *)
-   | [level] -> is_type0m_univ level
-   | [] -> (* type without constructors *) true
-   | _ -> false
-
-let infos_and_sort env t =
-  let rec aux env t max =
+let infos_and_sort env min t =
+  let rec aux env t onlysprop max =
     let t = whd_all env t in
       match kind t with
       | Prod (name,c1,c2) ->
         let varj = infer_type env c1 in
-	let env1 = Environ.push_rel (LocalAssum (name,varj.utj_val)) env in
-	let max = Universe.sup max (Term.univ_of_sort varj.utj_type) in
-	  aux env1 c2 max
-    | _ when is_constructor_head t -> max
-    | _ -> (* don't fail if not positive, it is tested later *) max
-  in aux env t Universe.type0m
+        let env1 = Environ.push_rel (LocalAssum (name,varj.utj_val)) env in
+        let sj = varj.utj_type in
+        let onlysprop = match onlysprop, Sorts.is_sprop sj with
+          | OnlySProp, true -> OnlySProp
+          | OnlySProp, false | NotOnlySProp, _ -> NotOnlySProp
+        in
+        let max = Universe.sup max (univ_of_sort sj) in
+          aux env1 c2 onlysprop max
+    | _ when is_constructor_head t -> onlysprop,max
+    | _ -> (* don't fail if not positive, it is tested later *) onlysprop,max
+  in aux env t OnlySProp min
 
 (* Computing the levels of polymorphic inductive types
 
@@ -164,18 +165,24 @@ let infos_and_sort env t =
 (* This (re)computes informations relevant to extraction and the sort of an
    arity or type constructor; we do not to recompute universes constraints *)
 
-let infer_constructor_packet env_ar_par params lc =
+let infer_constructor_packet env_ar_par params defu lc =
   (* type-check the constructors *)
   let jlc = List.map (infer_type env_ar_par) lc in
   let jlc = Array.of_list jlc in
+  let min =
+    (* Only generate SProp if target type. *)
+    if Array.length jlc > 1 then Universe.type0
+    else if Sorts.is_sprop defu then Universe.sprop
+    else Universe.type0m
+  in
   (* generalize the constructor over the parameters *)
   let lc'' = Array.map (fun j -> Term.it_mkProd_or_LetIn j.utj_val params) jlc in
   (* compute the max of the sorts of the products of the constructors types *)
-  let levels = List.map (infos_and_sort env_ar_par) lc in
-  let isunit = is_unit levels in
-  let min = if Array.length jlc > 1 then Universe.type0 else Universe.type0m in
-  let level = List.fold_left (fun max l -> Universe.sup max l) min levels in
-  (lc'', (isunit, level))
+  let osprop,level = List.fold_left (fun (osprop,max) c ->
+      let osprop', l = infos_and_sort env_ar_par min c in
+      (* We only care about onlysprop for records, so exactly 1 constructor *)
+      osprop', Universe.sup max l) (OnlySProp,min) lc in
+  (lc'', osprop, level)
 
 (* If indices matter *)
 let cumulate_arity_large_levels env sign =
@@ -191,7 +198,7 @@ let cumulate_arity_large_levels env sign =
     sign (Universe.type0m,env))
 
 let is_impredicative env u =
-  is_type0m_univ u || (is_type0_univ u && is_impredicative_set env)
+  Universe.is_sprop u || is_type0m_univ u || (is_type0_univ u && is_impredicative_set env)
 
 (* Returns the list [x_1, ..., x_n] of levels contributing to template
    polymorphism. The elements x_k is None if the k-th parameter (starting
@@ -328,11 +335,11 @@ let typecheck_inductive env mie =
   (* Now, we type the constructors (without params) *)
   let inds =
     List.fold_right2
-      (fun ind arity_data inds ->
-	 let (lc',cstrs_univ) =
-	   infer_constructor_packet env_ar_par paramsctxt ind.mind_entry_lc in
+      (fun ind ((_, _, _, _, defu, _) as arity_data) inds ->
+         let (lc',osprop,cstrs_univ) =
+           infer_constructor_packet env_ar_par paramsctxt defu ind.mind_entry_lc in
 	 let consnames = ind.mind_entry_consnames in
-	 let ind' = (arity_data,consnames,lc',cstrs_univ) in
+         let ind' = (arity_data,consnames,lc',osprop,cstrs_univ) in
 	   ind'::inds)
       mie.mind_entry_inds
       arity_list
@@ -342,8 +349,27 @@ let typecheck_inductive env mie =
 
   (* Compute/check the sorts of the inductive types *)
 
+  let isrecord =
+    (* A primitive record with all fields SProp is proof irrelevant by
+       eta, so if not declared in SProp downgrade primitiveness. *)
+    match mie.mind_entry_record with
+    | Some (Some _) as isrecord ->
+      begin match inds with
+        | [|((_,_,_,_,defu,_),_,_,osprop,clev)|] ->
+          begin match osprop with
+            | OnlySProp ->
+              if Universe.is_sprop clev then isrecord
+              else Some None
+            | _ -> isrecord
+          end
+        | _ ->
+          anomaly ~label:"check_inductive"
+            Pp.(str "Kernel got mutually inductive primitive record.")
+      end
+    | Some None | None as isrecord -> isrecord
+  in
   let inds =
-    Array.map (fun ((id,full_arity,sign,expltype,def_level,inf_level),cn,lc,(is_unit,clev))  ->
+    Array.map (fun ((id,full_arity,sign,expltype,def_level,inf_level),cn,lc,_osprop,clev)  ->
       let infu = 
 	(** Inferred level, with parameters and constructors. *)
 	match inf_level with
@@ -351,10 +377,10 @@ let typecheck_inductive env mie =
 	| None -> clev
       in
       let full_polymorphic () = 
-	let defu = Term.univ_of_sort def_level in
-	let is_natural =
-	  type_in_type env || (UGraph.check_leq (universes env') infu defu)
-	in
+        let defu = Term.univ_of_sort def_level in
+        let is_natural =
+          type_in_type env || (UGraph.check_leq (universes env') infu defu)
+        in
 	let _ =
 	  (** Impredicative sort, always allow *)
 	  if is_impredicative env defu then ()
@@ -405,7 +431,7 @@ let typecheck_inductive env mie =
     | Monomorphic_ind_entry _ -> ()
     | Polymorphic_ind_entry _ -> ()
     | Cumulative_ind_entry cumi -> check_subtyping cumi paramsctxt env_arities inds
-  in (env_arities, env_ar_par, paramsctxt, inds)
+  in (env_arities, env_ar_par, paramsctxt, isrecord, inds)
 
 (************************************************************************)
 (************************************************************************)
@@ -1000,11 +1026,11 @@ let build_inductive env prv iu env_ar paramsctxt kn isrecord isfinite inds nmr r
 
 let check_inductive env kn mie =
   (* First type-check the inductive definition *)
-  let (env_ar, env_ar_par, paramsctxt, inds) = typecheck_inductive env mie in
+  let (env_ar, env_ar_par, paramsctxt, isrecord, inds) = typecheck_inductive env mie in
   (* Then check positivity conditions *)
   let chkpos = (Environ.typing_flags env).check_guarded in
   let (nmr,recargs) = check_positivity ~chkpos kn env_ar_par paramsctxt mie.mind_entry_finite inds in
   (* Build the inductive packets *)
     build_inductive env mie.mind_entry_private mie.mind_entry_universes
-      env_ar paramsctxt kn mie.mind_entry_record mie.mind_entry_finite
+      env_ar paramsctxt kn isrecord mie.mind_entry_finite
       inds nmr recargs
