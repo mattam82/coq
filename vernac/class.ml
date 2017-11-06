@@ -17,7 +17,6 @@ open Entries
 open Environ
 open Classops
 open Declare
-open Globnames
 open Nametab
 open Decl_kinds
 

@@ -11,7 +11,6 @@ open Term
 open Vernacexpr
 open Constrexpr
 open Impargs
-open Globnames
 
 val primitive_flag : bool ref
 

@@ -262,9 +262,9 @@ val lookup_named_val : variable -> named_context_val -> named_declaration
 (* XXX Missing Sigma proxy *)
 val fresh_global :
   ?loc:Loc.t -> ?rigid:Evd.rigid -> ?names:Univ.Instance.t -> Environ.env ->
-  Evd.evar_map -> Globnames.global_reference -> Evd.evar_map * t
+  Evd.evar_map -> global_reference -> Evd.evar_map * t
 
-val is_global : Evd.evar_map -> Globnames.global_reference -> t -> bool
+val is_global : Evd.evar_map -> global_reference -> t -> bool
 
 (** {5 Extra} *)
 

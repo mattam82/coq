@@ -9,7 +9,6 @@
 open Term
 open EConstr
 open Names
-open Globnames
 
 type tactic = unit Proofview.tactic
 

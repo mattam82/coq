@@ -17,7 +17,6 @@ open Vars
 open Termops
 open Declarations
 open Names
-open Globnames
 open Nameops
 open Inductiveops
 open Tactics
@@ -631,7 +630,7 @@ repeat ( apply andb_prop in z;let z1:= fresh "Z" in destruct z as [z1 z]).
                         | App (c,ca) -> (
                           match EConstr.kind sigma c with
                           | Ind (indeq, u) ->
-                              if eq_gr (IndRef indeq) Coqlib.glob_eq
+                              if Globnames.eq_gr (IndRef indeq) Coqlib.glob_eq
                               then
                                 Tacticals.New.tclTHEN
                                   (do_replace_bl mode bl_scheme_key ind

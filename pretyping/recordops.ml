@@ -142,7 +142,7 @@ type obj_typ = {
   o_TCOMPS : constr list } (* ordered *)
 
 type cs_pattern =
-    Const_cs of global_reference
+    Const_cs of Names.global_reference
   | Prod_cs
   | Sort_cs of sorts_family
   | Default_cs

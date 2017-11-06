@@ -10,7 +10,6 @@ open Names
 open Environ
 open Reductionops
 open Libnames
-open Globnames
 open Misctypes
 
 (** A Pretty-Printer for the Calculus of Inductive Constructions. *)

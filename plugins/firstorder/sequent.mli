@@ -8,7 +8,7 @@
 
 open EConstr
 open Formula
-open Globnames
+open Names
 
 module OrderedConstr: Set.OrderedType with type t=Term.constr
 

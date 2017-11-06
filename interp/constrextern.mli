@@ -12,7 +12,6 @@ open Termops
 open EConstr
 open Environ
 open Libnames
-open Globnames
 open Glob_term
 open Pattern
 open Constrexpr

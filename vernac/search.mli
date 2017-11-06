@@ -10,7 +10,6 @@ open Names
 open Term
 open Environ
 open Pattern
-open Globnames
 
 (** {6 Search facilities. } *)
 

@@ -60,7 +60,7 @@ struct
   let compare=Term.compare
 end
 
-type h_item = global_reference * (int*Term.constr) option
+type h_item = Names.global_reference * (int*Term.constr) option
 
 module Hitem=
 struct
@@ -101,7 +101,7 @@ module HP=Heap.Functional(OrderedFormula)
 
 type t=
     {redexes:HP.t;
-     context:(global_reference list) CM.t;
+     context:(Names.global_reference list) CM.t;
      latoms:constr list;
      gl:types;
      glatom:constr option;

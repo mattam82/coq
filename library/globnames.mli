@@ -11,13 +11,6 @@ open Names
 open Term
 open Mod_subst
 
-(** {6 Global reference is a kernel side type for all references together } *)
-type global_reference = Names.global_reference =
-  | VarRef of variable           (** A reference to the section-context. *)
-  | ConstRef of constant         (** A reference to the environment. *)
-  | IndRef of inductive          (** A reference to an inductive type. *)
-  | ConstructRef of constructor  (** A reference to a constructor of an inductive type. *)
-
 val isVarRef : global_reference -> bool
 val isConstRef : global_reference -> bool
 val isIndRef : global_reference -> bool
@@ -101,3 +94,11 @@ val decode_con : constant -> DirPath.t * Id.t
 val pop_con : constant -> constant
 val pop_kn : mutual_inductive-> mutual_inductive
 val pop_global_reference : global_reference -> global_reference
+
+(** {6 Global reference is a kernel side type for all references together } *)
+type global_reference = Names.global_reference =
+  | VarRef of variable           (** A reference to the section-context. *)
+  | ConstRef of constant         (** A reference to the environment. *)
+  | IndRef of inductive          (** A reference to an inductive type. *)
+  | ConstructRef of constructor  (** A reference to a constructor of an inductive type. *)
+[@@ocaml.deprecated "Alias of Names.global_reference"]
