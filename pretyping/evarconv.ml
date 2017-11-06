@@ -462,7 +462,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
   in
   let rigids env evd sk term sk' term' =
     let check_strict () =
-      let univs = EConstr.eq_constr_universes evd term term' in
+      let univs = EConstr.eq_constr_universes env evd term term' in
       match univs with
       | Some univs ->
         begin
@@ -475,7 +475,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
     in
     let first_try_strict_check cond u u' try_subtyping_constraints =
       if cond then
-        let univs = EConstr.eq_constr_universes evd term term' in
+        let univs = EConstr.eq_constr_universes env evd term term' in
         match univs with
         | Some univs ->
           begin
@@ -797,7 +797,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
 	     allow this identification (first-order unification of universes). Otherwise
 	     fallback to unfolding.
 	  *)
-	  let univs = EConstr.eq_constr_universes evd term1 term2 in
+          let univs = EConstr.eq_constr_universes env evd term1 term2 in
           match univs with
           | Some univs ->
 	      ise_and i [(fun i -> 
@@ -1104,7 +1104,7 @@ let apply_on_subterm env evdref f c t =
     (* By using eq_constr, we make an approximation, for instance, we *)
     (* could also be interested in finding a term u convertible to t *)
     (* such that c occurs in u *)
-    let eq_constr c1 c2 = match EConstr.eq_constr_universes !evdref c1 c2 with
+    let eq_constr c1 c2 = match EConstr.eq_constr_universes env !evdref c1 c2 with
     | None -> false
     | Some cstr ->
       try ignore (Evd.add_universe_constraints !evdref cstr); true
