@@ -56,6 +56,16 @@ constructors. *)
 val convert_instances : flex:bool -> Univ.Instance.t -> Univ.Instance.t ->
   'a * 'a universe_compare -> 'a * 'a universe_compare
 
+val convert_inductives : conv_pb -> Declarations.mutual_inductive_body * int ->
+  Univ.Instance.t -> int ->
+  Univ.Instance.t -> int ->
+  'a universe_state -> 'a universe_state
+
+val convert_constructors : Declarations.mutual_inductive_body * int * int ->
+  Univ.Instance.t -> int ->
+  Univ.Instance.t -> int ->
+  'a universe_state -> 'a universe_state
+
 (** These two never raise UnivInconsistency, inferred_universes
     just gathers the constraints. *)
 val checked_universes : UGraph.t universe_compare

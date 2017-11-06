@@ -12,7 +12,7 @@ open Term
 open Mod_subst
 
 (** {6 Global reference is a kernel side type for all references together } *)
-type global_reference =
+type global_reference = Names.global_reference =
   | VarRef of variable           (** A reference to the section-context. *)
   | ConstRef of constant         (** A reference to the environment. *)
   | IndRef of inductive          (** A reference to an inductive type. *)

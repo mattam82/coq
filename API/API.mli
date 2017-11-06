@@ -2700,7 +2700,8 @@ sig
   val fold : Evd.evar_map -> ('a -> constr -> 'a) -> 'a -> constr -> 'a
   val existential_type : Evd.evar_map -> existential -> types
   val iter : Evd.evar_map -> (constr -> unit) -> constr -> unit
-  val eq_constr_universes : Evd.evar_map -> constr -> constr -> Universes.universe_constraints option
+  val eq_constr_universes : Environ.env -> Evd.evar_map ->
+    constr -> constr -> Universes.universe_constraints option
   val eq_constr_nounivs : Evd.evar_map -> constr -> constr -> bool
   val compare_constr : Evd.evar_map -> (constr -> constr -> bool) -> constr -> constr -> bool
   val isApp : Evd.evar_map -> constr -> bool
