@@ -161,8 +161,8 @@ let native_conv cv_pb sigma env t1 t2 =
   else
   let univs = Environ.universes env in
   let b =
-    if cv_pb = CUMUL then Constr.leq_constr_univs univs t1 t2
-    else Constr.eq_constr_univs univs t1 t2
+    if cv_pb = CUMUL then CompareConstr.leq_constr_univs env univs t1 t2
+    else CompareConstr.eq_constr_univs env univs t1 t2
   in
   if not b then
     let univs = (univs, checked_universes) in

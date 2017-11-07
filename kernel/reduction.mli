@@ -33,7 +33,7 @@ type 'a extended_conversion_function =
   ?evars:((existential->constr option) * UGraph.t) ->
   'a -> 'a -> unit
 
-type conv_pb = CONV | CUMUL
+type conv_pb = CompareConstr.conv_pb = CONV | CUMUL
 
 type 'a universe_compare =
   { (* Might raise NotConvertible *)

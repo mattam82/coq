@@ -138,8 +138,6 @@ let mkCoFix = Constr.mkCoFix
 (**********************************************************************)
 
 let eq_constr = Constr.equal
-let eq_constr_univs = Constr.eq_constr_univs
-let leq_constr_univs = Constr.leq_constr_univs
 let eq_constr_nounivs = Constr.eq_constr_nounivs
 
 let kind_of_term = Constr.kind

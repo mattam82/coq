@@ -568,75 +568,10 @@ let compare_constr sigma cmp c1 c2 =
   (* TODO upto cumulativity of inductives? *)
   compare_gen kind (fun _ _ -> Univ.Instance.equal) Sorts.equal cmp (unsafe_to_constr c1) (unsafe_to_constr c2)
 
-
-let cmp_cumulative_inductive_instances cv_pb uinfind u u' =
-  let len_instance =
-    Univ.AUContext.size (Univ.ACumulativityInfo.univ_context uinfind)
-  in
-  let ind_sbctx =  Univ.ACumulativityInfo.subtyp_context uinfind  in
-  if not ((len_instance = Univ.Instance.length u) &&
-          (len_instance = Univ.Instance.length u')) then
-     anomaly (Pp.str "Invalid inductive subtyping encountered!")
-  else
-    let comp_cst =
-      let comp_subst = (Univ.Instance.append u u') in
-      Univ.AUContext.instantiate comp_subst ind_sbctx
-    in
-    let comp_cst =
-      match cv_pb with
-      | Reduction.CONV ->
-        let comp_subst = (Univ.Instance.append u' u) in
-        let comp_cst' = Univ.AUContext.instantiate comp_subst ind_sbctx in
-        Univ.Constraint.union comp_cst comp_cst'
-      | Reduction.CUMUL -> comp_cst
-    in
-    comp_cst
-
-let cmp_inductives cv_pb (mind,ind) nargs u1 u2 cstrs =
-  let open Universes in
-  match mind.Declarations.mind_universes with
-  | Declarations.Monomorphic_ind _ ->
-    assert (Univ.Instance.length u1 = 0 && Univ.Instance.length u2 = 0);
-    cstrs
-  | Declarations.Polymorphic_ind _ ->
-     enforce_eq_instances_univs true u1 u2 cstrs
-  | Declarations.Cumulative_ind cumi ->
-    let num_param_arity =
-      mind.Declarations.mind_nparams +
-      mind.Declarations.mind_packets.(ind).Declarations.mind_nrealargs
-    in
-    if not (Int.equal num_param_arity nargs) then
-      enforce_eq_instances_univs true u1 u2 cstrs
-    else
-      let newcstrs = cmp_cumulative_inductive_instances cv_pb cumi u1 u2 in
-      let newcstrs = of_constraints true newcstrs in
-      Constraints.union cstrs newcstrs
-
-let cmp_constructors (mind, ind, cns) nargs u1 u2 cstrs =
-  let open Universes in
-  match mind.Declarations.mind_universes with
-  | Declarations.Monomorphic_ind _ ->
-    assert (Univ.Instance.length u1 = 0 && Univ.Instance.length u2 = 0);
-    cstrs
-  | Declarations.Polymorphic_ind _ ->
-    enforce_eq_instances_univs true u1 u2 cstrs
-  | Declarations.Cumulative_ind cumi ->
-    let num_cnstr_args =
-      let nparamsctxt =
-        mind.Declarations.mind_nparams +
-        mind.Declarations.mind_packets.(ind).Declarations.mind_nrealargs
-        (* Context.Rel.length mind.Declarations.mind_params_ctxt *) in
-      nparamsctxt + mind.Declarations.mind_packets.(ind).Declarations.mind_consnrealargs.(cns - 1)
-    in
-    if not (Int.equal num_cnstr_args nargs) then
-      enforce_eq_instances_univs true u1 u2 cstrs
-    else
-      let newcstrs = cmp_cumulative_inductive_instances Reduction.CONV cumi u1 u2 in
-      let newcstrs = of_constraints true newcstrs in
-      Constraints.union cstrs newcstrs
-
 let eq_universes env sigma cv_pb cstrs ref nargs l l' =
   let open Universes in
+  let cmp_instances u u' cstrs = enforce_eq_instances_univs true u u' cstrs in
+  let cmp_cumul csts cstrs = Constraints.union (of_constraints true csts) cstrs in
   let l = EInstance.kind sigma (EInstance.make l) in
   let l' = EInstance.kind sigma (EInstance.make l') in
   match ref with
@@ -645,11 +580,13 @@ let eq_universes env sigma cv_pb cstrs ref nargs l l' =
     cstrs := enforce_eq_instances_univs true l l' !cstrs; true
   | IndRef ind ->
     let mind = Environ.lookup_mind (fst ind) env in
-    cstrs := cmp_inductives cv_pb (mind,snd ind) nargs l l' !cstrs;
+    cstrs := CompareConstr.convert_inductives_gen cmp_instances cmp_cumul cv_pb
+        (mind,snd ind) nargs l l' !cstrs;
     true
   | ConstructRef ((mi,ind),ctor) ->
     let mind = Environ.lookup_mind mi env in
-    cstrs := cmp_constructors (mind,ind,ctor) nargs l l' !cstrs;
+    cstrs := CompareConstr.convert_constructors_gen cmp_instances cmp_cumul
+        (mind,ind,ctor) nargs l l' !cstrs;
     true
 
 let test_constr_universes env sigma leq m n =

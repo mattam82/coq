@@ -181,7 +181,7 @@ exception NotConvertibleVect of int
     and this holds whatever Set is predicative or impredicative
 *)
 
-type conv_pb =
+type conv_pb = CompareConstr.conv_pb =
   | CONV
   | CUMUL
 
@@ -207,73 +207,12 @@ let sort_cmp_universes env pb s0 s1 (u, check) =
 let convert_instances ~flex u u' (s, check) =
   (check.compare_instances ~flex u u' s, check)
 
-let get_cumulativity_constraints cv_pb cumi u u' =
-  let length_ind_instance =
-    Univ.AUContext.size (Univ.ACumulativityInfo.univ_context cumi)
-  in
-  let ind_subtypctx = Univ.ACumulativityInfo.subtyp_context cumi in
-  if not ((length_ind_instance = Univ.Instance.length u) &&
-          (length_ind_instance = Univ.Instance.length u')) then
-     anomaly (Pp.str "Invalid inductive subtyping encountered!")
-  else
-    let comp_cst =
-      let comp_subst = (Univ.Instance.append u u') in
-      Univ.AUContext.instantiate comp_subst ind_subtypctx
-    in
-    match cv_pb with
-    | CONV ->
-      let comp_cst' =
-        let comp_subst = (Univ.Instance.append u' u) in
-        Univ.AUContext.instantiate comp_subst ind_subtypctx
-      in
-      Univ.Constraint.union comp_cst comp_cst'
-    | CUMUL -> comp_cst
-
-let convert_inductives_gen cmp_instances cmp_cumul cv_pb (mind,ind) nargs u1 u2 s =
-  match mind.Declarations.mind_universes with
-  | Declarations.Monomorphic_ind _ ->
-    assert (Univ.Instance.length u1 = 0 && Univ.Instance.length u2 = 0);
-    s
-  | Declarations.Polymorphic_ind _ ->
-    cmp_instances u1 u2 s
-  | Declarations.Cumulative_ind cumi ->
-    let num_param_arity =
-      mind.Declarations.mind_nparams +
-      mind.Declarations.mind_packets.(ind).Declarations.mind_nrealargs
-    in
-    if not (Int.equal num_param_arity nargs) then
-      cmp_instances u1 u2 s
-    else
-      let csts = get_cumulativity_constraints cv_pb cumi u1 u2 in
-      cmp_cumul csts s
-
 let convert_inductives cv_pb ind nargs u1 u2 (s, check) =
-  convert_inductives_gen (check.compare_instances ~flex:false) check.compare_cumul_instances
+  CompareConstr.convert_inductives_gen (check.compare_instances ~flex:false) check.compare_cumul_instances
     cv_pb ind nargs u1 u2 s, check
 
-let convert_constructors_gen cmp_instances cmp_cumul (mind, ind, cns) nargs u1 u2 s =
-  match mind.Declarations.mind_universes with
-  | Declarations.Monomorphic_ind _ ->
-    assert (Univ.Instance.length u1 = 0 && Univ.Instance.length u2 = 0);
-    s
-  | Declarations.Polymorphic_ind _ ->
-    cmp_instances u1 u2 s
-  | Declarations.Cumulative_ind cumi ->
-    let num_cnstr_args =
-      let nparamsctxt =
-        mind.Declarations.mind_nparams +
-        mind.Declarations.mind_packets.(ind).Declarations.mind_nrealargs
-        (* Context.Rel.length mind.Declarations.mind_params_ctxt *) in
-      nparamsctxt + mind.Declarations.mind_packets.(ind).Declarations.mind_consnrealargs.(cns - 1)
-    in
-    if not (Int.equal num_cnstr_args nargs) then
-      cmp_instances u1 u2 s
-    else
-      let csts = get_cumulativity_constraints CONV cumi u1 u2 in
-      cmp_cumul csts s
-
 let convert_constructors ctor nargs u1 u2 (s, check) =
-  convert_constructors_gen (check.compare_instances ~flex:false) check.compare_cumul_instances
+  CompareConstr.convert_constructors_gen (check.compare_instances ~flex:false) check.compare_cumul_instances
     ctor nargs u1 u2 s, check
 
 let conv_table_key infos k1 k2 cuniv =
@@ -754,8 +693,8 @@ let inferred_universes : (UGraph.t * Univ.Constraint.t) universe_compare =
 
 let gen_conv cv_pb l2r reds env evars univs t1 t2 =
   let b = 
-    if cv_pb = CUMUL then leq_constr_univs univs t1 t2 
-    else eq_constr_univs univs t1 t2
+    if cv_pb = CUMUL then CompareConstr.leq_constr_univs env univs t1 t2
+    else CompareConstr.eq_constr_univs env univs t1 t2
   in
     if b then ()
     else 
@@ -780,15 +719,16 @@ let generic_conv cv_pb ~l2r evars reds env univs t1 t2 =
   in s
 
 let infer_conv_universes cv_pb l2r evars reds env univs t1 t2 =
-  let b, cstrs =
-    if cv_pb == CUMUL then Constr.leq_constr_univs_infer univs t1 t2
-    else Constr.eq_constr_univs_infer univs t1 t2
+  let cstrs =
+    if cv_pb == CUMUL then CompareConstr.leq_constr_univs_infer env univs t1 t2
+    else CompareConstr.eq_constr_univs_infer env univs t1 t2
   in
-    if b then cstrs
-    else
-      let univs = ((univs, Univ.Constraint.empty), inferred_universes) in
-      let ((_,cstrs), _) = clos_gen_conv reds cv_pb l2r evars env univs t1 t2 in
-	cstrs
+  match cstrs with
+  | Some cstrs -> cstrs
+  | None ->
+    let univs = ((univs, Univ.Constraint.empty), inferred_universes) in
+    let ((_,cstrs), _) = clos_gen_conv reds cv_pb l2r evars env univs t1 t2 in
+    cstrs
 
 (* Profiling *)
 let infer_conv_universes = 

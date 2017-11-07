@@ -27,6 +27,7 @@ Nativelambda
 Nativecode
 Nativelib
 Environ
+CompareConstr
 CClosure
 Reduction
 Nativeconv

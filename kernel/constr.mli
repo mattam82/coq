@@ -229,22 +229,6 @@ val of_kind : (constr, types, Sorts.t, Univ.Instance.t) kind_of_term -> constr
    and application grouping *)
 val equal : constr -> constr -> bool
 
-(** [eq_constr_univs u a b] is [true] if [a] equals [b] modulo alpha, casts,
-   application grouping and the universe equalities in [u]. *)
-val eq_constr_univs : constr UGraph.check_function
-
-(** [leq_constr_univs u a b] is [true] if [a] is convertible to [b] modulo 
-    alpha, casts, application grouping and the universe inequalities in [u]. *)
-val leq_constr_univs : constr UGraph.check_function
-
-(** [eq_constr_univs u a b] is [true] if [a] equals [b] modulo alpha, casts,
-   application grouping and the universe equalities in [u]. *)
-val eq_constr_univs_infer : UGraph.t -> constr -> constr -> bool Univ.constrained
-
-(** [leq_constr_univs u a b] is [true] if [a] is convertible to [b] modulo 
-    alpha, casts, application grouping and the universe inequalities in [u]. *)
-val leq_constr_univs_infer : UGraph.t -> constr -> constr -> bool Univ.constrained
-
 (** [eq_constr_univs a b] [true, c] if [a] equals [b] modulo alpha, casts,
    application grouping and ignoring universe instances. *)
 val eq_constr_nounivs : constr -> constr -> bool
