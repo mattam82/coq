@@ -380,6 +380,8 @@ and check_signatures cst env mp1 sig1 mp2 sig2 subst1 subst2 reso1 reso2=
     List.fold_left check_one_body cst sig2
 
 and check_modtypes cst env mtb1 mtb2 subst1 subst2 equiv =
+  let env = add_module_type mtb1.mod_mp mtb1 env in
+  let env = Environ.push_context_set ~strict:true mtb1.mod_constraints env in
   if mtb1==mtb2 || mtb1.mod_type == mtb2.mod_type then cst
   else
     let rec check_structure cst env str1 str2 equiv subst1 subst2 =
@@ -425,8 +427,6 @@ and check_modtypes cst env mtb1 mtb2 subst1 subst2 equiv =
     check_structure cst env mtb1.mod_type mtb2.mod_type equiv subst1 subst2
 
 let check_subtypes env sup super =
-  let env = add_module_type sup.mod_mp sup env in
-  let env = Environ.push_context_set ~strict:true super.mod_constraints env in
   check_modtypes Univ.Constraint.empty env
     (strengthen sup sup.mod_mp) super empty_subst
     (map_mp super.mod_mp sup.mod_mp sup.mod_delta) false
