@@ -355,13 +355,16 @@ and check_signatures cst env mp1 sig1 mp2 sig2 subst1 subst2 reso1 reso2=
   let map1 = make_labmap mp1 sig1 in
   let check_one_body cst (l,spec2) =
     match spec2 with
-	| SFBconst cb2 ->
-	    check_constant cst env mp1 l (get_obj mp1 map1 l)
-	      cb2 spec2 subst1 subst2
-	| SFBmind mib2 ->
-	    check_inductive cst env mp1 l (get_obj mp1 map1 l)
-	      mp2 mib2 spec2 subst1 subst2 reso1 reso2
-	| SFBmodule msb2 ->
+    | SFBconst cb2 ->
+       let obj = get_obj mp1 map1 l in
+       let env = add_structure mp1 [(l,spec2)] reso1 env in
+       check_constant cst env mp1 l obj cb2 spec2 subst1 subst2
+    | SFBmind mib2 ->
+       let obj = get_obj mp1 map1 l in
+       let env = add_structure mp1 [(l,spec2)] reso1 env in
+       check_inductive cst env mp1 l obj
+                       mp2 mib2 spec2 subst1 subst2 reso1 reso2
+    | SFBmodule msb2 ->
 	    begin match get_mod mp1 map1 l with
 	      | Module msb -> check_modules cst env msb msb2 subst1 subst2
 	      | _ -> error_signature_mismatch l spec2 ModuleFieldExpected
@@ -426,7 +429,7 @@ and check_modtypes cst env mtb1 mtb2 subst1 subst2 equiv =
 
 let check_subtypes env sup super =
   let env = add_module_type sup.mod_mp sup env in
-  let env = Environ.push_context_set ~strict:true super.mod_constraints env in
+  let env = Environ.push_context_set ~strict:true sup.mod_constraints env in
   check_modtypes Univ.Constraint.empty env
     (strengthen sup sup.mod_mp) super empty_subst
     (map_mp super.mod_mp sup.mod_mp sup.mod_delta) false
