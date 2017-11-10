@@ -358,7 +358,7 @@ End BushkToList_Type.
 
 Module BushDep (BushkToListM:BushkToList_Type).
 
-Module Bush := Bush BushkToListM.
+Module Bush' := Bush BushkToListM.
 
 Import Bush.
 Import BushkToListM.

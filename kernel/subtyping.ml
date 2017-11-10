@@ -79,9 +79,8 @@ let make_labmap mp list =
   in
   List.fold_right add_one list empty_labmap
 
-
 let check_conv_error error why cst poly f env a1 a2 =
-  try 
+  try
     let cst' = f env (Environ.universes env) a1 a2 in
       if poly then 
 	if Constraint.is_empty cst' then cst
@@ -301,6 +300,7 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
       let cb1 = Declareops.subst_const_body subst1 cb1 in
       let cb2 = Declareops.subst_const_body subst2 cb2 in
       (* Start by checking universes *)
+      Printf.printf "check_constant univs\n%!";
       let poly, env =
         match cb1.const_universes, cb2.const_universes with
         | Monomorphic_const _, Monomorphic_const _ ->
@@ -315,7 +315,9 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
       (* Now check types *)
       let typ1 = cb1.const_type in
       let typ2 = cb2.const_type in
+      Printf.printf "check_constant types\n%!";
       let cst = check_type poly cst env typ1 typ2 in
+      Printf.printf "check_constant bodies\n%!";
       (* Now we check the bodies:
 	 - A transparent constant can only be implemented by a compatible
 	   transparent constant.
@@ -330,8 +332,11 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
 	    | Def lc1 ->
 	      (* NB: cb1 might have been strengthened and appear as transparent.
 		 Anyway [check_conv] will handle that afterwards. *)
+               Printf.printf "check_constant force lc1\n%!";
 	      let c1 = Mod_subst.force_constr lc1 in
+               Printf.printf "check_constant force lc2\n%!";
 	      let c2 = Mod_subst.force_constr lc2 in
+               Printf.printf "check_constant convert bodies\n%!";
 	      check_conv NotConvertibleBodyField cst poly infer_conv env c1 c2))
    | IndType ((kn,i),mind1) ->
        CErrors.user_err Pp.(str @@
@@ -347,42 +352,49 @@ let check_constant cst env mp1 l info1 cb2 spec2 subst1 subst2 =
        "name.")
 
 let rec check_modules cst env msb1 msb2 subst1 subst2 =
+  Printf.printf "check_modules\n%!";
   let mty1 = module_type_of_module msb1 in
   let mty2 =  module_type_of_module msb2 in
   check_modtypes cst env mty1 mty2 subst1 subst2 false
 
-and check_signatures cst env mp1 sig1 mp2 sig2 subst1 subst2 reso1 reso2= 
+and check_signatures cst env mp1 sig1 mp2 sig2 subst1 subst2 reso1 reso2=
+  Printf.printf "check_signatures\n%!";
   let map1 = make_labmap mp1 sig1 in
+  let env = add_structure mp1 sig1 reso1 env in
+  (* let env = Environ.push_context_set ~strict:true sup.mod_constraints env in *)
   let check_one_body cst (l,spec2) =
     match spec2 with
     | SFBconst cb2 ->
+       Printf.printf "check_signatures const\n%!";
        let obj = get_obj mp1 map1 l in
-       let env = add_structure mp1 [(l,spec2)] reso1 env in
        check_constant cst env mp1 l obj cb2 spec2 subst1 subst2
     | SFBmind mib2 ->
+       Printf.printf "check_signatures mind\n%!";
        let obj = get_obj mp1 map1 l in
-       let env = add_structure mp1 [(l,spec2)] reso1 env in
        check_inductive cst env mp1 l obj
                        mp2 mib2 spec2 subst1 subst2 reso1 reso2
     | SFBmodule msb2 ->
+       Printf.printf "check_signatures module\n%!";
 	    begin match get_mod mp1 map1 l with
 	      | Module msb -> check_modules cst env msb msb2 subst1 subst2
 	      | _ -> error_signature_mismatch l spec2 ModuleFieldExpected
 	    end
 	| SFBmodtype mtb2 ->
+       Printf.printf "check_signatures modtype\n%!";
 	    let mtb1 = match get_mod mp1 map1 l with
 	      | Modtype mtb -> mtb
 	      | _ -> error_signature_mismatch l spec2 ModuleTypeFieldExpected
 	    in
-	    let env =
-              add_module_type mtb2.mod_mp mtb2
-	        (add_module_type mtb1.mod_mp mtb1 env)
-            in
+            (* let env = *)
+            (*   add_module_type mtb2.mod_mp mtb2 *)
+            (*     (add_module_type mtb1.mod_mp mtb1 env) *)
+            (* in *)
 	    check_modtypes cst env mtb1 mtb2 subst1 subst2 true
   in
     List.fold_left check_one_body cst sig2
 
 and check_modtypes cst env mtb1 mtb2 subst1 subst2 equiv =
+  Printf.printf "check_modtypes\n%!";
   if mtb1==mtb2 || mtb1.mod_type == mtb2.mod_type then cst
   else
     let rec check_structure cst env str1 str2 equiv subst1 subst2 =
@@ -390,7 +402,7 @@ and check_modtypes cst env mtb1 mtb2 subst1 subst2 equiv =
       |NoFunctor list1,
        NoFunctor list2 ->
 	if equiv then
-	  let subst2 = add_mp mtb2.mod_mp mtb1.mod_mp mtb1.mod_delta subst2 in
+          (* let subst2 = add_mp mtb2.mod_mp mtb1.mod_mp mtb1.mod_delta subst2 in *)
           let cst1 = check_signatures cst env
 	    mtb1.mod_mp list1 mtb2.mod_mp list2 subst1 subst2
 	    mtb1.mod_delta mtb2.mod_delta
@@ -411,25 +423,25 @@ and check_modtypes cst env mtb1 mtb2 subst1 subst2 equiv =
 	let cst = check_modtypes cst env arg_t2 arg_t1 subst2 subst1 equiv in
         (* contravariant *)
 	let env = add_module_type mp2 arg_t2 env in
-	let env =
-          if Modops.is_functor body_t1 then env
-          else add_module
-            {mod_mp = mtb1.mod_mp;
-	     mod_expr = Abstract;
-	     mod_type = subst_signature subst1 body_t1;
-	     mod_type_alg = None;
-	     mod_constraints = mtb1.mod_constraints;
-	     mod_retroknowledge = ModBodyRK [];
-	     mod_delta = mtb1.mod_delta} env
-	in
+        (* let env = *)
+        (*   if Modops.is_functor body_t1 then env *)
+        (*   else add_module *)
+        (*     {mod_mp = mtb1.mod_mp; *)
+        (*      mod_expr = Abstract; *)
+        (*      mod_type = subst_signature subst1 body_t1; *)
+        (*      mod_type_alg = None; *)
+        (*      mod_constraints = mtb1.mod_constraints; *)
+        (*      mod_retroknowledge = ModBodyRK []; *)
+        (*      mod_delta = mtb1.mod_delta} env *)
+        (* in *)
 	check_structure cst env body_t1 body_t2 equiv subst1 subst2
       | _ , _ -> error_incompatible_modtypes mtb1 mtb2
     in
     check_structure cst env mtb1.mod_type mtb2.mod_type equiv subst1 subst2
 
 let check_subtypes env sup super =
-  let env = add_module_type sup.mod_mp sup env in
-  let env = Environ.push_context_set ~strict:true sup.mod_constraints env in
+  (* let env = add_module_type sup.mod_mp sup env in *)
+  (* let env = Environ.push_context_set ~strict:true sup.mod_constraints env in *)
   check_modtypes Univ.Constraint.empty env
     (strengthen sup sup.mod_mp) super empty_subst
     (map_mp super.mod_mp sup.mod_mp sup.mod_delta) false
