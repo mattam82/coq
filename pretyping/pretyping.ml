@@ -518,23 +518,30 @@ let pretype_ref ?loc evdref env ref us =
     let ty = unsafe_type_of env.ExtraEnv.env evd c in
       make_judge c ty
 
-let judge_of_Type ?loc evd s =
-  let evd, s = interp_universe ?loc evd s in
+let judge_of_Type ?loc env evd s =
+  let evd, u = interp_universe ?loc evd s in
+  let evd, u' =
+    if Univ.Universe.is_levels u then evd, Univ.super u
+    else (* u is algebraic already, use an explicit subtyping constraint instead *)
+      let evd, l = new_univ_variable ?loc univ_flexible evd in
+      let evd = Evd.set_leq_sort env evd (Type u) (Type l) in
+      evd, Univ.super l
+  in
   let judge = 
-    { uj_val = mkSort (Type s); uj_type = mkSort (Type (Univ.super s)) }
+    { uj_val = mkSort (Type u); uj_type = mkSort (Type u') }
   in
     evd, judge
 
-let pretype_sort ?loc evdref = function
+let pretype_sort ?loc env evdref = function
   | GProp -> judge_of_prop
   | GSet -> judge_of_set
-  | GType s -> evd_comb1 (judge_of_Type ?loc) evdref s
+  | GType s -> evd_comb1 (judge_of_Type ?loc env) evdref s
 
 let new_type_evar env evdref loc =
   let sigma = !evdref in
   let (sigma, (e, _)) =
     Evarutil.new_type_evar env.ExtraEnv.env sigma
-      univ_flexible_alg ~src:(loc,Evar_kinds.InternalHole)
+      univ_flexible ~src:(loc,Evar_kinds.InternalHole)
   in
   evdref := sigma;
   e
@@ -704,7 +711,7 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
 	inh_conv_coerce_to_tycon ?loc env evdref fixj tycon
 
   | GSort s ->
-    let j = pretype_sort ?loc evdref s in
+    let j = pretype_sort ?loc env.ExtraEnv.env evdref s in
       inh_conv_coerce_to_tycon ?loc env evdref j tycon
 
   | GApp (f,args) ->
@@ -1119,7 +1126,7 @@ and pretype_type k0 resolve_tc valcon (env : ExtraEnv.t) evdref lvar c = match D
 	     utj_type = s }
        | None ->
            let env = ltac_interp_name_env k0 lvar env !evdref in
-	   let s = evd_comb0 (new_sort_variable univ_flexible_alg) evdref in
+           let s = evd_comb0 (new_sort_variable univ_flexible) evdref in
 	     { utj_val = e_new_evar env evdref ~src:(loc, knd) ~naming (mkSort s);
 	       utj_type = s})
   | _ ->
