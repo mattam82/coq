@@ -277,13 +277,6 @@ let type_of_apply env evars func funt argsv argstv =
 
 (* Type of product *)
 
-let is_impredicative_sort env s =
-  let open Sorts in
-  match s with
-  | SProp | Prop -> true
-  | Set -> is_impredicative_set env
-  | _ -> false
-
 let sort_of_product env domsort rangsort =
   let open Sorts in
   match (domsort, rangsort) with
@@ -414,7 +407,7 @@ let rec infer env evars cstr =
   | Prod (name,c1,c2) ->
     let env1 = push_rel (LocalAssum (name,c1)) env in
     let rang = infer_type env1 evars c2 in
-    if is_impredicative_sort env rang then mkSort rang
+    if Environ.is_impredicative_sort env rang then mkSort rang
     else
       let dom = infer_type env evars c1 in
       type_of_product env name dom rang

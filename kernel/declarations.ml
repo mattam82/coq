@@ -124,6 +124,27 @@ type regular_inductive_arity = {
 
 type inductive_arity = (regular_inductive_arity, template_arity) declaration_arity
 
+(** A constructor is invertible if its out_tree is made of invertible constructors. *)
+type ctor_invertible = Invertible | NotInvertible
+
+(** An argument to a constructor [c] is forced iff it appears as a
+   non-forced argument of a constructor in the out_tree of [c]. *)
+type ctor_arg_info = ForcedArg | MatchArg
+
+(* This is supposed to verify that each Variable occurs only once
+   (with uip mode, may also occur in Eqn nodes). Note how we don't
+   look at ForcedArg occurences. *)
+type ctor_out_tree =
+  | OutInvert of Names.constructor * ctor_out_tree option array (* We only look at the MathArg locations, parameters do not appear not even as None. *)
+  | OutVariable of int
+  (* | OutEqn of Constr.t (* eg eq_refl, needs uip mode. TODO consider if allowed to be non variable. *) *)
+
+type ctor_info = {
+  ctor_invertible : ctor_invertible;
+  ctor_arg_infos : ctor_arg_info array; (* no parameters *)
+  ctor_out_tree : ctor_out_tree array option; (** 1 for each index (no parameters), None if not natural SProp type (ie squashed or non-SProp). *)
+}
+
 type one_inductive_body = {
 (** {8 Primitive datas } *)
 
@@ -157,6 +178,10 @@ type one_inductive_body = {
  (** Length of the signature of the constructors (with let, w/o params) *)
 
     mind_recargs : wf_paths; (** Signature of recursive arguments in the constructors *)
+
+    mind_lc_info : ctor_info array;
+
+    mind_natural_sprop : bool;
 
 (** {8 Datas for bytecode compilation } *)
 

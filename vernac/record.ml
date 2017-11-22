@@ -148,8 +148,7 @@ let typecheck_params_and_fields finite def id pl t ps nots fs =
     Pretyping.solve_remaining_evars Pretyping.all_and_fail_flags env_ar !evars Evd.empty in
   let typ, evars =
     let _, univ = compute_constructor_level evars env_ar newfs in
-      if not def && (Sorts.is_prop sort ||
-	(Sorts.is_set sort && is_impredicative_set env0)) then
+      if not def && (is_impredicative_sort env0 sort) then
 	typ, evars
       else
         let evars = Evd.set_leq_sort env_ar evars (Sorts.sort_of_univ univ) sort in

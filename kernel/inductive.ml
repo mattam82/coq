@@ -303,11 +303,8 @@ let build_dependent_inductive ind (_,mip) params =
 exception LocalArity of (Sorts.family * Sorts.family * arity_error) option
 
 let check_allowed_sort ksort specif =
-  let open Sorts in
-  let eq_ksort s = match ksort, s with
-  | InProp, InProp | InSet, InSet | InType, InType -> true
-  | _ -> false in
-  if not (CList.exists eq_ksort (elim_sorts specif)) then
+  let eq_ksort s = Sorts.family_equal ksort s in
+  if not (List.exists eq_ksort (elim_sorts specif)) then
     let s = inductive_sort_family (snd specif) in
     raise (LocalArity (Some(ksort,s,error_elim_explain ksort s)))
 

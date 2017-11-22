@@ -52,6 +52,17 @@ let is_impredicative_set env =
   | ImpredicativeSet -> true
   | _ -> false
 
+let is_impredicative_sort env s =
+  let open Sorts in
+  match s with
+  | SProp | Prop -> true
+  | Set -> is_impredicative_set env
+  | _ -> false
+
+let is_impredicative_univ env u =
+  let open Univ in
+  Universe.is_sprop u || Universe.is_type0m u || (is_impredicative_set env && Universe.is_type0 u)
+
 let type_in_type env = not (typing_flags env).check_universes
 let deactivated_guard env = not (typing_flags env).check_guarded
 

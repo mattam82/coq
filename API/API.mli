@@ -1323,6 +1323,8 @@ sig
 
   type inductive_arity = (regular_inductive_arity, template_arity) declaration_arity
 
+  type ctor_info
+
   type one_inductive_body = {
         mind_typename : Names.Id.t;
         mind_arity_ctxt : Context.Rel.t;
@@ -1336,6 +1338,8 @@ sig
         mind_consnrealargs : int array;
         mind_consnrealdecls : int array;
         mind_recargs : wf_paths;
+        mind_lc_info : ctor_info array;
+        mind_natural_sprop : bool;
         mind_nb_constant : int;
         mind_nb_args : int;
         mind_reloc_tbl :  Cbytecodes.reloc_table;
