@@ -52,6 +52,16 @@ Defined.
 Fail Definition big_pb (b:BIG) : pb :=
   match b return pb with foo => pt | bar => pf end.
 
+Inductive which_pb : pb -> SProp :=
+| is_pt : which_pb pt
+| is_pf : which_pb pf.
+
+Fail Definition pb_which b (w:which_pb b) : bool
+  := match w with
+     | is_pt => true
+     | is_pf => false
+     end.
+
 Inductive sNZ : nat -> SProp := snz : forall n, sNZ (S n).
 
 Definition sPred (n:nat) (s:sNZ n) : nat :=
@@ -73,4 +83,5 @@ Definition spred3' n (s:sNZ _) : sPred n s = n := eq_refl.
 
 Inductive sprod (A B : SProp) : SProp := spair : A -> B -> sprod A B.
 
-and the reduction stuff *)
+pretyping of matches landing in SProp
+ *)

@@ -867,7 +867,15 @@ let allowed_sorts is_smashed s =
     (* Smashed to Prop, no informative eliminations allowed *)
     | InProp -> logical_sorts
     | InSProp -> sprop_sorts
-    
+
+(** Constructors of squashed types are not invertible *)
+let squash_ctor_infos is_smashed (natsprop,infos) =
+  if is_smashed
+  then
+    false, Array.smartmap (fun _ -> None) infos
+  else
+    natsprop, infos
+
 (* Previous comment: *)
 (* Unitary/empty Prop: elimination to all sorts are realizable *)
 (* unless the type is large. If it is large, forbids large elimination *)
@@ -1011,7 +1019,7 @@ let build_inductive env prv iu env_ar paramsctxt kn isrecord isfinite inds nmr r
       Environ.push_rel_context ctxunivs' env
   in
   (* Check one inductive *)
-  let build_one_packet (id,cnames,lc,infos,(ar_sign,ar_kind)) recarg =
+  let build_one_packet (id,cnames,lc,ctorinfos,(ar_sign,ar_kind)) recarg =
     (* Type of constructors in normal form *)
     let lc = Array.map (Vars.subst_univs_level_constr substunivs) lc in
     let splayed_lc = Array.map (dest_prod_assum env_ar) lc in
@@ -1023,18 +1031,19 @@ let build_inductive env prv iu env_ar paramsctxt kn isrecord isfinite inds nmr r
       Array.map (fun (d,_) -> Context.Rel.nhyps d - nparamargs)
 	splayed_lc in
     (* Elimination sorts *)
-    let arkind,kelim = 
+    let arkind,kelim,ctorinfos =
       match ar_kind with
       | TemplateArity (paramlevs, lev) -> 
 	let ar = {template_param_levels = paramlevs; template_level = lev} in
-	  TemplateArity ar, all_sorts
+          TemplateArity ar, all_sorts, ctorinfos
       | RegularArity (info,ar,defs) ->
-	let s = sort_of_univ defs in
+        let s = sort_of_univ defs in
+        let ctorinfos = squash_ctor_infos info ctorinfos in
 	let kelim = allowed_sorts info s in
 	let ar = RegularArity 
 	  { mind_user_arity = Vars.subst_univs_level_constr substunivs ar; 
 	    mind_sort = sort_of_univ (Univ.subst_univs_level_universe substunivs defs); } in
-	  ar, kelim in
+          ar, kelim, ctorinfos in
     (* Assigning VM tags to constructors *)
     let nconst, nblock = ref 0, ref 0 in
     let transf num =
@@ -1062,8 +1071,8 @@ let build_inductive env prv iu env_ar paramsctxt kn isrecord isfinite inds nmr r
 	mind_user_lc = lc;
 	mind_nf_lc = nf_lc;
         mind_recargs = recarg;
-        mind_lc_info = snd infos;
-        mind_natural_sprop = fst infos;
+        mind_lc_info = snd ctorinfos;
+        mind_natural_sprop = fst ctorinfos;
 	mind_nb_constant = !nconst;
 	mind_nb_args = !nblock;
 	mind_reloc_tbl = rtbl;
