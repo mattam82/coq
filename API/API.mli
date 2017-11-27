@@ -1338,7 +1338,7 @@ sig
         mind_consnrealargs : int array;
         mind_consnrealdecls : int array;
         mind_recargs : wf_paths;
-        mind_lc_info : ctor_info array;
+        mind_lc_info : ctor_info option array;
         mind_natural_sprop : bool;
         mind_nb_constant : int;
         mind_nb_args : int;

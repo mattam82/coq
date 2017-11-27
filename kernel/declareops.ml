@@ -192,8 +192,7 @@ let rec subst_out_tree sub = function
   | OutVariable i -> OutVariable i
 
 let subst_lc_info sub info =
-  { ctor_invertible = info.ctor_invertible;
-    ctor_arg_infos = info.ctor_arg_infos;
+  { ctor_arg_infos = info.ctor_arg_infos;
     ctor_out_tree = Option.map (Array.map (subst_out_tree sub)) info.ctor_out_tree }
 
 (* FIXME records *)
@@ -213,7 +212,7 @@ let subst_mind_packet sub mbp =
     mind_nrealdecls = mbp.mind_nrealdecls;
     mind_kelim = mbp.mind_kelim;
     mind_recargs = subst_wf_paths sub mbp.mind_recargs (*wf_paths*);
-    mind_lc_info = Array.map (subst_lc_info sub) mbp.mind_lc_info;
+    mind_lc_info = Array.map (Option.map (subst_lc_info sub)) mbp.mind_lc_info;
     mind_natural_sprop = mbp.mind_natural_sprop;
     mind_nb_constant = mbp.mind_nb_constant;
     mind_nb_args = mbp.mind_nb_args;

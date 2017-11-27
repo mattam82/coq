@@ -124,9 +124,6 @@ type regular_inductive_arity = {
 
 type inductive_arity = (regular_inductive_arity, template_arity) declaration_arity
 
-(** A constructor is invertible if its out_tree is made of invertible constructors. *)
-type ctor_invertible = Invertible | NotInvertible
-
 (** An argument to a constructor [c] is forced iff it appears as a
    non-forced argument of a constructor in the out_tree of [c]. *)
 type ctor_arg_info = ForcedArg | MatchArg
@@ -140,7 +137,6 @@ type ctor_out_tree =
   (* | OutEqn of Constr.t (* eg eq_refl, needs uip mode. TODO consider if allowed to be non variable. *) *)
 
 type ctor_info = {
-  ctor_invertible : ctor_invertible;
   ctor_arg_infos : ctor_arg_info array; (* no parameters *)
   ctor_out_tree : ctor_out_tree array option; (** 1 for each index (no parameters), None if not natural SProp type (ie squashed or non-SProp). *)
 }
@@ -179,7 +175,7 @@ type one_inductive_body = {
 
     mind_recargs : wf_paths; (** Signature of recursive arguments in the constructors *)
 
-    mind_lc_info : ctor_info array;
+    mind_lc_info : ctor_info option array; (** None if non invertible *)
 
     mind_natural_sprop : bool;
 

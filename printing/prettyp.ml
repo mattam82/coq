@@ -260,15 +260,15 @@ let rec pr_out_tree = function
     str "|])"
   | OutVariable i -> str "Var(" ++ Pp.int i ++ str")"
 
-let pr_info {ctor_invertible; ctor_arg_infos; ctor_out_tree} =
-  (match ctor_invertible with
-   | Invertible -> str"is invertible\n"
-   | NotInvertible -> str"is not invertible\n") ++
-  str "!forced, ?match arguments: " ++
-  prvect pr_forced ctor_arg_infos ++ fnl() ++
-  (match ctor_out_tree with
-   | None -> mt()
-   | Some trees -> prvect pr_out_tree trees ++ fnl())
+let pr_info = function
+  | Some {ctor_arg_infos; ctor_out_tree} ->
+    str"is invertible\n" ++
+    str "!forced, ?match arguments: " ++
+    prvect pr_forced ctor_arg_infos ++ fnl() ++
+    (match ctor_out_tree with
+     | None -> mt()
+     | Some trees -> str"[|" ++ prvect_with_sep (fun () -> str"; ") pr_out_tree trees ++ str"|]" ++ fnl())
+  | None -> str"is not invertible\n"
 
 let print_debug_ind = function
   | IndRef ind ->

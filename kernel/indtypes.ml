@@ -124,7 +124,9 @@ exception BadTree
 
 let ctor_invert_info env ((mi,ind),ctor) =
   let mib = Environ.lookup_mind mi env in
-  mib.mind_nparams, mib.mind_packets.(ind).mind_lc_info.(ctor-1).ctor_arg_infos
+  match mib.mind_packets.(ind).mind_lc_info.(ctor-1) with
+  | Some infos -> mib.mind_nparams, infos.ctor_arg_infos
+  | None -> raise BadTree
 
 let make_infos env levels t =
   let rec fold forced arg =
@@ -176,13 +178,10 @@ let make_infos env levels t =
       then Some trees
       else None
     in
-    { ctor_invertible = Invertible;
-      ctor_arg_infos = forced;
-      ctor_out_tree = trees }
+    Some { ctor_arg_infos = forced;
+           ctor_out_tree = trees }
   with BadTree ->
-    { ctor_invertible = NotInvertible;
-      ctor_arg_infos = Array.make (List.length levels) MatchArg;
-      ctor_out_tree = None; }
+    None
 
 let infos_and_sort env t =
   let rec aux env t onlysprop levels =
@@ -203,19 +202,31 @@ let infos_and_sort env t =
   in aux env t OnlySProp []
 
 let sup_unforced_args info levels max =
-  List.fold_left_i (fun i max lvl -> match info.ctor_arg_infos.(i) with
-      | ForcedArg -> max | MatchArg -> Universe.sup lvl max) 0 max levels
+  List.fold_left_i (fun i max lvl -> match info with
+      | None -> Universe.sup lvl max
+      | Some info -> begin match info.ctor_arg_infos.(i) with
+          | ForcedArg -> max
+          | MatchArg -> Universe.sup lvl max
+        end) 0 max levels
 
 (* We can only verify natural SProp once we have all the infos. *)
 let finish_infos level infos =
-  let infos = List.rev infos in
-  if Universe.is_sprop level && List.for_all (function
-      | { ctor_out_tree = Some _ } -> true | { ctor_out_tree = None } -> false)
+  (** Current condition: all constructors invertible + condition to
+      get some out_tree, see above *)
+  if Universe.is_sprop level
+  then if List.for_all (function
+      | Some { ctor_out_tree = Some _ } -> true | Some { ctor_out_tree = None } | None -> false)
       infos
-  then
-    level, (true, Array.of_list infos)
+    then
+      level, (true, Array.rev_of_list infos)
+    else
+      Universe.sup level Universe.type0m, (false, Array.make (List.length infos) None)
   else
-    let infos = Array.map_of_list (fun infos -> {infos with ctor_out_tree = None }) infos in
+    let infos = List.rev_map
+        (Option.map (fun infos -> { infos with ctor_out_tree = None; } ))
+        infos
+    in
+    let infos = Array.of_list infos in
     Universe.sup level Universe.type0m, (false, infos)
 
 (* Computing the levels of polymorphic inductive types
