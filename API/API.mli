@@ -2479,7 +2479,7 @@ sig
   type 'a substitutivity =
                          | Dispose
                            | Substitute of 'a
-                         | Keep of 'a
+                         | Keep of bool * 'a
                          | Anticipate of 'a
 
   type 'a object_declaration =   {

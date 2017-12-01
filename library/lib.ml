@@ -19,6 +19,7 @@ module NamedDecl = Context.Named.Declaration
 
 type is_type = bool (* Module Type or just Module *)
 type export = bool option (* None for a Module Type *)
+type keep_functor = bool (* Keep object exported by module functor *)
 
 type node =
   | Leaf of obj
@@ -33,6 +34,7 @@ and library_entry = object_name * node
 and library_segment = library_entry list
 
 type lib_objects =  (Names.Id.t * obj) list
+type lib_keep_objects = (Names.Id.t * keep_functor * Libobject.obj) list
 
 let module_kind is_type =
   if is_type then "module type" else "module"
@@ -65,8 +67,8 @@ let classify_segment seg =
 	let id = Names.Label.to_id (Names.KerName.label kn) in
 	  (match classify_object o with
 	     | Dispose -> clean acc stk
-	     | Keep o' ->
-		 clean (substl, (id,o')::keepl, anticipl) stk
+	     | Keep (b, o') ->
+		 clean (substl, (id,b,o')::keepl, anticipl) stk
 	     | Substitute o' ->
 		 clean ((id,o')::substl, keepl, anticipl) stk
 	     | Anticipate o' ->

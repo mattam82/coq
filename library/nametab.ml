@@ -467,6 +467,9 @@ let global r =
   with Not_found ->
     error_global_not_found ?loc qid
 
+let universe_id_of_path p =
+  locate_universe (qualid_of_path p)
+
 (* Exists functions ********************************************************)
 
 let exists_cci sp = ExtRefTab.exists sp !the_ccitab

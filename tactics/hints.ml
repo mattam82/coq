@@ -862,7 +862,7 @@ let input_context_set : Univ.ContextSet.t -> Libobject.obj =
       cache_function = cache_context_set;
       load_function = (fun _ -> cache_context_set);
       discharge_function = (fun (_,a) -> Some a);
-      classify_function = (fun a -> Keep a) }
+      classify_function = (fun a -> Keep (true, a)) }
 
 let warn_polymorphic_hint =
   CWarnings.create ~name:"polymorphic-hint" ~category:"automation"

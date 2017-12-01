@@ -119,6 +119,10 @@ val locate_extended_all_modtype : qualid -> ModPath.t list
 val global_of_path : full_path -> global_reference
 val extended_global_of_path : full_path -> extended_global_reference
 
+(** Mapping a full path to a [universe_id] *)
+
+val universe_id_of_path : full_path -> universe_id
+
 (** {6 These functions tell if the given absolute name is already taken } *)
 
 val exists_cci : full_path -> bool

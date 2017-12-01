@@ -448,7 +448,7 @@ let input_universe_context : universe_context_decl -> Libobject.obj =
       cache_function = (fun (na, pi) -> cache_universe_context pi);
       load_function = (fun _ (_, pi) -> cache_universe_context pi);
       discharge_function = (fun (_, (p, _ as x)) -> if p then None else Some x);
-      classify_function = (fun a -> Keep a) }
+      classify_function = (fun a -> Keep (true, a)) }
 
 let declare_universe_context poly ctx =
   Lib.add_anonymous_leaf (input_universe_context (poly, ctx))
@@ -483,7 +483,9 @@ let check_exists sp =
   let depth = sections_depth () in
   let sp = Libnames.make_path (pop_dirpath_n depth (dirpath sp)) (basename sp) in
   if Nametab.exists_universe sp then
-    alreadydeclared (str "Universe " ++ Id.print (basename sp) ++ str " already exists")
+    let uid = Nametab.universe_id_of_path sp in
+    alreadydeclared (str "Universe " ++ pr_qualid (Nametab.shortest_qualid_of_universe uid)
+                     ++ str " already exists")
   else ()
 
 let qualify_univ src (sp,i as orig) =
@@ -502,7 +504,7 @@ let cache_universe ((sp, _), (src, id)) =
 
 let load_universe i ((sp, _), (src, id)) =
   let sp, i = qualify_univ src (sp,i) in
-  let () = Nametab.push_universe (Nametab.Until i) sp id in
+  let () = Nametab.push_universe (Nametab.Until (i + 1)) sp id in
   add_universe src id
 
 let open_universe i ((sp, _), (src, id)) =
@@ -522,7 +524,7 @@ let input_universe : universe_decl -> Libobject.obj =
       open_function = open_universe;
       discharge_function = discharge_universe;
       subst_function = (fun (subst, a) -> (** Actually the name is generated once and for all. *) a);
-      classify_function = (fun a -> Substitute a) }
+      classify_function = (fun a -> Keep (true, a)) }
 
 let declare_univ_binders gr pl =
   if Global.is_polymorphic gr then
@@ -578,7 +580,7 @@ let input_constraints : constraint_decl -> Libobject.obj =
       cache_function = cache_constraints;
       load_function = (fun _ -> cache_constraints);
       discharge_function = discharge_constraints;
-      classify_function = (fun a -> Keep a) }
+      classify_function = (fun a -> Keep (true, a)) }
 
 let loc_of_glob_level = function
   | Misctypes.GType (Misctypes.UNamed n) -> Libnames.loc_of_reference n

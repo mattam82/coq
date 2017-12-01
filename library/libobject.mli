@@ -62,7 +62,7 @@ open Mod_subst
 *)
 
 type 'a substitutivity =
-    Dispose | Substitute of 'a | Keep of 'a | Anticipate of 'a
+    Dispose | Substitute of 'a | Keep of bool * 'a | Anticipate of 'a
 
 type 'a object_declaration = {
   object_name : string;

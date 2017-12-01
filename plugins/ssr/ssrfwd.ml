@@ -112,7 +112,7 @@ let inHaveTCResolution = Libobject.declare_object {
   (Libobject.default_object "SSRHAVETCRESOLUTION") with
   Libobject.cache_function = (fun (_,v) -> ssrhaveNOtcresolution := v);
   Libobject.load_function = (fun _ (_,v) -> ssrhaveNOtcresolution := v);
-  Libobject.classify_function = (fun v -> Libobject.Keep v);
+  Libobject.classify_function = (fun v -> Libobject.Keep (false, v));
 }
 let _ =
   Goptions.declare_bool_option

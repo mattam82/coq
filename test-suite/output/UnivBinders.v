@@ -56,6 +56,9 @@ Module mono2.
   Monomorphic Universe u.
 End mono2.
 
+Fail Monomorphic Constraint u = u.
+Monomorphic Constraint mono2.u = mono2.u.
+
 Fail Monomorphic Definition mono2@{u} := Type@{u}.
 
 Module SecLet.
@@ -78,6 +81,55 @@ Module SecLet.
                     bobmorane is universe polymorphic
                     *)
 End SecLet.
+
+Module A.
+  Unset Universe Polymorphism.
+  Module B.
+    Definition foo@{local} := Type@{local}.
+  End B.
+
+  Check Type@{B.foo.local}.
+  Fail Check Type@{foo.local}.
+End A.
+
+Check Type@{A.B.foo.local}.
+(** This should fail but doesn't as of now. Keep functor univs are exported too much *)
+Fail Check Type@{B.foo.local}.
+Fail Check Type@{foo.local}.
+
+Module Functors.
+  Unset Universe Polymorphism.
+  Universe functuniv.
+  Definition foo := Type@{functuniv}.
+  Universe functuniv2.
+  Definition foo' := Type@{functuniv2}.
+  Module Type S.
+  End S.
+  Module Functor (X : S).
+
+    Definition foo@{i} := Type@{i}.
+    Print foo.
+  End Functor.
+
+  Print Functor.
+
+  Module Simpl : S.
+  End Simpl.
+  Module M := Functor Simpl.
+  Print M.
+
+  Constraint Set < Functor.foo.i.
+  Print Universes.
+End Functors.
+
+Fail Monomorphic Constraint functuniv = functuniv.
+Monomorphic Constraint Functors.functuniv <= Functors.functuniv2.
+Print Universes.
+Import Functors.
+
+Monomorphic Constraint functuniv = functuniv2.
+
+Fail Monomorphic Constraint foo.i = foo.i.
 
 (* fun x x => foo is nonsense with local binders *)
 Fail Definition fo@{u u} := Type@{u}.
