@@ -28,6 +28,8 @@ Record rBox (A:SProp) : Prop := rmkbox { relem : A }.
 (* Check that it doesn't have eta *)
 Fail Check (fun (A : SProp) (x : rBox A) => eq_refl : x = @rmkbox _ (@relem _ x)).
 
+Unset Elimination Schemes.
+
 Inductive sEmpty : SProp := .
 
 Inductive sUnit : SProp := stt.
@@ -70,6 +72,8 @@ Definition sPred (n:nat) (s:sNZ n) : nat :=
 Definition spred1 n (s : sNZ (S n)) : sPred _ s = sPred _ (snz n) := eq_refl.
 Definition spred2 n (s : sNZ (S n)) : sPred _ (snz n) = n := eq_refl.
 Definition spred3 n (s:sNZ _) : sPred _ s = n := eq_trans (spred1 n s) (spred2 n s).
+
+Definition sPred_S n (s:sNZ (S n)) : sPred _ s = n := eq_refl.
 
 Inductive Ispair (A:Type) (B:A -> Type) : sigT B -> SProp :=
   ispair : forall x y, Ispair A B (existT B x y).

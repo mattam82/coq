@@ -920,6 +920,8 @@ and knht info e t stk =
 
 (************************************************************************)
 
+exception InvertFail
+
 (* Computes a weak head normal form from the result of knh. *)
 let rec knr info m stk =
   match m.term with
@@ -972,7 +974,10 @@ let rec knr info m stk =
           Some c -> knit info env c stk
         | None -> (m,stk))
   | FCaseInvert (ci,p,is,c,v,env) when red_set info.i_flags fMATCH ->
-    assert false (* TODO *)
+    begin match case_inversion info ci is c v with
+      | Some (c, projs) -> knit info env c (append_stack projs stk)
+      | None -> (m, stk)
+    end
   | _ -> (m,stk)
 
 (* Computes the weak head normal form of a term *)
@@ -982,6 +987,60 @@ and kni info m stk =
 and knit info e t stk =
   let (ht,s) = knht info e t stk in
   knr info ht s
+
+and invert_match_one_index info ci args reali =
+  let open Declarations in function
+    | OutVariable i -> args.(i) <- Some reali
+    | OutInvert ((_,ctor), trees) ->
+      let m, stk = kni info reali [] in
+      begin match m.term with
+        | FConstruct ((_,ctor'),_) when Int.equal ctor ctor' ->
+          Array.iteri (fun i tree ->
+              Option.iter (invert_match_one_index info ci args (stack_nth stk i)) tree)
+            trees
+        | _ -> raise InvertFail
+      end
+
+and try_match_ctor_infos info ci is =
+  let open Declarations in function
+    | None | Some { ctor_out_tree = None }->
+      assert false (* All constructors of natural sprop are invertible *)
+    | Some { ctor_arg_infos = ainfos; ctor_out_tree = Some trees } ->
+      begin try
+          let args = Array.make (Array.length ainfos) None in
+          Array.iter2 (invert_match_one_index info ci args) is trees;
+          (* When there are projections this is where they're inserted *)
+          let args = Array.map Option.get args in
+          Some args
+        with InvertFail -> None
+      end
+
+(* Reduction for matches from SProp to Type. We actually match the
+   indices.
+
+   Currently no projections -> c (match scrutiny) is ignored.
+
+   Return match branch term (which is under a substitution) and
+   matched values. *)
+and case_inversion info ci is c v =
+  let open Declarations in
+  let env = info_env info in
+  let ind = ci.ci_ind in
+  let mind = Environ.lookup_mind (fst ind) env in
+  let mip = mind.mind_packets.(snd ind) in
+  (* We only match indices *)
+  let is = Array.sub is mind.mind_nparams (Array.length is - mind.mind_nparams) in
+  let nctors = Array.length mip.mind_consnames in
+  let rec loop i =
+    if Int.equal i nctors then None
+    else
+      match try_match_ctor_infos info ci is mip.mind_lc_info.(i) with
+      | Some res ->
+        Some (v.(i), res)
+      | None -> loop (i+1)
+  in
+  loop 0
+
 
 let kh info v stk = fapp_stack(kni info v stk)
 
