@@ -93,7 +93,7 @@ let kind_of_head env t =
       (try on_subterm k (c :: l) b (constant_head (Projection.constant p))
        with Not_found -> assert false)
 
-  | Case (_,_,c,_) -> aux k [] c true
+  | Case (_,_,_,c,_) -> aux k [] c true
   | Fix ((i,j),_) ->
       let n = i.(j) in
       try aux k [] (List.nth l n) true

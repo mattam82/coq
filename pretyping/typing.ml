@@ -136,7 +136,8 @@ let e_type_case_branches env evdref (ind,largs) pj c =
   let ty = whd_betaiota !evdref (lambda_applist_assum !evdref (n+1) p (realargs@[c])) in
   (lc, ty)
 
-let e_judge_of_case env evdref ci pj cj lfj =
+let e_judge_of_case env evdref ci pj is cj lfj =
+  (* TODO check the stupid is *)
   let ((ind, u), spec) =
     try find_mrectype env !evdref cj.uj_type
     with Not_found -> error_case_not_inductive env !evdref cj in
@@ -144,7 +145,7 @@ let e_judge_of_case env evdref ci pj cj lfj =
   let _ = check_case_info env (fst indspec) ci in
   let (bty,rslty) = e_type_case_branches env evdref indspec pj cj.uj_val in
   e_check_branch_types env evdref (fst indspec) cj (lfj,bty);
-  { uj_val  = mkCase (ci, pj.uj_val, cj.uj_val, Array.map j_val lfj);
+  { uj_val  = mkCase (ci, pj.uj_val, is, cj.uj_val, Array.map j_val lfj);
     uj_type = rslty }
 
 let check_type_fixpoint ?loc env evdref lna lar vdefj =
@@ -158,7 +159,9 @@ let check_type_fixpoint ?loc env evdref lna lar vdefj =
       done
 
 (* FIXME: might depend on the level of actual parameters!*)
-let check_allowed_sort env sigma ind c p =
+let check_allowed_sort env sigma indty c p =
+  let IndType (indf, realargs) = indty in
+  let ind, params = dest_ind_family indf in
   let pj = Retyping.get_judgment_of env sigma p in
   let ksort = Sorts.family (ESorts.kind sigma (sort_of_arity env sigma pj.uj_type)) in
   let specif = Global.lookup_inductive (fst ind) in
@@ -167,6 +170,15 @@ let check_allowed_sort env sigma ind c p =
     let s = inductive_sort_family (snd specif) in
     error_elim_arity env sigma ind sorts c pj
       (Some(ksort,s,Type_errors.error_elim_explain ksort s))
+  else
+  if (snd specif).Declarations.mind_natural_sprop
+  then
+    match ksort with
+    | Sorts.InSProp -> None
+    | InProp | InSet | InType ->
+      Some (Array.of_list ((List.map EConstr.of_constr params) @ realargs))
+  else None
+
 
 let e_judge_of_cast env evdref cj k tj =
   let expected_type = tj.utj_val in
@@ -273,11 +285,11 @@ let rec execute env evdref cstr =
         let u = EInstance.kind !evdref u in
 	make_judge cstr (EConstr.of_constr (rename_type_of_constructor env (cstruct, u)))
 
-    | Case (ci,p,c,lf) ->
+    | Case (ci,p,is,c,lf) ->
         let cj = execute env evdref c in
         let pj = execute env evdref p in
         let lfj = execute_array env evdref lf in
-        e_judge_of_case env evdref ci pj cj lfj
+        e_judge_of_case env evdref ci pj is cj lfj
 
     | Fix ((vn,i as vni),recdef) ->
         let (_,tys,_ as recdef') = execute_recdef env evdref recdef in

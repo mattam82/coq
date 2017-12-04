@@ -357,20 +357,21 @@ let rec map_kn f f' c =
       | Construct (((kn,i),j),u) ->
 	  let kn' = f kn in
 	  if kn'==kn then c else mkConstructU (((kn',i),j),u)
-      | Case (ci,p,ct,l) ->
-	  let ci_ind =
-            let (kn,i) = ci.ci_ind in
-	    let kn' = f kn in
-	    if kn'==kn then ci.ci_ind else kn',i
-	  in
-	  let p' = func p in
-	  let ct' = func ct in
-	  let l' = Array.smartmap func l in
-	    if (ci.ci_ind==ci_ind && p'==p
-		&& l'==l && ct'==ct)then c
-	    else
-	      mkCase ({ci with ci_ind = ci_ind},
-		      p',ct', l')
+      | Case (ci,p,is,ct,l) ->
+        let ci_ind =
+          let (kn,i) = ci.ci_ind in
+          let kn' = f kn in
+          if kn'==kn then ci.ci_ind else kn',i
+        in
+        let p' = func p in
+        let is' = Option.smartmap (Array.smartmap func) is in
+        let ct' = func ct in
+        let l' = Array.smartmap func l in
+        if (ci.ci_ind==ci_ind && p'==p && is' == is
+            && l'==l && ct'==ct)then c
+        else
+          mkCase ({ci with ci_ind = ci_ind},
+                  p',is',ct', l')
       | Cast (ct,k,t) ->
 	  let ct' = func ct in
 	  let t'= func t in

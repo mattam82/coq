@@ -571,7 +571,7 @@ sig
      | Const     of (Constant.t * 'univs)
      | Ind       of (inductive * 'univs)
      | Construct of (constructor * 'univs)
-     | Case      of case_info * 'constr * 'constr * 'constr array
+     | Case      of case_info * 'constr * 'constr array option * 'constr * 'constr array
      | Fix       of ('constr, 'types) pfixpoint
      | CoFix     of ('constr, 'types) pcofixpoint
      | Proj      of Projection.t * 'constr
@@ -625,7 +625,7 @@ val compare_head : (constr -> constr -> bool) -> constr -> constr -> bool
   val mkConstructU : pconstructor -> t
   val mkConstructUi : pinductive * int -> t
 
-  val mkCase : case_info * t * t * t array -> t
+  val mkCase : case_info * t * t array option * t * t array -> t
 
 end
 
@@ -942,7 +942,7 @@ sig
      | Const     of (Names.Constant.t * 'univs)
      | Ind       of (Names.inductive * 'univs)
      | Construct of (Names.constructor * 'univs)
-     | Case      of case_info * 'constr * 'constr * 'constr array
+     | Case      of case_info * 'constr * 'constr array option * 'constr * 'constr array
      | Fix       of ('constr, 'types) pfixpoint
      | CoFix     of ('constr, 'types) pcofixpoint
      | Proj      of Names.Projection.t * 'constr
@@ -1003,7 +1003,7 @@ sig
   [@@ocaml.deprecated "Alias of similarly named Constr function"]
   val mkConstructUi : (pinductive * int) -> constr
   [@@ocaml.deprecated "Alias of similarly named Constr function"]
-  val mkCase : case_info * constr * constr * constr array -> constr
+  val mkCase : case_info * constr * constr array option * constr * constr array -> constr
   [@@ocaml.deprecated "Alias of similarly named Constr function"]
   val mkFix : fixpoint -> constr
   [@@ocaml.deprecated "Alias of similarly named Constr function"]
@@ -1548,6 +1548,7 @@ sig
     | FFix of Term.fixpoint * fconstr Esubst.subs
     | FCoFix of Term.cofixpoint * fconstr Esubst.subs
     | FCaseT of Term.case_info * Constr.t * fconstr * Constr.t array * fconstr Esubst.subs (* predicate and branches are closures *)
+    | FCaseInvert of Constr.case_info * Constr.t * fconstr array * fconstr * Constr.constr array * fconstr Esubst.subs
     | FLambda of int * (Names.Name.t * Constr.t) list * Constr.t * fconstr Esubst.subs
     | FProd of Names.Name.t * fconstr * fconstr
     | FLetIn of Names.Name.t * fconstr * fconstr * Constr.t * fconstr Esubst.subs
@@ -1671,6 +1672,7 @@ sig
     | IllTypedRecBody of
         int * Name.t array * ('constr, 'types) punsafe_judgment array * 'types array
     | UnsatisfiedConstraints of Univ.Constraint.t
+    | SPropError of Pp.t
 
   type type_error = (constr, types) ptype_error
 
@@ -2965,10 +2967,11 @@ sig
   val isApp : Evd.evar_map -> constr -> bool
   val it_mkProd_or_LetIn : constr -> rel_context -> constr
   val push_named : named_declaration -> Environ.env -> Environ.env
-  val destCase : Evd.evar_map -> constr -> Constr.case_info * constr * constr * constr array
+  val destCase : Evd.evar_map -> constr ->
+    Constr.case_info * constr * constr array option * constr * constr array
   val decompose_lam_assum : Evd.evar_map -> constr -> rel_context * constr
   val mkConst : Names.Constant.t -> constr
-  val mkCase : Constr.case_info * constr * constr * constr array -> constr
+  val mkCase : Constr.case_info * constr * constr array option * constr * constr array -> constr
   val named_context : Environ.env -> named_context
   val val_of_named_context : named_context -> Environ.named_context_val
   val mkFix : (t, t) Constr.pfixpoint -> t

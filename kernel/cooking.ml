@@ -102,8 +102,8 @@ let expmod_constr cache modlist c =
   let update_case_info = update_case_info cache in
   let rec substrec c =
     match kind c with
-      | Case (ci,p,t,br) ->
-	  Constr.map substrec (mkCase (update_case_info ci modlist,p,t,br))
+      | Case (ci,p,is,t,br) ->
+          Constr.map substrec (mkCase (update_case_info ci modlist,p,is,t,br))
 
       | Ind (ind,u) ->
 	  (try

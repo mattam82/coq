@@ -38,7 +38,7 @@ type cbv_value =
 and cbv_stack =
   | TOP
   | APP of cbv_value array * cbv_stack
-  | CASE of constr * constr array * case_info * cbv_value subs * cbv_stack
+  | CASE of constr * constr array option * constr array * case_info * cbv_value subs * cbv_stack
   | PROJ of projection * Declarations.projection_body * cbv_stack
 
 val shift_value : int -> cbv_value -> cbv_value

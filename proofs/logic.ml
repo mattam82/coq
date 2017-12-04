@@ -383,7 +383,7 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	let ty = EConstr.Unsafe.to_constr ty in
 	  (acc',ty,sigma,c)
 
-      | Case (ci,p,c,lf) ->
+      | Case (ci,p,is,c,lf) ->
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
 	let sigma = check_conv_leq_goal env sigma trm conclty' conclty in
 	let (acc'',sigma, rbranches) =
@@ -395,7 +395,7 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
         let lf' = Array.rev_of_list rbranches in
         let ans =
           if p' == p && c' == c && Array.equal (==) lf' lf then trm
-          else mkCase (ci,p',c',lf')
+          else mkCase (ci,p',is(*TODO is this right?*),c',lf')
         in
 	(acc'',conclty',sigma, ans)
 
@@ -437,7 +437,7 @@ and mk_hdgoals sigma goal goalacc trm =
         let ans = if applicand == f && args == l then trm else mkApp (applicand, args) in
 	(acc'',conclty',sigma, ans)
 
-    | Case (ci,p,c,lf) ->
+    | Case (ci,p,is,c,lf) -> (* TODO is? *)
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
 	let (acc'',sigma,rbranches) =
 	  Array.fold_left2
@@ -448,7 +448,7 @@ and mk_hdgoals sigma goal goalacc trm =
 	let lf' = Array.rev_of_list rbranches in
 	let ans =
           if p' == p && c' == c && Array.equal (==) lf' lf then trm
-          else mkCase (ci,p',c',lf')
+          else mkCase (ci,p',is,c',lf')
 	in
 	(acc'',conclty',sigma, ans)
 

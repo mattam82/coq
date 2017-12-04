@@ -232,7 +232,7 @@ let compute_ivs f cs gl =
         let nargs3 = List.length args3 in
         let is_conv = Reductionops.is_conv env sigma in
           begin match decomp_term sigma body3 with
-          | Case(_,p,c,lci) -> (* <p> Case c of c1 ... cn end *)
+            | Case(_,p,_,c,lci) -> (* <p> Case c of c1 ... cn end *) (* TODO is? *)
               let n_lhs_rhs = ref []
               and v_lhs = ref (None : constr option)
               and c_lhs = ref (None : constr option) in

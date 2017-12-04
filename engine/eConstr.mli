@@ -108,7 +108,7 @@ val mkIndU : inductive * EInstance.t -> t
 val mkConstruct : constructor -> t
 val mkConstructU : constructor * EInstance.t -> t
 val mkConstructUi : (inductive * EInstance.t) * int -> t
-val mkCase : case_info * t * t * t array -> t
+val mkCase : case_info * t * t array option * t * t array -> t
 val mkFix : (t, t) pfixpoint -> t
 val mkCoFix : (t, t) pcofixpoint -> t
 val mkArrow : t -> t -> t
@@ -164,7 +164,7 @@ val destConst : Evd.evar_map -> t -> Constant.t * EInstance.t
 val destEvar : Evd.evar_map -> t -> t pexistential
 val destInd : Evd.evar_map -> t -> inductive * EInstance.t
 val destConstruct : Evd.evar_map -> t -> constructor * EInstance.t
-val destCase : Evd.evar_map -> t -> case_info * t * t * t array
+val destCase : Evd.evar_map -> t -> case_info * t * t array option * t * t array
 val destProj : Evd.evar_map -> t -> projection * t
 val destFix : Evd.evar_map -> t -> (t, t) pfixpoint
 val destCoFix : Evd.evar_map -> t -> (t, t) pcofixpoint

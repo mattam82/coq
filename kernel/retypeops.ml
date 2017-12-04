@@ -426,7 +426,7 @@ let rec infer env evars cstr =
   | Construct c ->
     type_of_constructor env c
 
-  | Case (ci,p,c,lf) ->
+  | Case (ci,p,is,c,lf) ->
     let ct = infer env evars c in
     type_of_case env evars p c ct
 

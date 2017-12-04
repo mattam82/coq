@@ -101,6 +101,10 @@ let smartmap f = function
   | Some y as x -> let y' = f y in if y' == y then x else Some y'
   | _ -> None
 
+let smartfoldmap f acc = function
+  | Some y as x -> let acc, y' = f acc y in acc, if y' == y then x else Some y'
+  | None -> acc, None
+
 (** [fold_left f a x] is [f a y] if [x] is [Some y], and [a] otherwise. *)
 let fold_left f a = function
   | Some y -> f a y

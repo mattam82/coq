@@ -139,7 +139,7 @@ let occur_rigidly (evk,_ as ev) evd t =
     | Const _ -> false
     | Prod (_, b, t) -> ignore(aux b || aux t); true
     | Rel _ | Var _ -> false
-    | Case (_,_,c,_) -> if eq_constr evd (mkEvar ev) c then raise Occur else false
+    | Case (_,_,_,c,_) -> if eq_constr evd (mkEvar ev) c then raise Occur else false
   in try ignore(aux t); false with Occur -> true
 
 (* [check_conv_record env sigma (t1,stack1) (t2,stack2)] tries to decompose 
@@ -290,7 +290,8 @@ let ise_stack2 no_app env evd f sk1 sk2 =
       else None, x in
     match sk1, sk2 with
     | [], [] -> None, Success i
-    | Stack.Case (_,t1,c1,_)::q1, Stack.Case (_,t2,c2,_)::q2 ->
+    | Stack.Case (_,t1,_,c1,_)::q1, Stack.Case (_,t2,_,c2,_)::q2 ->
+      (* TODO optim: skip t1/t2 when Some is? *)
       (match f env i CONV t1 t2 with
       | Success i' ->
 	(match ise_array2 i' (fun ii -> f env ii CONV) c1 c2 with
@@ -327,7 +328,8 @@ let exact_ise_stack2 env evd f sk1 sk2 =
   let rec ise_stack2 i sk1 sk2 =
     match sk1, sk2 with
     | [], [] -> Success i
-    | Stack.Case (_,t1,c1,_)::q1, Stack.Case (_,t2,c2,_)::q2 ->
+    | Stack.Case (_,t1,_,c1,_)::q1, Stack.Case (_,t2,_,c2,_)::q2 ->
+      (* TODO is? *)
       ise_and i [
       (fun i -> ise_stack2 i q1 q2);
       (fun i -> ise_array2 i (fun ii -> f env ii CONV) c1 c2);

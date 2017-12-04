@@ -347,11 +347,14 @@ let get_projections env (ind,params) =
     | Some (Some (id, projs, pbs)) -> Some projs
     | _ -> None
 
-let make_case_or_project env sigma indf ci pred c branches =
+let make_case_or_project env sigma indty ci ~with_is pred c branches =
   let open EConstr in
+  let IndType (indf, is) = indty in
   let projs = get_projections env indf in
   match projs with
-  | None -> (mkCase (ci, pred, c, branches))
+  | None ->
+    let is = if with_is then Some (Array.of_list is) else None in
+    (mkCase (ci, pred, is, c, branches))
   | Some ps ->
      assert(Array.length branches == 1);
      let () =

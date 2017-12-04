@@ -284,16 +284,6 @@ let check_branch_types env (ind,u) c ct lft explft =
     | Invalid_argument _ ->
         error_number_branches env (make_judge c ct) (Array.length explft)
 
-let type_of_case env ci p pt c ct lf lft =
-  let (pind, _ as indspec) =
-    try find_rectype env ct
-    with Not_found -> error_case_not_inductive env (make_judge c ct) in
-  let () = check_case_info env pind ci in
-  let (bty,rslty) =
-    type_case_branches env indspec (make_judge p pt) c in
-  let () = check_branch_types env pind c ct lft bty in
-  rslty
-
 let type_of_projection env p c ct =
   let pb = lookup_projection p env in
   let (ind,u), args =
@@ -392,11 +382,11 @@ let rec execute env cstr =
     | Construct c ->
       type_of_constructor env c
 
-    | Case (ci,p,c,lf) ->
+    | Case (ci,p,is,c,lf) ->
         let ct = execute env c in
         let pt = execute env p in
         let lft = execute_array env lf in
-          type_of_case env ci p pt c ct lf lft
+          type_of_case env ci p pt is c ct lf lft
 
     | Fix ((vn,i as vni),recdef) ->
       let (fix_ty,recdef') = execute_recdef env recdef i in
@@ -428,6 +418,37 @@ and execute_recdef env (names,lar,vdef) i =
     (lara.(i),(names,lara,vdef))
 
 and execute_array env = Array.map (execute env)
+
+and type_of_case env ci p pt is c ct lf lft =
+  let (pind, pis as indspec) =
+    try find_rectype env ct
+    with Not_found -> error_case_not_inductive env (make_judge c ct) in
+  let () = check_case_info env pind ci in
+  let sc = execute_is_type env ct in
+  let _, sp = dest_arity env pt in
+  let () = match is with
+    | None ->
+      if Sorts.is_sprop sc && not (Sorts.is_sprop sp)
+      then error_sprop env Pp.(str"eliminating sprop missing is")
+    | Some is ->
+      if not (Sorts.is_sprop sc)
+      then error_sprop env Pp.(str "eliminating non sprop but is present")
+      else if (Sorts.is_sprop sp)
+      then error_sprop env Pp.(str "eliminating sprop to sprop but is present")
+      else if not (Int.equal (Array.length is) (CList.length pis))
+      then error_sprop env Pp.(str "eliminating sprop with bad length is")
+      else
+        CList.iteri (fun i pi ->
+            let i = is.(i) in
+            try Reduction.default_conv Reduction.CONV env pi i
+            with Reduction.NotConvertible -> error_sprop env Pp.(str "eliminating sprop bad is"))
+          pis
+  in
+  let (bty,rslty) =
+    type_case_branches env indspec (make_judge p pt) c in
+  let () = check_branch_types env pind c ct lft bty in
+  rslty
+
 
 (* Derived functions *)
 let infer env constr =
@@ -519,10 +540,10 @@ let judge_of_inductive env indu =
 let judge_of_constructor env cu =
   make_judge (mkConstructU cu) (type_of_constructor env cu)
 
-let judge_of_case env ci pj cj lfj =
-  let lf, lft = dest_judgev lfj in
-  make_judge (mkCase (ci, (*nf_betaiota*) pj.uj_val, cj.uj_val, lft))
-             (type_of_case env ci pj.uj_val pj.uj_type cj.uj_val cj.uj_type lf lft)
+(* let judge_of_case env ci pj cj lfj = *)
+(*   let lf, lft = dest_judgev lfj in *)
+(*   make_judge (mkCase (ci, (\*nf_betaiota*\) pj.uj_val, cj.uj_val, lft)) *)
+(*              (type_of_case env ci pj.uj_val pj.uj_type cj.uj_val cj.uj_type lf lft) *)
 
 let type_of_projection_constant env (p,u) =
   let cst = Projection.constant p in

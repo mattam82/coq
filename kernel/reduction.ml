@@ -258,6 +258,7 @@ let in_whnf (t,stk) =
     | FConstruct _ -> no_case_available stk
     | FCoFix _ -> no_case_available stk
     | FFix(((ri,n),(_,_,_)),_) -> no_nth_arg_available ri.(n) stk
+    | FCaseInvert _ -> true (* probably ...*)
     | (FFlex _ | FProd _ | FEvar _ | FInd _ | FAtom _ | FRel _ | FProj _) -> true
     | FLOCKED -> assert false
 

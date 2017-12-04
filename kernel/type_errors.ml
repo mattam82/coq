@@ -60,6 +60,7 @@ type ('constr, 'types) ptype_error =
   | IllTypedRecBody of
       int * Name.t array * ('constr, 'types) punsafe_judgment array * 'types array
   | UnsatisfiedConstraints of Univ.constraints
+  | SPropError of Pp.t
 
 type type_error = (constr, types) ptype_error
 
@@ -113,6 +114,8 @@ let error_ill_formed_rec_body env why lna i fixenv vdefj =
 
 let error_ill_typed_rec_body env i lna vdefj vargs =
   raise (TypeError (env, IllTypedRecBody (i,lna,vdefj,vargs)))
+
+let error_sprop env s = raise (TypeError (env, SPropError s))
 
 let error_elim_explain kp ki =
   let open Sorts in

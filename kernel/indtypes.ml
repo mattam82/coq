@@ -943,7 +943,8 @@ let compute_projections ((kn, _ as ind), u as indu) n x nparamargs params
     let ccl' = liftn 1 2 ccl in
     let p = mkLambda (x, lift 1 indty, ccl') in
     let branch = it_mkLambda_or_LetIn (mkRel (len - i)) ctx in
-    let body = mkCase (ci, p, mkRel 1, [|lift 1 branch|]) in
+    (* TODO is??? compute_projections *)
+    let body = mkCase (ci, p, None, mkRel 1, [|lift 1 branch|]) in
       it_mkLambda_or_LetIn (mkLambda (x,indty,body)) params
   in
   let projections decl (i, j, kns, pbs, subst, letsubst) =

@@ -37,10 +37,13 @@ val meta_type : evar_map -> metavariable -> types
 (** Solve existential variables using typing *)
 val e_solve_evars : env -> evar_map ref -> constr -> constr
 
-(** Raise an error message if incorrect elimination for this inductive *)
-(** (first constr is term to match, second is return predicate) *)
-val check_allowed_sort : env -> evar_map -> pinductive -> constr -> constr ->
-  unit
+(** Raise an error message if incorrect elimination for this inductive
+    (first constr is term to match, second is return predicate)
+    Returns the [is] that go into the Case.
+ *)
+val check_allowed_sort : env -> evar_map -> Inductiveops.inductive_type -> constr -> constr ->
+  constr array option
+
 
 (** Raise an error message if bodies have types not unifiable with the
     expected ones *)

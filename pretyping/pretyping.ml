@@ -858,7 +858,7 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
 
   | GLetTuple (nal,(na,po),c,d) ->
     let cj = pretype empty_tycon env evdref lvar c in
-    let (IndType (indf,realargs)) =
+    let (IndType (indf,realargs) as indty) =
       try find_rectype env.ExtraEnv.env !evdref cj.uj_type
       with Not_found ->
 	let cloc = loc_of_glob_constr c in
@@ -893,14 +893,14 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
     let fsign = if Flags.version_strictly_greater Flags.V8_6 || Flags.version_less_or_equal Flags.VOld
                 then Context.Rel.map (whd_betaiota !evdref) fsign
                 else fsign (* beta-iota-normalization regression in 8.5 and 8.6 *) in
-    let obj ind p v f =
+    let obj ind is p v f =
       if not record then 
         let nal = List.map (fun na -> ltac_interp_name lvar na) nal in
         let nal = List.rev nal in
         let fsign = List.map2 set_name nal fsign in
 	let f = it_mkLambda_or_LetIn f fsign in
 	let ci = make_case_info env.ExtraEnv.env (fst ind) LetStyle in
-	  mkCase (ci, p, cj.uj_val,[|f|]) 
+          mkCase (ci, p, is, cj.uj_val,[|f|])
       else it_mkLambda_or_LetIn f fsign
     in
     let env_f = push_rel_context !evdref fsign env in
@@ -917,24 +917,24 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
       let psign' = Namegen.name_context env.ExtraEnv.env !evdref psign' in (* For naming abstractions in [po] *)
       let psign = List.map (fun d -> map_rel_decl EConstr.of_constr d) psign in
       let nar = List.length arsgn in
-	  (match po with
-	  | Some p ->
-	    let env_p = push_rel_context !evdref psign env in
-	    let pj = pretype_type empty_valcon env_p evdref predlvar p in
-	    let ccl = nf_evar !evdref pj.utj_val in
-	    let p = it_mkLambda_or_LetIn ccl psign' in
-	    let inst =
-	      (Array.map_to_list EConstr.of_constr cs.cs_concl_realargs)
-	      @[EConstr.of_constr (build_dependent_constructor cs)] in
-	    let lp = lift cs.cs_nargs p in
-	    let fty = hnf_lam_applist env.ExtraEnv.env !evdref lp inst in
-	    let fj = pretype (mk_tycon fty) env_f evdref lvar d in
-	    let v =
-	      let ind,_ = dest_ind_family indf in
-		Typing.check_allowed_sort env.ExtraEnv.env !evdref ind cj.uj_val p;
-		obj ind p cj.uj_val fj.uj_val
-	    in
-	      { uj_val = v; uj_type = (substl (realargs@[cj.uj_val]) ccl) }
+    (match po with
+     | Some p ->
+       let env_p = push_rel_context !evdref psign env in
+       let pj = pretype_type empty_valcon env_p evdref predlvar p in
+       let ccl = nf_evar !evdref pj.utj_val in
+       let p = it_mkLambda_or_LetIn ccl psign' in
+       let inst =
+         (Array.map_to_list EConstr.of_constr cs.cs_concl_realargs)
+         @[EConstr.of_constr (build_dependent_constructor cs)] in
+       let lp = lift cs.cs_nargs p in
+       let fty = hnf_lam_applist env.ExtraEnv.env !evdref lp inst in
+       let fj = pretype (mk_tycon fty) env_f evdref lvar d in
+       let v =
+         let ind,_ = dest_ind_family indf in
+         let is = Typing.check_allowed_sort env.ExtraEnv.env !evdref indty cj.uj_val p in
+         obj ind is p cj.uj_val fj.uj_val
+       in
+       { uj_val = v; uj_type = (substl (realargs@[cj.uj_val]) ccl) }
 
 	  | None ->
 	    let tycon = lift_tycon cs.cs_nargs tycon in
@@ -950,13 +950,13 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
 	    let p = it_mkLambda_or_LetIn (lift (nar+1) ccl) psign' in
 	    let v =
 	      let ind,_ = dest_ind_family indf in
-		Typing.check_allowed_sort env.ExtraEnv.env !evdref ind cj.uj_val p;
-		obj ind p cj.uj_val fj.uj_val
+                let is = Typing.check_allowed_sort env.ExtraEnv.env !evdref indty cj.uj_val p in
+                obj ind is p cj.uj_val fj.uj_val
 	    in { uj_val = v; uj_type = ccl })
 
   | GIf (c,(na,po),b1,b2) ->
     let cj = pretype empty_tycon env evdref lvar c in
-    let (IndType (indf,realargs)) =
+    let (IndType (indf,realargs) as indty) =
       try find_rectype env.ExtraEnv.env !evdref cj.uj_type
       with Not_found ->
 	let cloc = loc_of_glob_constr c in
@@ -1018,8 +1018,8 @@ let rec pretype k0 resolve_tc (tycon : type_constraint) (env : ExtraEnv.t) evdre
 	let ind,_ = dest_ind_family indf in
 	let ci = make_case_info env.ExtraEnv.env (fst ind) IfStyle in
 	let pred = nf_evar !evdref pred in
-	  Typing.check_allowed_sort env.ExtraEnv.env !evdref ind cj.uj_val pred;
-	  mkCase (ci, pred, cj.uj_val, [|b1;b2|])
+        let is = Typing.check_allowed_sort env.ExtraEnv.env !evdref indty cj.uj_val pred in
+          mkCase (ci, pred, is, cj.uj_val, [|b1;b2|])
       in
       let cj = { uj_val = v; uj_type = p } in
       inh_conv_coerce_to_tycon ?loc env evdref cj tycon

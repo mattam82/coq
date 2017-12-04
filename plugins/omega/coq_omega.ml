@@ -530,10 +530,10 @@ let context sigma operation path (t : constr) =
       | ((P_APP n :: p),  App (f,v)) ->
 	  let v' = Array.copy v in
 	  v'.(pred n) <- loop i p v'.(pred n); mkApp (f, v')
-      | ((P_BRANCH n :: p), Case (ci,q,c,v)) ->
+      | ((P_BRANCH n :: p), Case (ci,q,is,c,v)) ->
 	  (* avant, y avait mkApp... anyway, BRANCH seems nowhere used *)
 	  let v' = Array.copy v in
-	  v'.(n) <- loop i p v'.(n); (mkCase (ci,q,c,v'))
+          v'.(n) <- loop i p v'.(n); (mkCase (ci,q,is,c,v'))
       | ((P_ARITY :: p),  App (f,l)) ->
 	  mkApp (loop i p f,l)
       | ((P_ARG :: p),  App (f,v)) ->
@@ -565,7 +565,7 @@ let occurrence sigma path (t : constr) =
     | (p, Cast (c,_,_)) -> loop p c
     | ([], _) -> t
     | ((P_APP n :: p),  App (f,v)) -> loop p v.(pred n)
-    | ((P_BRANCH n :: p), Case (_,_,_,v)) -> loop p v.(n)
+    | ((P_BRANCH n :: p), Case (_,_,_,_,v)) -> loop p v.(n)
     | ((P_ARITY :: p),  App (f,_)) -> loop p f
     | ((P_ARG :: p),  App (f,v)) -> loop p v.(0)
     | (p, Fix((_,n) ,(_,_,v))) -> loop p v.(n)

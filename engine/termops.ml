@@ -81,9 +81,9 @@ let rec pr_constr c = match kind c with
   | Construct (((sp,i),j),u) ->
       str"Constr(" ++ pr_puniverses (MutInd.print sp ++ str"," ++ int i ++ str"," ++ int j) u ++ str")"
   | Proj (p,c) -> str"Proj(" ++ pr_con (Projection.constant p) ++ str"," ++ bool (Projection.unfolded p) ++ pr_constr c ++ str")"
-  | Case (ci,p,c,bl) -> v 0
+  | Case (ci,p,is,c,bl) -> v 0
       (hv 0 (str"<"++pr_constr p++str">"++ cut() ++ str"Case " ++
-             pr_constr c ++ str"of") ++ cut() ++
+             pr_constr c ++ pr_case_is is ++ str"of") ++ cut() ++
        prlist_with_sep (fun _ -> brk(1,2)) pr_constr (Array.to_list bl) ++
       cut() ++ str"end")
   | Fix f -> pr_fix pr_constr f
@@ -95,6 +95,10 @@ let rec pr_constr c = match kind c with
            Name.print na ++ str":" ++ pr_constr ty ++
            cut() ++ str":=" ++ pr_constr bd) (Array.to_list fixl)) ++
          str"}")
+
+and pr_case_is = function
+  | None -> mt()
+  | Some is -> str"indices" ++ prvect_with_sep spc pr_constr is
 
 let term_printer = ref (fun _env _sigma c -> pr_constr (EConstr.Unsafe.to_constr c))
 let print_constr_env env sigma t = !term_printer env sigma t
@@ -684,13 +688,14 @@ let map_constr_with_binders_left_to_right sigma g f l c =
     let al' = Array.map_left (f l) al in
       if Array.for_all2 (==) al' al then c
       else mkEvar (e, al')
-  | Case (ci,p,b,bl) ->
+  | Case (ci,p,is,b,bl) ->
       (* In v8 concrete syntax, predicate is after the term to match! *)
       let b' = f l b in
       let p' = f l p in
+      let is' = Option.map (Array.map_left (f l)) is in
       let bl' = Array.map_left (f l) bl in
-	if b' == b && p' == p && bl' == bl then c
-	else mkCase (ci, p', b', bl')
+        if b' == b && p' == p && is' == is && bl' == bl then c
+        else mkCase (ci, p', is', b', bl')
   | Fix (ln,(lna,tl,bl as fx)) ->
       let l' = fold_rec_types g fx l in
       let (tl', bl') = map_left2 (f l) tl (f l') bl in
@@ -734,16 +739,17 @@ let map_constr_with_full_binders sigma g f l cstr =
       if c==c' && Array.for_all2 (==) al al' then cstr else mkApp (c', al')
   | Proj (p,c) -> 
       let c' = f l c in
-	if c' == c then cstr else mkProj (p, c')
+      if c' == c then cstr else mkProj (p, c')
   | Evar (e,al) ->
       let al' = Array.map (f l) al in
       if Array.for_all2 (==) al al' then cstr else mkEvar (e, al')
-  | Case (ci,p,c,bl) ->
-      let p' = f l p in
-      let c' = f l c in
-      let bl' = Array.map (f l) bl in
-      if p==p' && c==c' && Array.for_all2 (==) bl bl' then cstr else
-        mkCase (ci, p', c', bl')
+  | Case (ci,p,is,c,bl) ->
+    let p' = f l p in
+    let is' = Option.map (Array.map (f l)) is in
+    let c' = f l c in
+    let bl' = Array.map (f l) bl in
+    if p==p' && is' == is && c==c' && Array.for_all2 (==) bl bl' then cstr else
+      mkCase (ci, p', is', c', bl')
   | Fix (ln,(lna,tl,bl)) ->
       let tl' = Array.map (f l) tl in
       let l' =
@@ -781,7 +787,7 @@ let fold_constr_with_full_binders sigma g f n acc c =
   | App (c,l) -> Array.fold_left (f n) (f n acc c) l
   | Proj (p,c) -> f n acc c
   | Evar (_,l) -> Array.fold_left (f n) acc l
-  | Case (_,p,c,bl) -> Array.fold_left (f n) (f n (f n acc p) c) bl
+  | Case (_,p,is,c,bl) -> Array.fold_left (f n) (f n (Option.fold_left (Array.fold_left (f n)) (f n acc p) is) c) bl
   | Fix (_,(lna,tl,bl)) ->
       let n' = CArray.fold_left2 (fun c n t -> g (LocalAssum (n, inj t)) c) n lna tl in
       let fd = Array.map2 (fun t b -> (t,b)) tl bl in
@@ -811,7 +817,7 @@ let iter_constr_with_full_binders g f l c =
   | App (c,args) -> f l c; Array.iter (f l) args
   | Proj (p,c) -> f l c
   | Evar (_,args) -> Array.iter (f l) args
-  | Case (_,p,c,bl) -> f l p; f l c; Array.iter (f l) bl
+  | Case (_,p,is,c,bl) -> f l p; Option.iter (Array.iter (f l)) is; f l c; Array.iter (f l) bl
   | Fix (_,(lna,tl,bl)) ->
       let l' = Array.fold_left2 (fun l na t -> g (LocalAssum (na,t)) l) l lna tl in
       Array.iter (f l) tl;

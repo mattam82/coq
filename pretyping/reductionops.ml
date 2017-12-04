@@ -280,7 +280,7 @@ sig
 
   type 'a member =
   | App of 'a app_node
-  | Case of case_info * 'a * 'a array * Cst_stack.t
+  | Case of case_info * 'a * 'a array option * 'a array * Cst_stack.t
   | Proj of int * int * projection * Cst_stack.t
   | Fix of ('a, 'a) pfixpoint * 'a t * Cst_stack.t
   | Cst of cst_member * int * int list * 'a t * Cst_stack.t
@@ -339,7 +339,7 @@ struct
 
   type 'a member =
   | App of 'a app_node
-  | Case of case_info * 'a * 'a array * Cst_stack.t
+  | Case of case_info * 'a * 'a array option * 'a array * Cst_stack.t
   | Proj of int * int * projection * Cst_stack.t
   | Fix of ('a, 'a) pfixpoint * 'a t * Cst_stack.t
   | Cst of cst_member * int * int list * 'a t * Cst_stack.t
@@ -352,7 +352,7 @@ struct
     let pr_c x = hov 1 (pr_c x) in
     match member with
     | App app -> str "ZApp" ++ pr_app_node pr_c app
-    | Case (_,_,br,cst) ->
+    | Case (_,_,_,br,cst) ->
        str "ZCase(" ++
 	 prvect_with_sep (pr_bar) pr_c br
        ++ str ")"
@@ -421,8 +421,10 @@ struct
 	let t1,s1' = decomp_node_last a1 s1 in
 	let t2,s2' = decomp_node_last a2 s2 in
 	if f (t1,lft1) (t2,lft2) then equal_rec s1' lft1 s2' lft2 else None
-      | Case (_,t1,a1,_) :: s1, Case (_,t2,a2,_) :: s2 ->
-	if f (t1,lft1) (t2,lft2) && CArray.equal (fun x y -> f (x,lft1) (y,lft2)) a1 a2
+      | Case (_,t1,is1,a1,_) :: s1, Case (_,t2,is2,a2,_) :: s2 ->
+        if f (t1,lft1) (t2,lft2) &&
+           Option.equal (CArray.equal (fun x y -> f (x,lft1) (y,lft2))) is1 is2 &&
+           CArray.equal (fun x y -> f (x,lft1) (y,lft2)) a1 a2
 	then equal_rec s1 lft1 s2 lft2
 	else None
       | (Proj (n1,m1,p,_)::s1, Proj(n2,m2,p2,_)::s2) ->
@@ -453,7 +455,7 @@ struct
       | (_, (Update _|Shift _)::s2) -> compare_rec bal stk1 s2
       | (App (i,_,j)::s1, _) -> compare_rec (bal + j + 1 - i) s1 stk2
       | (_, App (i,_,j)::s2) -> compare_rec (bal - j - 1 + i) stk1 s2
-      | (Case(c1,_,_,_)::s1, Case(c2,_,_,_)::s2) ->
+      | (Case(c1,_,_,_,_)::s1, Case(c2,_,_,_,_)::s2) ->
         Int.equal bal 0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
       | (Proj (n1,m1,p,_)::s1, Proj(n2,m2,p2,_)::s2) ->
 	Int.equal bal 0 && compare_rec 0 s1 s2
@@ -479,9 +481,9 @@ struct
 	 let t2,l2 = decomp_node_last n2 q2 in
 	 aux (f o (Vars.lift lft1 t1) (Vars.lift lft2 t2))
 	     lft1 l1 lft2 l2
-      | Case (_,t1,a1,_) :: q1, Case (_,t2,a2,_) :: q2 ->
+      | Case (_,t1,is1,a1,_) :: q1, Case (_,t2,is2,a2,_) :: q2 ->
 	aux (fold_array
-	       (f o (Vars.lift lft1 t1) (Vars.lift lft2 t2))
+               (Option.fold_left2 fold_array (f o (Vars.lift lft1 t1) (Vars.lift lft2 t2)) is1 is2)
 	       a1 a2) lft1 q1 lft2 q2
       | Proj (n1,m1,p1,_) :: q1, Proj (n2,m2,p2,_) :: q2 ->
 	aux o lft1 q1 lft2 q2
@@ -498,17 +500,17 @@ struct
     in aux o 0 (List.rev sk1) 0 (List.rev sk2)
 
   let rec map f x = List.map (function
-			       | Update _ -> assert false
-			       | (Proj (_,_,_,_) | Shift _) as e -> e
-			       | App (i,a,j) ->
-				  let le = j - i + 1 in
-				  App (0,Array.map f (Array.sub a i le), le-1)
-			       | Case (info,ty,br,alt) -> Case (info, f ty, Array.map f br, alt)
-			       | Fix ((r,(na,ty,bo)),arg,alt) ->
-				  Fix ((r,(na,Array.map f ty, Array.map f bo)),map f arg,alt)
-			       | Cst (cst,curr,remains,params,alt) ->
-				 Cst (cst,curr,remains,map f params,alt)
-  ) x
+      | Update _ -> assert false
+      | (Proj (_,_,_,_) | Shift _) as e -> e
+      | App (i,a,j) ->
+        let le = j - i + 1 in
+ App (0,Array.map f (Array.sub a i le), le-1)
+      | Case (info,ty,is,br,alt) -> Case (info, f ty, Option.map (Array.map f) is, Array.map f br, alt)
+      | Fix ((r,(na,ty,bo)),arg,alt) ->
+        Fix ((r,(na,Array.map f ty, Array.map f bo)),map f arg,alt)
+      | Cst (cst,curr,remains,params,alt) ->
+        Cst (cst,curr,remains,map f params,alt)
+    ) x
 
   let append_app_list l s =
     let a = Array.of_list l in
@@ -545,7 +547,7 @@ struct
     List.exists (function (Fix _ | Case _ | Proj _ | Cst _) -> true | _ -> false) args
   let will_expose_iota args =
     List.exists
-      (function (Fix (_,_,l) | Case (_,_,_,l) |
+      (function (Fix (_,_,l) | Case (_,_,_,_,l) |
 		 Proj (_,_,_,l) | Cst (_,_,_,_,l)) when Cst_stack.is_empty l -> true | _ -> false)
       args
 
@@ -616,9 +618,9 @@ struct
 		then a
 		else Array.sub a i (j - i + 1) in
        zip (mkApp (f, a'), s)
-    | f, (Case (ci,rt,br,cst_l)::s) when refold ->
-      zip (best_state sigma (mkCase (ci,rt,f,br), s) cst_l)
-    | f, (Case (ci,rt,br,_)::s) -> zip (mkCase (ci,rt,f,br), s)
+    | f, (Case (ci,rt,is,br,cst_l)::s) when refold ->
+      zip (best_state sigma (mkCase (ci,rt,is,f,br), s) cst_l)
+    | f, (Case (ci,rt,is,br,_)::s) -> zip (mkCase (ci,rt,is,f,br), s)
     | f, (Fix (fix,st,cst_l)::s) when refold ->
       zip (best_state sigma (mkFix fix, st @ (append_app [|f|] s)) cst_l)
   | f, (Fix (fix,st,_)::s) -> zip
@@ -795,7 +797,7 @@ let reduce_mind_case sigma mia =
         applist (mia.mlf.(i-1),real_cargs)
     | CoFix cofix ->
 	let cofix_def = contract_cofix sigma cofix in
-	mkCase (mia.mci, mia.mP, applist(cofix_def,mia.mcargs), mia.mlf)
+        mkCase (mia.mci, mia.mP, None, applist(cofix_def,mia.mcargs), mia.mlf)
     | _ -> assert false
 
 (* contracts fix==FIX[nl;i](A1...Ak;[F1...Fk]{B1....Bk}) to produce
@@ -1021,8 +1023,8 @@ let rec whd_state_gen ?csts ~refold ~tactic_mode flags env sigma =
 	| _ -> fold ())
       | _ -> fold ())
 
-    | Case (ci,p,d,lf) ->
-      whrec Cst_stack.empty (d, Stack.Case (ci,p,lf,cst_l) :: stack)
+    | Case (ci,p,is,d,lf) ->
+      whrec Cst_stack.empty (d, Stack.Case (ci,p,is,lf,cst_l) :: stack)
 
     | Fix ((ri,n),_ as f) ->
       (match Stack.strip_n_app ri.(n) stack with
@@ -1035,7 +1037,7 @@ let rec whd_state_gen ?csts ~refold ~tactic_mode flags env sigma =
       let use_fix = CClosure.RedFlags.red_set flags CClosure.RedFlags.fFIX in
       if use_match || use_fix then
 	match Stack.strip_app stack with
-	|args, (Stack.Case(ci, _, lf,_)::s') when use_match ->
+        |args, (Stack.Case(ci, _, _, lf,_)::s') when use_match ->
 	  whrec Cst_stack.empty (lf.(c-1), (Stack.tail ci.ci_npar args) @ s')
 	|args, (Stack.Proj (n,m,p,_)::s') when use_match ->
 	  whrec Cst_stack.empty (Stack.nth args (n+m), s')
@@ -1127,8 +1129,8 @@ let local_whd_state_gen flags sigma =
 			       p, Cst_stack.empty)
            :: stack))
 
-    | Case (ci,p,d,lf) ->
-      whrec (d, Stack.Case (ci,p,lf,Cst_stack.empty) :: stack)
+    | Case (ci,p,is,d,lf) ->
+      whrec (d, Stack.Case (ci,p,is,lf,Cst_stack.empty) :: stack)
 
     | Fix ((ri,n),_ as f) ->
       (match Stack.strip_n_app ri.(n) stack with
@@ -1146,7 +1148,7 @@ let local_whd_state_gen flags sigma =
       let use_fix = CClosure.RedFlags.red_set flags CClosure.RedFlags.fFIX in
       if use_match || use_fix then
 	match Stack.strip_app stack with
-	|args, (Stack.Case(ci, _, lf,_)::s') when use_match ->
+        |args, (Stack.Case(ci, _, _, lf,_)::s') when use_match ->
 	  whrec (lf.(c-1), (Stack.tail ci.ci_npar args) @ s')
 	|args, (Stack.Proj (n,m,p,_) :: s') when use_match ->
 	  whrec (Stack.nth args (n+m), s')
@@ -1738,7 +1740,7 @@ let meta_reducible_instance evd b =
   let rec irec u =
     let u = whd_betaiota Evd.empty u (** FIXME *) in
     match EConstr.kind evd u with
-    | Case (ci,p,c,bl) when EConstr.isMeta evd (strip_outer_cast evd c) ->
+    | Case (ci,p,is,c,bl) when EConstr.isMeta evd (strip_outer_cast evd c) ->
 	let m = destMeta evd (strip_outer_cast evd c) in
 	(match
 	  try
@@ -1748,8 +1750,8 @@ let meta_reducible_instance evd b =
 	    if isConstruct evd g || not is_coerce then Some g else None
 	  with Not_found -> None
 	  with
-	    | Some g -> irec (mkCase (ci,p,g,bl))
-	    | None -> mkCase (ci,irec p,c,Array.map irec bl))
+            | Some g -> irec (mkCase (ci,p,is,g,bl))
+            | None -> mkCase (ci,irec p,Option.map (Array.map irec) is (* not sure about this...*), c,Array.map irec bl))
     | App (f,l) when EConstr.isMeta evd (strip_outer_cast evd f) ->
 	let m = destMeta evd (strip_outer_cast evd f) in
 	(match

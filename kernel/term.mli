@@ -106,7 +106,7 @@ Ci(...yij...) => ti | ... end] (or [let (..y1i..) := c as x in I args
 return P in t1], or [if c then t1 else t2])
 @return [(info,c,fun args x => P,[|...|fun yij => ti| ...|])]
 where [info] is pretty-printing information *)
-val destCase : constr -> case_info * constr * constr * constr array
+val destCase : constr -> case_info * constr * constr array option * constr * constr array
 
 (** Destructs a projection *)
 val destProj : constr -> projection * constr
@@ -368,7 +368,7 @@ val mkConstructU : constructor puniverses -> constr
 [@@ocaml.deprecated "Alias for Constr"]
 val mkConstructUi : (pinductive * int) -> constr
 [@@ocaml.deprecated "Alias for Constr"]
-val mkCase : case_info * constr * constr * constr array -> constr
+val mkCase : case_info * constr * constr array option * constr * constr array -> constr
 [@@ocaml.deprecated "Alias for Constr.mkCase"]
 val mkFix : fixpoint -> constr
 [@@ocaml.deprecated "Alias for Constr.mkFix"]
@@ -513,7 +513,7 @@ type ('constr, 'types, 'sort, 'univs) kind_of_term =
   | Const     of (Constant.t * 'univs)
   | Ind       of (inductive * 'univs)
   | Construct of (constructor * 'univs)
-  | Case      of Constr.case_info * 'constr * 'constr * 'constr array
+  | Case      of Constr.case_info * 'constr * 'constr array option * 'constr * 'constr array
   | Fix       of ('constr, 'types) Constr.pfixpoint
   | CoFix     of ('constr, 'types) Constr.pcofixpoint
   | Proj      of projection * 'constr

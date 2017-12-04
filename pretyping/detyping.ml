@@ -293,7 +293,7 @@ and align_tree nal isgoal (e,c as rhs) sigma = match nal with
   | [] -> [[],rhs]
   | na::nal ->
     match EConstr.kind sigma c with
-    | Case (ci,p,c,cl) when
+    | Case (ci,p,is,c,cl) when
         eq_constr sigma c (mkRel (List.index Name.equal na (fst (snd e))))
         && not (Int.equal (Array.length cl) 0)
 	&& (* don't contract if p dependent *)
@@ -564,7 +564,7 @@ and detype_r d flags avoid env sigma t =
 	GRef (IndRef ind_sp, detype_instance sigma u)
     | Construct (cstr_sp,u) ->
 	GRef (ConstructRef cstr_sp, detype_instance sigma u)
-    | Case (ci,p,c,bl) ->
+    | Case (ci,p,is,c,bl) ->
 	let comp = computable sigma p (List.length (ci.ci_pp_info.ind_tags)) in
 	detype_case comp (detype d flags avoid env sigma)
 	  (detype_eqns d flags avoid env sigma ci comp)

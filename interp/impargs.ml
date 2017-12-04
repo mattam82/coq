@@ -217,7 +217,7 @@ let add_free_rels_until strict strongly_strict revpat bound env m pos acc =
 let rec is_rigid_head t = match kind t with
   | Rel _ | Evar _ -> false
   | Ind _ | Const _ | Var _ | Sort _ -> true
-  | Case (_,_,f,_) -> is_rigid_head f
+  | Case (_, _,_,f,_) -> is_rigid_head f
   | Proj (p,c) -> true
   | App (f,args) ->
       (match kind f with

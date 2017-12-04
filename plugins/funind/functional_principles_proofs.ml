@@ -701,12 +701,12 @@ let build_proof
         let sigma = project g in
 (*      observe (str "proving on " ++ Printer.pr_lconstr_env (pf_env g) term);*)
 	match EConstr.kind sigma dyn_infos.info with
-	  | Case(ci,ct,t,cb) ->
+          | Case(ci,ct,is,t,cb) ->
 	      let do_finalize_t dyn_info' =
 		fun g ->
 		  let t = dyn_info'.info in
 		  let dyn_infos = {dyn_info' with info =
-		      mkCase(ci,ct,t,cb)} in
+                      mkCase(ci,ct,is,t,cb)} in
 		  let g_nb_prod = nb_prod (project g) (pf_concl g) in
 		  let type_of_term = pf_unsafe_type_of g t in
 		  let term_eq =

@@ -716,7 +716,8 @@ let explain_type_error env sigma err =
   | WrongCaseInfo (ind,ci) ->
       explain_wrong_case_info env ind ci
   | UnsatisfiedConstraints cst ->
-      explain_unsatisfied_constraints env sigma cst
+    explain_unsatisfied_constraints env sigma cst
+  | SPropError p -> str"sprop error: " ++ p
 
 let pr_position (cl,pos) =
   let clpos = match cl with
@@ -1308,6 +1309,8 @@ let map_ptype_error f = function
 | IllTypedRecBody (n, na, jv, t) ->
   IllTypedRecBody (n, na, Array.map (on_judgment f) jv, Array.map f t)
 | UnsatisfiedConstraints g -> UnsatisfiedConstraints g
+| SPropError p -> let p : Pp.t = p in (*trick to fail when the type gets saner *)
+  SPropError p
 
 let explain_reduction_tactic_error = function
   | Tacred.InvalidAbstraction (env,sigma,c,(env',e)) ->

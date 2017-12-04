@@ -780,7 +780,7 @@ let rec find_a_destructable_match sigma t =
   let cl = [cl, (None, None), None], None in
   let dest = TacAtom (Loc.tag @@ TacInductionDestruct(false, false, cl)) in
   match EConstr.kind sigma t with
-    | Case (_,_,x,_) when closed0 sigma x ->
+    | Case (_,_,_,x,_) when closed0 sigma x ->
 	if isVar sigma x then
 	  (* TODO check there is no rel n. *)
 	  raise (Found (Tacinterp.eval_tactic dest))
@@ -864,8 +864,8 @@ let rec has_evar x =
       has_evar t1 || has_evar t2 || has_evar t3
     | App (t1, ts) ->
       has_evar t1 || has_evar_array ts
-    | Case (_, t1, t2, ts) ->
-      has_evar t1 || has_evar t2 || has_evar_array ts
+    | Case (_, t1, is, t2, ts) ->
+      Option.cata has_evar_array true is || has_evar t1 || has_evar t2 || has_evar_array ts
     | Fix ((_, tr)) | CoFix ((_, tr)) ->
       has_evar_prec tr
     | Proj (p, c) -> has_evar c

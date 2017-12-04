@@ -652,7 +652,7 @@ let rec is_neutral env sigma ts t =
       not (Id.Pred.mem id (fst ts))
     | Rel n -> true
     | Evar _ | Meta _ -> true
-    | Case (_, p, c, cl) -> is_neutral env sigma ts c
+    | Case (_, p, _, c, cl) -> is_neutral env sigma ts c
     | Proj (p, c) -> is_neutral env sigma ts c
     | _ -> false
 
@@ -834,15 +834,16 @@ let rec unify_0_with_initial_metas (sigma,ms,es as subst : subst0) conv_at_top e
 	       unify_app_pattern true curenvnb pb opt substn cM f1 l1 cN f2 l2
 	     | _ -> raise ex)
 
-	| Case (_,p1,c1,cl1), Case (_,p2,c2,cl2) ->
-            (try 
-	     let opt' = {opt with at_top = true; with_types = false} in
-	       Array.fold_left2 (unirec_rec curenvnb CONV {opt with at_top = true})
-	       (unirec_rec curenvnb CONV opt'
-		(unirec_rec curenvnb CONV opt' substn p1 p2) c1 c2)
-                 cl1 cl2
-	     with ex when precatchable_exception ex ->
-	       reduce curenvnb pb opt substn cM cN)
+        | Case (_,p1,is1,c1,cl1), Case (_,p2,is2,c2,cl2) ->
+          (try
+             let opt' = {opt with at_top = true; with_types = false} in
+             Array.fold_left2 (unirec_rec curenvnb CONV {opt with at_top = true})
+               (unirec_rec curenvnb CONV opt'
+                  (Option.fold_left2 (Array.fold_left2 (unirec_rec curenvnb CONV opt'))
+                     (unirec_rec curenvnb CONV opt' substn p1 p2) is1 is2) c1 c2)
+               cl1 cl2
+           with ex when precatchable_exception ex ->
+             reduce curenvnb pb opt substn cM cN)
 
 	| App (f1,l1), _ when 
 	    (isMeta sigma f1 && use_metas_pattern_unification sigma flags nb l1
@@ -1751,7 +1752,7 @@ let w_unify_to_subterm env evd ?(flags=default_unify_flags ()) (op,cl) =
 		 matchrec c1
 	       with ex when precatchable_exception ex ->
 		 matchrec c2)
-          | Case(_,_,c,lf) -> (* does not search in the predicate *)
+          | Case(_,_,_,c,lf) -> (* does not search in the predicate *)
 	       (try
 		 matchrec c
 	       with ex when precatchable_exception ex ->
@@ -1834,7 +1835,7 @@ let w_unify_to_subterm_all env evd ?(flags=default_unify_flags ()) (op,cl) =
 		let c2 = args.(n-1) in
 		bind (matchrec c1) (matchrec c2)
 
-            | Case(_,_,c,lf) -> (* does not search in the predicate *)
+            | Case(_,_,_,c,lf) -> (* does not search in the predicate *)
 		bind (matchrec c) (bind_iter matchrec lf)
 
 	    | Proj (p,c) -> matchrec c

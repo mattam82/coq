@@ -193,7 +193,7 @@ let pattern_of_constr env sigma t =
       | Evar_kinds.MatchingVar (Evar_kinds.SecondOrderPatVar ido) -> assert false
       | _ -> 
 	 PMeta None)
-    | Case (ci,p,a,br) ->
+    | Case (ci,p,is,a,br) ->
         let cip =
 	  { cip_style = ci.ci_pp_info.style;
 	    cip_ind = Some ci.ci_ind;

@@ -74,6 +74,8 @@ val map : ('a -> 'b) -> 'a option -> 'b option
     some memory. *)
 val smartmap : ('a -> 'a) -> 'a option -> 'a option
 
+val smartfoldmap : ('b -> 'a -> 'b * 'a) -> 'b -> 'a option -> 'b * 'a option
+
 (** [fold_left f a x] is [f a y] if [x] is [Some y], and [a] otherwise. *)
 val fold_left : ('b -> 'a -> 'b) -> 'b -> 'a option -> 'b
 

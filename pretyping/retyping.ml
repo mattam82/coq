@@ -107,7 +107,7 @@ let retype ?(polyprop=true) sigma =
     | Evar ev -> existential_type sigma ev
     | Ind (ind, u) -> EConstr.of_constr (rename_type_of_inductive env (ind, EInstance.kind sigma u))
     | Construct (cstr, u) -> EConstr.of_constr (rename_type_of_constructor env (cstr, EInstance.kind sigma u))
-    | Case (_,p,c,lf) ->
+    | Case (_,p,_,c,lf) ->
         let Inductiveops.IndType(indf,realargs) =
           let t = type_of env c in
           try Inductiveops.find_rectype env sigma t

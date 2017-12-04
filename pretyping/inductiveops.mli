@@ -185,7 +185,7 @@ val make_case_info : env -> inductive -> case_style -> case_info
     Fail with an error if the elimination is dependent while the
     inductive type does not allow dependent elimination. *)
 val make_case_or_project :
-  env -> evar_map -> inductive_family -> case_info ->
+  env -> evar_map -> inductive_type -> case_info -> with_is:bool ->
   (* pred *) EConstr.constr -> (* term *) EConstr.constr -> (* branches *) EConstr.constr array -> EConstr.constr
 
 (*i Compatibility

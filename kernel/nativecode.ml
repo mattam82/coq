@@ -2045,7 +2045,7 @@ let rec compile_deps env sigma prefix ~interactive init t =
   | Proj (p,c) ->
     let term = mkApp (mkConst (Projection.constant p), [|c|]) in
       compile_deps env sigma prefix ~interactive init term
-  | Case (ci, p, c, ac) ->
+  | Case (ci, p, is, c, ac) ->(*TODO something with is?*)
       let mind = fst ci.ci_ind in
       let init = compile_mind_deps env prefix ~interactive init mind in
       Constr.fold (compile_deps env sigma prefix ~interactive) init t

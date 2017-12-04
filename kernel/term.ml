@@ -86,7 +86,7 @@ type ('constr, 'types, 'sort, 'univs) kind_of_term =
   | Const     of (Constant.t * 'univs)
   | Ind       of (inductive * 'univs)
   | Construct of (constructor * 'univs)
-  | Case      of case_info * 'constr * 'constr * 'constr array
+  | Case      of case_info * 'constr * 'constr array option * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
   | Proj      of projection * 'constr
@@ -304,7 +304,7 @@ let isConstruct c = match kind_of_term c with Construct _ -> true | _ -> false
 
 (* Destructs a term <p>Case c of lc1 | lc2 .. | lcn end *)
 let destCase c = match kind_of_term c with
-  | Case (ci,p,c,v) -> (ci,p,c,v)
+  | Case (ci,p,is,c,v) -> (ci,p,is,c,v)
   | _ -> raise DestKO
 
 let isCase c =  match kind_of_term c with Case _ -> true | _ -> false

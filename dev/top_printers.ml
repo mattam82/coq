@@ -271,8 +271,8 @@ let constr_display csr =
       "MutConstruct(("^(MutInd.to_string sp)^","^(string_of_int i)^"),"
       ^","^(universes_display u)^(string_of_int j)^")"
   | Proj (p, c) -> "Proj("^(Constant.to_string (Projection.constant p))^","^term_display c ^")"
-  | Case (ci,p,c,bl) ->
-      "MutCase(<abs>,"^(term_display p)^","^(term_display c)^","
+  | Case (ci,p,is,c,bl) ->
+      "MutCase(<abs>,"^(term_display p)^","^(array_opt_display is)^","^(term_display c)^","
       ^(array_display bl)^")"
   | Fix ((t,i),(lna,tl,bl)) ->
       "Fix(([|"^(Array.fold_right (fun x i -> (string_of_int x)^(if not(i="")
@@ -293,6 +293,10 @@ let constr_display csr =
     (Array.fold_right
        (fun x i -> (term_display x)^(if not(i="") then (";"^i) else ""))
        v "")^"|]"
+
+  and array_opt_display = function
+    | None -> "None"
+    | Some v -> "Some("^(array_display v)^")"
 
   and univ_display u =
     incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ pr_uni u ++ fnl ())
@@ -377,7 +381,7 @@ let print_pure_constr csr =
       print_int i; print_string ","; print_int j; 
       print_string ","; universes_display u;
       print_string ")"
-  | Case (ci,p,c,bl) ->
+  | Case (ci,p,is,c,bl) ->
       open_vbox 0;
       print_string "<"; box_display p; print_string ">";
       print_cut(); print_string "Case";

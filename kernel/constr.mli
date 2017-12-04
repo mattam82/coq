@@ -135,14 +135,16 @@ val mkConstructUi : pinductive * int -> constr
 
 (** Constructs a destructor of inductive type.
     
-    [mkCase ci p c ac] stand for match [c] as [x] in [I args] return [p] with [ac] 
+    [mkCase ci p is c ac] stand for match [c] as [x] in [I args] return [p] with [ac]
     presented as describe in [ci].
 
     [p] stucture is [fun args x -> "return clause"]
 
+    [is] is the indices of [c], present only for informative match of SProp inductive.
+
     [ac]{^ ith} element is ith constructor case presented as 
     {e lambda construct_args (without params). case_term } *)
-val mkCase : case_info * constr * constr * constr array -> constr
+val mkCase : case_info * constr * constr array option * constr * constr array -> constr
 
 (** If [recindxs = [|i1,...in|]]
       [funnames = [|f1,.....fn|]]
@@ -214,7 +216,7 @@ type ('constr, 'types, 'sort, 'univs) kind_of_term =
 
   | Ind       of (inductive * 'univs)                 (** A name of an inductive type defined by [Variant], [Inductive] or [Record] Vernacular-commands. *)
   | Construct of (constructor * 'univs)              (** A constructor of an inductive type defined by [Variant], [Inductive] or [Record] Vernacular-commands. *)
-  | Case      of case_info * 'constr * 'constr * 'constr array
+  | Case      of case_info * 'constr * 'constr array option * 'constr * 'constr array
   | Fix       of ('constr, 'types) pfixpoint
   | CoFix     of ('constr, 'types) pcofixpoint
   | Proj      of projection * 'constr

@@ -61,6 +61,7 @@ type ('constr, 'types) ptype_error =
   | IllTypedRecBody of
       int * Name.t array * ('constr, 'types) punsafe_judgment array * 'types array
   | UnsatisfiedConstraints of Univ.constraints
+  | SPropError of Pp.t
 
 type type_error = (constr, types) ptype_error
 
@@ -106,3 +107,5 @@ val error_ill_typed_rec_body  :
 val error_elim_explain : Sorts.family -> Sorts.family -> arity_error
 
 val error_unsatisfied_constraints : env -> Univ.constraints -> 'a
+
+val error_sprop : env -> Pp.t -> 'a

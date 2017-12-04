@@ -172,7 +172,7 @@ let fold_constr_with_full_binders g f n acc c =
   | App (c,l) -> Array.fold_left (f n) (f n acc c) l
   | Proj (p,c) -> f n acc c
   | Evar (_,l) -> Array.fold_left (f n) acc l
-  | Case (_,p,c,bl) -> Array.fold_left (f n) (f n (f n acc p) c) bl
+  | Case (_,p,is,c,bl) -> Array.fold_left (f n) (f n (Option.fold_left (Array.fold_left (f n)) (f n acc p) is) c) bl
   | Fix (_,(lna,tl,bl)) ->
       let n' = CArray.fold_left2 (fun c n t -> g (LocalAssum (n,t)) c) n lna tl in
       let fd = Array.map2 (fun t b -> (t,b)) tl bl in
@@ -194,7 +194,7 @@ let rec traverse current ctx accu t = match Constr.kind t with
 | Construct (((mind, _), _) as cst, _) ->
   traverse_inductive accu mind (ConstructRef cst)
 | Meta _ | Evar _ -> assert false
-| Case (_,oty,c,[||]) ->
+| Case (_,oty,is,c,[||]) -> (* TODO is? *)
     (* non dependent match on an inductive with no constructors *)
     begin match Constr.(kind oty, kind c) with
     | Lambda(_,_,oty), Const (kn, _)

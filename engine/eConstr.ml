@@ -174,7 +174,7 @@ let mkInd i = of_kind (Ind (in_punivs i))
 let mkConstructU pc = of_kind (Construct pc)
 let mkConstruct c = of_kind (Construct (in_punivs c))
 let mkConstructUi ((ind,u),i) = of_kind (Construct ((ind,i),u))
-let mkCase (ci, c, r, p) = of_kind (Case (ci, c, r, p))
+let mkCase (ci, c, is, r, p) = of_kind (Case (ci, c, is, r, p))
 let mkFix f = of_kind (Fix f)
 let mkCoFix f = of_kind (CoFix f)
 let mkProj (p, c) = of_kind (Proj (p, c))
@@ -267,7 +267,7 @@ let destCoFix sigma c = match kind sigma c with
 | _ -> raise DestKO
 
 let destCase sigma c = match kind sigma c with
-| Case (ci, t, c, p) -> (ci, t, c, p)
+| Case (ci, t, is, c, p) -> (ci, t, is, c, p)
 | _ -> raise DestKO
 
 let destProj sigma c = match kind sigma c with
@@ -421,12 +421,13 @@ let map sigma f c = match kind sigma c with
       let l' = Array.smartmap f l in
       if l'==l then c
       else mkEvar (e, l')
-  | Case (ci,p,b,bl) ->
+  | Case (ci,p,is,b,bl) ->
       let b' = f b in
       let p' = f p in
+      let is' = Option.smartmap (Array.smartmap f) is in
       let bl' = Array.smartmap f bl in
-      if b'==b && p'==p && bl'==bl then c
-      else mkCase (ci, p', b', bl')
+      if b'==b && p'==p && is' == is && bl'==bl then c
+      else mkCase (ci, p', is', b', bl')
   | Fix (ln,(lna,tl,bl)) ->
       let tl' = Array.smartmap f tl in
       let bl' = Array.smartmap f bl in
@@ -475,12 +476,13 @@ let map_with_binders sigma g f l c0 = match kind sigma c0 with
     let al' = CArray.Fun1.smartmap f l al in
     if al' == al then c0
     else mkEvar (e, al')
-  | Case (ci, p, c, bl) ->
+  | Case (ci, p, is, c, bl) ->
     let p' = f l p in
+    let is' = Option.smartmap (CArray.smartmap (f l)) is in (* TODO Fun1.smartmap *)
     let c' = f l c in
     let bl' = CArray.Fun1.smartmap f l bl in
-    if p' == p && c' == c && bl' == bl then c0
-    else mkCase (ci, p', c', bl')
+    if p' == p && is' == is && c' == c && bl' == bl then c0
+    else mkCase (ci, p', is', c', bl')
   | Fix (ln, (lna, tl, bl)) ->
     let tl' = CArray.Fun1.smartmap f l tl in
     let l' = iterate g (Array.length tl) l in
@@ -503,7 +505,7 @@ let iter sigma f c = match kind sigma c with
   | App (c,l) -> f c; Array.iter f l
   | Proj (p,c) -> f c
   | Evar (_,l) -> Array.iter f l
-  | Case (_,p,c,bl) -> f p; f c; Array.iter f bl
+  | Case (_,p,is,c,bl) -> f p; Option.iter (Array.iter f) is; f c; Array.iter f bl
   | Fix (_,(_,tl,bl)) -> Array.iter f tl; Array.iter f bl
   | CoFix (_,(_,tl,bl)) -> Array.iter f tl; Array.iter f bl
 
@@ -518,7 +520,7 @@ let iter_with_full_binders sigma g f n c =
   | LetIn (na,b,t,c) -> f n b; f n t; f (g (LocalDef (na, b, t)) n) c
   | App (c,l) -> f n c; CArray.Fun1.iter f n l
   | Evar (_,l) -> CArray.Fun1.iter f n l
-  | Case (_,p,c,bl) -> f n p; f n c; CArray.Fun1.iter f n bl
+  | Case (_,p,is,c,bl) -> f n p; Option.iter (Array.iter (f n)) is; f n c; CArray.Fun1.iter f n bl
   | Proj (p,c) -> f n c
   | Fix (_,(lna,tl,bl)) ->
     Array.iter (f n) tl;
@@ -542,7 +544,11 @@ let fold sigma f acc c = match kind sigma c with
   | App (c,l) -> Array.fold_left f (f acc c) l
   | Proj (p,c) -> f acc c
   | Evar (_,l) -> Array.fold_left f acc l
-  | Case (_,p,c,bl) -> Array.fold_left f (f (f acc p) c) bl
+  | Case (_,p,is,c,bl) ->
+    let acc = f acc p in
+    let acc = Option.fold_left (Array.fold_left f) acc is in
+    let acc = f acc c in
+    Array.fold_left f acc bl
   | Fix (_,(lna,tl,bl)) ->
     Array.fold_left2 (fun acc t b -> f (f acc t) b) acc tl bl
   | CoFix (_,(lna,tl,bl)) ->

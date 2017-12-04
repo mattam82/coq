@@ -329,7 +329,7 @@ let matches_core env sigma convert allow_partial_app allow_bound_rels
 	  sorec (push_binder na1 na2 t2 ctx) (EConstr.push_rel (LocalDef (na2,c2,t2)) env)
             (add_binders na1 na2 binding_vars (sorec ctx env subst c1 c2)) d1 d2
 
-      | PIf (a1,b1,b1'), Case (ci,_,a2,[|b2;b2'|]) ->
+      | PIf (a1,b1,b1'), Case (ci,_,_,a2,[|b2;b2'|]) ->
 	  let ctx_b2,b2 = decompose_lam_n_decls sigma ci.ci_cstr_ndecls.(0) b2 in
 	  let ctx_b2',b2' = decompose_lam_n_decls sigma ci.ci_cstr_ndecls.(1) b2' in
 	  let n = Context.Rel.length ctx_b2 in
@@ -345,7 +345,7 @@ let matches_core env sigma convert allow_partial_app allow_bound_rels
           else
             raise PatternMatchingFailure
 
-      | PCase (ci1,p1,a1,br1), Case (ci2,p2,a2,br2) ->
+      | PCase (ci1,p1,a1,br1), Case (ci2,p2,_,a2,br2) ->
 	  let n2 = Array.length br2 in
           let () = match ci1.cip_ind with
           | None -> ()
@@ -480,9 +480,9 @@ let sub_match ?(partial_app=false) ?(closed=true) env sigma pat c =
             mk_ctx (mkApp (List.hd le, Array.of_list (List.tl le))) in
           let sub = (env, c1) :: subargs env lc in
           try_aux sub mk_ctx next
-  | Case (ci,hd,c1,lc) ->
+  | Case (ci,hd,is,c1,lc) ->
       let next_mk_ctx = function
-      | c1 :: hd :: lc -> mk_ctx (mkCase (ci,hd,c1,Array.of_list lc))
+      | c1 :: hd :: lc -> mk_ctx (mkCase (ci,hd,is,c1,Array.of_list lc))
       | _ -> assert false
       in
       let sub = (env, c1) :: (env, hd) :: subargs env lc in

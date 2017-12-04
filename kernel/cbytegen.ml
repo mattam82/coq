@@ -744,7 +744,7 @@ let rec compile_constr reloc c sz cont =
       compile_fv reloc fv.fv_rev sz
 	(Kclosurecofix(fv.size, init, lbl_types, lbl_bodies) :: cont)
 
-  | Case(ci,t,a,branchs) ->
+  | Case(ci,t,is,a,branchs) -> (* TODO I have no clue what this does with SProp *)
       let ind = ci.ci_ind in
       let mib = lookup_mind (fst ind) !global_env in
       let oib = mib.mind_packets.(snd ind) in
