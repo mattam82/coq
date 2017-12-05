@@ -284,6 +284,25 @@ let check_branch_types env (ind,u) c ct lft explft =
     | Invalid_argument _ ->
         error_number_branches env (make_judge c ct) (Array.length explft)
 
+let check_case_is env sp sc pis is =
+  match is with
+  | None ->
+    if Sorts.is_sprop sc && not (Sorts.is_sprop sp)
+    then error_sprop env Pp.(str"eliminating sprop missing is")
+  | Some is ->
+    if not (Sorts.is_sprop sc)
+    then error_sprop env Pp.(str "eliminating non sprop but is present")
+    else if (Sorts.is_sprop sp)
+    then error_sprop env Pp.(str "eliminating sprop to sprop but is present")
+    else if not (Int.equal (Array.length is) (CList.length pis))
+    then error_sprop env Pp.(str "eliminating sprop with bad length is")
+    else
+      CList.iteri (fun i pi ->
+          let i = is.(i) in
+          try Reduction.default_conv Reduction.CONV env pi i
+          with Reduction.NotConvertible -> error_sprop env Pp.(str "eliminating sprop bad is"))
+        pis
+
 let type_of_projection env p c ct =
   let pb = lookup_projection p env in
   let (ind,u), args =
@@ -426,27 +445,10 @@ and type_of_case env ci p pt is c ct lf lft =
   let () = check_case_info env pind ci in
   let sc = execute_is_type env ct in
   let _, sp = dest_arity env pt in
-  let () = match is with
-    | None ->
-      if Sorts.is_sprop sc && not (Sorts.is_sprop sp)
-      then error_sprop env Pp.(str"eliminating sprop missing is")
-    | Some is ->
-      if not (Sorts.is_sprop sc)
-      then error_sprop env Pp.(str "eliminating non sprop but is present")
-      else if (Sorts.is_sprop sp)
-      then error_sprop env Pp.(str "eliminating sprop to sprop but is present")
-      else if not (Int.equal (Array.length is) (CList.length pis))
-      then error_sprop env Pp.(str "eliminating sprop with bad length is")
-      else
-        CList.iteri (fun i pi ->
-            let i = is.(i) in
-            try Reduction.default_conv Reduction.CONV env pi i
-            with Reduction.NotConvertible -> error_sprop env Pp.(str "eliminating sprop bad is"))
-          pis
-  in
   let (bty,rslty) =
     type_case_branches env indspec (make_judge p pt) c in
   let () = check_branch_types env pind c ct lft bty in
+  let () = check_case_is env sp sc pis is in
   rslty
 
 
