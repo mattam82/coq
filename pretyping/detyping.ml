@@ -359,10 +359,21 @@ let it_destRLambda_or_LetIn_names l c =
               | _ -> DAst.make @@ GApp (c,[a]))
   in aux l [] c
 
-let detype_case computable detype detype_eqns testdep avoid data p c bl =
-  let (indsp,st,constagsl,k) = data in
+let detype_case computable detype detype_eqns testdep avoid ci p is c bl =
+  let { ci_ind = indsp;
+        ci_pp_info = { style = st; cstr_tags = constagsl; ind_tags = k }; } = ci in
   let synth_type = synthetize_type () in
-  let tomatch = detype c in
+  let tomatch = match is with
+    | None -> detype c
+    | Some is ->
+      (* print is by inserting a Cast *)
+      let is = Array.map_to_list detype is in
+      (* We don't have the instance available... *)
+      let ind = DAst.make @@ GRef (IndRef ci.ci_ind, None) in
+      let indty = DAst.make @@ GApp (ind, is) in
+      let c = detype c in
+      DAst.make @@ GCast (c, CastConv indty)
+  in
   let alias, aliastyp, pred=
     if (not !Flags.raw_print) && synth_type && computable && not (Int.equal (Array.length bl) 0)
     then
@@ -567,9 +578,7 @@ and detype_r d flags avoid env sigma t =
 	detype_case comp (detype d flags avoid env sigma)
 	  (detype_eqns d flags avoid env sigma ci comp)
 	  (is_nondep_branch sigma) avoid
-	  (ci.ci_ind,ci.ci_pp_info.style,
-	   ci.ci_pp_info.cstr_tags,ci.ci_pp_info.ind_tags)
-          p c bl
+          ci p is c bl
     | Fix (nvn,recdef) -> detype_fix d flags avoid env sigma nvn recdef
     | CoFix (n,recdef) -> detype_cofix d flags avoid env sigma n recdef
 
