@@ -140,7 +140,9 @@ val mkConstructUi : pinductive * int -> constr
 
     [p] stucture is [fun args x -> "return clause"]
 
-    [is] is the indices of [c], present only for informative match of SProp inductive.
+    [is] is the indices (no parameters) of [c],
+    present only for informative match of SProp inductive.
+    NB: not having parameters makes discharge much easier.
 
     [ac]{^ ith} element is ith constructor case presented as 
     {e lambda construct_args (without params). case_term } *)

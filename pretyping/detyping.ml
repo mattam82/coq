@@ -368,6 +368,9 @@ let detype_case computable detype detype_eqns testdep avoid ci p is c bl =
     | Some is ->
       (* print is by inserting a Cast *)
       let is = Array.map_to_list detype is in
+      (* parameters are _ *)
+      let param_hole = DAst.make @@ GHole(Evar_kinds.InternalHole,Misctypes.IntroAnonymous,None) in
+      let is = List.rev_append (List.make ci.ci_npar param_hole) is in
       (* We don't have the instance available... *)
       let ind = DAst.make @@ GRef (IndRef ci.ci_ind, None) in
       let indty = DAst.make @@ GApp (ind, is) in

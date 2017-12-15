@@ -128,7 +128,7 @@ let ctor_invert_info env ((mi,ind),ctor) =
   | Some infos -> mib.mind_nparams, infos.ctor_arg_infos
   | None -> raise BadTree
 
-let make_infos env levels t =
+let make_infos env nparams levels t =
   let rec fold forced arg =
     match kind arg with (* TODO reduce? *)
     | Cast (arg,_,_) -> fold forced arg
@@ -167,6 +167,7 @@ let make_infos env levels t =
     | _ -> raise BadTree
   in
   let args = match kind t with App (_,args) -> args | _ -> [||] in
+  let args = Array.sub args nparams (Array.length args - nparams) in
   try
     let forced, trees = Array.fold_left_map fold Int.Set.empty args in
     let forced = Array.init (List.length levels)
@@ -183,7 +184,7 @@ let make_infos env levels t =
   with BadTree ->
     None
 
-let infos_and_sort env t =
+let infos_and_sort env nparams t =
   let rec aux env t onlysprop levels =
     let t = whd_all env t in
       match kind t with
@@ -196,9 +197,9 @@ let infos_and_sort env t =
           | OnlySProp, false | NotOnlySProp, _ -> NotOnlySProp
         in
         aux env1 c2 onlysprop ((Sorts.univ_of_sort sj)::levels)
-    | _ when is_constructor_head t -> onlysprop,levels,make_infos env levels t
+    | _ when is_constructor_head t -> onlysprop,levels,make_infos env nparams levels t
     | _ -> (* don't fail if not positive, it is tested later *)
-      onlysprop,levels,make_infos env levels t
+      onlysprop,levels,make_infos env nparams levels t
   in aux env t OnlySProp []
 
 let sup_unforced_args info levels max =
@@ -265,8 +266,9 @@ let infer_constructor_packet env_ar_par params defu lc =
   (* generalize the constructor over the parameters *)
   let lc'' = Array.map (fun j -> Term.it_mkProd_or_LetIn j.utj_val params) jlc in
   (* compute the max of the sorts of the products of the constructors types *)
+  let nparams = List.length params in
   let osprop, infos, level = List.fold_left (fun (osprop,infos,max) c ->
-      let osprop', levels, info = infos_and_sort env_ar_par c in
+      let osprop', levels, info = infos_and_sort env_ar_par nparams c in
       (* We only care about onlysprop for records, so exactly 1 constructor *)
       osprop', info::infos, sup_unforced_args info levels max) (OnlySProp,[],min) lc in
   let level, infos = finish_infos level infos in

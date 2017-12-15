@@ -284,7 +284,7 @@ let check_branch_types env (ind,u) c ct lft explft =
     | Invalid_argument _ ->
         error_number_branches env (make_judge c ct) (Array.length explft)
 
-let check_case_is env sp sc pis is =
+let check_case_is env nparams sp sc pis is =
   match is with
   | None ->
     if Sorts.is_sprop sc && not (Sorts.is_sprop sp)
@@ -294,13 +294,15 @@ let check_case_is env sp sc pis is =
     then error_sprop env Pp.(str "eliminating non sprop but is present")
     else if (Sorts.is_sprop sp)
     then error_sprop env Pp.(str "eliminating sprop to sprop but is present")
-    else if not (Int.equal (Array.length is) (CList.length pis))
+    else if not (Int.equal (Array.length is) (CList.length pis - nparams))
     then error_sprop env Pp.(str "eliminating sprop with bad length is")
     else
       CList.iteri (fun i pi ->
-          let i = is.(i) in
-          try Reduction.default_conv Reduction.CONV env pi i
-          with Reduction.NotConvertible -> error_sprop env Pp.(str "eliminating sprop bad is"))
+          if i >= nparams
+          then
+            let i = is.(i - nparams) in
+            try Reduction.default_conv Reduction.CONV env pi i
+            with Reduction.NotConvertible -> error_sprop env Pp.(str "eliminating sprop bad is"))
         pis
 
 let type_of_projection env p c ct =
@@ -448,7 +450,7 @@ and type_of_case env ci p pt is c ct lf lft =
   let (bty,rslty) =
     type_case_branches env indspec (make_judge p pt) c in
   let () = check_branch_types env pind c ct lft bty in
-  let () = check_case_is env sp sc pis is in
+  let () = check_case_is env ci.ci_npar sp sc pis is in
   rslty
 
 

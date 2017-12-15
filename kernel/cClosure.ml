@@ -991,12 +991,13 @@ and knit info e t stk =
 and invert_match_one_index info ci args reali =
   let open Declarations in function
     | OutVariable i -> args.(i) <- Some reali
-    | OutInvert ((_,ctor), trees) ->
+    | OutInvert (((mind,_),ctor), trees) ->
       let m, stk = kni info reali [] in
       begin match m.term with
         | FConstruct ((_,ctor'),_) when Int.equal ctor ctor' ->
+          let nparams = (Environ.lookup_mind mind (info_env info)).mind_nparams in
           Array.iteri (fun i tree ->
-              Option.iter (invert_match_one_index info ci args (stack_nth stk i)) tree)
+              Option.iter (invert_match_one_index info ci args (stack_nth stk (i+nparams))) tree)
             trees
         | _ -> raise InvertFail
       end
@@ -1007,10 +1008,12 @@ and try_match_ctor_infos info ci is =
       assert false (* All constructors of natural sprop are invertible *)
     | Some { ctor_arg_infos = ainfos; ctor_out_tree = Some trees } ->
       begin try
+          assert (Int.equal (Array.length trees) (Array.length is));
           let args = Array.make (Array.length ainfos) None in
           Array.iter2 (invert_match_one_index info ci args) is trees;
           (* When there are projections this is where they're inserted *)
           let args = Array.map Option.get args in
+          let () = Array.rev args in
           Some args
         with InvertFail -> None
       end
@@ -1028,8 +1031,6 @@ and case_inversion info ci is c v =
   let ind = ci.ci_ind in
   let mind = Environ.lookup_mind (fst ind) env in
   let mip = mind.mind_packets.(snd ind) in
-  (* We only match indices *)
-  let is = Array.sub is mind.mind_nparams (Array.length is - mind.mind_nparams) in
   let nctors = Array.length mip.mind_consnames in
   let rec loop i =
     if Int.equal i nctors then None

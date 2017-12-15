@@ -92,11 +92,40 @@ Definition sPred_S n (s:sNZ (S n))
   : sPred (S n) s = n
   := eq_refl.
 
-Inductive Ispair (A:Type) (B:A -> Type) : sigT B -> SProp :=
-  ispair : forall x y, Ispair A B (existT B x y).
+Module IsPair_nosec.
 
-Definition p1 A B p (i : Ispair A B p) : A :=
-  match i with ispair _ _ x _ => x end.
+  Inductive Ispair (A:Type) (B:A -> Type) : sigT B -> SProp :=
+    ispair : forall x y, Ispair A B (existT B x y).
+
+  (* TODO Definition p1 A B p (i : Ispair A B p) : A :=
+    match i with ispair _ _ x _ => x end. *)
+
+End IsPair_nosec.
+
+Module IsPair_sec.
+
+  Section Sec.
+    Variables (A : Type) (B: A -> Type).
+    Inductive IsPair : sigT B -> SProp :=
+      ispair : forall x y, IsPair (existT B x y).
+
+    Definition p1 p (i: IsPair p) : A :=
+      match i with ispair x _ => x end.
+
+    Section Comp.
+      Variables (x:A) (y:B x) (i : IsPair (existT B x y)).
+
+      Eval lazy in p1 _ i.
+    End Comp.
+    Definition p1_compute_insec x y (i:IsPair (existT B x y)) : p1 (existT B x y) i = x
+      := eq_refl.
+  End Sec.
+
+  Definition p1_comp_nosec A B (x:A) (y:B x) (i : IsPair A B (existT B x y))
+    : p1 A B _ i = x
+    := eq_refl.
+
+End IsPair_sec.
 
 (* TODO
 Inductive sprod (A B : SProp) : SProp := spair : A -> B -> sprod A B.

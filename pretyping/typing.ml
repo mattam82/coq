@@ -176,7 +176,7 @@ let check_allowed_sort env sigma indty c p =
     match ksort with
     | Sorts.InSProp -> None
     | InProp | InSet | InType ->
-      Some (Array.of_list ((List.map EConstr.of_constr params) @ realargs))
+      Some (Array.of_list realargs)
   else None
 
 
