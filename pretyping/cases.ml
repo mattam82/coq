@@ -1400,7 +1400,7 @@ and match_current pb (initial,tomatch) =
 	check_all_variables pb.env !(pb.evdref) typ pb.mat;
 	compile_all_variables initial tomatch pb
     | IsInd (_,(IndType(indf,realargs) as indt),names) ->
-      let mind,_ = dest_ind_family indf in
+      let mind,params = dest_ind_family indf in
       let mind = Tacred.check_privacy pb.env mind in
       let cstrs = get_constructors pb.env indf in
       let arsign, _ = get_arity pb.env indf in
@@ -1422,20 +1422,21 @@ and match_current pb (initial,tomatch) =
         let brvals = Array.map (fun (sign,body) ->
             let sign = List.map (map_name (ltac_interp_name pb.lvar)) sign in
             it_mkLambda_or_LetIn body sign) brvals in
+        let (pred,typ) =
+          find_predicate pb.caseloc pb.env pb.evdref
+            pred current indt (names,dep) tomatch in
+        let predinst = beta_applist !(pb.evdref) (pred, realargs @ [current]) in
         let with_is =
           try
-          let pred = Retyping.get_sort_family_of pb.env !(pb.evdref) pred in
+          let pred = Retyping.get_sort_family_of pb.env !(pb.evdref) predinst in
           if Sorts.family_equal Sorts.InSProp pred
           then
             false
           else
             let _, mip = Inductive.lookup_mind_specif pb.env (fst mind) in
             mip.mind_natural_sprop
-          with _ -> false (* WTF even *)
+          with _ -> anomaly (Pp.str"WTF")
         in
-        let (pred,typ) =
-          find_predicate pb.caseloc pb.env pb.evdref
-            pred current indt (names,dep) tomatch in
         let ci = make_case_info pb.env (fst mind) pb.casestyle in
         let pred = nf_betaiota !(pb.evdref) pred in
         let case = Inductiveops.make_case_or_project pb.env !(pb.evdref)
