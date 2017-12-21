@@ -120,15 +120,17 @@ let max_prefix_sign lid sign =
     | id::l -> snd (max_rec (id, sign_prefix id sign) l)
 *)
 let rec add_prods_sign env sigma t =
-  match kind_of_term (whd_betadeltaiota env sigma t) with
-    | Prod (na,c1,b) ->
-	let id = id_of_name_using_hdchar env t na in
+  match Constr.kind_of_term (whd_betadeltaiota env sigma t) with
+    | Constr.Prod (na,c1,b) ->
+	let id = id_of_name_using_hdchar env t (name_of na) in
+	let na' = map_binder (fun _ -> id) na in
 	let b'= subst1 (mkVar id) b in
-        add_prods_sign (push_named (id,None,c1) env) sigma b'
-    | LetIn (na,c1,t1,b) ->
-	let id = id_of_name_using_hdchar env t na in
+        add_prods_sign (push_named (var_decl_of na' c1) env) sigma b'
+    | Constr.LetIn (na,c1,t1,b) ->
+	let id = id_of_name_using_hdchar env t (letname_of na) in
+	let na' = map_letbinder (fun _ -> id) na in
 	let b'= subst1 (mkVar id) b in
-        add_prods_sign (push_named (id,Some c1,t1) env) sigma b'
+        add_prods_sign (push_named (def_decl_of na' c1 t1) env) sigma b'
     | _ -> (env,t)
 
 (* [dep_option] indicates wether the inversion lemma is dependent or not.
@@ -151,9 +153,12 @@ let compute_first_inversion_scheme env sigma ind sort dep_option =
   let pty,goal =
     if dep_option  then
       let pty = make_arity env true indf sort in
+      let rel = Retyping.get_relevance_of env sigma pty in
       let goal =
 	mkProd
-	  (Anonymous, mkAppliedInd ind, applist(mkVar p,realargs@[mkRel 1]))
+	  (Anonymous, mkAppliedInd ind, 
+	   Constr.app_argsl(mkVar p,
+			    Constr.concat_argsl realargs ([rel],[mkRel 1])))
       in
       pty,goal
     else
@@ -173,7 +178,7 @@ let compute_first_inversion_scheme env sigma ind sort dep_option =
       (pty,goal)
   in
   let npty = nf_betadeltaiota env sigma pty in
-  let extenv = push_named (p,None,npty) env in
+  let extenv = push_named (var_decl_of_name p npty) env in
   extenv, goal
 
 (* [inversion_scheme sign I]
@@ -220,7 +225,7 @@ let inversion_scheme env sigma t sort dep_option inv_op =
 	let h = next_ident_away (id_of_string "H") !avoid in
 	let ty,inst = Evarutil.generalize_evar_over_rels sigma (e,args) in
 	avoid := h::!avoid;
-	ownSign := add_named_decl (h,None,ty) !ownSign;
+	ownSign := add_named_decl (var_decl_of_name h ty) !ownSign;
 	applist (mkVar h, inst)
     | _ -> map_constr fill_holes c
   in

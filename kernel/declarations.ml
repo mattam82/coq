@@ -39,7 +39,7 @@ type polymorphic_arity = {
 }
 
 type constant_type =
-  | NonPolymorphicType of types
+  | NonPolymorphicType of types * relevance
   | PolymorphicArity of rel_context * polymorphic_arity
 
 type constr_substituted = constr substituted
@@ -107,7 +107,7 @@ let is_opaque cb = match cb.const_body with
 (* Substitutions of [constant_body] *)
 
 let subst_rel_declaration sub (id,copt,t as x) =
-  let copt' = Option.smartmap (subst_mps sub) copt in
+  let copt' = smartmap_body (subst_mps sub) copt in
   let t' = subst_mps sub t in
   if copt == copt' & t == t' then x else (id,copt',t')
 
@@ -119,7 +119,7 @@ let subst_rel_context sub = list_smartmap (subst_rel_declaration sub)
 let subst_const_type sub arity =
   if is_empty_subst sub then arity
   else match arity with
-    | NonPolymorphicType s -> NonPolymorphicType (subst_mps sub s)
+    | NonPolymorphicType (s, r) -> NonPolymorphicType (subst_mps sub s, r)
     | PolymorphicArity (ctx,s) -> PolymorphicArity (subst_rel_context sub ctx,s)
 
 let subst_const_def sub = function
@@ -138,7 +138,7 @@ let subst_const_body sub cb = {
 
 let hcons_rel_decl ((n,oc,t) as d) =
   let n' = hcons_name n
-  and oc' = Option.smartmap hcons_constr oc
+  and oc' = smartmap_body hcons_constr oc
   and t' = hcons_types t
   in if n' == n && oc' == oc && t' == t then d else (n',oc',t')
 
@@ -150,8 +150,8 @@ let hcons_polyarity ar =
     poly_level = hcons_univ ar.poly_level }
 
 let hcons_const_type = function
-  | NonPolymorphicType t ->
-    NonPolymorphicType (hcons_constr t)
+  | NonPolymorphicType (t, r) ->
+    NonPolymorphicType (hcons_constr t, r)
   | PolymorphicArity (ctx,s) ->
     PolymorphicArity (hcons_rel_context ctx, hcons_polyarity s)
 
@@ -266,6 +266,8 @@ type one_inductive_body = {
  (* Head normalized constructor types so that their conclusion is atomic *)
     mind_nf_lc : types array;
 
+    mind_singleton_cond : constr array option;
+
  (* Length of the signature of the constructors (with let, w/o params) *)
     mind_consnrealdecls : int array;
 
@@ -288,8 +290,9 @@ type mutual_inductive_body = {
   (* The component of the mutual inductive block *)
     mind_packets : one_inductive_body array;
 
-  (* Whether the inductive type has been declared as a record *)
-    mind_record : bool;
+  (* Whether the inductive type has been declared as a record:
+     We keep it's eta-expanded form in that case *)
+    mind_record : constr option;
 
   (* Whether the type is inductive or coinductive *)
     mind_finite : bool;
@@ -327,6 +330,7 @@ let subst_mind_packet sub mbp =
     mind_consnrealdecls = mbp.mind_consnrealdecls;
     mind_typename = mbp.mind_typename;
     mind_nf_lc = array_smartmap (subst_mps sub) mbp.mind_nf_lc;
+    mind_singleton_cond = Option.smartmap (array_smartmap (subst_mps sub)) mbp.mind_singleton_cond;
     mind_arity_ctxt = subst_rel_context sub mbp.mind_arity_ctxt;
     mind_arity = subst_indarity sub mbp.mind_arity;
     mind_user_lc = array_smartmap (subst_mps sub) mbp.mind_user_lc;

@@ -26,6 +26,7 @@ open Decl_kinds
 open Indtypes
 open Type_errors
 open Topconstr
+open Constr
 
 (********** definition d'un record (structure) **************)
 
@@ -37,8 +38,12 @@ let interp_evars evdref env impls k typ =
 let interp_fields_evars evars env impls_env nots l =
   List.fold_left2
     (fun (env, uimpls, params, impls) no ((loc, i), b, t) ->
-      let impl, t' = interp_evars evars env impls Pretyping.IsType t in
-      let b' = Option.map (fun x -> snd (interp_evars evars env impls (Pretyping.OfType (Some t')) x)) b in
+      let impl, (t', rel) = interp_evars evars env impls Pretyping.IsType t in
+      let b' = 
+	Option.cata 
+	  (fun x -> 
+	     let _, (x', rel') = interp_evars evars env impls (Pretyping.OfType (Some t')) x in
+	       Term.Definition (rel, x')) (Term.Variable (rel, false)) b in
       let impls =
 	match i with
 	| Anonymous -> impls
@@ -72,7 +77,7 @@ let typecheck_params_and_fields id t ps nots fs =
   in 
   let impls_env, ((env1,newps), imps) = interp_context_evars evars env0 ps in
   let fullarity = it_mkProd_or_LetIn (Option.cata (fun x -> x) (Termops.new_Type ()) t) newps in
-  let env_ar = push_rel_context newps (push_rel (Name id,None,fullarity) env0) in
+  let env_ar = push_rel_context newps (push_rel (var_decl_of_name (Name id) fullarity) env0) in
   let env2,impls,newfs,data =
     interp_fields_evars evars env_ar impls_env nots (binders_of_decls fs)
   in
@@ -82,15 +87,15 @@ let typecheck_params_and_fields id t ps nots fs =
   let newps = Evarutil.nf_rel_context_evar sigma newps in
   let newfs = Evarutil.nf_rel_context_evar sigma newfs in
   let ce t = Evarutil.check_evars env0 Evd.empty evars t in
-    List.iter (fun (n, b, t) -> Option.iter ce b; ce t) (List.rev newps);
-    List.iter (fun (n, b, t) -> Option.iter ce b; ce t) (List.rev newfs);
+    List.iter (fun (n, b, t) -> iter_body ce b; ce t) (List.rev newps);
+    List.iter (fun (n, b, t) -> iter_body ce b; ce t) (List.rev newfs);
     imps, newps, impls, newfs
 
 let degenerate_decl (na,b,t) =
   let id = match na with
     | Name id -> id
     | Anonymous -> anomaly "Unnamed record variable" in
-  match b with
+  match constr_of_body b with
     | None -> (id, Entries.LocalAssum t)
     | Some b -> (id, Entries.LocalDef b)
 
@@ -171,9 +176,11 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
   let (mib,mip) = Global.lookup_inductive indsp in
   let paramdecls = mib.mind_params_ctxt in
   let r = mkInd indsp in
-  let rp = applist (r, Termops.extended_rel_list 0 paramdecls) in
-  let paramargs = Termops.extended_rel_list 1 paramdecls in (*def in [[params;x:rp]]*)
+  let rp = app_argsl (r, extended_rel_applist 0 paramdecls) in
+  let paramargs = extended_rel_applist 1 paramdecls in (*def in [[params;x:rp]]*)
   let x = match name with Some n -> Name n | None -> Namegen.named_hd (Global.env()) r Anonymous in
+  let rel = inductive_relevance env indsp in
+  let binder = (x, (rel, false)) in
   let fields = instantiate_possibly_recursive_type indsp paramdecls fields in
   let lifted_fields = Termops.lift_rel_context 1 fields in
   let (_,kinds,sp_projs,_) =
@@ -187,19 +194,19 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
             try
               let ccl = subst_projection fid subst ti in
 	      let body = match optci with
-              | Some ci -> subst_projection fid subst ci
-              | None ->
+              | Term.Definition (an, ci) -> subst_projection fid subst ci
+              | Term.Variable an ->
 	        (* [ccl] is defined in context [params;x:rp] *)
 		(* [ccl'] is defined in context [params;x:rp;x:rp] *)
 		let ccl' = liftn 1 2 ccl in
-		let p = mkLambda (x, lift 1 rp, ccl') in
+		let p = mkLambda (binder, lift 1 rp, ccl') in
 		let branch = it_mkLambda_or_LetIn (mkRel nfi) lifted_fields in
 		let ci = Inductiveops.make_case_info env indsp LetStyle in
-		mkCase (ci, p, mkRel 1, [|branch|]) in
+		Term.mkCase (ci, p, mkRel 1, [|branch|]) in
 	      let proj =
-	        it_mkLambda_or_LetIn (mkLambda (x,rp,body)) paramdecls in
+	        it_mkLambda_or_LetIn (mkLambda (binder,rp,body)) paramdecls in
               let projtyp =
-                it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
+                it_mkProd_or_LetIn (mkProd (binder,rp,ccl)) paramdecls in
 	      let kn =
 	        try
 		  let cie = {
@@ -220,13 +227,14 @@ let declare_projections indsp ?(kind=StructureComponent) ?name coers fieldimpls 
 	        let cl = Class.class_of_global (IndRef indsp) in
 	        Class.try_add_new_coercion_with_source refi Global ~source:cl
 	      end;
-	      let proj_args = (*Rel 1 refers to "x"*) paramargs@[mkRel 1] in
-	      let constr_fip = applist (constr_fi,proj_args) in
+	      let proj_args = (*Rel 1 refers to "x"*) 
+		concat_argsl paramargs ([rel],[mkRel 1]) in
+	      let constr_fip = app_argsl (constr_fi,proj_args) in
 	      (Some kn::sp_projs, Projection constr_fip::subst)
             with NotDefinable why ->
 	      warning_or_error coe indsp why;
 	      (None::sp_projs,NoProjection fi::subst) in
-      (nfi-1,(fi, optci=None)::kinds,sp_projs,subst))
+      (nfi-1,(fi, is_variable_body optci)::kinds,sp_projs,subst))
       (List.length fields,[],[],[]) coers (List.rev fields) (List.rev fieldimpls)
   in (kinds,sp_projs)
 
@@ -249,8 +257,8 @@ open Typeclasses
 let declare_structure finite infer id idbuild paramimpls params arity fieldimpls fields
     ?(kind=StructureComponent) ?name is_coe coers sign =
   let nparams = List.length params and nfields = List.length fields in
-  let args = Termops.extended_rel_list nfields params in
-  let ind = applist (mkRel (1+nparams+nfields), args) in
+  let args = extended_rel_applist nfields params in
+  let ind = app_argsl (mkRel (1+nparams+nfields), args) in
   let type_constructor = it_mkProd_or_LetIn ind fields in
   let mie_ind =
     { mind_entry_typename = id;
@@ -309,7 +317,7 @@ let declare_class finite def infer id idbuild paramimpls params arity fieldimpls
   in
   let impl, projs =
     match fields with
-    | [(Name proj_name, _, field)] when def ->
+    | [(Name proj_name, body, field)] when def ->
 	let class_body = it_mkLambda_or_LetIn field params in
 	let class_type = Option.map (fun ar -> it_mkProd_or_LetIn ar params) arity in
 	let class_entry =
@@ -321,9 +329,12 @@ let declare_class finite def infer id idbuild paramimpls params arity fieldimpls
 	let cst = Declare.declare_constant (snd id)
 	  (DefinitionEntry class_entry, IsDefinition Definition)
 	in
+	let rel = annot_of_body body in
 	let inst_type = appvectc (mkConst cst) (Termops.rel_vect 0 (List.length params)) in
-	let proj_type = it_mkProd_or_LetIn (mkProd(Name (snd id), inst_type, lift 1 field)) params in
-	let proj_body = it_mkLambda_or_LetIn (mkLambda (Name (snd id), inst_type, mkRel 1)) params in
+	let proj_type = it_mkProd_or_LetIn 
+	  (mkProd((Name (snd id), (rel,false)), inst_type, lift 1 field)) params in
+	let proj_body = it_mkLambda_or_LetIn 
+	  (mkLambda ((Name (snd id), (rel,false)), inst_type, mkRel 1)) params in
 	let proj_entry =
 	  { const_entry_body = proj_body;
             const_entry_secctx = None;

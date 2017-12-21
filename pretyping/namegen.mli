@@ -22,6 +22,9 @@ val named_hd : env -> types -> name -> name
 val mkProd_name : env -> name * types * types -> types
 val mkLambda_name : env -> name * types * constr -> constr
 
+val mkProd_name_annot : env -> name binder_annot * types * types -> types
+val mkLambda_name_annot : env -> name binder_annot * types * constr -> constr
+
 (** Deprecated synonyms of [mkProd_name] and [mkLambda_name] *)
 val prod_name : env -> name * types * types -> types
 val lambda_name : env -> name * types * constr -> constr

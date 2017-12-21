@@ -545,7 +545,7 @@ Lemma Bv2N_Nsize_1 : forall n (bv:Bvector (S n)),
   Bsign _ bv = true <->
   Nsize (Bv2N _ bv) = (S n).
 Proof.
-apply Vector.rectS ; intros ; simpl.
+apply Vector.indS ; intros ; simpl.
 destruct a ; compute ; split ; intros x ; now inversion x.
  destruct a, (Bv2N (S n) v) ;
   simpl ;intuition ; try discriminate.
@@ -605,7 +605,7 @@ Qed.
 Lemma Nbit0_Blow : forall n, forall (bv:Bvector (S n)),
   Nbit0 (Bv2N _ bv) = Blow _ bv.
 Proof.
-apply Vector.caseS.
+apply Vector.caseSP.
 intros.
 unfold Blow.
 simpl.
@@ -648,7 +648,7 @@ Qed.
 Lemma Nxor_BVxor : forall n (bv bv' : Bvector n),
   Bv2N _ (BVxor _ bv bv') = Nxor (Bv2N _ bv) (Bv2N _ bv').
 Proof.
-apply Vector.rect2 ; intros.
+apply Vector.ind2 ; intros.
 now simpl.
 simpl.
 destruct a, b, (Bv2N n v1), (Bv2N n v2); simpl in *; rewrite H ; now simpl.
@@ -657,7 +657,7 @@ Qed.
 Lemma Nand_BVand : forall n (bv bv' : Bvector n),
   Bv2N _ (BVand _ bv bv') = N.land (Bv2N _ bv) (Bv2N _ bv').
 Proof.
-refine (@Vector.rect2 _ _ _ _ _); simpl; intros; auto.
+refine (@Vector.ind2 _ _ _ _ _); simpl; intros; auto.
 rewrite H.
 destruct a, b, (Bv2N n v1), (Bv2N n v2);
  simpl; auto.

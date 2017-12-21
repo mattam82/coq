@@ -339,7 +339,16 @@ Definition peano_rec (P:positive->Set) := peano_rect P.
 
 (** Peano induction *)
 
-Definition peano_ind (P:positive->Prop) := peano_rect P.
+Fixpoint peano_ind (P:positive->Prop) (a:P 1)
+  (f: forall p:positive, P p -> P (succ p)) (p:positive) : P p :=
+let f2 := peano_ind (fun p:positive => P (p~0)) (f _ a)
+  (fun (p:positive) (x:P (p~0)) => f _ (f _ x))
+in
+match p with
+  | q~1 => f _ (f2 q)
+  | q~0 => f2 q
+  | 1 => a
+end.
 
 (** Peano case analysis *)
 
@@ -413,7 +422,7 @@ Qed.
 Lemma peano_equiv (P:positive->Type) (a:P 1) (f:forall p, P p -> P (succ p)) p :
    PeanoView_iter P a f p (peanoView p) = peano_rect P a f p.
 Proof.
-  revert P a f. induction p using peano_rect.
+  revert P a f. induction p using peano_ind.
   trivial.
   intros; simpl. rewrite peano_rect_succ.
   rewrite (PeanoViewUnique _ (peanoView (succ p)) (PeanoSucc _ (peanoView p))).

@@ -699,7 +699,7 @@ Proof.
   intros H8; subst p; absurd (Zabs x <= n); auto with zarith.
   apply Zdivide_le; auto with zarith.
   apply Zdivide_Zabs_inv_l; auto.
-  rewrite H7; pattern (Zabs x); apply Zabs_intro; auto with zarith.
+  rewrite H7; pattern (Zabs x). apply Zabs_intro; auto with zarith.
   absurd (0%Z = p); auto with zarith.
   assert (x=0) by (destruct x; simpl in *; now auto).
   subst x; elim H3; intro q; rewrite Zmult_0_r; auto.

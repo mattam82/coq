@@ -28,6 +28,7 @@ open Pattern
 open Tacexpr
 open Clenv
 
+open Constr
 
 (* This function put casts around metavariables whose type could not be
  * infered by the refiner, that is head of applications, predicates and
@@ -51,9 +52,9 @@ let clenv_cast_meta clenv =
 	    if occur_meta b then u
             else mkCast (mkMeta mv, DEFAULTcast, b)
 	  with Not_found -> u)
-      | App(f,args) -> mkApp (crec_hd f, Array.map crec args)
+      | App(f,an,args) -> mkApp (crec_hd f, an, Array.map crec args)
       | Case(ci,p,c,br) ->
-	  mkCase (ci, crec_hd p, crec_hd c, Array.map crec br)
+	  mkCase (ci, map_case_pred crec_hd p, crec_hd c, Array.map crec br)
       | _ -> u
   in
   crec

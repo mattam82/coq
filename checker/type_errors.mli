@@ -60,7 +60,9 @@ type type_error =
   | CantApplyNonFunctional of unsafe_judgment * unsafe_judgment array
   | IllFormedRecBody of guard_error * name array * int
   | IllTypedRecBody of
-      int * name array * unsafe_judgment array * constr array
+      int * name letbinder_annot array * unsafe_judgment array * constr array
+  | IrrelevanceMismatch of types * relevance * sorts
+
 
 exception TypeError of env * type_error
 
@@ -97,5 +99,8 @@ val error_ill_formed_rec_body :
   env -> guard_error -> name array -> int -> 'a
 
 val error_ill_typed_rec_body  :
-  env -> int -> name array -> unsafe_judgment array -> constr array -> 'a
+  env -> int -> name letbinder_annot array -> unsafe_judgment array -> constr array -> 'a
+
+val error_irrelevance_mismatch :
+  env -> types -> relevance -> relevance -> 'a
 

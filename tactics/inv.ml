@@ -128,7 +128,7 @@ let make_inv_predicate env sigma indf realargs id status concl =
      push <Ai>(mkRel k)=ai (when   Ai is closed).
    In any case, we carry along the rest of pairs *)
   let rec build_concl eqns n = function
-    | [] -> (it_mkProd concl eqns,n)
+    | [] -> (it_mkProd_or_LetIn concl eqns,n)
     | (ai,(xi,ti))::restlist ->
         let (lhs,eqnty,rhs) =
           if closed0 ti then
@@ -138,7 +138,7 @@ let make_inv_predicate env sigma indf realargs id status concl =
 	in
         let eq_term = Coqlib.build_coq_eq () in
         let eqn = applist (eq_term ,[eqnty;lhs;rhs]) in
-	build_concl ((Anonymous,lift n eqn)::eqns) (n+1) restlist
+	build_concl (var_decl_of (Anonymous,(Irr,false)) (lift n eqn)::eqns) (n+1) restlist
   in
   let (newconcl,neqns) = build_concl [] 0 pairs in
   let predicate = it_mkLambda_or_LetIn_name env newconcl hyps in
@@ -462,13 +462,15 @@ let raw_inversion inv_kind id status names gl =
   check_no_metas indclause ccl;
   let IndType (indf,realargs) = find_rectype env sigma ccl in
   let (elim_predicate,neqns) =
-    make_inv_predicate env sigma indf realargs id status (pf_concl gl) in
+    make_inv_predicate env sigma indf (snd realargs) id status (pf_concl gl) in
+  let rel = Retyping.get_relevance_of env sigma t in
   let (cut_concl,case_tac) =
     if status <> NoDep & (dependent c (pf_concl gl)) then
-      Reduction.beta_appvect elim_predicate (Array.of_list (realargs@[c])),
+      Reduction.beta_app_argsl elim_predicate 
+      (Constr.concat_argsl realargs ([rel],[c])),
       case_then_using
     else
-      Reduction.beta_appvect elim_predicate (Array.of_list realargs),
+      Reduction.beta_app_argsl elim_predicate realargs,
       case_nodep_then_using
   in
   (tclTHENS
@@ -480,7 +482,8 @@ let raw_inversion inv_kind id status names gl =
         (fun id ->
            (tclTHEN
               (apply_term (mkVar id)
-                 (list_tabulate (fun _ -> Evarutil.mk_new_meta()) neqns))
+                 (list_tabulate (fun _ -> Irr) neqns,
+                  list_tabulate (fun _ -> Evarutil.mk_new_meta()) neqns))
               reflexivity))])
   gl
 

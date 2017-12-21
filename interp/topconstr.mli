@@ -209,6 +209,7 @@ val free_vars_of_constr_expr : constr_expr -> Idset.t
 val occur_var_constr_expr : identifier -> constr_expr -> bool
 
 val default_binder_kind : binder_kind
+val implicit_binder_kind : binder_kind
 
 (** Specific function for interning "in indtype" syntax of "match" *)
 val ids_of_cases_indtype : cases_pattern_expr -> identifier list

@@ -137,9 +137,9 @@ let cook_constant env r =
     cb.const_body
   in
   let typ = match cb.const_type with
-    | NonPolymorphicType t ->
+    | NonPolymorphicType (t,rel) ->
 	let typ = abstract_constant_type (expmod_constr r.d_modlist t) hyps in
-	NonPolymorphicType typ
+	NonPolymorphicType (typ,rel)
     | PolymorphicArity (ctx,s) ->
 	let t = mkArity (ctx,Type s.poly_level) in
 	let typ = abstract_constant_type (expmod_constr r.d_modlist t) hyps in

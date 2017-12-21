@@ -179,7 +179,7 @@ val set_xml_close_section : (Names.identifier -> unit) -> unit
 type binding_kind = Explicit | Implicit
 
 (** {6 Section management for discharge } *)
-type variable_info = Names.identifier * binding_kind * Term.constr option * Term.types
+type variable_info = Names.identifier * binding_kind * Term.body * Term.types
 type variable_context = variable_info list
 
 val instance_from_variable_context : variable_context -> Names.identifier array

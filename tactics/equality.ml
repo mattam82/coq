@@ -529,8 +529,8 @@ exception DiscrFound of
 
 let find_positions env sigma t1 t2 =
   let rec findrec sorts posn t1 t2 =
-    let hd1,args1 = whd_betadeltaiota_stack env sigma t1 in
-    let hd2,args2 = whd_betadeltaiota_stack env sigma t2 in
+    let hd1,(ann1,args1) = whd_betadeltaiota_stack env sigma t1 in
+    let hd2,(ann2,args2) = whd_betadeltaiota_stack env sigma t2 in
     match (kind_of_term hd1, kind_of_term hd2) with
 
       | Construct sp1, Construct sp2
@@ -551,8 +551,8 @@ let find_positions env sigma t1 t2 =
 	  else []
 
       | _ ->
-	  let t1_0 = applist (hd1,args1)
-          and t2_0 = applist (hd2,args2) in
+	  let t1_0 = Constr.app_argsl (hd1,(ann1,args1))
+          and t2_0 = Constr.app_argsl (hd2,(ann2,args2)) in
           if is_conv env sigma t1_0 t2_0 then
 	    []
           else
@@ -755,7 +755,8 @@ let discrimination_pf e (t,t1,t2) discriminator lbeq =
   let i           = build_coq_I () in
   let absurd_term = build_coq_False () in
   let eq_elim     = ind_scheme_of_eq lbeq in
-  (applist (eq_elim, [t;t1;mkNamedLambda e t discriminator;i;t2]), absurd_term)
+  (Constr.applist (eq_elim, [Expl;Expl;Expl;Irr;Expl],
+		     [t;t1;mkNamedLambda e t discriminator;i;t2]), absurd_term)
 
 exception NotDiscriminable
 
@@ -772,11 +773,11 @@ let apply_on_clause (f,t) clause =
 
 let discr_positions env sigma (lbeq,eqn,(t,t1,t2)) eq_clause cpath dirn sort =
   let e = next_ident_away eq_baseid (ids_of_context env) in
-  let e_env = push_named (e,None,t) env in
+  let e_env = push_named (var_decl_of (e,(Irr,false)) t) env in
   let discriminator =
     build_discriminator sigma e_env dirn (mkVar e) sort cpath in
   let (pf, absurd_term) = discrimination_pf e (t,t1,t2) discriminator lbeq in
-  let pf_ty = mkArrow eqn absurd_term in
+  let pf_ty = Constr.mkArrow Irr eqn absurd_term in
   let absurd_clause = apply_on_clause (pf,pf_ty) eq_clause in
   let pf = clenv_value_cast_meta absurd_clause in
   tclTHENS (cut_intro absurd_term)
@@ -860,15 +861,17 @@ let find_sigma_data s = build_sigma_type ()
 
 let make_tuple env sigma (rterm,rty) lind =
   assert (dependent (mkRel lind) rty);
+  let s = get_sort_of env sigma rty in
+  let rel = relevance_of_sort s in
   let {intro = exist_term; typ = sig_term} =
-    find_sigma_data (get_sort_of env sigma rty) in
+    find_sigma_data s in
   let a = type_of env sigma (mkRel lind) in
   let (na,_,_) = lookup_rel lind env in
   (* We move [lind] to [1] and lift other rels > [lind] by 1 *)
   let rty = lift (1-lind) (liftn lind (lind+1) rty) in
   (* Now [lind] is [mkRel 1] and we abstract on (na:a) *)
   let p = mkLambda (na, a, rty) in
-  (applist(exist_term,[a;p;(mkRel lind);rterm]),
+  (Constr.app_argsl(exist_term,([Expl;Expl;Expl;rel],[a;p;(mkRel lind);rterm])),
    applist(sig_term,[a;p]))
 
 (* check that the free-references of the type of [c] are contained in
@@ -947,10 +950,11 @@ let sig_clausal_form env sigma sort_of_ty siglen ty dflt =
 	error "Cannot solve a unification problem."
     else
       let (a,p_i_minus_1) = match whd_beta_stack !evdref p_i with
-	| (_sigS,[a;p]) -> (a,p)
+	| (_sigS,([an;ans],[a;p])) -> (a,p)
  	| _ -> anomaly "sig_clausal_form: should be a sigma type" in
       let ev = Evarutil.e_new_evar evdref env a in
-      let rty = beta_applist(p_i_minus_1,[ev]) in
+      let rel = Retyping.get_relevance_of env !evdref a in
+      let rty = beta_applist(p_i_minus_1,[rel],[ev]) in
       let tuple_tail = sigrec_clausal_form (siglen-1) rty in
       match
         Evd.existential_opt_value !evdref
@@ -1079,7 +1083,7 @@ let simplify_args env sigma t =
 
 let inject_at_positions env sigma (eq,_,(t,t1,t2)) eq_clause posns tac =
   let e = next_ident_away eq_baseid (ids_of_context env) in
-  let e_env = push_named (e,None,t) env in
+  let e_env = push_named (var_decl_of_name e t) env in
   let injectors =
     map_succeed
       (fun (cpath,t1',t2') ->
@@ -1199,9 +1203,13 @@ let swapEquandsInConcl gls =
   let (lbeq,eq_args) = find_eq_data (pf_concl gls) in
   let sym_equal = lbeq.sym in
   refine
-    (applist(sym_equal,(swap_equality_args eq_args@[Evarutil.mk_new_meta()])))
+    (Constr.app_argsl(sym_equal,([Expl;Expl;Expl;Irr], 
+				 swap_equality_args eq_args@[Evarutil.mk_new_meta()])))
     gls
 
+let relevance_of_arity p = 
+  let _, concl = destArity p in relevance_of_sort concl
+    
 (* Refine from [|- P e2] to [|- P e1] and [|- e1=e2:>t] (body is P (Rel 1)) *)
 
 let bareRevSubstInConcl lbeq body (t,e1,e2) gls =
@@ -1209,9 +1217,13 @@ let bareRevSubstInConcl lbeq body (t,e1,e2) gls =
   let eq_elim = find_elim lbeq.eq (Some false) false None [e1;e2] gls in
   (* build substitution predicate *)
   let p = lambda_create (pf_env gls) (t,body) in
+  let rele = pf_apply get_relevance_of gls t in
+  let rel = relevance_of_arity (pf_type_of gls p) in
   (* apply substitution scheme *)
-  refine (applist(eq_elim,[t;e1;p;Evarutil.mk_new_meta();
-                           e2;Evarutil.mk_new_meta()])) gls
+    refine (Constr.app_argsl (eq_elim,
+			      ([Expl;rele;Expl;rel;rele;Irr],
+			       [t;e1;p;Evarutil.mk_new_meta();
+				e2;Evarutil.mk_new_meta()]))) gls
 
 (* [subst_tuple_term dep_pair B]
 
@@ -1252,7 +1264,7 @@ let decomp_tuple_term env c t =
       let {proj1=p1; proj2=p2},(a,p,car,cdr) = find_sigma_data_decompose ex in
       let car_code = applist (p1,[a;p;inner_code])
       and cdr_code = applist (p2,[a;p;inner_code]) in
-      let cdrtyp = beta_applist (p,[car]) in
+      let cdrtyp = beta_applist (p,[Expl],[car]) in
       List.map (fun l -> ((car,a),car_code)::l) (decomprec cdr_code cdr cdrtyp)
     with PatternMatchingFailure ->
       []
@@ -1278,8 +1290,8 @@ let subst_tuple_term env sigma dep_pair1 dep_pair2 b =
   let abst_B =
     List.fold_right
       (fun (e,t) body -> lambda_create env (t,subst_term e body)) e1_list b in
-  let pred_body = beta_applist(abst_B,proj_list) in
-  let expected_goal = beta_applist (abst_B,List.map fst e2_list) in
+  let pred_body = beta_applist_expl(abst_B,proj_list) in
+  let expected_goal = beta_applist_expl (abst_B,List.map fst e2_list) in
   (* Simulate now the normalisation treatment made by Logic.mk_refgoals *)
   let expected_goal = nf_betaiota sigma expected_goal in
   pred_body,expected_goal
@@ -1378,10 +1390,10 @@ user = raise user error specific to rewrite
 let unfold_body x gl =
   let hyps = pf_hyps gl in
   let xval =
-    match Sign.lookup_named x hyps with
-        (_,Some xval,_) -> xval
-      | _ -> errorlabstrm "unfold_body"
-          (pr_id x ++ str" is not a defined hypothesis.") in
+    match Sign.named_value x hyps with
+    | Some xval -> xval
+    | _ -> errorlabstrm "unfold_body"
+        (pr_id x ++ str" is not a defined hypothesis.") in
   let aft = afterHyp x gl in
   let hl = List.fold_right (fun (y,yval,_) cl -> (y,InHyp) :: cl) aft [] in
   let xvar = mkVar x in
@@ -1424,13 +1436,13 @@ let subst_one dep_proof_ok x (hyp,rhs,dir) gl =
      rewritten and reintroduced *)
   let abshyps =
     map_succeed
-      (fun (id,v,_) -> if v=None then mkVar id else failwith "caught")
+      (fun (id,v,_) -> if is_variable_body v then mkVar id else failwith "caught")
       depdecls in
   (* a tactic that either introduce an abstracted and rewritten hyp,
      or introduce a definition where x was replaced *)
   let introtac = function
-      (id,None,_) -> intro_using id
-    | (id,Some hval,htyp) ->
+      (id,Variable _,_) -> intro_using id
+    | (id,Definition (_, hval),htyp) ->
         letin_tac None (Name id)
 	  (replace_term (mkVar x) rhs hval)
 	  (Some (replace_term (mkVar x) rhs htyp)) nowhere
@@ -1453,7 +1465,7 @@ let subst_one_var dep_proof_ok x gl =
   let hyps = pf_hyps gl in
   let (_,xval,_) = pf_get_hyp gl x in
   (* If x has a body, simply replace x with body and clear x *)
-  if xval <> None then tclTHEN (unfold_body x) (clear [x]) gl else
+  if not (is_variable_body xval) then tclTHEN (unfold_body x) (clear [x]) gl else
   (* x is a variable: *)
   let varx = mkVar x in
   (* Find a non-recursive definition for x *)

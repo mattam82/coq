@@ -34,7 +34,9 @@ type patvar = identifier
 
 type glob_sort = GProp of Term.contents | GType of Univ.universe option
 
-type binding_kind = Lib.binding_kind = Explicit | Implicit
+type binding_implicit = Lib.binding_kind = Explicit | Implicit
+
+type binding_kind = binding_implicit * relevance
 
 type quantified_hypothesis = AnonHyp of int | NamedHyp of identifier
 
@@ -100,6 +102,9 @@ val cases_predicate_names : tomatch_tuples -> name list
 val mkGApp : loc -> glob_constr -> glob_constr -> glob_constr
 
 val map_glob_constr : (glob_constr -> glob_constr) -> glob_constr -> glob_constr
+
+val explicit_bk : binding_kind
+val implicit_bk : binding_kind
 
 (* Ensure traversal from left to right *)
 val map_glob_constr_left_to_right :

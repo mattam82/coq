@@ -77,13 +77,13 @@ let env_nf_betaiotaevar sigma env =
 let contract env lc =
   let l = ref [] in
   let contract_context (na,c,t) env =
-    match c with
+    match constr_of_body c with
       | Some c' when isRel c' ->
 	  l := (substl !l c') :: !l;
 	  env
       | _ ->
 	  let t' = substl !l t in
-	  let c' = Option.map (substl !l) c in
+	  let c' = map_body (substl !l) c in
 	  let na' = named_hd env t' na in
 	  l := (mkRel 1) :: List.map (lift 1) !l;
 	  push_rel (na',c',t') env in

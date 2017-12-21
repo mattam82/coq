@@ -176,27 +176,27 @@ module CPropRetyping =
   | [] -> typ
   | h::rest ->
       match T.kind_of_term (DoubleTypeInference.whd_betadeltaiotacprop env sigma typ) with
-        | T.Prod (na,c1,c2) -> subst_type env sigma (T.subst1 h c2) rest
+        | T.Prod (na,c1,c2) -> subst_type env sigma (Term.subst1 h c2) rest
         | _ -> Errors.anomaly "Non-functional construction"
 
 
   let sort_of_atomic_type env sigma ft args =
   let rec concl_of_arity env ar =
     match T.kind_of_term (DoubleTypeInference.whd_betadeltaiotacprop env sigma ar) with
-      | T.Prod (na, t, b) -> concl_of_arity (Environ.push_rel (na,None,t) env) b
-      | T.Sort s -> Coq_sort (T.family_of_sort s)
+      | T.Prod (na, t, b) -> concl_of_arity (Environ.push_rel (T.var_decl_of_name na t) env) b
+      | T.Sort s -> Coq_sort (Term.family_of_sort s)
       | _ -> outsort env sigma (subst_type env sigma ft (Array.to_list args))
   in concl_of_arity env ft
 
 let typeur sigma metamap =
   let rec type_of env cstr=
-    match Term.kind_of_term cstr with
+    match T.kind_of_term cstr with
     | T.Meta n ->
-          (try T.strip_outer_cast (List.assoc n metamap)
+          (try Term.strip_outer_cast (List.assoc n metamap)
            with Not_found -> Errors.anomaly "type_of: this is not a well-typed term")
     | T.Rel n ->
         let (_,_,ty) = Environ.lookup_rel n env in
-        T.lift n ty
+        Term.lift n ty
     | T.Var id ->
         (try
           let (_,_,ty) = Environ.lookup_named id env in
@@ -213,14 +213,14 @@ let typeur sigma metamap =
         let Inductiveops.IndType(_,realargs) =
           try Inductiveops.find_rectype env sigma (type_of env c)
           with Not_found -> Errors.anomaly "type_of: Bad recursive type" in
-        let t = Reductionops.whd_beta sigma (T.applist (p, realargs)) in
+        let t = Reductionops.whd_beta sigma (T.applist (p, T.Constr.args_of realargs)) in
         (match Term.kind_of_term (DoubleTypeInference.whd_betadeltaiotacprop env sigma (type_of env t)) with
           | T.Prod _ -> Reductionops.whd_beta sigma (T.applist (t, [c]))
           | _ -> t)
     | T.Lambda (name,c1,c2) ->
-          T.mkProd (name, c1, type_of (Environ.push_rel (name,None,c1) env) c2)
+          T.mkProd (name, c1, type_of (Environ.push_rel (T.var_decl_of_name name c1) env) c2)
     | T.LetIn (name,b,c1,c2) ->
-         T.subst1 b (type_of (Environ.push_rel (name,Some b,c1) env) c2)
+         T.subst1 b (type_of (Environ.push_rel (T.def_decl_of_name name b c1) env) c2)
     | T.Fix ((_,i),(_,tys,_)) -> tys.(i)
     | T.CoFix (i,(_,tys,_)) -> tys.(i)
     | T.App(f,args)->
@@ -240,7 +240,7 @@ let typeur sigma metamap =
     | T.Sort (T.Prop c) -> Coq_sort T.InType
     | T.Sort (T.Type u) -> Coq_sort T.InType
     | T.Prod (name,t,c2) ->
-       (match sort_of env t,sort_of (Environ.push_rel (name,None,t) env) c2 with
+       (match sort_of env t,sort_of (Environ.push_rel (T.var_decl_of_name name t) env) c2 with
           | _, (Coq_sort T.InProp as s) -> s
           | Coq_sort T.InProp, (Coq_sort T.InSet as s)
           | Coq_sort T.InSet, (Coq_sort T.InSet as s) -> s
@@ -261,7 +261,7 @@ let typeur sigma metamap =
     | T.Cast (c,_, s) when T.isSort s -> family_of_term s
     | T.Sort (T.Prop c) -> Coq_sort T.InType
     | T.Sort (T.Type u) -> Coq_sort T.InType
-    | T.Prod (name,t,c2) -> sort_family_of (Environ.push_rel (name,None,t) env) c2
+    | T.Prod (name,t,c2) -> sort_family_of (Environ.push_rel (T.var_decl_of_name name t) env) c2
     | T.App(f,args) ->
        sort_of_atomic_type env sigma (type_of env f) args
     | T.Lambda _ | T.Fix _ | T.Construct _ ->
@@ -562,7 +562,7 @@ print_endline "PASSATO" ; flush stdout ;
                     passed_lambdas_or_prods_or_letins
                    else [])
                in
-                let new_env = E.push_rel (n', None, s) env in
+                let new_env = E.push_rel (T.var_decl_of_name n' s) env in
                 let new_idrefs = fresh_id''::idrefs in
                  (match Term.kind_of_term t with
                      T.Prod _ ->
@@ -599,7 +599,7 @@ print_endline "PASSATO" ; flush stdout ;
                   (if father_is_lambda then
                     passed_lambdas_or_prods_or_letins
                    else []) in
-                let new_env = E.push_rel (n', None, s) env in
+                let new_env = E.push_rel (T.var_decl_of_name n' s) env in
                 let new_idrefs = fresh_id''::idrefs in
                  (match Term.kind_of_term t with
                      T.Lambda _ ->
@@ -649,7 +649,7 @@ print_endline "PASSATO" ; flush stdout ;
                   (if father_is_letin then
                     passed_lambdas_or_prods_or_letins
                    else []) in
-                let new_env = E.push_rel (n', Some s, t) env in
+                let new_env = E.push_rel (T.def_decl_of_name n' s t) env in
                 let new_idrefs = fresh_id''::idrefs in
                  (match Term.kind_of_term d with
                      T.LetIn _ ->
@@ -737,11 +737,11 @@ print_endline "PASSATO" ; flush stdout ;
                 let ids = ref (Termops.ids_of_context env) in
                  Array.map
                   (function
-                      N.Anonymous -> Errors.error "Anonymous fix function met"
-                    | N.Name id as n ->
+                      N.Anonymous, _ -> Errors.error "Anonymous fix function met"
+                    | N.Name id as n, a ->
                        let res = N.Name (Namegen.next_name_away n !ids) in
                         ids := id::!ids ;
-                        res
+                        res, a
                  ) f
                in
                 A.AFix (fresh_id'', i,
@@ -756,7 +756,7 @@ print_endline "PASSATO" ; flush stdout ;
                       aux' env idrefs ti,
                       aux' (E.push_rec_types (f',t,b) env) new_idrefs bi)::i)
                   (Array.mapi
-                   (fun j x -> (fresh_idrefs.(j),x,t.(j),b.(j),ai.(j))) f'
+                   (fun j x -> (fresh_idrefs.(j),fst x,t.(j),b.(j),ai.(j))) f'
                   ) []
                  )
            | T.CoFix (i,(f,t,b)) ->
@@ -771,11 +771,11 @@ print_endline "PASSATO" ; flush stdout ;
                 let ids = ref (Termops.ids_of_context env) in
                  Array.map
                   (function
-                      N.Anonymous -> Errors.error "Anonymous fix function met"
-                    | N.Name id as n ->
+                      N.Anonymous, _ -> Errors.error "Anonymous fix function met"
+                    | N.Name id as n, a ->
                        let res = N.Name (Namegen.next_name_away n !ids) in
                         ids := id::!ids ;
-                        res
+                        res, a
                  ) f
                in
                 A.ACoFix (fresh_id'', i,
@@ -790,7 +790,7 @@ print_endline "PASSATO" ; flush stdout ;
                       aux' env idrefs ti,
                       aux' (E.push_rec_types (f',t,b) env) new_idrefs bi)::i)
                   (Array.mapi
-                    (fun j x -> (fresh_idrefs.(j),x,t.(j),b.(j)) ) f'
+                    (fun j x -> (fresh_idrefs.(j),fst x,t.(j),b.(j)) ) f'
                   ) []
                  )
     in
@@ -877,7 +877,7 @@ let acic_object_of_cic_object sigma obj =
                    match decl_or_def with
                        A.Decl t ->
                         let final_env,final_idrefs,atl =
-                         aux (Environ.push_rel (Names.Name n,None,t) env)
+                         aux (Environ.push_rel (Term.var_decl_of_name (Names.Name n) t) env)
                           new_idrefs tl
                         in
                          let at =
@@ -887,7 +887,7 @@ let acic_object_of_cic_object sigma obj =
                      | A.Def (t,ty) ->
                         let final_env,final_idrefs,atl =
                          aux
-                          (Environ.push_rel (Names.Name n,Some t,ty) env)
+                          (Environ.push_rel (Term.def_decl_of_name (Names.Name n) t ty) env)
                            new_idrefs tl
                         in
                          let at =
@@ -915,7 +915,7 @@ let acic_object_of_cic_object sigma obj =
        let env' =
         List.fold_right
          (fun (name,_,arity,_) env ->
-           Environ.push_rel (Names.Name name, None, arity) env
+           Environ.push_rel (Term.var_decl_of_name (Names.Name name) arity) env
          ) (List.rev tys) env in
        let idrefs = List.map (function _ -> gen_id seed) tys in
        let atys =

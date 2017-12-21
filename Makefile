@@ -45,6 +45,7 @@ export FIND_VCS_CLAUSE:='(' \
   -name '{arch}' -o \
   -name '.svn' -o \
   -name '_darcs' -o \
+  -name 'checker' -o \
   -name '.git' -o \
   -name '.bzr' -o \
   -name 'debian' -o \

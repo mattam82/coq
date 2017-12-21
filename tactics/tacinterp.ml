@@ -1167,9 +1167,9 @@ let coerce_to_evaluable_ref env v =
 let interp_evaluable ist env = function
   | ArgArg (r,Some (loc,id)) ->
       (* Maybe [id] has been introduced by Intro-like tactics *)
-      (try match Environ.lookup_named id env with
-       | (_,Some _,_) -> EvalVarRef id
-       | _ -> error_not_evaluable (VarRef id)
+      (try 
+	 if Environ.evaluable_named id env then EvalVarRef id
+	 else error_not_evaluable (VarRef id)
        with Not_found ->
        match r with
        | EvalConstRef _ -> r
@@ -1703,10 +1703,10 @@ let apply_one_mhyp_context ist env gl lmatch (hypname,patv,pat) lhyps =
               with
                 | PatternMatchingFailure -> apply_one_mhyp_context_rec tl in
             match_next_pattern (fun () ->
-	      let hyp = if b<>None then refresh_universes_strict hyp else hyp in
+	      let hyp = if is_variable_body b then hyp else refresh_universes_strict hyp in
 	      match_pat lmatch hyp pat) ()
 	| Some patv ->
-	    match b with
+	    match constr_of_body b with
 	    | Some body ->
                 let rec match_next_pattern_in_body next_in_body () =
                   try
@@ -2042,7 +2042,7 @@ and apply_hyps_context ist env lz goal mt lctxt lgmatch mhyps hyps =
     | hyp_pat::tl ->
 	let (hypname, _, _ as hyp_pat) =
 	  match hyp_pat with
-	  | Hyp ((_,hypname),mhyp) -> hypname,  None, mhyp
+	  | Hyp ((_,hypname),mhyp) -> hypname, None, mhyp
 	  | Def ((_,hypname),mbod,mhyp) -> hypname, Some mbod, mhyp
 	in
         let rec match_next_pattern find_next =

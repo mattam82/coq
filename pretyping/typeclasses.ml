@@ -158,7 +158,7 @@ let subst_class (subst,cl) =
   and do_subst c = Mod_subst.subst_mps subst c
   and do_subst_gr gr = fst (subst_global subst gr) in
   let do_subst_ctx ctx = list_smartmap
-    (fun (na, b, t) -> (na, Option.smartmap do_subst b, do_subst t))
+    (fun (na, b, t) -> (na, smartmap_body do_subst b, do_subst t))
     ctx in
   let do_subst_context (grs,ctx) =
     list_smartmap (Option.smartmap (fun (gr,b) -> do_subst_gr gr, b)) grs,
@@ -173,7 +173,7 @@ let discharge_class (_,cl) =
   let repl = Lib.replacement_context () in
   let rel_of_variable_context ctx = List.fold_right
     ( fun (n,_,b,t) (ctx', subst) ->
-	let decl = (Name n, Option.map (substn_vars 1 subst) b, substn_vars 1 subst t) in
+	let decl = (Name n, map_body (substn_vars 1 subst) b, substn_vars 1 subst t) in
 	(decl :: ctx', n :: subst)
     ) ctx ([], []) in
   let discharge_rel_context subst n rel =
@@ -181,7 +181,7 @@ let discharge_class (_,cl) =
     let ctx, _ =
       List.fold_right
 	(fun (id, b, t) (ctx, k) ->
-	   (id, Option.smartmap (substn_vars k subst) b, substn_vars k subst t) :: ctx, succ k)
+	   (id, smartmap_body (substn_vars k subst) b, substn_vars k subst t) :: ctx, succ k)
 	rel ([], n)
     in ctx
   in
@@ -385,7 +385,7 @@ let add_constant_class cst =
   let tc = 
     { cl_impl = ConstRef cst;
       cl_context = (List.map (const None) ctx, ctx);
-      cl_props = [(Anonymous, None, arity)];
+      cl_props = [(var_decl_of_name Anonymous arity)];
       cl_projs = []
     }
   in add_class tc;
@@ -401,7 +401,7 @@ let add_inductive_class ind =
     in
       { cl_impl = IndRef ind;
 	cl_context = List.map (const None) ctx, ctx;
-	cl_props = [Anonymous, None, ty];
+	cl_props = [var_decl_of_name Anonymous ty];
 	cl_projs = [] }
   in add_class k
       
@@ -409,15 +409,24 @@ let add_inductive_class ind =
  * interface functions
  *)
 
+let rel_context_hyps_annots ctx =
+  List.rev
+    (list_map_filter
+     (fun (na, b, t) -> if is_variable_body b then Some (annot_of_body b) else None) 
+     ctx)
+
 let instance_constructor cl args =
-  let lenpars = List.length (List.filter (fun (na, b, t) -> b = None) (snd cl.cl_context)) in
-  let pars = fst (list_chop lenpars args) in
+  let parans = rel_context_hyps_annots (snd cl.cl_context) in
+  let lenpars = List.length parans in
+  let pars = list_firstn lenpars args in
+  let argans = parans @ rel_context_hyps_annots cl.cl_props in
     match cl.cl_impl with
-      | IndRef ind -> Some (applistc (mkConstruct (ind, 1)) args),
-	  applistc (mkInd ind) pars
+      | IndRef ind -> 
+	Some (Constr.applistc (mkConstruct (ind, 1)) argans args),
+	Constr.applistc (mkInd ind) parans pars
       | ConstRef cst -> 
 	let term = if args = [] then None else Some (list_last args) in
-	  term, applistc (mkConst cst) pars
+	  term, Constr.applistc (mkConst cst) parans pars
       | _ -> assert false
 
 let typeclasses () = Gmap.fold (fun _ l c -> l :: c) !classes []

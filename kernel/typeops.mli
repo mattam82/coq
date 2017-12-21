@@ -28,7 +28,10 @@ val infer_local_decls :
 (** If [j] is the judgement {% $ %}c:t{% $ %}, then [assumption_of_judgement env j]
    returns the type {% $ %}c{% $ %}, checking that {% $ %}t{% $ %} is a sort. *)
 
-val assumption_of_judgment :  env -> unsafe_judgment -> types
+(** [relevance_of_type t] First infers the sort of [t] and returns its relevance *)
+val relevance_of_type : env -> types -> relevance
+
+val assumption_of_judgment :  env -> unsafe_judgment -> types * relevance
 val type_judgment          :  env -> unsafe_judgment -> unsafe_type_judgment
 
 (** {6 Type of sorts. } *)
@@ -49,22 +52,23 @@ val judge_of_constant_knowing_parameters :
 
 (** {6 Type of application. } *)
 val judge_of_apply :
-  env -> unsafe_judgment -> unsafe_judgment array
+  env -> unsafe_judgment ->
+  relevance array -> unsafe_judgment array
     -> unsafe_judgment * constraints
 
 (** {6 Type of an abstraction. } *)
 val judge_of_abstraction :
-  env -> name -> unsafe_type_judgment -> unsafe_judgment
+  env -> name binder_annot -> unsafe_type_judgment -> unsafe_judgment
     -> unsafe_judgment
 
 (** {6 Type of a product. } *)
 val judge_of_product :
-  env -> name -> unsafe_type_judgment -> unsafe_type_judgment
+  env -> name binder_annot -> unsafe_type_judgment -> unsafe_type_judgment
     -> unsafe_judgment
 
 (** s Type of a let in. *)
 val judge_of_letin :
-  env -> name -> unsafe_judgment -> unsafe_type_judgment -> unsafe_judgment
+  env -> name letbinder_annot -> unsafe_judgment -> unsafe_type_judgment -> unsafe_judgment
     -> unsafe_judgment
 
 (** {6 Type of a cast. } *)
@@ -87,7 +91,7 @@ val judge_of_case : env -> case_info
     -> unsafe_judgment * constraints
 
 (** Typecheck general fixpoint (not checking guard conditions) *)
-val type_fixpoint : env -> name array -> types array
+val type_fixpoint : env -> name letbinder_annot array -> types array
     -> unsafe_judgment array -> constraints
 
 (** Kernel safe typing but applicable to partial proofs *)

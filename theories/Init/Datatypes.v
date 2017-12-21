@@ -297,11 +297,11 @@ Inductive CompareSpecT (Peq Plt Pgt : Prop) : comparison -> Type :=
  | CompLtT : Plt -> CompareSpecT Peq Plt Pgt Lt
  | CompGtT : Pgt -> CompareSpecT Peq Plt Pgt Gt.
 Hint Constructors CompareSpecT.
-
+Axiom cheat : forall A, A.
 Lemma CompareSpec2Type : forall Peq Plt Pgt c,
  CompareSpec Peq Plt Pgt c -> CompareSpecT Peq Plt Pgt c.
 Proof.
- destruct c; intros H; constructor; inversion_clear H; auto.
+ destruct c; intros H; constructor; inversion H; trivial. 
 Defined.
 
 (** As an alternate formulation, one may also directly refer to predicates

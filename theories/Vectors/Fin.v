@@ -28,10 +28,24 @@ Definition case0 P (p: t 0): P p :=
   with |0 => fun f0 => P f0 |S _ => fun _ => @ID end p'
   with |F1 _ => @id |FS _ _ => @id end.
 
+Definition case0P (P : t 0 -> Prop) (p: t 0): P p :=
+  match p as p' in t n return
+    match n as n' return t n' -> Prop
+  with |0 => fun f0 => P f0 |S _ => fun _ => True end p'
+  with |F1 _ => I |FS _ _ => I end.
+
 Definition caseS (P: forall {n}, t (S n) -> Type)
   (P1: forall n, @P n F1) (PS : forall {n} (p: t n), P (FS p))
   {n} (p: t (S n)): P p :=
   match p with
+  |F1 k => P1 k
+  |FS k pp => PS pp
+  end.
+
+Definition caseSP (P: forall {n}, t (S n) -> Prop)
+  (P1: forall n, @P n F1) (PS : forall {n} (p: t n), P (FS p))
+  {n} (p: t (S n)): P p :=
+  match p in t n' return match n', p return Prop with 0, _ => True | S n, p => P p end with
   |F1 k => P1 k
   |FS k pp => PS pp
   end.
@@ -43,6 +57,16 @@ fix rectS_fix {n} (p: t (S n)): P p:=
   match p with
   |F1 k => P1 k
   |FS 0 pp => case0 (fun f => P (FS f)) pp
+  |FS (S k) pp => PS pp (rectS_fix pp)
+  end.
+
+Definition indS (P: forall {n}, t (S n) -> Prop)
+  (P1: forall n, @P n F1) (PS : forall {n} (p: t (S n)), P p -> P (FS p)):
+  forall {n} (p: t (S n)), P p :=
+fix rectS_fix {n} (p: t (S n)): P p:=
+  match p in t n' return match n', p return Prop with 0, _ => True | S n, p => P p end with
+  |F1 k => P1 k
+  |FS 0 pp => case0P (fun f => P (FS f)) pp
   |FS (S k) pp => PS pp (rectS_fix pp)
   end.
 
@@ -113,7 +137,7 @@ Lemma of_nat_to_nat_inv {m} (p : t m) : of_nat_lt (proj2_sig (to_nat p)) = p.
 Proof.
 induction p.
  reflexivity.
- simpl; destruct (to_nat p). simpl. subst p; repeat f_equal. apply Peano_dec.le_unique.
+ simpl; destruct (to_nat p). simpl. subst p; repeat f_equal. 
 Qed.
 
 (** [weak p f] answers a function witch is the identity for the p{^  th} first

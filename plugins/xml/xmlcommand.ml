@@ -247,7 +247,7 @@ let find_hyps t =
       T.Var id when not (List.mem id l) ->
        let (_,bo,ty) = Global.lookup_named id in
         let boids =
-         match bo with
+         match T.constr_of_body bo with
             Some bo' -> aux l bo'
           | None -> l
         in
@@ -315,11 +315,11 @@ let mk_current_proof_obj is_a_variable id bo ty evar_map env =
         let rec aux var_ids =
          function
             [] -> var_ids,[]
-          | (n,None,t)::tl ->
+          | (n,Term.Variable _,t)::tl ->
               let final_var_ids,tl' = aux (n::var_ids) tl in
               let t' = Term.subst_vars var_ids t in
                final_var_ids,(n, Acic.Decl (Unshare.unshare t'))::tl'
-          | (n,Some b,t)::tl ->
+          | (n,Term.Definition (_, b),t)::tl ->
               let final_var_ids,tl' = aux (n::var_ids) tl in
               let b' = Term.subst_vars var_ids b in
                (* t will not be exported to XML. Thus no unsharing performed *)
@@ -524,7 +524,7 @@ let print internal glob_ref kind xml_library_root =
         N.make_kn mod_path dir_path (N.label_of_id id)
        in
        let (_,body,typ) = G.lookup_named id in
-        Cic2acic.Variable kn,mk_variable_obj id body typ
+        Cic2acic.Variable kn,mk_variable_obj id (Term.constr_of_body body) typ
     | Ln.ConstRef kn ->
        let id = N.id_of_label (N.con_label kn) in
        let cb = G.lookup_constant kn in

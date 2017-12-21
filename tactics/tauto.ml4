@@ -90,7 +90,7 @@ let is_record t =
     match (kind_of_term hdapp) with
       | Ind ind  ->
           let (mib,mip) = Global.lookup_inductive ind in
-	    mib.Declarations.mind_record
+	    mib.Declarations.mind_record <> None
       | _ -> false
 
 let bugged_is_binary t =

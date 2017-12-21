@@ -100,7 +100,7 @@ val reduce_to_atomic_ref :
   env ->  evar_map -> global_reference -> types -> types
 
 val find_hnf_rectype : 
-  env ->  evar_map -> types -> inductive * constr list
+  env ->  evar_map -> types -> inductive * constr args_list
 
 val contextually : bool -> occurrences * constr_pattern ->
   (patvar_map -> reduction_function) -> reduction_function

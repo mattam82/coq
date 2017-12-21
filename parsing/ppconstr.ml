@@ -89,7 +89,7 @@ let pr_notation pr pr_binders s env =
 let pr_delimiters key strm =
   strm ++ str ("%"^key)
 
-let pr_generalization bk ak c =
+let pr_generalization (bk,_) ak c =
   let hd, tl =
     match bk with
     | Implicit -> "{", "}"
@@ -215,6 +215,11 @@ let begin_of_binders = function
   | b::_ -> begin_of_binder b
   | _ -> 0
 
+let surround_relevance k p =
+  match k with
+  | Expl -> p
+  | Irr -> str"[" ++ p ++ str"]"
+
 let surround_impl k p =
   match k with
   | Explicit -> str"(" ++ p ++ str")"
@@ -228,25 +233,25 @@ let surround_implicit k p =
 let pr_binder many pr (nal,k,t) =
   match k with
     | Generalized (b, b', t') ->
-      assert (b=Implicit);
+      assert (b=implicit_bk);
       begin match nal with
 	|[loc,Anonymous] ->
-	  hov 1 (str"`" ++ (surround_impl b'
+	  hov 1 (str"`" ++ (surround_impl (fst b')
 			      ((if t' then str "!" else mt ()) ++ pr t)))
 	|[loc,Name id] ->
-	  hov 1 (str "`" ++ (surround_impl b'
-			       (pr_lident (loc,id) ++ str " : " ++
+	  hov 1 (str "`" ++ (surround_impl (fst b')
+			       (surround_relevance (snd b') (pr_lident (loc,id)) ++ str " : " ++
 				  (if t' then str "!" else mt()) ++ pr t)))
-	|_ -> anomaly "List of generalized binders have alwais one element."
+	|_ -> anomaly "List of generalized binders have always one element."
       end
-    | Default b ->
+    | Default (i,r) ->
       match t with
 	| CHole _ ->
 	  let s = prlist_with_sep spc pr_lname nal in
-	  hov 1 (surround_implicit b s)
+	  hov 1 (surround_implicit i (surround_relevance r s))
 	| _ ->
-	  let s = prlist_with_sep spc pr_lname nal ++ str " : " ++ pr t in
-	  hov 1 (if many then surround_impl b s else surround_implicit b s)
+	  let s = surround_relevance r (prlist_with_sep spc pr_lname nal) ++ str " : " ++ pr t in
+	  hov 1 (if many then surround_impl i s else surround_implicit i s)
 
 let pr_binder_among_many pr_c = function
   | LocalRawAssum (nal,k,t) ->

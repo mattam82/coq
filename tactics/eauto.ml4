@@ -483,7 +483,7 @@ let unfold_head env (ids, csts) c =
   let rec aux c = 
     match kind_of_term c with
     | Var id when Idset.mem id ids ->
-	(match Environ.named_body id env with
+	(match Environ.named_value id env with
 	| Some b -> true, b
 	| None -> false, c)
     | Const cst when Cset.mem cst csts ->

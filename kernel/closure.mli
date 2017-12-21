@@ -83,6 +83,7 @@ type table_key = id_key
 type 'a infos
 val ref_value_cache: 'a infos -> table_key -> 'a option
 val info_flags: 'a infos -> reds
+val info_env : 'a infos -> env
 val create: ('a infos -> constr -> 'a) -> reds -> env ->
   (existential -> constr option) -> 'a infos
 val evar_value : 'a infos -> existential -> constr option
@@ -104,13 +105,13 @@ type fterm =
   | FFlex of table_key
   | FInd of inductive
   | FConstruct of constructor
-  | FApp of fconstr * fconstr array
+  | FApp of fconstr application
   | FFix of fixpoint * fconstr subs
   | FCoFix of cofixpoint * fconstr subs
-  | FCases of case_info * fconstr * fconstr * fconstr array
-  | FLambda of int * (name * constr) list * constr * fconstr subs
-  | FProd of name * fconstr * fconstr
-  | FLetIn of name * fconstr * fconstr * constr * fconstr subs
+  | FCases of case_info * fconstr case_pred * fconstr * fconstr array
+  | FLambda of int * (name binder_annot * constr) list * constr * fconstr subs
+  | FProd of name binder_annot * fconstr * fconstr
+  | FLetIn of name letbinder_annot * fconstr * fconstr * constr * fconstr subs
   | FEvar of existential * fconstr subs
   | FLIFT of int * fconstr
   | FCLOS of constr * fconstr subs
@@ -122,16 +123,16 @@ type fterm =
    one by one *)
 
 type stack_member =
-  | Zapp of fconstr array
-  | Zcase of case_info * fconstr * fconstr array
-  | Zfix of fconstr * stack
+  | Zapp of fconstr args
+  | Zcase of case_info * fconstr case_pred * fconstr array
+  | Zfix of fconstr * relevance * stack * relevance
   | Zshift of int
   | Zupdate of fconstr
 
 and stack = stack_member list
 
 val empty_stack : stack
-val append_stack : fconstr array -> stack -> stack
+val append_stack : fconstr args -> stack -> stack
 
 val decomp_stack : stack -> (fconstr * stack) option
 val array_of_stack : stack -> fconstr array
@@ -140,7 +141,7 @@ val stack_args_size : stack -> int
 val stack_tail : int -> stack -> stack
 val stack_nth : stack -> int -> fconstr
 val zip_term : (fconstr -> constr) -> constr -> stack -> constr
-val eta_expand_stack : stack -> stack
+val eta_expand_stack : relevance -> stack -> stack
 
 (** To lazy reduce a constr, create a [clos_infos] with
    [create_clos_infos], inject the term to reduce with [inject]; then use
@@ -154,12 +155,13 @@ val mk_atom : constr -> fconstr
 val fterm_of : fconstr -> fterm
 val term_of_fconstr : fconstr -> constr
 val destFLambda :
-  (fconstr subs -> constr -> fconstr) -> fconstr -> name * fconstr * fconstr
+  (fconstr subs -> constr -> fconstr) -> fconstr -> name binder_annot * fconstr * fconstr
 
 (** Global and local constant cache *)
 type clos_infos
 val create_clos_infos :
   ?evars:(existential->constr option) -> reds -> env -> clos_infos
+val clos_infos_env : clos_infos -> env
 
 (** Reduction function *)
 
@@ -174,12 +176,25 @@ val whd_val : clos_infos -> fconstr -> constr
 val whd_stack :
   clos_infos -> fconstr -> stack -> fconstr * stack
 
+val eta_expand_ind_stack : clos_infos -> lift -> inductive -> fconstr -> stack -> 
+  (lift * (fconstr * stack)) -> 
+  lift * (fconstr * stack)
+
 (** Conversion auxiliary functions to do step by step normalisation *)
 
 (** [unfold_reference] unfolds references in a [fconstr] *)
 val unfold_reference : clos_infos -> table_key -> fconstr option
 
 val eq_table_key : table_key -> table_key -> bool
+
+val relevance_of_table_key : clos_infos -> lift -> table_key -> relevance
+
+val is_irrelevant : env -> constr -> bool
+val is_irrelevant_fconstr : clos_infos -> lift -> fconstr * stack -> bool
+val push_var : name binder_annot -> clos_infos -> clos_infos
+
+val set_conv_forward : (clos_infos -> fconstr -> fconstr -> Univ.constraints) -> unit
+val is_convertible : clos_infos -> fconstr -> fconstr -> Univ.constraints
 
 (***********************************************************************
   i This is for lazy debug *)

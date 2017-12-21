@@ -104,16 +104,16 @@ val define_evar_as_product : evar_map -> existential -> evar_map * types
 val define_evar_as_lambda : env -> evar_map -> existential -> evar_map * types
 val define_evar_as_sort : evar_map -> existential -> evar_map * sorts
 
-val is_unification_pattern_evar : env -> evar_map -> existential -> constr list ->
-  constr -> constr list option
+val is_unification_pattern_evar : env -> evar_map -> existential -> constr args_list ->
+  constr -> constr args_list option
 
-val is_unification_pattern : env * int -> evar_map -> constr -> constr list ->
-  constr -> constr list option
+val is_unification_pattern : env * int -> evar_map -> constr -> constr args_list ->
+  constr -> constr args_list option
 
 val evar_absorb_arguments : env -> evar_map -> existential -> constr list ->
   evar_map * existential
 
-val solve_pattern_eqn : env -> constr list -> constr -> constr
+val solve_pattern_eqn : env -> constr args_list -> constr -> constr
 
 (** The following functions return the set of evars immediately
     contained in the object, including defined evars *)
@@ -160,7 +160,7 @@ val mk_valcon : constr -> val_constraint
 
 val split_tycon :
   loc -> env ->  evar_map -> type_constraint ->
-    evar_map * (name * type_constraint * type_constraint)
+    evar_map * (name binder_annot * type_constraint * type_constraint)
 
 val valcon_of_tycon : type_constraint -> val_constraint
 val lift_tycon : int -> type_constraint -> type_constraint

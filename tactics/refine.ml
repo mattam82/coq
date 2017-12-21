@@ -61,6 +61,7 @@ open Typing
 open Tactics
 open Tacticals
 open Printer
+open Constr
 
 type term_with_holes = TH of constr * meta_type_map * sg_proofs
 and  sg_proofs       = (term_with_holes option) list
@@ -98,10 +99,10 @@ let replace_by_meta env sigma = function
       let m = mkMeta n in
       (* quand on introduit une mv on calcule son type *)
       let ty = match kind_of_term c with
-	| Lambda (Name id,c1,c2) when isCast c2 ->
-	    let _,_,t = destCast c2 in mkNamedProd id c1 t
-	| Lambda (Anonymous,c1,c2) when isCast c2 ->
-	    let _,_,t = destCast c2 in mkArrow c1 t
+	| Lambda ((Name id, ann),c1,c2) when isCast c2 ->
+	    let _,_,t = destCast c2 in mkFullNamedProd (id,ann) c1 t
+	| Lambda ((Anonymous, (ann, _)),c1,c2) when isCast c2 ->
+	    let _,_,t = destCast c2 in mkArrow ann c1 t
 	| _ -> (* (App _ | Case _) -> *)
 	    let sigma' =
 	      List.fold_right (fun (m,t) sigma -> Evd.meta_declare m t sigma)
@@ -150,22 +151,22 @@ let rec compute_metamap env sigma c = match kind_of_term c with
   (* abstraction => il faut décomposer si le terme dessous n'est pas pur
    *    attention : dans ce cas il faut remplacer (Rel 1) par (Var x)
    *    où x est une variable FRAICHE *)
-  | Lambda (name,c1,c2) ->
+  | Lambda ((name, an),c1,c2) ->
       let v = fresh env name in
-      let env' = push_named (v,None,c1) env in
+      let env' = push_named (var_decl_of (v, an) c1) env in
       begin match compute_metamap env' sigma (subst1 (mkVar v) c2) with
 	(* terme de preuve complet *)
 	| TH (_,_,[]) -> TH (c,[],[])
 	(* terme de preuve incomplet *)
 	| th ->
 	    let m,mm,sgp = replace_by_meta env' sigma th in
-	    TH (mkLambda (Name v,c1,m), mm, sgp)
+	    TH (mkLambda ((Name v, an),c1, m), mm, sgp)
       end
 
-  | LetIn (name, c1, t1, c2) ->
+  | LetIn ((name, an), c1, t1, c2) ->
       let v = fresh env name in
       let th1 = compute_metamap env sigma c1 in
-      let env' = push_named (v,Some c1,t1) env in
+      let env' = push_named (def_decl_of (v, an) c1 t1) env in
       let th2 = compute_metamap env' sigma (subst1 (mkVar v) c2) in
       begin match th1,th2 with
 	(* terme de preuve complet *)
@@ -178,17 +179,17 @@ let rec compute_metamap env sigma c = match kind_of_term c with
 	    let m2,mm2,sgp2 =
               if sgp2=[] then (c2,mm2,[])
               else replace_by_meta env' sigma th2 in
-	    TH (mkNamedLetIn v m1 t1 m2, mm1@mm2, sgp1@sgp2)
+	    TH (mkFullNamedLetIn (v,an) m1 t1 m2, mm1@mm2, sgp1@sgp2)
       end
 
   (* 4. Application *)
-  | App (f,v) ->
+  | App (f,an,v) ->
       let a = Array.map (compute_metamap env sigma) (Array.append [|f|] v) in
       begin
 	try
 	  let v',mm,sgp = replace_in_array false env sigma a in
           let v'' = Array.sub v' 1 (Array.length v) in
-          TH (mkApp(v'.(0), v''),mm,sgp)
+          TH (mkApp(v'.(0), an, v''),mm,sgp)
 	with NoMeta ->
 	  TH (c,[],[])
       end
@@ -196,13 +197,13 @@ let rec compute_metamap env sigma c = match kind_of_term c with
   | Case (ci,p,cc,v) ->
       (* bof... *)
       let nbr = Array.length v in
-      let v = Array.append [|p;cc|] v in
+      let v = Array.append [|case_pred p;cc|] v in
       let a = Array.map (compute_metamap env sigma) v in
       begin
 	try
 	  let v',mm,sgp = replace_in_array false env sigma a in
 	  let v'' = Array.sub v' 2 nbr in
-	  TH (mkCase (ci,v'.(0),v'.(1),v''),mm,sgp)
+	  TH (Term.mkCase (ci,v'.(0),v'.(1),v''),mm,sgp)
 	with NoMeta ->
 	  TH (c,[],[])
       end
@@ -210,7 +211,7 @@ let rec compute_metamap env sigma c = match kind_of_term c with
   (* 5. Fix. *)
   | Fix ((ni,i),(fi,ai,v)) ->
       (* TODO: use a fold *)
-      let vi = Array.map (fresh env) fi in
+      let vi = Array.map (fun x -> fst (map_letbinder (fresh env) x)) fi in
       let fi' = Array.map (fun id -> Name id) vi in
       let env' = push_named_rec_types (fi',ai,v) env in
       let a = Array.map
@@ -220,6 +221,7 @@ let rec compute_metamap env sigma c = match kind_of_term c with
       begin
 	try
 	  let v',mm,sgp = replace_in_array true env' sigma a in
+	  let fi' = Array.map letbinder_annot_of fi' in
 	  let fix = mkFix ((ni,i),(fi',ai,v')) in
 	  TH (fix,mm,sgp)
 	with NoMeta ->
@@ -240,7 +242,7 @@ let rec compute_metamap env sigma c = match kind_of_term c with
 
   (* Cofix. *)
   | CoFix (i,(fi,ai,v)) ->
-      let vi = Array.map (fresh env) fi in
+      let vi = Array.map (fun (id, _) -> fresh env id) fi in
       let fi' = Array.map (fun id -> Name id) vi in
       let env' = push_named_rec_types (fi',ai,v) env in
       let a = Array.map
@@ -250,6 +252,7 @@ let rec compute_metamap env sigma c = match kind_of_term c with
       begin
 	try
 	  let v',mm,sgp = replace_in_array true env' sigma a in
+	  let fi' = Array.map letbinder_annot_of fi' in
 	  let cofix = mkCoFix (i,(fi',ai,v')) in
 	  TH (cofix,mm,sgp)
 	with NoMeta ->
@@ -290,7 +293,7 @@ let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
 	refine c gl
 
     (* abstraction => intro *)
-    | Lambda (Name id,_,m), _ ->
+    | Lambda ((Name id,_),_,m), _ ->
 	assert (isMeta (strip_outer_cast m));
 	begin match sgp with
 	  | [None] -> intro_mustbe_force id gl
@@ -300,7 +303,7 @@ let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
 	  | _ -> assert false
 	end
 
-    | Lambda (Anonymous,_,m), _ -> (* if anon vars are allowed in evars *)
+    | Lambda ((Anonymous,_),_,m), _ -> (* if anon vars are allowed in evars *)
         assert (isMeta (strip_outer_cast m));
 	begin match sgp with
 	  | [None] -> tclTHEN intro (onLastHypId (fun id -> clear [id])) gl
@@ -315,9 +318,9 @@ let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
 	end
 
     (* let in without holes in the body => possibly dependent intro *)
-    | LetIn (Name id,c1,t1,c2), _ when not (isMeta (strip_outer_cast c1)) ->
+    | LetIn ((Name id,an),c1,t1,c2), _ when not (isMeta (strip_outer_cast c1)) ->
 	let c = pf_concl gl in
-	let newc = mkNamedLetIn id c1 t1 c in
+	let newc = mkFullNamedLetIn (id, an) c1 t1 c in
 	tclTHEN
 	  (change_in_concl None newc)
 	  (match sgp with
@@ -330,7 +333,7 @@ let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
 
     (* let in with holes in the body => unable to handle dependency
        because of evars limitation, use non dependent assert instead *)
-    | LetIn (Name id,c1,t1,c2), _ ->
+    | LetIn ((Name id,_),c1,t1,c2), _ ->
 	tclTHENS
           (assert_tac (Name id) t1)
 	  [(match List.hd sgp with
@@ -350,12 +353,13 @@ let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
 	  | Name id -> id
           | _ -> error "Recursive functions must have names."
 	in
-	let fixes = array_map3 (fun f n c -> (out_name f,succ n,c)) fi ni ai in
+	let fixes = array_map3 (fun f n c -> (out_name (letname_of f),succ n,c)) fi ni ai in
 	let firsts,lasts = list_chop j (Array.to_list fixes) in
 	tclTHENS
 	  (tclTHEN
             (ensure_products (succ ni.(j)))
-            (mutual_fix (out_name fi.(j)) (succ ni.(j)) (firsts@List.tl lasts) j))
+            (mutual_fix (out_name (letname_of fi.(j)))
+	       (succ ni.(j)) (firsts@List.tl lasts) j))
 	  (List.map (function
 		       | None -> tclIDTAC
 		       | Some th -> tcc_aux subst th) sgp)
@@ -367,10 +371,10 @@ let rec tcc_aux subst (TH (c,mm,sgp) as _th) gl =
 	  | Name id -> id
           | _ -> error "Recursive functions must have names."
 	in
-	let cofixes = array_map2 (fun f c -> (out_name f,c)) fi ai in
+	let cofixes = array_map2 (fun f c -> (out_name (letname_of f),c)) fi ai in
 	let firsts,lasts = list_chop j (Array.to_list cofixes) in
 	tclTHENS
-	  (mutual_cofix (out_name fi.(j)) (firsts@List.tl lasts) j)
+	  (mutual_cofix (out_name (letname_of fi.(j))) (firsts@List.tl lasts) j)
 	  (List.map (function
 		       | None -> tclIDTAC
 		       | Some th -> tcc_aux subst th) sgp)

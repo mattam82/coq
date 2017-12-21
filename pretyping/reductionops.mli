@@ -23,7 +23,7 @@ exception Elimconst
    one by one *)
 
 type 'a stack_member =
-  | Zapp of 'a list
+  | Zapp of 'a args_list
   | Zcase of case_info * 'a * 'a array
   | Zfix of 'a * 'a stack
   | Zshift of int
@@ -32,12 +32,12 @@ type 'a stack_member =
 and 'a stack = 'a stack_member list
 
 val empty_stack : 'a stack
-val append_stack : 'a array -> 'a stack -> 'a stack
-val append_stack_list : 'a list -> 'a stack -> 'a stack
+val append_stack : annot array -> 'a array -> 'a stack -> 'a stack
+val append_stack_list : annot list -> 'a list -> 'a stack -> 'a stack
 
 val decomp_stack : 'a stack -> ('a * 'a stack) option
-val list_of_stack : 'a stack -> 'a list
-val array_of_stack : 'a stack -> 'a array
+val list_of_stack : 'a stack -> 'a args_list
+val array_of_stack : 'a stack -> 'a args
 val stack_assign : 'a stack -> int -> 'a -> 'a stack
 val stack_args_size : 'a stack -> int
 val app_stack : constr * constr stack -> constr
@@ -53,10 +53,10 @@ type reduction_function = contextual_reduction_function
 type local_reduction_function = evar_map -> constr -> constr
 
 type contextual_stack_reduction_function =
-    env -> evar_map -> constr -> constr * constr list
+    env -> evar_map -> constr -> constr * constr args_list
 type stack_reduction_function = contextual_stack_reduction_function
 type local_stack_reduction_function =
-    evar_map -> constr -> constr * constr list
+    evar_map -> constr -> constr * constr args_list
 
 type contextual_state_reduction_function =
     env -> evar_map -> state -> state
@@ -141,7 +141,8 @@ val whd_zeta : constr -> constr
 
 val safe_evar_value : evar_map -> existential -> constr option
 
-val beta_applist : constr * constr list -> constr
+val beta_applist : constr application_list -> constr
+val beta_applist_expl : constr * constr list -> constr
 
 val hnf_prod_app     : env ->  evar_map -> constr -> constr -> constr
 val hnf_prod_appvect : env ->  evar_map -> constr -> constr array -> constr
@@ -150,9 +151,9 @@ val hnf_lam_app      : env ->  evar_map -> constr -> constr -> constr
 val hnf_lam_appvect  : env ->  evar_map -> constr -> constr array -> constr
 val hnf_lam_applist  : env ->  evar_map -> constr -> constr list -> constr
 
-val splay_prod : env ->  evar_map -> constr -> (name * constr) list * constr
-val splay_lam : env ->  evar_map -> constr -> (name * constr) list * constr
-val splay_arity : env ->  evar_map -> constr -> (name * constr) list * sorts
+val splay_prod : env ->  evar_map -> constr -> (name binder_annot * constr) list * constr
+val splay_lam : env ->  evar_map -> constr -> (name binder_annot * constr) list * constr
+val splay_arity : env ->  evar_map -> constr -> (name binder_annot * constr) list * sorts
 val sort_of_arity : env -> evar_map -> constr -> sorts
 val splay_prod_n : env ->  evar_map -> int -> constr -> rel_context * constr
 val splay_lam_n : env ->  evar_map -> int -> constr -> rel_context * constr
@@ -162,16 +163,16 @@ val decomp_sort : env -> evar_map -> types -> sorts
 val is_sort : env -> evar_map -> types -> bool
 
 type 'a miota_args = {
-  mP      : constr;     (** the result type *)
+  mP      : constr case_pred;     (** the result type *)
   mconstr : constr;     (** the constructor *)
   mci     : case_info;  (** special info to re-build pattern *)
-  mcargs  : 'a list;    (** the constructor's arguments *)
+  mcargs  : 'a args_list;    (** the constructor's arguments *)
   mlf     : 'a array }  (** the branch code vector *)
 
 val reducible_mind_case : constr -> bool
 val reduce_mind_case : constr miota_args -> constr
 
-val find_conclusion : env -> evar_map -> constr -> (constr,constr) kind_of_term
+val find_conclusion : env -> evar_map -> constr -> (constr,constr) Constr.kind_of_term
 val is_arity : env ->  evar_map -> constr -> bool
 
 val whd_programs :  reduction_function

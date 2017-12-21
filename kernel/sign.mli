@@ -19,6 +19,10 @@ val add_named_decl : named_declaration -> named_context -> named_context
 val vars_of_named_context : named_context -> identifier list
 
 val lookup_named : identifier -> named_context -> named_declaration
+val evaluable_named  : variable -> named_context -> bool
+val named_type : variable -> named_context -> types
+val named_body : variable -> named_context -> body
+val named_value : variable -> named_context -> constr option
 
 (** number of declarations *)
 val named_context_length : named_context -> int
@@ -36,6 +40,7 @@ val fold_named_context_reverse :
 
 (** {6 Section-related auxiliary functions } *)
 val instance_from_named_context : named_context -> constr array
+val instance_args_from_named_context : named_context -> constr args_list
 
 (** {6 ... } *)
 (** Signatures of ordered optionally named variables, intended to be

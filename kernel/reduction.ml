@@ -24,6 +24,7 @@ open Declarations
 open Environ
 open Closure
 open Esubst
+open Constr
 
 let unfold_reference ((ids, csts), infos) k =
   match k with
@@ -55,23 +56,23 @@ let compare_stack_shape stk1 stk2 =
       ([],[]) -> bal=0
     | ((Zupdate _|Zshift _)::s1, _) -> compare_rec bal s1 stk2
     | (_, (Zupdate _|Zshift _)::s2) -> compare_rec bal stk1 s2
-    | (Zapp l1::s1, _) -> compare_rec (bal+Array.length l1) s1 stk2
-    | (_, Zapp l2::s2) -> compare_rec (bal-Array.length l2) stk1 s2
+    | (Zapp (_,l1)::s1, _) -> compare_rec (bal+Array.length l1) s1 stk2
+    | (_, Zapp (_,l2)::s2) -> compare_rec (bal-Array.length l2) stk1 s2
     | (Zcase(c1,_,_)::s1, Zcase(c2,_,_)::s2) ->
         bal=0 (* && c1.ci_ind  = c2.ci_ind *) && compare_rec 0 s1 s2
-    | (Zfix(_,a1)::s1, Zfix(_,a2)::s2) ->
+    | (Zfix(_,_,a1,_)::s1, Zfix(_,_,a2,_)::s2) ->
         bal=0 && compare_rec 0 a1 a2 && compare_rec 0 s1 s2
     | (_,_) -> false in
   compare_rec 0 stk1 stk2
 
 type lft_constr_stack_elt =
-    Zlapp of (lift * fconstr) array
+    Zlapp of (lift * fconstr) args
   | Zlfix of (lift * fconstr) * lft_constr_stack
-  | Zlcase of case_info * lift * fconstr * fconstr array
+  | Zlcase of case_info * lift * fconstr case_pred * fconstr array
 and lft_constr_stack = lft_constr_stack_elt list
 
 let rec zlapp v = function
-    Zlapp v2 :: s -> zlapp (Array.append v v2) s
+    Zlapp v2 :: s -> zlapp (concat_args v v2) s
   | s -> Zlapp v :: s
 
 let pure_stack lfts stk =
@@ -83,8 +84,8 @@ let pure_stack lfts stk =
               (Zupdate _,lpstk)  -> lpstk
             | (Zshift n,(l,pstk)) -> (el_shft n l, pstk)
             | (Zapp a, (l,pstk)) ->
-                (l,zlapp (Array.map (fun t -> (l,t)) a) pstk)
-            | (Zfix(fx,a),(l,pstk)) ->
+                (l,zlapp (map_args (fun t -> (l,t)) a) pstk)
+            | (Zfix(fx,_,a,_),(l,pstk)) ->
                 let (lfx,pa) = pure_rec l a in
                 (l, Zlfix((lfx,fx),pa)::pstk)
             | (Zcase(ci,p,br),(l,pstk)) ->
@@ -125,17 +126,34 @@ let beta_appvect c v =
   let rec stacklam env t stack =
     match kind_of_term t, stack with
         Lambda(_,_,c), arg::stacktl -> stacklam (arg::env) c stacktl
-      | _ -> applist (substl env t, stack) in
+      | _ -> Term.applist (substl env t, stack) in
   stacklam [] c (Array.to_list v)
 
 let betazeta_appvect n c v =
   let rec stacklam n env t stack =
-    if n = 0 then applist (substl env t, stack) else
+    if n = 0 then Term.applist (substl env t, stack) else
     match kind_of_term t, stack with
         Lambda(_,_,c), arg::stacktl -> stacklam (n-1) (arg::env) c stacktl
       | LetIn(_,b,_,c), _ -> stacklam (n-1) (b::env) c stack
       | _ -> anomaly "Not enough lambda/let's" in
   stacklam n [] c (Array.to_list v)
+
+let beta_app_argsl c (ans, args) =
+  let rec stacklam env t ans args =
+    match kind_of_term t, ans, args with
+        Lambda(_,_,c), _ :: ans, arg::args -> stacklam (arg::env) c ans args
+      | _ -> Constr.app_argslc (substl env t) (ans, args) in
+  stacklam [] c ans args
+
+let betazeta_app_argsl n c (ans, args) =
+  let rec stacklam n env t ans args =
+    if n = 0 then Constr.app_argslc (substl env t) (ans, args)
+    else
+      match kind_of_term t, ans, args with
+        Lambda(_,_,c), _ :: ans, arg::args -> stacklam (n-1) (arg::env) c ans args
+      | LetIn(_,b,_,c), _, _ -> stacklam (n-1) (b::env) c ans args
+      | _ -> anomaly "Not enough lambda/let's" in
+  stacklam n [] c ans args
 
 (********************************************************************)
 (*                         Conversion                               *)
@@ -148,20 +166,27 @@ type 'a trans_conversion_function = transparent_state -> env -> 'a -> 'a -> Univ
 exception NotConvertible
 exception NotConvertibleVect of int
 
+let expl_filter (ans, vs) =
+  array_fold_right2 (fun a v (n,args) -> if a = Expl then (n+1, v :: args) else (n,args)) ans vs (0,[])
+
 let compare_stacks f fmind lft1 stk1 lft2 stk2 cuniv =
   let rec cmp_rec pstk1 pstk2 cuniv =
     match (pstk1,pstk2) with
       | (z1::s1, z2::s2) ->
           let cu1 = cmp_rec s1 s2 cuniv in
           (match (z1,z2) with
-            | (Zlapp a1,Zlapp a2) -> array_fold_right2 f a1 a2 cu1
+            | (Zlapp a1,Zlapp a2) -> 
+	      let n,a1 = expl_filter a1 in
+	      let m,a2 = expl_filter a2 in
+		if n = m then List.fold_right2 f a1 a2 cu1
+		else raise NotConvertible
             | (Zlfix(fx1,a1),Zlfix(fx2,a2)) ->
                 let cu2 = f fx1 fx2 cu1 in
                 cmp_rec a1 a2 cu2
             | (Zlcase(ci1,l1,p1,br1),Zlcase(ci2,l2,p2,br2)) ->
                 if not (fmind ci1.ci_ind ci2.ci_ind) then
 		  raise NotConvertible;
-		let cu2 = f (l1,p1) (l2,p2) cu1 in
+		let cu2 = fold_case_pred2 (fun acc p1 p2 -> f (l1,p1) (l2,p2) acc) cu1 p1 p2 in
                 array_fold_right2 (fun c1 c2 -> f (l1,c1) (l2,c2)) br1 br2 cu2
             | _ -> assert false)
       | _ -> cuniv in
@@ -173,7 +198,9 @@ let compare_stacks f fmind lft1 stk1 lft2 stk2 cuniv =
 
 (* The sort cumulativity is
 
-    Prop <= Set <= Type 1 <= ... <= Type i <= ...
+    Set <= Type 1 <= ... <= Type i <= ...
+
+    Prop </= Type
 
     and this holds whatever Set is predicative or impredicative
 *)
@@ -185,11 +212,12 @@ type conv_pb =
 let sort_cmp pb s0 s1 cuniv =
   match (s0,s1) with
     | (Prop c1, Prop c2) when pb = CUMUL ->
-        if c1 = Null or c2 = Pos then cuniv   (* Prop <= Set *)
+        if c1 = c2 || (!Flags.prop_type && c1 = Null) then cuniv   (* Prop <= Set *)
         else raise NotConvertible
     | (Prop c1, Prop c2) ->
         if c1 = c2 then cuniv else raise NotConvertible
-    | (Prop c1, Type u) when pb = CUMUL -> assert (is_univ_variable u); cuniv
+    | (Prop c1, Type u) when pb = CUMUL && (!Flags.prop_type or c1 = Pos) -> 
+      assert (is_univ_variable u); cuniv
     | (Type u1, Type u2) ->
 	assert (is_univ_variable u2);
 	(match pb with
@@ -206,7 +234,7 @@ let rec no_arg_available = function
   | [] -> true
   | Zupdate _ :: stk -> no_arg_available stk
   | Zshift _ :: stk -> no_arg_available stk
-  | Zapp v :: stk -> Array.length v = 0 && no_arg_available stk
+  | Zapp (_,v) :: stk -> Array.length v = 0 && no_arg_available stk
   | Zcase _ :: _ -> true
   | Zfix _ :: _ -> true
 
@@ -214,7 +242,7 @@ let rec no_nth_arg_available n = function
   | [] -> true
   | Zupdate _ :: stk -> no_nth_arg_available n stk
   | Zshift _ :: stk -> no_nth_arg_available n stk
-  | Zapp v :: stk ->
+  | Zapp (_,v) :: stk ->
       let k = Array.length v in
       if n >= k then no_nth_arg_available (n-k) stk
       else false
@@ -240,11 +268,11 @@ let in_whnf (t,stk) =
     | FLOCKED -> assert false
 
 (* Conversion between  [lft1]term1 and [lft2]term2 *)
-let rec ccnv cv_pb l2r infos lft1 lft2 term1 term2 cuniv =
-  eqappr cv_pb l2r infos (lft1, (term1,[])) (lft2, (term2,[])) cuniv
+let rec ccnv cv_pb l2r infos check_irrel lft1 lft2 term1 term2 cuniv =
+  eqappr cv_pb l2r infos check_irrel (lft1, (term1,[])) (lft2, (term2,[])) cuniv
 
 (* Conversion between [lft1](hd1 v1) and [lft2](hd2 v2) *)
-and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
+and eqappr cv_pb l2r infos check_irrel (lft1,st1) (lft2,st2) cuniv =
   Util.check_for_interrupt ();
   (* First head reduce both terms *)
   let rec whd_both (t1,stk1) (t2,stk2) =
@@ -258,7 +286,11 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
   (* compute the lifts that apply to the head of the term (hd1 and hd2) *)
   let el1 = el_stack lft1 v1 in
   let el2 = el_stack lft2 v2 in
-  match (fterm_of hd1, fterm_of hd2) with
+  let f1 = fterm_of hd1 and f2 = fterm_of hd2 in
+  if check_irrel && is_irrelevant_fconstr (snd infos) el1 (hd1,v1)
+    && is_irrelevant_fconstr (snd infos) el2 (hd2,v2)
+  then cuniv else
+  match (f1, f2) with
     (* case of leaves *)
     | (FAtom a1, FAtom a2) ->
 	(match kind_of_term a1, kind_of_term a2 with
@@ -308,7 +340,9 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
                     (match unfold_reference infos fl1 with
                     | Some def1 -> ((lft1, whd_stack (snd infos) def1 v1), appr2)
 		    | None -> raise NotConvertible) in
-          eqappr cv_pb l2r infos app1 app2 cuniv)
+	    (* FIXME: checking irrelevance as one might eliminate non-singleton Props into Type,
+	       which is WRONG. Just to make WF go through. *)
+          eqappr cv_pb l2r infos true app1 app2 cuniv)
 
     (* other constructors *)
     | (FLambda _, FLambda _) ->
@@ -316,43 +350,64 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
            we throw them away *)
         if not (is_empty_stack v1 && is_empty_stack v2) then
 	  anomaly "conversion was given ill-typed terms (FLambda)";
-        let (_,ty1,bd1) = destFLambda mk_clos hd1 in
+        let (na,ty1,bd1) = destFLambda mk_clos hd1 in
         let (_,ty2,bd2) = destFLambda mk_clos hd2 in
-        let u1 = ccnv CONV l2r infos el1 el2 ty1 ty2 cuniv in
-        ccnv CONV l2r infos (el_lift el1) (el_lift el2) bd1 bd2 u1
+        let u1 = ccnv CONV l2r infos false el1 el2 ty1 ty2 cuniv in
+	let infos' = fst infos, push_var na (snd infos) in
+        ccnv CONV l2r infos' false (el_lift el1) (el_lift el2) bd1 bd2 u1
 
-    | (FProd (_,c1,c2), FProd (_,c'1,c'2)) ->
+    | (FProd (_,c1,c2), FProd (na,c'1,c'2)) ->
         if not (is_empty_stack v1 && is_empty_stack v2) then
 	  anomaly "conversion was given ill-typed terms (FProd)";
 	(* Luo's system *)
-        let u1 = ccnv CONV l2r infos el1 el2 c1 c'1 cuniv in
-        ccnv cv_pb l2r infos (el_lift el1) (el_lift el2) c2 c'2 u1
+        let u1 = ccnv CONV l2r infos false el1 el2 c1 c'1 cuniv in
+	let infos' = fst infos, push_var na (snd infos) in
+        ccnv cv_pb l2r infos' false (el_lift el1) (el_lift el2) c2 c'2 u1
 
     (* Eta-expansion on the fly *)
     | (FLambda _, _) ->
         if v1 <> [] then
 	  anomaly "conversion was given unreduced term (FLambda)";
-        let (_,_ty1,bd1) = destFLambda mk_clos hd1 in
-	eqappr CONV l2r infos
-	  (el_lift lft1, (bd1, [])) (el_lift lft2, (hd2, eta_expand_stack v2)) cuniv
+        let ((_, (ann, _) as na),_ty1,bd1) = destFLambda mk_clos hd1 in
+	let infos' = fst infos, push_var na (snd infos) in
+	eqappr CONV l2r infos' false
+	  (el_lift lft1, (bd1, [])) (el_lift lft2, (hd2, eta_expand_stack ann v2)) cuniv
     | (_, FLambda _) ->
         if v2 <> [] then
 	  anomaly "conversion was given unreduced term (FLambda)";
-        let (_,_ty2,bd2) = destFLambda mk_clos hd2 in
-	eqappr CONV l2r infos
-	  (el_lift lft1, (hd1, eta_expand_stack v1)) (el_lift lft2, (bd2, [])) cuniv
+        let ((_,(ann,_) as na),_ty2,bd2) = destFLambda mk_clos hd2 in
+	let infos' = fst infos, push_var na (snd infos) in
+	eqappr CONV l2r infos' false
+	  (el_lift lft1, (hd1, eta_expand_stack ann v1)) (el_lift lft2, (bd2, [])) cuniv
 
     (* only one constant, defined var or defined rel *)
-    | (FFlex fl1, _)      ->
+    | (FFlex fl1, c2)      ->
         (match unfold_reference infos fl1 with
            | Some def1 ->
-	       eqappr cv_pb l2r infos (lft1, whd_stack (snd infos) def1 v1) appr2 cuniv
-           | None -> raise NotConvertible)
-    | (_, FFlex fl2)      ->
+	       eqappr cv_pb l2r infos false
+	         (lft1, whd_stack (snd infos) def1 v1) appr2 cuniv
+           | None -> 
+	     match c2 with 
+	     | FConstruct (ind2,j2) ->
+	       (try
+		  let appr1' = eta_expand_ind_stack (snd infos) lft2 ind2 hd2 v2 appr1 in
+		    eqappr CONV l2r infos false appr1' appr2 cuniv
+		with Not_found -> raise NotConvertible)
+	     | _ -> raise NotConvertible)
+
+    | (c1, FFlex fl2)      ->
         (match unfold_reference infos fl2 with
            | Some def2 ->
-	       eqappr cv_pb l2r infos appr1 (lft2, whd_stack (snd infos) def2 v2) cuniv
-           | None -> raise NotConvertible)
+	       eqappr cv_pb l2r infos false
+	         appr1 (lft2, whd_stack (snd infos) def2 v2) cuniv
+	   | None ->
+	     match c1 with 
+	     | FConstruct (ind1,j1) ->
+	       (try
+		  let appr2' = eta_expand_ind_stack (snd infos) lft1 ind1 hd1 v1 appr2 in
+		    eqappr CONV l2r infos false appr1 appr2' cuniv
+		with Not_found -> raise NotConvertible)
+	     | _ -> raise NotConvertible)
 
     (* Inductive types:  MutInd MutConstruct Fix Cofix *)
 
@@ -368,7 +423,17 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
           convert_stacks l2r infos lft1 lft2 v1 v2 cuniv
         else raise NotConvertible
 
-    | (FFix ((op1,(_,tys1,cl1)),e1), FFix((op2,(_,tys2,cl2)),e2)) ->
+    | (FConstruct (ind1,j1), _) ->
+      (try let appr2' = eta_expand_ind_stack (snd infos) lft1 ind1 hd1 v1 appr2 in
+	 eqappr CONV l2r infos false appr1 appr2' cuniv
+       with Not_found -> raise NotConvertible)
+
+    | (_, FConstruct (ind2,j2)) ->
+      (try let appr1' = eta_expand_ind_stack (snd infos) lft2 ind2 hd2 v2 appr1 in
+	 eqappr CONV l2r infos false appr1' appr2 cuniv
+       with Not_found -> raise NotConvertible)
+	   
+    | (FFix ((op1,(n1,tys1,cl1)),e1), FFix((op2,(_,tys2,cl2)),e2)) ->
 	if op1 = op2
 	then
 	  let n = Array.length cl1 in
@@ -377,13 +442,14 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
           let fcl1 = Array.map (mk_clos (subs_liftn n e1)) cl1 in
           let fcl2 = Array.map (mk_clos (subs_liftn n e2)) cl2 in
 	  let u1 = convert_vect l2r infos el1 el2 fty1 fty2 cuniv in
+	  let infos' = fst infos, Array.fold_right (fun (na,an) -> push_var (na, (an,false))) n1 (snd infos) in
           let u2 =
-            convert_vect l2r infos
+            convert_vect l2r infos'
 	      (el_liftn n el1) (el_liftn n el2) fcl1 fcl2 u1 in
           convert_stacks l2r infos lft1 lft2 v1 v2 u2
         else raise NotConvertible
 
-    | (FCoFix ((op1,(_,tys1,cl1)),e1), FCoFix((op2,(_,tys2,cl2)),e2)) ->
+    | (FCoFix ((op1,(n1,tys1,cl1)),e1), FCoFix((op2,(_,tys2,cl2)),e2)) ->
         if op1 = op2
         then
 	  let n = Array.length cl1 in
@@ -392,8 +458,9 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
           let fcl1 = Array.map (mk_clos (subs_liftn n e1)) cl1 in
           let fcl2 = Array.map (mk_clos (subs_liftn n e2)) cl2 in
           let u1 = convert_vect l2r infos el1 el2 fty1 fty2 cuniv in
+	  let infos' = fst infos, Array.fold_right (fun (na,an) -> push_var (na, (an,false))) n1 (snd infos) in
           let u2 =
-	    convert_vect l2r infos
+	    convert_vect l2r infos'
 	      (el_liftn n el1) (el_liftn n el2) fcl1 fcl2 u1 in
           convert_stacks l2r infos lft1 lft2 v1 v2 u2
         else raise NotConvertible
@@ -408,7 +475,7 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
 
 and convert_stacks l2r infos lft1 lft2 stk1 stk2 cuniv =
   compare_stacks
-    (fun (l1,t1) (l2,t2) c -> ccnv CONV l2r infos l1 l2 t1 t2 c)
+    (fun (l1,t1) (l2,t2) c -> ccnv CONV l2r infos false l1 l2 t1 t2 c)
     (eq_ind)
     lft1 stk1 lft2 stk2 cuniv
 
@@ -420,14 +487,14 @@ and convert_vect l2r infos lft1 lft2 v1 v2 cuniv =
     let rec fold n univ =
       if n >= lv1 then univ
       else
-        let u1 = ccnv CONV l2r infos lft1 lft2 v1.(n) v2.(n) univ in
+        let u1 = ccnv CONV l2r infos false lft1 lft2 v1.(n) v2.(n) univ in
         fold (n+1) u1 in
     fold 0 cuniv
   else raise NotConvertible
 
 let clos_fconv trans cv_pb l2r evars env t1 t2 =
   let infos = trans, create_clos_infos ~evars betaiotazeta env in
-  ccnv cv_pb l2r infos el_id el_id (inject t1) (inject t2) empty_constraint
+  ccnv cv_pb l2r infos true el_id el_id (inject t1) (inject t2) empty_constraint
 
 let trans_fconv reds cv_pb l2r evars env t1 t2 =
   if eq_constr t1 t2 then empty_constraint
@@ -465,10 +532,14 @@ let vm_conv cv_pb env t1 t2 =
       (* If compilation fails, fall-back to closure conversion *)
       fconv cv_pb false (fun _->None) env t1 t2
 
+let _ = Closure.set_conv_forward 
+  (fun infos t1 t2 -> ccnv CONV false (full_transparent_state, infos)
+   true el_id el_id t1 t2 empty_constraint)
 
 let default_conv = ref (fun cv_pb ?(l2r=false) -> fconv cv_pb l2r (fun _->None))
 
-let set_default_conv f = default_conv := f
+let set_default_conv f = 
+  default_conv := f
 
 let default_conv cv_pb ?(l2r=false) env t1 t2 =
   try
@@ -511,9 +582,9 @@ let hnf_prod_applist env t nl =
 let dest_prod env =
   let rec decrec env m c =
     let t = whd_betadeltaiota env c in
-    match kind_of_term t with
-      | Prod (n,a,c0) ->
-          let d = (n,None,a) in
+    match Constr.kind_of_term t with
+      | Constr.Prod (n,a,c0) ->
+          let d = var_decl_of n a in
 	  decrec (push_rel d env) (add_rel_decl d m) c0
       | _ -> m,t
   in
@@ -523,14 +594,14 @@ let dest_prod env =
 let dest_prod_assum env =
   let rec prodec_rec env l ty =
     let rty = whd_betadeltaiota_nolet env ty in
-    match kind_of_term rty with
-    | Prod (x,t,c)  ->
-        let d = (x,None,t) in
+    match Constr.kind_of_term rty with
+    | Constr.Prod (x,t,c)  ->
+        let d = var_decl_of x t in
 	prodec_rec (push_rel d env) (add_rel_decl d l) c
-    | LetIn (x,b,t,c) ->
-        let d = (x,Some b,t) in
+    | Constr.LetIn (x,b,t,c) ->
+        let d = def_decl_of x b t in
 	prodec_rec (push_rel d env) (add_rel_decl d l) c
-    | Cast (c,_,_)    -> prodec_rec env l c
+    | Constr.Cast (c,_,_)    -> prodec_rec env l c
     | _               -> l,rty
   in
   prodec_rec env empty_rel_context

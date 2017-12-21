@@ -26,6 +26,7 @@ open Nametab
 open Miniml
 open Table
 open Mlutil
+open Constr
 (*i*)
 
 exception I of inductive_kind
@@ -75,7 +76,7 @@ type flag = info * scheme
 let rec flag_of_type env t =
   let t = whd_betadeltaiota env none t in
   match kind_of_term t with
-    | Prod (x,t,c) -> flag_of_type (push_rel (x,None,t) env) c
+    | Prod (x,t,c) -> flag_of_type (push_rel (var_decl_of x t) env) c
     | Sort (Prop Null) -> (Logic,TypeScheme)
     | Sort _ -> (Info,TypeScheme)
     | _ -> if (sort_of env t) = InProp then (Logic,Default) else (Info,Default)
@@ -119,7 +120,7 @@ let rec type_sign_vl env c =
     | Prod (n,t,d) ->
 	let s,vl = type_sign_vl (push_rel_assum (n,t) env) d in
 	if not (is_info_scheme env t) then Kill Kother::s, vl
-	else Keep::s, (next_ident_away (id_of_name n) vl) :: vl
+	else Keep::s, (next_ident_away (id_of_name (fst n)) vl) :: vl
     | _ -> [],[]
 
 let rec nb_default_params env c =
@@ -228,7 +229,7 @@ let mib_equal m1 m2 =
 
 let rec extract_type env db j c args =
   match kind_of_term (whd_betaiotazeta Evd.empty c) with
-    | App (d, args') ->
+    | App (d, _, args') ->
 	(* We just accumulate the arguments. *)
 	extract_type env db j d (Array.to_list args' @ args)
     | Lambda (_,_,d) ->
@@ -259,10 +260,10 @@ let rec extract_type env db j c args =
 		      let reason = if lvl=TypeScheme then Ktype else Kother in
 		      Tarr (Tdummy reason, mld)))
     | Sort _ -> Tdummy Ktype (* The two logical cases. *)
-    | _ when sort_of env (applist (c, args)) = InProp -> Tdummy Kother
+    | _ when sort_of env (Term.applist (c, args)) = InProp -> Tdummy Kother
     | Rel n ->
-	(match lookup_rel n env with
-           | (_,Some t,_) -> extract_type env db j (lift n t) args
+	(match rel_value n env with
+           | Some t -> extract_type env db j (lift n t) args
 	   | _ ->
 	       (* Asks [db] a translation for [n]. *)
 	       if n > List.length db then Tunknown
@@ -280,7 +281,7 @@ let rec extract_type env db j c args =
 		  | Undef _ | OpaqueDef _ -> mlt
 		  | Def _ when is_custom r -> mlt
 		  | Def lbody ->
-		      let newc = applist (Declarations.force lbody, args) in
+		      let newc = Term.applist (Declarations.force lbody, args) in
 		      let mlt' = extract_type env db j newc [] in
 		      (* ML type abbreviations interact badly with Coq *)
 		      (* reduction, so [mlt] and [mlt'] might be different: *)
@@ -294,7 +295,7 @@ let rec extract_type env db j c args =
 		  | Undef _  | OpaqueDef _ -> Tunknown (* Brutal approx ... *)
 		  | Def lbody ->
 		      (* We try to reduce. *)
-		      let newc = applist (Declarations.force lbody, args) in
+		      let newc = Term.applist (Declarations.force lbody, args) in
 		      extract_type env db j newc []))
     | Ind (kn,i) ->
 	let s = (extract_ind env kn).ind_packets.(i).ip_sign in
@@ -407,7 +408,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	  let prods,head = dest_prod epar t in
 	  let nprods = List.length prods in
           let args = match kind_of_term head with
-            | App (f,args) -> args (* [kind_of_term f = Ind ip] *)
+            | App (f,_,args) -> args (* [kind_of_term f = Ind ip] *)
             | _ -> [||]
           in
 	  let dbmap = parse_ind_args p.ip_sign args (nprods + npar) in
@@ -432,7 +433,7 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	    List.length l = 1 && not (type_mem_kn kn (List.hd l))
 	then raise (I Singleton);
 	if l = [] then raise (I Standard);
-	if not mib.mind_record then raise (I Standard);
+	if mib.mind_record = None then raise (I Standard);
 	(* Now we're sure it's a record. *)
 	(* First, we find its field names. *)
 	let rec names_prod t = match kind_of_term t with
@@ -450,9 +451,9 @@ and extract_ind env kn = (* kn is supposed to be in long form *)
 	  | [],[] -> []
 	  | _::l, typ::typs when isDummy (expand env typ) ->
 	      select_fields l typs
-	  | Anonymous::l, typ::typs ->
+	  | (Anonymous,_)::l, typ::typs ->
 	      None :: (select_fields l typs)
-	  | Name id::l, typ::typs ->
+	  | (Name id,_)::l, typ::typs ->
 	      let knp = make_con mp d (label_of_id id) in
 	      (* Is it safe to use [id] for projections [foo.id] ? *)
 	      if List.for_all ((=) Keep) (type2signature env typ)
@@ -555,17 +556,17 @@ let record_constant_type env kn opt_typ =
 
 let rec extract_term env mle mlt c args =
   match kind_of_term c with
-    | App (f,a) ->
+    | App (f,_,a) ->
 	extract_term env mle mlt f (Array.to_list a @ args)
-    | Lambda (n, t, d) ->
+    | Lambda ((n,(an,_)) as na, t, d) ->
 	let id = id_of_name n in
 	(match args with
 	   | a :: l ->
 	       (* We make as many [LetIn] as possible. *)
- 	       let d' = mkLetIn (Name id,a,t,applistc d (List.map (lift 1) l))
+ 	       let d' = mkLetIn ((Name id,an),a,t,Term.applistc d (List.map (lift 1) l))
 	       in extract_term env mle mlt d' []
 	   | [] ->
-	       let env' = push_rel_assum (Name id, t) env in
+	       let env' = push_rel (var_decl_of na t) env in
 	       let id, a =
 		 try check_default env t; Id id, new_meta()
 		 with NotDefault d -> Dummy, Tdummy d
@@ -575,9 +576,9 @@ let rec extract_term env mle mlt c args =
 	       let magic = needs_magic (mlt, Tarr (a, b)) in
 	       let d' = extract_term env' (Mlenv.push_type mle a) b d [] in
 	       put_magic_if magic (MLlam (id, d')))
-    | LetIn (n, c1, t1, c2) ->
+    | LetIn ((n,an) as na, c1, t1, c2) ->
 	let id = id_of_name n in
-	let env' = push_rel (Name id, Some c1, t1) env in
+	let env' = push_rel (def_decl_of na c1 t1) env in
 	(* We directly push the args inside the [LetIn].
            TODO: the opt_let_app flag is supposed to prevent that *)
 	let args' = List.map (lift 1) args in
@@ -837,7 +838,7 @@ and extract_fix env mle i (fi,ti,ci as recd) mlt =
   metas.(i) <- mlt;
   let mle = Array.fold_left Mlenv.push_type mle metas in
   let ei = array_map2 (extract_maybe_term env mle) metas ci in
-  MLfix (i, Array.map id_of_name fi, ei)
+  MLfix (i, Array.map (fun (i, _) -> id_of_name i) fi, ei)
 
 (*S ML declarations. *)
 
@@ -847,19 +848,19 @@ and extract_fix env mle i (fi,ti,ci as recd) mlt =
 let rec decomp_lams_eta_n n m env c t =
   let rels = fst (splay_prod_n env none n t) in
   let rels = List.map (fun (id,_,c) -> (id,c)) rels in
-  let rels',c = decompose_lam c in
+  let rels',c = Term.decompose_lam c in
   let d = n - m in
   (* we'd better keep rels' as long as possible. *)
   let rels = (list_firstn d rels) @ rels' in
   let eta_args = List.rev_map mkRel (interval 1 d) in
-  rels, applist (lift d c,eta_args)
+  rels, Term.applist (lift d c,eta_args)
 
 (* Let's try to identify some situation where extracted code
    will allow generalisation of type variables *)
 
 let rec gentypvar_ok c = match kind_of_term c with
   | Lambda _ | Const _ -> true
-  | App (c,v) ->
+  | App (c,_,v) ->
       (* if all arguments are variables, these variables will
 	 disappear after extraction (see [empty_s] below) *)
       array_for_all isRel v && gentypvar_ok c
@@ -915,7 +916,9 @@ let extract_std_constant env kn body typ =
   (* The lambdas names. *)
   let ids = List.map (fun (n,_) -> Id (id_of_name n)) rels in
   (* The according Coq environment. *)
-  let env = push_rels_assum rels env in
+  let env = push_rels_assum
+    (List.map (fun (na, t) -> binder_annot_of na, t) rels) env 
+  in
   (* The real extraction: *)
   let e = extract_term env mle t' c [] in
   (* Expunging term and type from dummy lambdas. *)

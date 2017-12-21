@@ -39,7 +39,7 @@ type object_pr = {
   print_syntactic_def       : kernel_name -> std_ppcmds;
   print_module              : bool -> Names.module_path -> std_ppcmds;
   print_modtype             : module_path -> std_ppcmds;
-  print_named_decl          : identifier * constr option * types -> std_ppcmds;
+  print_named_decl          : identifier declaration -> std_ppcmds;
   print_library_entry       : bool -> (object_name * Lib.node) -> std_ppcmds option;
   print_context             : bool -> int option -> Lib.library_segment -> std_ppcmds;
   print_typed_value_in_env  : Environ.env -> Term.constr * Term.types -> Pp.std_ppcmds;
@@ -128,7 +128,7 @@ let print_renames_list prefix l =
 let need_expansion impl ref =
   let typ = Global.type_of_global ref in
   let ctx = (prod_assum typ) in
-  let nprods = List.length (List.filter (fun (_,b,_) -> b=None) ctx) in
+  let nprods = List.length (List.filter (fun (_,b,_) -> is_variable_body b) ctx) in
   impl <> [] & List.length impl >= nprods &
     let _,lastimpl = list_chop nprods impl in
       List.filter is_status_implicit lastimpl <> []
@@ -199,7 +199,7 @@ type opacity =
   | TransparentMaybeOpacified of Conv_oracle.level
 
 let opacity env = function
-  | VarRef v when pi2 (Environ.lookup_named v env) <> None ->
+  | VarRef v when Environ.named_value v env <> None ->
       Some(TransparentMaybeOpacified (Conv_oracle.get_strategy(VarKey v)))
   | ConstRef cst ->
       let cb = Environ.lookup_constant cst env in
@@ -375,8 +375,8 @@ let print_named_assum name typ =
 let gallina_print_named_decl (id,c,typ) =
   let s = string_of_id id in
   match c with
-    | Some body -> print_named_def s body typ
-    | None -> print_named_assum s typ
+  | Definition (_, body) -> print_named_def s body typ
+  | Variable _ -> print_named_assum s typ
 
 let assumptions_for_print lna =
   List.fold_right (fun na env -> add_name na env) lna empty_names_context
@@ -410,7 +410,7 @@ let print_typed_body (val_0,typ) =
 
 let ungeneralized_type_of_constant_type = function
   | PolymorphicArity (ctx,a) -> mkArity (ctx, Type a.poly_level)
-  | NonPolymorphicType t -> t
+  | NonPolymorphicType (t,_) -> t
 
 let print_constant with_values sep sp =
   let cb = Global.lookup_constant sp in

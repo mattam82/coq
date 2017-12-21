@@ -223,35 +223,42 @@ let combine_params avoid fn applied needed =
     (fun x -> match x with (t, Some (loc, ExplByName id)) -> id, t | _ -> assert false)
     named
   in
-  let needed = List.filter (fun (_, (_, b, _)) -> b = None) needed in
-  let rec aux ids avoid app need =
+  let needed = List.filter (fun (_, (_, b, _)) -> is_variable_body b) needed in
+  let add_kind x b kinds = match x with
+    | CRef (Ident (_, id)) -> (id, annot_of_body b) :: kinds
+    | _ -> kinds
+  in
+  let rec aux ids avoid kinds app need =
     match app, need with
-	[], [] -> List.rev ids, avoid
+	[], [] -> List.rev ids, avoid, kinds
 
-      | app, (_, (Name id, _, _)) :: need when List.mem_assoc id named ->
-	  aux (List.assoc id named :: ids) avoid app need
+      | app, (_, (Name id, b, _)) :: need when List.mem_assoc id named ->
+	  aux (List.assoc id named :: ids) avoid ((id, annot_of_body b) :: kinds) app need
 
-      | (x, None) :: app, (None, (Name id, _, _)) :: need ->
-	  aux (x :: ids) avoid app need
+      | (x, None) :: app, (None, (Name id, b, _)) :: need ->
+	let kinds' = add_kind x b kinds in
+	  aux (x :: ids) avoid kinds' app need
 
-      | _, (Some cl, (_, _, _) as d) :: need ->
-	  let t', avoid' = fn avoid d in
-	    aux (t' :: ids) avoid' app need
+      | _, (Some cl, (_, b, _) as d) :: need ->
+	let id', t', avoid' = fn avoid d in
+	  aux (t' :: ids) avoid' ((id', annot_of_body b) :: kinds) app need
 
-      | x :: app, (None, _) :: need -> aux (fst x :: ids) avoid app need
+      | x :: app, (None, (_, b, _)) :: need -> 
+	let kinds' = add_kind (fst x) b kinds in
+	  aux (fst x :: ids) avoid kinds' app need
 
-      | [], (None, _ as decl) :: need ->
-	  let t', avoid' = fn avoid decl in
-	    aux (t' :: ids) avoid' app need
+      | [], (None, (_, b, _) as decl) :: need ->
+	  let id', t', avoid' = fn avoid decl in
+	    aux (t' :: ids) avoid' ((id', annot_of_body b) :: kinds) app need
 
       | (x,_) :: _, [] ->
 	  user_err_loc (constr_loc x,"",str "Typeclass does not expect more arguments")
-  in aux [] avoid applied needed
+  in aux [] avoid [] applied needed
 
 let combine_params_freevar =
   fun avoid (_, (na, _, _)) ->
     let id' = next_name_away_from na avoid in
-      (CRef (Ident (dummy_loc, id')), Idset.add id' avoid)
+      (id', CRef (Ident (dummy_loc, id')), Idset.add id' avoid)
 
 let destClassApp cl =
   match cl with
@@ -276,27 +283,29 @@ let implicit_application env ?(allow_partial=true) f ty =
     with Not_found -> None
   in
     match is_class with
-    | None -> ty, env
+    | None -> ty, env, []
     | Some ((loc, id, par), gr) ->
 	let avoid = Idset.union env (ids_of_list (free_vars_of_constr_expr ty ~bound:env [])) in
-	let c, avoid =
-	  let c = class_info gr in
-	  let (ci, rd) = c.cl_context in
+	let c = class_info gr in
+	let (ci, rd) = c.cl_context in
 	  if not allow_partial then
 	    begin
-	      let applen = List.fold_left (fun acc (x, y) -> if y = None then succ acc else acc) 0 par in
-	      let needlen = List.fold_left (fun acc x -> if x = None then succ acc else acc) 0 ci in
+	      let applen = List.fold_left
+		(fun acc (x, y) -> if y = None then succ acc else acc) 0 par 
+	      in
+	      let needlen = List.fold_left
+		(fun acc x -> if x = None then succ acc else acc) 0 ci in
 		if needlen <> applen then
-		  Typeclasses_errors.mismatched_ctx_inst (Global.env ()) Parameters (List.map fst par) rd
+		  Typeclasses_errors.mismatched_ctx_inst
+		  (Global.env ()) Parameters (List.map fst par) rd
 	    end;
 	  let pars = List.rev (List.combine ci rd) in
-	  let args, avoid = combine_params avoid f par pars in
-	    CAppExpl (loc, (None, id), args), avoid
-	in c, avoid
+	  let args, avoid, kinds = combine_params avoid f par pars in
+	    CAppExpl (loc, (None, id), args), avoid, kinds
 
 let implicits_of_glob_constr ?(with_products=true) l =
   let add_impl i na bk l =
- 	if bk = Implicit then
+ 	if fst bk = Lib.Implicit then
 	  let name =
 	    match na with
 	    | Name id -> Some id
@@ -312,7 +321,7 @@ let implicits_of_glob_constr ?(with_products=true) l =
       | GProd (loc, na, bk, t, b) ->
 	  if with_products then abs na bk b
 	  else 
-	    (if bk = Implicit then
+	    (if fst bk = Lib.Implicit then
 	       msg_warning (str "Ignoring implicit status of product binder " ++ 
 			      pr_name na ++ str " and following binders");
 	     [])

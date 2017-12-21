@@ -61,7 +61,7 @@ let finished = function
   | _  -> false
 
 (* Returns the current value of the proofview partial proofs. *)
-let return { initial=init; solution=defs }  =
+let return { initial=init; solution=defs } =
   List.map (fun (c,t) -> (Evarutil.nf_evar defs c , t)) init
 
 (* spiwack: this function should probably go in the Util section,

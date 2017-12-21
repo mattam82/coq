@@ -207,9 +207,9 @@ let assumptions ?(add_opaque=false) st (* t *) =
   and add_id id s acc =
     (* a Var can be either a variable, or a "Let" definition.*)
     match Global.lookup_named id with
-    | (_,None,t) ->
+    | (_,Term.Variable _,t) ->
         (s,ContextObjectMap.add (Variable id) t acc)
-    | (_,Some bdy,_) -> do_constr bdy s acc
+    | (_,Definition (_, bdy),_) -> do_constr bdy s acc
 
   and do_memoize_id id =
     try_and_go (Variable id) (add_id id)
@@ -220,7 +220,7 @@ let assumptions ?(add_opaque=false) st (* t *) =
       let ctype =
 	match cb.Declarations.const_type with
 	| PolymorphicArity (ctx,a) -> mkArity (ctx, Type a.poly_level)
-	| NonPolymorphicType t -> t
+	| NonPolymorphicType (t,r) -> t
       in
 	(s,ContextObjectMap.add cst ctype acc)
     in

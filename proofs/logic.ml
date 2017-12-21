@@ -27,6 +27,7 @@ open Type_errors
 open Retyping
 open Evarutil
 open Tacexpr
+open Constr
 
 type refiner_error =
 
@@ -113,20 +114,21 @@ let recheck_typability (what,id) env sigma t =
     error
       ("The correctness of "^s^" relies on the body of "^(string_of_id id))
 
+(* FIXME: cut and paste with goal *)
 let remove_hyp_body env sigma id =
   let sign =
     apply_to_hyp_and_dependent_on (named_context_val env) id
       (fun (_,c,t) _ ->
 	match c with
-	| None -> error ((string_of_id id)^" is not a local definition.")
-	| Some c ->(id,None,t))
+	| Variable _ -> Errors.error ((Names.string_of_id id)^" is not a local definition")
+	| Definition (ann, c) ->(id,Variable (ann, false),t))
       (fun (id',c,t as d) sign ->
 	(if !check then
 	  begin
 	    let env = reset_with_named_context sign env in
 	    match c with
-	    | None ->  recheck_typability (Some id',id) env sigma t
-	    | Some b ->
+	    | Variable _ ->  recheck_typability (Some id',id) env sigma t
+	    | Definition (_, b) ->
 		let b' = mkCast (b,DEFAULTcast, t) in
 		recheck_typability (Some id',id) env sigma b'
 	  end;d))
@@ -352,7 +354,7 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	  let (gls,cty,sigma,trm) = res in
 	  (gls,cty,sigma,mkCast(trm,k,ty))
 
-    | App (f,l) ->
+    | App (f,a,l) ->
 	let (acc',hdty,sigma,applicand) =
 	  match kind_of_term f with
 	    | Ind _ | Const _
@@ -367,7 +369,7 @@ let rec mk_refgoals sigma goal goalacc conclty trm =
 	let (acc'',conclty',sigma, args) =
 	  mk_arggoals sigma goal acc' hdty (Array.to_list l) in
 	check_conv_leq_goal env sigma trm conclty' conclty;
-        (acc'',conclty',sigma, Term.mkApp (applicand, Array.of_list args))
+        (acc'',conclty',sigma, mkApp (applicand, a, Array.of_list args))
 
     | Case (ci,p,c,lf) ->
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
@@ -406,7 +408,7 @@ and mk_hdgoals sigma goal goalacc trm =
 	check_typability env sigma ty;
 	mk_refgoals sigma goal goalacc ty t
 
-    | App (f,l) ->
+    | App (f,a,l) ->
 	let (acc',hdty,sigma,applicand) =
 	  if isInd f or isConst f
 	     & not (array_exists occur_meta l) (* we could be finer *)
@@ -416,7 +418,7 @@ and mk_hdgoals sigma goal goalacc trm =
 	in
 	let (acc'',conclty',sigma, args) =
 	  mk_arggoals sigma goal acc' hdty (Array.to_list l) in
-	(acc'',conclty',sigma, Term.mkApp (applicand, Array.of_list args))
+	(acc'',conclty',sigma, mkApp (applicand, a, Array.of_list args))
 
     | Case (ci,p,c,lf) ->
 	let (acc',lbrty,conclty',sigma,p',c') = mk_casegoals sigma goal goalacc p c in
@@ -450,12 +452,12 @@ and mk_arggoals sigma goal goalacc funty = function
 and mk_casegoals sigma goal goalacc p c =
   let env = Goal.V82.env sigma goal in
   let (acc',ct,sigma,c') = mk_hdgoals sigma goal goalacc c in
-  let (acc'',pt,sigma,p') = mk_hdgoals sigma goal acc' p in
+  let (acc'',pt,sigma,p') = mk_hdgoals sigma goal acc' (case_pred p) in
   let indspec =
     try Tacred.find_hnf_rectype env sigma ct
     with Not_found -> anomaly "mk_casegoals" in
   let (lbrty,conclty) =
-    type_case_branches_with_names env indspec p c in
+    type_case_branches_with_names env indspec (case_pred p) c in
   (acc'',lbrty,conclty,sigma,p',c')
 
 
@@ -468,7 +470,7 @@ let convert_hyp sign sigma (id,b,bt as d) =
         let env = Global.env_of_context sign in
         if !check && not (is_conv env sigma bt ct) then
 	  error ("Incorrect change of the type of "^(string_of_id id)^".");
-        if !check && not (Option.Misc.compare (is_conv env sigma) b c) then
+        if !check && not (compare_body (is_conv env sigma) b c) then
 	  error ("Incorrect change of the body of "^(string_of_id id)^".");
        if !check then reorder := check_decl_position env sign d;
        d) in
@@ -492,59 +494,65 @@ let prim_refiner r sigma goal =
     | Intro id ->
     	if !check && mem_named_context id (named_context_of_val sign) then
 	  error ("Variable " ^ string_of_id id ^ " is already declared.");
-        (match kind_of_term (strip_outer_cast cl) with
-	   | Prod (_,c1,b) ->
-	       let (sg,ev,sigma) = mk_goal (push_named_context_val (id,None,c1) sign)
-			  (subst1 (mkVar id) b) in
+        (match Constr.kind_of_term (strip_outer_cast cl) with
+	   | Constr.Prod (na,c1,b) ->
+	       let decl = var_decl_of (map_binder (fun _ -> id) na) c1 in
+	       let ctxval = push_named_context_val decl sign in
+	       let (sg,ev,sigma) = mk_goal ctxval (subst1 (mkVar id) b) in
                let sigma = 
-		 Goal.V82.partial_solution sigma goal (mkNamedLambda id c1 ev) in
+		 Goal.V82.partial_solution sigma goal 
+		   (mkNamedLambda_or_LetIn decl ev) in
 	       ([sg], sigma)
-	   | LetIn (_,c1,t1,b) ->
+	   | Constr.LetIn (na,c1,t1,b) ->
+	       let decl = def_decl_of (map_letbinder (fun _ -> id) na) c1 t1 in
 	       let (sg,ev,sigma) =
-		 mk_goal (push_named_context_val (id,Some c1,t1) sign)
+		 mk_goal (push_named_context_val decl sign)
 		   (subst1 (mkVar id) b) in
 	       let sigma = 
-		 Goal.V82.partial_solution sigma goal (mkNamedLetIn id c1 t1 ev) in
+		 Goal.V82.partial_solution sigma goal 
+		   (mkNamedLambda_or_LetIn decl ev) in
 	       ([sg], sigma)
 	   | _ ->
 	       raise (RefinerError IntroNeedsProduct))
 
     | Cut (b,replace,id,t) ->
         let (sg1,ev1,sigma) = mk_goal sign (nf_betaiota sigma t) in
+	let rel = Retyping.get_relevance_of env sigma t in
+	let na = (id, (rel, false)) in
 	let sign,cl,sigma =
 	  if replace then
 	    let nexthyp = get_hyp_after id (named_context_of_val sign) in
 	    let sign,cl,sigma = clear_hyps sigma [id] sign cl in
-	    move_hyp true false ([],(id,None,t),named_context_of_val sign)
+	    move_hyp true false ([],(var_decl_of na t),named_context_of_val sign)
 	      nexthyp,
 	      cl,sigma
 	  else
             (if !check && mem_named_context id (named_context_of_val sign) then
 	      error ("Variable " ^ string_of_id id ^ " is already declared.");
-	     push_named_context_val (id,None,t) sign,cl,sigma) in
+	     push_named_context_val (var_decl_of na t) sign,cl,sigma) in
         let (sg2,ev2,sigma) = 
 	  Goal.V82.mk_goal sigma sign cl (Goal.V82.extra sigma goal) in
-	let oterm = Term.mkApp (Term.mkNamedLambda id t ev2 , [| ev1 |]) in
+	let oterm = mkApp (mkFullNamedLambda na t ev2, [| rel |], [| ev1 |]) in
 	let sigma = Goal.V82.partial_solution sigma goal oterm in
         if b then ([sg1;sg2],sigma) else ([sg2;sg1],sigma)
 
     | FixRule (f,n,rest,j) ->
      	let rec check_ind env k cl =
-          match kind_of_term (strip_outer_cast cl) with
-            | Prod (na,c1,b) ->
+          match Constr.kind_of_term (strip_outer_cast cl) with
+            | Constr.Prod (na,c1,b) ->
             	if k = 1 then
 		  try
 		    fst (find_inductive env sigma c1)
 		  with Not_found ->
 		    error "Cannot do a fixpoint on a non inductive type."
             	else
-		  check_ind (push_rel (na,None,c1) env) (k-1) b
+		  check_ind (push_rel (var_decl_of na c1) env) (k-1) b
             | _ -> error "Not enough products."
 	in
 	let (sp,_) = check_ind env n cl in
 	let firsts,lasts = list_chop j rest in
 	let all = firsts@(f,n,cl)::lasts in
-     	let rec mk_sign sign = function
+     	let rec mk_sign sign rels = function
 	  | (f,n,ar)::oth ->
 	      let (sp',_)  = check_ind env n ar in
 	      if not (sp=sp') then
@@ -553,21 +561,22 @@ let prim_refiner r sigma goal =
 	      if !check && mem_named_context f (named_context_of_val sign) then
 		error
 		  ("Name "^string_of_id f^" already used in the environment");
-	      mk_sign (push_named_context_val (f,None,ar) sign) oth
+	      let rel = relevance_of_type env ar in
+	      mk_sign (push_named_context_val (var_decl_of (f, (rel,false)) ar) sign) (rel :: rels) oth
 	  | [] ->
 	      Goal.list_map (fun sigma (_,_,c) ->
-				                   let (gl,ev,sig')=
-				                     Goal.V82.mk_goal sigma sign c
-						             (Goal.V82.extra sigma goal)
-						   in ((gl,ev),sig'))
-		                              all sigma
+			     let (gl,ev,sig')=
+			       Goal.V82.mk_goal sigma sign c
+			       (Goal.V82.extra sigma goal)
+			     in ((gl,ev),sig'))
+	        all sigma, List.rev rels
 	in
-	let (gls_evs,sigma) =  mk_sign sign all in
+	let (gls_evs,sigma), rels = mk_sign sign [] all in
 	let (gls,evs) = List.split gls_evs in
 	let ids = List.map pi1 all in
 	let evs = List.map (Term.subst_vars (List.rev ids)) evs in
 	let indxs = Array.of_list (List.map (fun n -> n-1) (List.map pi2 all)) in
-	let funnames = Array.of_list (List.map (fun i -> Name i) ids) in
+	let funnames = Array.of_list (List.map2 (fun i rel -> (Name i, rel)) ids rels) in
 	let typarray = Array.of_list (List.map pi3 all) in
 	let bodies = Array.of_list evs in
 	let oterm = Term.mkFix ((indxs,0),(funnames,typarray,bodies)) in
@@ -577,8 +586,8 @@ let prim_refiner r sigma goal =
     | Cofix (f,others,j) ->
      	let rec check_is_coind env cl =
 	  let b = whd_betadeltaiota env sigma cl in
-          match kind_of_term b with
-            | Prod (na,c1,b) -> check_is_coind (push_rel (na,None,c1) env) b
+          match Constr.kind_of_term b with
+            | Constr.Prod (na,c1,b) -> check_is_coind (push_rel (var_decl_of na c1) env) b
             | _ ->
 		try
 		  let _ = find_coinductive env sigma b in ()
@@ -589,27 +598,32 @@ let prim_refiner r sigma goal =
 	let firsts,lasts = list_chop j others in
 	let all = firsts@(f,cl)::lasts in
      	List.iter (fun (_,c) -> check_is_coind env c) all;
-        let rec mk_sign sign = function
+        let rec mk_sign sign rels = function
           | (f,ar)::oth ->
 	      (try
                 (let _ = lookup_named_val f sign in
                 error "Name already used in the environment.")
               with
               |	Not_found ->
-                  mk_sign (push_named_context_val (f,None,ar) sign) oth)
-	  | [] -> Goal.list_map (fun sigma(_,c) ->
-				                       let (gl,ev,sigma) =
-				                         Goal.V82.mk_goal sigma sign c
-							   (Goal.V82.extra sigma goal)
-						       in
-				                       ((gl,ev),sigma))
-	                                             all sigma                                      
+		let rel = relevance_of_type env ar in
+                  mk_sign (push_named_context_val (var_decl_of (f, (rel,false)) ar) sign) 
+		    (rel :: rels) oth)
+	  | [] -> 
+	    let gls = Goal.list_map 
+	      (fun sigma(_,c) ->
+	       let (gl,ev,sigma) =
+		 Goal.V82.mk_goal sigma sign c
+		 (Goal.V82.extra sigma goal)
+	       in
+		 ((gl,ev),sigma))
+	      all sigma
+	    in gls, List.rev rels        
      	in
-	let (gls_evs,sigma) =  mk_sign sign all in
+	let (gls_evs,sigma), rels =  mk_sign sign [] all in
 	let (gls,evs) = List.split gls_evs in
 	let (ids,types) = List.split all in
 	let evs = List.map (Term.subst_vars (List.rev ids)) evs in
-	let funnames = Array.of_list (List.map (fun i -> Name i) ids) in
+	let funnames = Array.of_list (List.map2 (fun i rel -> (Name i, rel)) ids rels) in
 	let typarray = Array.of_list types in
 	let bodies = Array.of_list evs in
 	let oterm = Term.mkCoFix (0,(funnames,typarray,bodies)) in

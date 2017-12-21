@@ -535,16 +535,21 @@ let set_leq_sort ({evars = (sigma, (us, sm))} as d) s1 s2 =
   | Some (u1, u2) ->
       match s1, s2 with
       | Prop c, Prop c' -> 
-	  if c = Null && c' = Pos then d
-	  else (raise (Univ.UniverseInconsistency (Univ.Le, u1, u2)))
-     | Type u, Prop c -> 
-	  if c = Pos then 
-	    add_constraints d (Univ.enforce_leq u Univ.type0_univ Univ.empty_constraint)
-	  else raise (Univ.UniverseInconsistency (Univ.Le, u1, u2))
+	if c = Null && c' = Pos && !Flags.prop_type then d
+	else (raise (Univ.UniverseInconsistency (Univ.Le, u1, u2)))
+      | Type u, Prop c -> 
+	if c = Pos then 
+	  add_constraints d (Univ.enforce_leq u Univ.type0_univ Univ.empty_constraint)
+	else raise (Univ.UniverseInconsistency (Univ.Le, u1, u2))
+      | Prop Null, Type u when not !Flags.prop_type ->
+	if Univ.is_univ_variable u then d
+	  (* TODO: ability to lower a universe variable to Prop *)
+	  (* add_constraints d (Univ.enforce_eq u1 u2 Univ.empty_constraint) *)
+	else raise (Univ.UniverseInconsistency (Univ.Le, u1, u2))
       | _, Type u ->
-	  if is_univ_var_or_set u then
-	    add_constraints d (Univ.enforce_leq u1 u2 Univ.empty_constraint)
-	  else raise (Univ.UniverseInconsistency (Univ.Le, u1, u2))
+	if is_univ_var_or_set u then
+	  add_constraints d (Univ.enforce_leq u1 u2 Univ.empty_constraint)
+	else raise (Univ.UniverseInconsistency (Univ.Le, u1, u2))
 
 let is_univ_level_var us u =
   match Univ.universe_level u with
@@ -747,8 +752,8 @@ let pr_meta_map mmap =
 
 let pr_decl ((id,b,_),ok) =
   match b with
-  | None -> if ok then pr_id id else (str "{" ++ pr_id id ++ str "}")
-  | Some c -> str (if ok then "(" else "{") ++ pr_id id ++ str ":=" ++
+  | Variable _ -> if ok then pr_id id else (str "{" ++ pr_id id ++ str "}")
+  | Definition (_, c) -> str (if ok then "(" else "{") ++ pr_id id ++ str ":=" ++
       print_constr c ++ str (if ok then ")" else "}")
 
 let pr_evar_source = function
@@ -849,8 +854,8 @@ let pr_evar_map_t depth sigma =
 
 let print_env_short env =
   let pr_body n = function None -> pr_name n | Some b -> str "(" ++ pr_name n ++ str " := " ++ print_constr b ++ str ")" in
-  let pr_named_decl (n, b, _) = pr_body (Name n) b in
-  let pr_rel_decl (n, b, _) = pr_body n b in
+  let pr_named_decl (n, b, _) = pr_body (Name n) (constr_of_body b) in
+  let pr_rel_decl (n, b, _) = pr_body n (constr_of_body b) in
   let nc = List.rev (named_context env) in
   let rc = List.rev (rel_context env) in
     str "[" ++ pr_sequence pr_named_decl nc ++ str "]" ++ spc () ++

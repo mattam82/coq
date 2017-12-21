@@ -36,6 +36,7 @@ val vm_conv : conv_pb -> constr conversion_function
 
 (* Builds an application node, reducing beta redexes it may produce. *)
 val beta_appvect : constr -> constr array -> constr
+val beta_app_argsl : constr -> constr args_list -> constr
 
 (* Pseudo-reduction rule  Prod(x,A,B) a --> B[x\a] *)
 val hnf_prod_applist : env -> constr -> constr list -> constr

@@ -72,18 +72,21 @@ Ltac simpl_existTs := repeat simpl_existT.
 
 (** Tries to eliminate a call to [eq_rect] (the substitution principle) by any means available. *)
 
+Lemma K : forall A (P : A -> Type) (x : A) (t : P x) (p : x = x), @eq_rect A x P t x p = t.
+Proof. intros. unfold eq_rect. reflexivity. Qed.
+
 Ltac elim_eq_rect :=
   match goal with
     | [ |- ?t ] =>
       match t with
-        | context [ @eq_rect _ _ _ _ _ ?p ] =>
+        | context [ @eq_rect ?A ?x _ _ _ ?p ] =>
           let P := fresh "P" in
             set (P := p); simpl in P ;
-	      ((case P ; clear P) || (clearbody P; rewrite (UIP_refl _ _ P); clear P))
-        | context [ @eq_rect _ _ _ _ _ ?p _ ] =>
+	      ((case P ; clear P) || (clearbody P; change P with (@eq_refl A x); clear P))
+        | context [ @eq_rect ?A ?x _ _ _ ?p _ ] =>
           let P := fresh "P" in
             set (P := p); simpl in P ;
-	      ((case P ; clear P) || (clearbody P; rewrite (UIP_refl _ _ P); clear P))
+	      ((case P ; clear P) || (clearbody P; change P with (@eq_refl A x); clear P))
       end
   end.
 
@@ -91,7 +94,7 @@ Ltac elim_eq_rect :=
 
 Ltac simpl_uip :=
   match goal with
-    [ H : ?X = ?X |- _ ] => rewrite (UIP_refl _ _ H) in *; clear H
+    [ H : ?X = ?X |- _ ] => change H with (@eq_refl _ X) in *; clear H
   end.
 
 (** Simplify equalities appearing in the context and goal. *)
@@ -134,20 +137,21 @@ Ltac abstract_eq_proofs := repeat abstract_eq_proof.
 (** Factorize proofs, by using proof irrelevance so that two proofs of the same equality
    in the goal become convertible. *)
 
-Ltac pi_eq_proof_hyp p :=
-  let ty := type of p in
-  let tyred := eval simpl in ty in
-  match tyred with
-    ?X = ?Y =>
-    match goal with
-      | [ H : X = Y |- _ ] =>
-        match p with
-          | H => fail 2
-          | _ => rewrite (proof_irrelevance (X = Y) p H)
-        end
-      | _ => fail " No hypothesis with same type "
-    end
-  end.
+Ltac pi_eq_proof_hyp p := idtac.
+
+  (* let ty := type of p in *)
+  (* let tyred := eval simpl in ty in *)
+  (* match tyred with *)
+  (*   ?X = ?Y => *)
+  (*   match goal with *)
+  (*     | [ H : X = Y |- _ ] => *)
+  (*       match p with *)
+  (*         | H => fail 2 *)
+  (*         | _ => rewrite (proof_irrelevance (X = Y) p H) *)
+  (*       end *)
+  (*     | _ => fail " No hypothesis with same type " *)
+  (*   end *)
+  (* end. *)
 
 (** Factorize proofs of equality appearing as coercion arguments. *)
 
@@ -165,18 +169,18 @@ Hint Rewrite <- eq_rect_eq : refl_id.
 (** The [refl_id] database should be populated with lemmas of the form
    [coerce_* t eq_refl = t]. *)
 
-Lemma JMeq_eq_refl {A} (x : A) : JMeq_eq (@JMeq_refl _ x) = eq_refl.
-Proof. apply proof_irrelevance. Qed.
+(*Lemma JMeq_eq_refl {A} (x : A) : JMeq_eq (@JMeq_refl _ x) = eq_refl. *)
+(* Proof. apply proof_irrelevance. Qed. *)
 
-Lemma UIP_refl_refl A (x : A) :
-  Eqdep.EqdepTheory.UIP_refl A x eq_refl = eq_refl.
-Proof. apply UIP_refl. Qed.
+(* Lemma UIP_refl_refl A (x : A) : *)
+(*   Eqdep.EqdepTheory.UIP_refl A x eq_refl = eq_refl. *)
+(* Proof. apply UIP_refl. Qed. *)
 
-Lemma inj_pairT2_refl A (x : A) (P : A -> Type) (p : P x) :
-  Eqdep.EqdepTheory.inj_pairT2 A P x p p eq_refl = eq_refl.
-Proof. apply UIP_refl. Qed.
+(* Lemma inj_pairT2_refl A (x : A) (P : A -> Type) (p : P x) : *)
+(*   Eqdep.EqdepTheory.inj_pairT2 A P x p p eq_refl = eq_refl. *)
+(* Proof. apply UIP_refl. Qed. *)
 
-Hint Rewrite @JMeq_eq_refl @UIP_refl_refl @inj_pairT2_refl : refl_id.
+(* Hint Rewrite @JMeq_eq_refl @UIP_refl_refl @inj_pairT2_refl : refl_id. *)
 
 Ltac rewrite_refl_id := autorewrite with refl_id.
 
@@ -300,7 +304,7 @@ Proof. injection 2. auto. Defined.
 
 Lemma simplification_K A (x : A) (B : x = x -> Type) :
   B eq_refl -> (forall p : x = x, B p).
-Proof. intros. rewrite (UIP_refl A). assumption. Defined.
+Proof. intros. apply X. Defined. (* rewrite (UIP_refl A). assumption. Defined. *)
 
 (** This hint database and the following tactic can be used with [autounfold] to 
    unfold everything to [eq_rect]s. *)

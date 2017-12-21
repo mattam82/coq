@@ -41,7 +41,8 @@ let retrieve_first_recthm = function
       (pi2 (Global.lookup_named id),variable_opacity id)
   | ConstRef cst ->
       let cb = Global.lookup_constant cst in
-      (Option.map Declarations.force (body_of_constant cb), is_opaque cb)
+      let b, o = (Option.map Declarations.force (body_of_constant cb), is_opaque cb) in
+	Option.cata definition_body variable_body b, o
   | _ -> assert false
 
 let adjust_guardness_conditions const = function
@@ -72,7 +73,7 @@ let find_mutually_recursive_statements thms =
           (match kind_of_term t with
           | Ind (kn,_ as ind) when
               let mind = Global.lookup_mind kn in
-              mind.mind_finite & b = None ->
+              mind.mind_finite & is_variable_body b ->
               [ind,x,i],[]
           | _ ->
               error "Decreasing argument is not an inductive assumption.")
@@ -89,7 +90,7 @@ let find_mutually_recursive_statements thms =
           match kind_of_term t with
           | Ind (kn,_ as ind) when
                 let mind = Global.lookup_mind kn in
-                mind.mind_finite & b = None ->
+                mind.mind_finite & is_variable_body b ->
               [ind,x,i]
           | _ ->
               []) 0 (List.rev whnf_hyp_hds)) in
@@ -189,7 +190,7 @@ let compute_proof_name locality = function
       next_global_ident_away default_thm_id (Pfedit.get_all_proof_names ()) 
 
 let save_remaining_recthms (local,kind) body opaq i (id,(t_i,(_,imps))) =
-  match body with
+  match constr_of_body body with
   | None ->
       (match local with
       | Local ->

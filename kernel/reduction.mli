@@ -66,6 +66,9 @@ val beta_appvect : constr -> constr array -> constr
 (** Builds an application node, reducing the [n] first beta-zeta redexes. *)
 val betazeta_appvect : int -> constr -> constr array -> constr
 
+val beta_app_argsl : constr -> constr args_list -> constr
+val betazeta_app_argsl : int -> constr -> constr args_list -> constr
+
 (** Pseudo-reduction rule  Prod(x,A,B) a --> B[x\a] *)
 val hnf_prod_applist : env -> types -> constr list -> types
 
@@ -80,3 +83,6 @@ exception NotArity
 
 val dest_arity : env -> types -> arity (* raises NotArity if not an arity *)
 val is_arity   : env -> types -> bool
+
+(* debugging *)
+val expl_filter : (Esubst.lift * fconstr) args -> int * (Esubst.lift * fconstr) list

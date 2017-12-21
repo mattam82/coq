@@ -18,7 +18,7 @@ val make_hyps :
     atom_env ->
     Proof_type.goal Tacmach.sigma ->
     Term.types list ->
-    (Names.identifier * Term.types option * Term.types) list ->
+    Sign.named_context ->
     (Names.identifier * Proof_search.form) list
 
 val rtauto_tac : Proof_type.tactic

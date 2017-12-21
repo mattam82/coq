@@ -245,7 +245,7 @@ let concrete_clause_of cl gls =
 
 type branch_args = {
   ity        : inductive;   (* the type we were eliminating on *)
-  largs      : constr list; (* its arguments *)
+  largs      : constr args_list; (* its arguments *)
   branchnum  : int;         (* the branch number *)
   pred       : constr;      (* the predicate we used *)
   nassums    : int;         (* the number of assumptions to be introduced *)
@@ -344,7 +344,7 @@ let general_elim_then_using mk_elim
   let branchsigns = compute_construtor_signatures isrec ind in
   let brnames = compute_induction_names (Array.length branchsigns) allnames in
   let after_tac ce i gl =
-    let (hd,largs) = decompose_app ce.templtyp.Evd.rebus in
+    let (hd,largs) = Constr.decompose_app_argsl ce.templtyp.Evd.rebus in
     let ba = { branchsign = branchsigns.(i);
                branchnames = brnames.(i);
                nassums =
@@ -353,7 +353,7 @@ let general_elim_then_using mk_elim
                    0 branchsigns.(i);
                branchnum = i+1;
                ity = ind;
-               largs = List.map (clenv_nf_meta ce) largs;
+               largs = Constr.map_argsl (clenv_nf_meta ce) largs;
                pred = clenv_nf_meta ce hd }
     in
     tac ba gl

@@ -43,89 +43,89 @@ Section EqdepDec.
   Let comp (x y y':A) (eq1:x = y) (eq2:x = y') : y = y' :=
     eq_ind _ (fun a => a = y') eq2 _ eq1.
 
-  Remark trans_sym_eq : forall (x y:A) (u:x = y), comp u u = refl_equal y.
-  Proof.
-    intros.
-    case u; trivial.
-  Qed.
+  (* Remark trans_sym_eq : forall (x y:A) (u:x = y), comp u u = refl_equal y. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   case u; trivial. *)
+  (* Qed. *)
 
   Variable eq_dec : forall x y:A, x = y \/ x <> y.
 
   Variable x : A.
 
-  Let nu (y:A) (u:x = y) : x = y :=
-    match eq_dec x y with
-      | or_introl eqxy => eqxy
-      | or_intror neqxy => False_ind _ (neqxy u)
-    end.
+  (* Let nu (y:A) (u:x = y) : x = y := *)
+  (*   match eq_dec x y with *)
+  (*     | or_introl eqxy => eqxy *)
+  (*     | or_intror neqxy => False_ind _ (neqxy u) *)
+  (*   end. *)
 
-  Let nu_constant : forall (y:A) (u v:x = y), nu u = nu v.
-    intros.
-    unfold nu in |- *.
-    case (eq_dec x y); intros.
-    reflexivity.
+  (* Let nu_constant : forall (y:A) (u v:x = y), nu u = nu v. *)
+  (*   intros. *)
+  (*   unfold nu in |- *. *)
+  (*   case (eq_dec x y); intros. *)
+  (*   reflexivity. *)
 
-    case n; trivial.
-  Qed.
-
-
-  Let nu_inv (y:A) (v:x = y) : x = y := comp (nu (refl_equal x)) v.
+  (*   case n; trivial. *)
+  (* Qed. *)
 
 
-  Remark nu_left_inv : forall (y:A) (u:x = y), nu_inv (nu u) = u.
-  Proof.
-    intros.
-    case u; unfold nu_inv in |- *.
-    apply trans_sym_eq.
-  Qed.
+  (* Let nu_inv (y:A) (v:x = y) : x = y := comp (nu (refl_equal x)) v. *)
 
 
-  Theorem eq_proofs_unicity : forall (y:A) (p1 p2:x = y), p1 = p2.
-  Proof.
-    intros.
-    elim nu_left_inv with (u := p1).
-    elim nu_left_inv with (u := p2).
-    elim nu_constant with y p1 p2.
-    reflexivity.
-  Qed.
-
-  Theorem K_dec :
-    forall P:x = x -> Prop, P (refl_equal x) -> forall p:x = x, P p.
-  Proof.
-    intros.
-    elim eq_proofs_unicity with x (refl_equal x) p.
-    trivial.
-  Qed.
-
-  (** The corollary *)
-
-  Let proj (P:A -> Prop) (exP:ex P) (def:P x) : P x :=
-    match exP with
-      | ex_intro x' prf =>
-        match eq_dec x' x with
-          | or_introl eqprf => eq_ind x' P prf x eqprf
-          | _ => def
-        end
-    end.
+  (* Remark nu_left_inv : forall (y:A) (u:x = y), nu_inv (nu u) = u. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   case u; unfold nu_inv in |- *. *)
+  (*   apply trans_sym_eq. *)
+  (* Qed. *)
 
 
-  Theorem inj_right_pair :
-    forall (P:A -> Prop) (y y':P x),
-      ex_intro P x y = ex_intro P x y' -> y = y'.
-  Proof.
-    intros.
-    cut (proj (ex_intro P x y) y = proj (ex_intro P x y') y).
-    simpl in |- *.
-    case (eq_dec x x).
-    intro e.
-    elim e using K_dec; trivial.
+  (* Theorem eq_proofs_unicity : forall (y:A) (p1 p2:x = y), p1 = p2. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   elim nu_left_inv with (u := p1). *)
+  (*   elim nu_left_inv with (u := p2). *)
+  (*   elim nu_constant with y p1 p2. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-    intros.
-    case n; trivial.
+  (* Theorem K_dec : *)
+  (*   forall P:x = x -> Prop, P (refl_equal x) -> forall p:x = x, P p. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   elim eq_proofs_unicity with x (refl_equal x) p. *)
+  (*   trivial. *)
+  (* Qed. *)
 
-    case H.
-    reflexivity.
-  Qed.
+  (* (** The corollary *) *)
+
+  (* Let proj (P:A -> Prop) (exP:ex P) (def:P x) : P x := *)
+  (*   match exP with *)
+  (*     | ex_intro x' prf => *)
+  (*       match eq_dec x' x with *)
+  (*         | or_introl eqprf => eq_ind x' P prf x eqprf *)
+  (*         | _ => def *)
+  (*       end *)
+  (*   end. *)
+
+
+  (* Theorem inj_right_pair : *)
+  (*   forall (P:A -> Prop) (y y':P x), *)
+  (*     ex_intro P x y = ex_intro P x y' -> y = y'. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   cut (proj (ex_intro P x y) y = proj (ex_intro P x y') y). *)
+  (*   simpl in |- *. *)
+  (*   case (eq_dec x x). *)
+  (*   intro e. *)
+  (*   elim e using K_dec; trivial. *)
+
+  (*   intros. *)
+  (*   case n; trivial. *)
+
+  (*   case H. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
 End EqdepDec.
 
@@ -138,10 +138,12 @@ Theorem K_dec_type :
     forall (x:A) (P:x = x -> Prop), P (refl_equal x) -> forall p:x = x, P p.
 Proof.
   intros A eq_dec x P H p.
-  elim p using K_dec; intros.
-  case (eq_dec x0 y); [left|right]; assumption.
-  trivial.
+  apply H.
 Qed.
+(*   elim p using K_dec; intros. *)
+(*   case (eq_dec x0 y); [left|right]; assumption. *)
+(*   trivial. *)
+(* Qed. *)
 
 Theorem K_dec_set :
   forall A:Set,
@@ -166,11 +168,11 @@ Theorem eq_dep_eq_dec :
      forall (P:A->Type) (p:A) (x y:P p), eq_dep A P p x p y -> x = y.
 Proof (fun A eq_dec => eq_rect_eq__eq_dep_eq A (eq_rect_eq_dec eq_dec)).
 
-Theorem UIP_dec :
-  forall (A:Type),
-    (forall x y:A, {x = y} + {x <> y}) ->
-    forall (x y:A) (p1 p2:x = y), p1 = p2.
-Proof (fun A eq_dec => eq_dep_eq__UIP A (eq_dep_eq_dec eq_dec)).
+(* Theorem UIP_dec : *)
+(*   forall (A:Type), *)
+(*     (forall x y:A, {x = y} + {x <> y}) -> *)
+(*     forall (x y:A) (p1 p2:x = y), p1 = p2. *)
+(* Proof (fun A eq_dec => eq_dep_eq__UIP A (eq_dep_eq_dec eq_dec)). *)
 
 Unset Implicit Arguments.
 
@@ -207,13 +209,13 @@ Module DecidableEqDep (M:DecidableType).
 
   (** Uniqueness of Identity Proofs (UIP) *)
 
-  Lemma UIP : forall (x y:U) (p1 p2:x = y), p1 = p2.
-  Proof (eq_dep_eq__UIP U eq_dep_eq).
+  (* Lemma UIP : forall (x y:U) (p1 p2:x = y), p1 = p2. *)
+  (* Proof (eq_dep_eq__UIP U eq_dep_eq). *)
 
   (** Uniqueness of Reflexive Identity Proofs *)
 
-  Lemma UIP_refl : forall (x:U) (p:x = x), p = refl_equal x.
-  Proof (UIP__UIP_refl U UIP).
+  (* Lemma UIP_refl : forall (x:U) (p:x = x), p = refl_equal x. *)
+  (* Proof (UIP__UIP_refl U UIP). *)
 
   (** Streicher's axiom K *)
 
@@ -230,15 +232,15 @@ Module DecidableEqDep (M:DecidableType).
 
   (** Proof-irrelevance on subsets of decidable sets *)
 
-  Lemma inj_pairP2 :
-    forall (P:U -> Prop) (x:U) (p q:P x),
-      ex_intro P x p = ex_intro P x q -> p = q.
-  Proof.
-    intros.
-    apply inj_right_pair with (A:=U).
-    intros x0 y0; case (eq_dec x0 y0); [left|right]; assumption.
-    assumption.
-  Qed.
+  (* Lemma inj_pairP2 : *)
+  (*   forall (P:U -> Prop) (x:U) (p q:P x), *)
+  (*     ex_intro P x p = ex_intro P x q -> p = q. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   apply inj_right_pair with (A:=U). *)
+  (*   intros x0 y0; case (eq_dec x0 y0); [left|right]; assumption. *)
+  (*   assumption. *)
+  (* Qed. *)
 
 End DecidableEqDep.
 
@@ -276,13 +278,13 @@ Module DecidableEqDepSet (M:DecidableSet).
 
   (** Uniqueness of Identity Proofs (UIP) *)
 
-  Lemma UIP : forall (x y:U) (p1 p2:x = y), p1 = p2.
-  Proof N.UIP.
+  (* Lemma UIP : forall (x y:U) (p1 p2:x = y), p1 = p2. *)
+  (* Proof N.UIP. *)
 
   (** Uniqueness of Reflexive Identity Proofs *)
 
-  Lemma UIP_refl : forall (x:U) (p:x = x), p = refl_equal x.
-  Proof N.UIP_refl.
+  (* Lemma UIP_refl : forall (x:U) (p:x = x), p = refl_equal x. *)
+  (* Proof N.UIP_refl. *)
 
   (** Streicher's axiom K *)
 
@@ -292,10 +294,10 @@ Module DecidableEqDepSet (M:DecidableSet).
 
   (** Proof-irrelevance on subsets of decidable sets *)
 
-  Lemma inj_pairP2 :
-    forall (P:U -> Prop) (x:U) (p q:P x),
-      ex_intro P x p = ex_intro P x q -> p = q.
-  Proof N.inj_pairP2.
+  (* Lemma inj_pairP2 : *)
+  (*   forall (P:U -> Prop) (x:U) (p q:P x), *)
+  (*     ex_intro P x p = ex_intro P x q. *)
+  (* Proof. intros. apply eq_refl. N.inj_pairP2. *)
 
   (** Injectivity of equality on dependent pairs in [Type] *)
 

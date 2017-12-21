@@ -16,6 +16,7 @@ open Term
 open Libnames
 open Nametab
 open Evd
+open Lib
 (*i*)
 
 (* Untyped intermediate terms, after ASTs and before constr. *)
@@ -34,7 +35,9 @@ type patvar = identifier
 
 type glob_sort = GProp of Term.contents | GType of Univ.universe option
 
-type binding_kind = Lib.binding_kind = Explicit | Implicit
+type binding_implicit = Lib.binding_kind = Explicit | Implicit
+
+type binding_kind = binding_implicit * relevance
 
 type quantified_hypothesis = AnonHyp of int | NamedHyp of identifier
 
@@ -98,6 +101,9 @@ let mkGApp loc p t =
   match p with
   | GApp (loc,f,l) -> GApp (loc,f,l@[t])
   | _ -> GApp (loc,p,[t])
+
+let explicit_bk = Lib.Explicit, Expl
+let implicit_bk = Lib.Implicit, Expl
 
 let map_glob_decl_left_to_right f (na,k,obd,ty) = 
   let comp1 = Option.map f obd in

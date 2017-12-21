@@ -1656,18 +1656,18 @@ let destructure_hyps gl =
           | Kapp(Or,[t1;t2]) ->
               (tclTHENS
                 (elim_id i)
-                [ onClearedName i (fun i -> (loop ((i,None,t1)::lit)));
-                  onClearedName i (fun i -> (loop ((i,None,t2)::lit))) ])
+                [ onClearedName i (fun i -> (loop ((i,variable_body,t1)::lit)));
+                  onClearedName i (fun i -> (loop ((i,variable_body,t2)::lit))) ])
           | Kapp(And,[t1;t2]) ->
               tclTHEN
 		(elim_id i)
 		(onClearedName2 i (fun i1 i2 ->
-		  loop ((i1,None,t1)::(i2,None,t2)::lit)))
+		  loop ((i1,variable_body,t1)::(i2,variable_body,t2)::lit)))
           | Kapp(Iff,[t1;t2]) ->
 	      tclTHEN
 		(elim_id i)
 		(onClearedName2 i (fun i1 i2 ->
-		  loop ((i1,None,mkArrow t1 t2)::(i2,None,mkArrow t2 t1)::lit)))
+		  loop ((i1,variable_body,mkArrow t1 t2)::(i2,variable_body,mkArrow t2 t1)::lit)))
           | Kimp(t1,t2) ->
 	      (* t1 and t2 might be in Type rather than Prop.
 		 For t1, the decidability check will ensure being Prop. *)
@@ -1678,7 +1678,7 @@ let destructure_hyps gl =
 		  (generalize_tac [mkApp (Lazy.force coq_imp_simp,
                     [| t1; t2; d1; mkVar i|])]);
 		  (onClearedName i (fun i ->
-		    (loop ((i,None,mk_or (mk_not t1) t2)::lit))))
+		    (loop ((i,variable_body,mk_or (mk_not t1) t2)::lit))))
                 ]
               else
 		loop lit
@@ -1689,7 +1689,7 @@ let destructure_hyps gl =
 		      (generalize_tac
                         [mkApp (Lazy.force coq_not_or,[| t1; t2; mkVar i |])]);
 		      (onClearedName i (fun i ->
-                        (loop ((i,None,mk_and (mk_not t1) (mk_not t2)):: lit))))
+                        (loop ((i,variable_body,mk_and (mk_not t1) (mk_not t2)):: lit))))
                     ]
 		| Kapp(And,[t1;t2]) ->
 		    let d1 = decidability gl t1 in
@@ -1698,7 +1698,7 @@ let destructure_hyps gl =
 		        [mkApp (Lazy.force coq_not_and,
 				[| t1; t2; d1; mkVar i |])]);
 		      (onClearedName i (fun i ->
-                        (loop ((i,None,mk_or (mk_not t1) (mk_not t2))::lit))))
+                        (loop ((i,variable_body,mk_or (mk_not t1) (mk_not t2))::lit))))
                     ]
 		| Kapp(Iff,[t1;t2]) ->
 		    let d1 = decidability gl t1 in
@@ -1708,7 +1708,7 @@ let destructure_hyps gl =
 		        [mkApp (Lazy.force coq_not_iff,
 				[| t1; t2; d1; d2; mkVar i |])]);
 		      (onClearedName i (fun i ->
-                        (loop ((i,None,
+                        (loop ((i,variable_body,
 			        mk_or (mk_and t1 (mk_not t2))
 				      (mk_and (mk_not t1) t2))::lit))))
                     ]
@@ -1721,14 +1721,14 @@ let destructure_hyps gl =
 		        [mkApp (Lazy.force coq_not_imp,
 				[| t1; t2; d1; mkVar i |])]);
 		      (onClearedName i (fun i ->
-                        (loop ((i,None,mk_and t1 (mk_not t2)) :: lit))))
+                        (loop ((i,variable_body,mk_and t1 (mk_not t2)) :: lit))))
                     ]
 		| Kapp(Not,[t]) ->
 		    let d = decidability gl t in
                     tclTHENLIST [
 		      (generalize_tac
 			[mkApp (Lazy.force coq_not_not, [| t; d; mkVar i |])]);
-		      (onClearedName i (fun i -> (loop ((i,None,t)::lit))))
+		      (onClearedName i (fun i -> (loop ((i,variable_body,t)::lit))))
                     ]
 		| Kapp(op,[t1;t2]) ->
 		    (try

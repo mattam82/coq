@@ -170,8 +170,8 @@ val revert        : identifier list -> tactic
 
 (** {6 Resolution tactics. } *)
 
-val apply_type : constr -> constr list -> tactic
-val apply_term : constr -> constr list -> tactic
+val apply_type : constr -> constr args_list -> tactic
+val apply_term : constr -> constr args_list -> tactic
 val bring_hyps : named_context -> tactic
 
 val apply                 : constr -> tactic

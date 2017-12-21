@@ -97,7 +97,7 @@ let get_sym_eq_data env ind =
   if Array.length mib.mind_packets <> 1 or Array.length mip.mind_nf_lc <> 1 then
     error "Not an inductive type with a single constructor.";
   let realsign,_ = list_chop mip.mind_nrealargs_ctxt mip.mind_arity_ctxt in
-  if List.exists (fun (_,b,_) -> b <> None) realsign then
+  if List.exists (fun (_,b,_) -> not (is_variable_body b)) realsign then
     error "Inductive equalities with local definitions in arity not supported.";
   let constrsign,ccl = decompose_prod_assum mip.mind_nf_lc.(0) in
   let _,constrargs = decompose_app ccl in
@@ -129,7 +129,7 @@ let get_non_sym_eq_data env ind =
   if Array.length mib.mind_packets <> 1 or Array.length mip.mind_nf_lc <> 1 then
     error "Not an inductive type with a single constructor.";
   let realsign,_ = list_chop mip.mind_nrealargs_ctxt mip.mind_arity_ctxt in
-  if List.exists (fun (_,b,_) -> b <> None) realsign then
+  if List.exists (fun (_,b,_) -> not (is_variable_body b)) realsign then
     error "Inductive equalities with local definitions in arity not supported";
   let constrsign,ccl = decompose_prod_assum mip.mind_nf_lc.(0) in
   let _,constrargs = decompose_app ccl in
@@ -160,7 +160,7 @@ let build_sym_scheme env ind =
   let varH = fresh env (default_id_of_sort (snd (mind_arity mip))) in
   let applied_ind = build_dependent_inductive ind specif in
   let realsign_ind =
-    name_context env ((Name varH,None,applied_ind)::realsign) in
+    name_context env ((var_decl_of_name (Name varH) applied_ind)::realsign) in
   let ci = make_case_info (Global.env()) ind RegularStyle in
   (my_it_mkLambda_or_LetIn mib.mind_params_ctxt
   (my_it_mkLambda_or_LetIn_name realsign_ind
@@ -208,7 +208,7 @@ let build_sym_involutive_scheme env ind =
          (extended_rel_vect (nrealargs+1) mib.mind_params_ctxt)
          (rel_vect (nrealargs+1) nrealargs)) in
   let realsign_ind =
-    name_context env ((Name varH,None,applied_ind)::realsign) in
+    name_context env ((var_decl_of_name (Name varH) applied_ind)::realsign) in
   let ci = make_case_info (Global.env()) ind RegularStyle in
   (my_it_mkLambda_or_LetIn paramsctxt
   (my_it_mkLambda_or_LetIn_name realsign_ind
@@ -324,9 +324,9 @@ let build_l2r_rew_scheme dep env ind kind =
         rel_vect 0 nrealargs]) in
   let realsign_P = lift_rel_context nrealargs realsign in
   let realsign_ind_P =
-    name_context env ((Name varH,None,applied_ind_P)::realsign_P) in
+    name_context env ((var_decl_of_name (Name varH) applied_ind_P)::realsign_P) in
   let realsign_ind_G =
-    name_context env ((Name varH,None,applied_ind_G)::
+    name_context env ((var_decl_of_name (Name varH) applied_ind_G)::
                       lift_rel_context (nrealargs+3) realsign) in
   let applied_sym_C n =
      mkApp(sym,
@@ -431,9 +431,9 @@ let build_l2r_forward_rew_scheme dep env ind kind =
         rel_vect (2*nrealargs+1) nrealargs]) in
   let realsign_P n = lift_rel_context (nrealargs*n+n) realsign in
   let realsign_ind =
-    name_context env ((Name varH,None,applied_ind)::realsign) in
+    name_context env ((var_decl_of_name (Name varH) applied_ind)::realsign) in
   let realsign_ind_P n aP =
-    name_context env ((Name varH,None,aP)::realsign_P n) in
+    name_context env ((var_decl_of_name (Name varH) aP)::realsign_P n) in
   let s = mkSort (new_sort_in_family kind) in
   let ci = make_case_info (Global.env()) ind RegularStyle in
   let applied_PC =
@@ -506,7 +506,7 @@ let build_r2l_forward_rew_scheme dep env ind kind =
   let varP = fresh env (id_of_string "P") in
   let applied_ind = build_dependent_inductive ind specif in
   let realsign_ind =
-    name_context env ((Name varH,None,applied_ind)::realsign) in
+    name_context env ((var_decl_of_name (Name varH) applied_ind)::realsign) in
   let s = mkSort (new_sort_in_family kind) in
   let ci = make_case_info (Global.env()) ind RegularStyle in
   let applied_PC =
@@ -680,7 +680,7 @@ let build_congr env (eq,refl) ind =
     error "Expect an inductive type with one predicate parameter.";
   let i = 1 in
   let realsign,_ = list_chop mip.mind_nrealargs_ctxt mip.mind_arity_ctxt in
-  if List.exists (fun (_,b,_) -> b <> None) realsign then
+  if List.exists (fun (_,b,_) -> not (is_variable_body b)) realsign then
     error "Inductive equalities with local definitions in arity not supported.";
   let env_with_arity = push_rel_context mip.mind_arity_ctxt env in
   let (_,_,ty) = lookup_rel (mip.mind_nrealargs - i + 1) env_with_arity in

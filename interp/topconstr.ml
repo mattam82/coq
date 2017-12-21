@@ -114,9 +114,9 @@ let glob_constr_of_aconstr_with_binders loc g f e = function
       let outerl = [(ldots_var,inner)] in
       subst_glob_vars outerl it
   | ALambda (na,ty,c) ->
-      let e',na = g e na in GLambda (loc,na,Explicit,f e ty,f e' c)
+      let e',na = g e na in GLambda (loc,na,explicit_bk,f e ty,f e' c)
   | AProd (na,ty,c) ->
-      let e',na = g e na in GProd (loc,na,Explicit,f e ty,f e' c)
+      let e',na = g e na in GProd (loc,na,explicit_bk,f e ty,f e' c)
   | ALetIn (na,b,c) ->
       let e',na = g e na in GLetIn (loc,na,f e b,f e' c)
   | ACases (sty,rtntypopt,tml,eqnl) ->
@@ -145,7 +145,7 @@ let glob_constr_of_aconstr_with_binders loc g f e = function
   | ARec (fk,idl,dll,tl,bl) ->
       let e,dll = array_fold_map (list_fold_map (fun e (na,oc,b) ->
 	  let e,na = g e na in
-	  (e,(na,Explicit,Option.map (f e) oc,f e b)))) e dll in
+	  (e,(na,explicit_bk,Option.map (f e) oc,f e b)))) e dll in
       let e',idl = array_fold_map (to_id g) e idl in
       GRec (loc,fk,idl,dll,Array.map (f e) tl,Array.map (f e') bl)
   | ACast (c,k) -> GCast (loc,f e c,
@@ -310,8 +310,8 @@ let aconstr_and_vars_of_glob_constr a =
       AIf (aux c,(na,Option.map aux po),aux b1,aux b2)
   | GRec (_,fk,idl,dll,tl,bl) ->
       Array.iter (add_id found) idl;
-      let dll = Array.map (List.map (fun (na,bk,oc,b) ->
-	 if bk <> Explicit then
+      let dll = Array.map (List.map (fun (na,(bk,_),oc,b) ->
+	 if bk <> Lib.Explicit then
 	   error "Binders marked as implicit not allowed in notations.";
 	 add_name found na; (na,Option.map aux oc,aux b))) dll in
       ARec (fk,idl,dll,Array.map aux tl,Array.map aux bl)
@@ -521,7 +521,7 @@ let abstract_return_type_context pi mklam tml rtno =
 
 let abstract_return_type_context_glob_constr =
   abstract_return_type_context (fun (_,_,nal) -> nal)
-    (fun na c -> GLambda(dummy_loc,na,Explicit,GHole(dummy_loc,Evd.InternalHole),c))
+    (fun na c -> GLambda(dummy_loc,na,explicit_bk,GHole(dummy_loc,Evd.InternalHole),c))
 
 let abstract_return_type_context_aconstr =
   abstract_return_type_context snd
@@ -592,7 +592,7 @@ let rec match_iterated_binders islambda decls = function
       match_iterated_binders islambda ((na,bk,None,t)::decls) b
   | GLetIn (loc,na,c,b) when glue_letin_with_decls ->
       match_iterated_binders islambda
-	((na,Explicit (*?*), Some c,GHole(loc,Evd.BinderType na))::decls) b
+	((na,explicit_bk, Some c,GHole(loc,Evd.BinderType na))::decls) b
   | b -> (decls,b)
 
 let remove_sigma x (sigmavar,sigmalist,sigmabinders) =
@@ -742,7 +742,7 @@ let rec match_ inner u alp (tmetas,blmetas as metas) sigma a1 a2 =
   | b1, ALambda (Name id,AHole _,b2) when inner ->
       let id' = Namegen.next_ident_away id (free_glob_vars b1) in
       match_in u alp metas (bind_binder sigma id
-       [(Name id',Explicit,None,GHole(dummy_loc,Evd.BinderType (Name id')))])
+       [(Name id',explicit_bk,None,GHole(dummy_loc,Evd.BinderType (Name id')))])
        (mkGApp dummy_loc b1 (GVar (dummy_loc,id'))) b2
 
   | (GRec _ | GEvar _), _
@@ -932,7 +932,8 @@ let write_oldfashion_patterns = Goptions.declare_bool_option {
 (***********************)
 (* For binders parsing *)
 
-let default_binder_kind = Default Explicit
+let default_binder_kind = Default explicit_bk
+let implicit_binder_kind = Default implicit_bk
 
 let names_of_local_assums bl =
   List.flatten (List.map (function LocalRawAssum(l,_,_)->l|_->[]) bl)

@@ -54,9 +54,10 @@ type type_error =
   | CantApplyBadType of
       (int * constr * constr) * unsafe_judgment * unsafe_judgment array
   | CantApplyNonFunctional of unsafe_judgment * unsafe_judgment array
-  | IllFormedRecBody of guard_error * name array * int * env * unsafe_judgment array
+  | IllFormedRecBody of guard_error * name letbinder_annot array * int * env * unsafe_judgment array
   | IllTypedRecBody of
-      int * name array * unsafe_judgment array * types array
+      int * name letbinder_annot array * unsafe_judgment array * types array
+  | RelevanceMismatch of types * relevance * relevance
 
 exception TypeError of env * type_error
 
@@ -115,3 +116,5 @@ let error_elim_explain kp ki =
   | InType, InSet -> StrongEliminationOnNonSmallType (* if Set impredicative *)
   | _ -> WrongArity
 
+let error_relevance_mismatch env ty rel rel' =
+  raise (TypeError (env, RelevanceMismatch (ty, rel, rel')))

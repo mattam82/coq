@@ -942,6 +942,49 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
    intros; apply of_list_1b. inversion_clear Hdup; auto.
   Qed.
 
+  Lemma fold_ind :
+    forall (A:Type)(P : t elt -> A -> Prop)(f : key -> elt -> A -> A),
+     forall (i:A)(m:t elt),
+      (forall m, Empty m -> P m i) ->
+      (forall k e a m' m'', MapsTo k e m -> ~In k m' ->
+         Add k e m' m'' -> P m' a -> P m'' (f k e a)) ->
+      P m (fold f m i).
+  Proof.
+  intros A P f i m Hempty Hstep.
+  rewrite fold_spec_right.
+  set (F:=uncurry f).
+  set (l:=rev (elements m)).
+  assert (Hstep' : forall k e a m' m'', InA eqke (k,e) l -> ~In k m' ->
+             Add k e m' m'' -> P m' a -> P m'' (F (k,e) a)).
+   intros k e a m' m'' H ? ? ?; eapply Hstep; eauto.
+   revert H; unfold l; rewrite InA_rev, elements_mapsto_iff; auto with *.
+  assert (Hdup : NoDupA eqk l).
+   unfold l. apply NoDupA_rev; try red; unfold eq_key ; eauto with *.
+   apply elements_3w.
+  assert (Hsame : forall k, find k m = findA (eqb k) l).
+   intros k. unfold l. rewrite elements_o, findA_rev; auto.
+   apply elements_3w.
+  clearbody l. clearbody F. clear Hstep f. revert m Hsame. induction l.
+  (* empty *)
+  intros m Hsame; simpl.
+  apply Hempty. intros k e.
+  rewrite find_mapsto_iff, Hsame; simpl; discriminate.
+  (* step *)
+  intros m Hsame; destruct a as (k,e); simpl.
+  apply Hstep' with (of_list l); auto.
+   rewrite InA_cons; left; red; auto.
+   inversion_clear Hdup. contradict H. destruct H as (e',He').
+   apply InA_eqke_eqk with k e'; auto.
+   rewrite <- of_list_1; auto.
+   intro k'. rewrite Hsame, add_o, of_list_1b. simpl.
+   unfold eqb. do 2 destruct eq_dec; auto; elim n; eauto.
+   inversion_clear Hdup; auto.
+  apply IHl.
+   intros; eapply Hstep'; eauto.
+   inversion_clear Hdup; auto.
+   intros; apply of_list_1b. inversion_clear Hdup; auto.
+  Qed.
+
   (** Same, with [empty] and [add] instead of [Empty] and [Add]. In this
       case, [P] must be compatible with equality of sets *)
 
@@ -968,6 +1011,31 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
      P (fold f m i).
   Proof.
   intros; apply fold_rec_bis with (P:=fun _ => P); auto.
+  Qed.
+
+  Theorem fold_ind_bis :
+    forall (A:Type)(P : t elt -> A -> Prop)(f : key -> elt -> A -> A),
+     forall (i:A)(m:t elt),
+     (forall m m' a, Equal m m' -> P m a -> P m' a) ->
+     (P (empty _) i) ->
+     (forall k e a m', MapsTo k e m -> ~In k m' ->
+       P m' a -> P (add k e m') (f k e a)) ->
+     P m (fold f m i).
+  Proof.
+  intros A P f i m Pmorphism Pempty Pstep.
+  apply fold_ind; intros.
+  apply Pmorphism with (empty _); auto. intro k. rewrite empty_o.
+  case_eq (find k m0); auto; intros e'; rewrite <- find_mapsto_iff.
+  intro H'; elim (H k e'); auto.
+  apply Pmorphism with (add k e m'); try intro; auto.
+  Qed.
+
+  Lemma fold_ind_nodep :
+    forall (A:Type)(P : A -> Prop)(f : key -> elt -> A -> A)(i:A)(m:t elt),
+     P i -> (forall k e a, MapsTo k e m -> P a -> P (f k e a)) ->
+     P (fold f m i).
+  Proof.
+  intros; apply fold_ind_bis with (P:=fun _ => P); auto.
   Qed.
 
   (** [fold_rec_weak] is a weaker principle than [fold_rec_bis] :
@@ -1004,10 +1072,29 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   destruct a; simpl; rewrite InA_cons; left; red; auto.
   Qed.
 
+  Lemma fold_rel_ind :
+    forall (A B:Type)(R : A -> B -> Prop)
+     (f : key -> elt -> A -> A)(g : key -> elt -> B -> B)(i : A)(j : B)
+     (m : t elt),
+     R i j ->
+     (forall k e a b, MapsTo k e m -> R a b -> R (f k e a) (g k e b)) ->
+     R (fold f m i) (fold g m j).
+  Proof.
+  intros A B R f g i j m Rempty Rstep.
+  rewrite 2 fold_spec_right. set (l:=rev (elements m)).
+  assert (Rstep' : forall k e a b, InA eqke (k,e) l ->
+    R a b -> R (f k e a) (g k e b)) by
+    (intros; apply Rstep; auto; rewrite elements_mapsto_iff, <- InA_rev; auto with *).
+  clearbody l; clear Rstep m.
+  induction l; simpl; auto.
+  apply Rstep'; auto.
+  destruct a; simpl; rewrite InA_cons; left; red; auto.
+  Qed.
+
   (** From the induction principle on [fold], we can deduce some general
       induction principles on maps. *)
 
-  Lemma map_induction :
+  Lemma map_recursion :
    forall P : t elt -> Type,
    (forall m, Empty m -> P m) ->
    (forall m m', P m -> forall x e, ~In x m -> Add x e m m' -> P m') ->
@@ -1016,7 +1103,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   intros. apply (@fold_rec _ (fun s _ => P s) (fun _ _ _ => tt) tt m); eauto.
   Qed.
 
-  Lemma map_induction_bis :
+  Lemma map_recursion_bis :
    forall P : t elt -> Type,
    (forall m m', Equal m m' -> P m -> P m') ->
    P (empty _) ->
@@ -1027,12 +1114,32 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   apply (@fold_rec_bis _ (fun s _ => P s) (fun _ _ _ => tt) tt m); eauto.
   Qed.
 
+  Lemma map_induction :
+   forall P : t elt -> Prop,
+   (forall m, Empty m -> P m) ->
+   (forall m m', P m -> forall x e, ~In x m -> Add x e m m' -> P m') ->
+   forall m, P m.
+  Proof.
+  intros. apply (@fold_ind _ (fun s _ => P s) (fun _ _ _ => tt) tt m); eauto.
+  Qed.
+
+  Lemma map_induction_bis :
+   forall P : t elt -> Prop,
+   (forall m m', Equal m m' -> P m -> P m') ->
+   P (empty _) ->
+   (forall x e m, ~In x m -> P m -> P (add x e m)) ->
+   forall m, P m.
+  Proof.
+  intros.
+  apply (@fold_ind_bis _ (fun s _ => P s) (fun _ _ _ => tt) tt m); eauto.
+  Qed.
+
   (** [fold] can be used to reconstruct the same initial set. *)
 
   Lemma fold_identity : forall m : t elt, Equal (fold (@add _) m (empty _)) m.
   Proof.
   intros.
-  apply fold_rec with (P:=fun m acc => Equal acc m); auto with map.
+  apply fold_ind with (P:=fun m acc => Equal acc m); auto with map.
   intros m' Heq k'.
   rewrite empty_o.
   case_eq (find k' m'); auto; intros e'; rewrite <- find_mapsto_iff.
@@ -1058,14 +1165,14 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   Lemma fold_init :
    forall m i i', eqA i i' -> eqA (fold f m i) (fold f m i').
   Proof.
-  intros. apply fold_rel with (R:=eqA); auto.
+  intros. apply fold_rel_ind with (R:=eqA); auto.
   intros. apply Comp; auto.
   Qed.
 
   Lemma fold_Empty :
    forall m i, Empty m -> eqA (fold f m i) i.
   Proof.
-  intros. apply fold_rec_nodep with (P:=fun a => eqA a i).
+  intros. apply fold_ind_nodep with (P:=fun a => eqA a i).
   reflexivity.
   intros. elim (H k e); auto.
   Qed.
@@ -1095,7 +1202,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
    eqA (fold f m (f k e i)) (f k e (fold f m i)).
   Proof.
   intros i m k e Hnotin.
-  apply fold_rel with (R:= fun a b => eqA a (f k e b)); auto.
+  apply fold_rel_ind with (R:= fun a b => eqA a (f k e b)); auto.
   reflexivity.
   intros.
   transitivity (f k0 e0 (f k e b)).
@@ -1275,7 +1382,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   Proof.
   unfold filter.
   set (f':=fun k e m => if f k e then add k e m else m).
-  intro m. pattern m, (fold f' m (empty _)). apply fold_rec.
+  intro m. pattern m, (fold f' m (empty _)). apply fold_ind.
 
   intros m' Hm' k e. rewrite empty_mapsto_iff. intuition.
   elim (Hm' k e); auto.
@@ -1296,7 +1403,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   Proof.
   unfold for_all.
   set (f':=fun k e b => if f k e then b else false).
-  intro m. pattern m, (fold f' m true). apply fold_rec.
+  intro m. pattern m, (fold f' m true). apply fold_ind.
 
   intros m' Hm'. split; auto. intros _ k e Hke. elim (Hm' k e); auto.
 
@@ -1322,7 +1429,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   Proof.
   unfold exists_.
   set (f':=fun k e b => if f k e then true else b).
-  intro m. pattern m, (fold f' m false). apply fold_rec.
+  intro m. pattern m, (fold f' m false). apply fold_ind.
 
   intros m' Hm'. split; try discriminate.
   intros ((k,e),(Hke,_)); simpl in *. elim (Hm' k e); auto.
@@ -1543,7 +1650,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   set (f:=fun (_:key)(_:elt)=>S).
   setoid_replace (fold f m 0) with (fold f m1 (fold f m2 0)).
   rewrite <- cardinal_fold.
-  apply fold_rel with (R:=fun u v => u = v + cardinal m2); simpl; auto.
+  apply fold_rel_ind with (R:=fun u v => u = v + cardinal m2); simpl; auto.
   apply Partition_fold with (eqA:=eq); repeat red; auto.
   Qed.
 
@@ -1581,7 +1688,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   Proof.
   unfold update.
   intros m m'.
-  pattern m', (fold (@add _) m' m). apply fold_rec.
+  pattern m', (fold (@add _) m' m). apply fold_ind.
 
   intros m0 Hm0 k e.
   assert (~In k m0) by (intros (e0,He0); apply (Hm0 k e0); auto).
@@ -1708,7 +1815,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   intros m1 m1' Hm1 m2 m2' Hm2.
   setoid_replace (restrict m1 m2) with (restrict m1' m2);
    unfold restrict, filter.
-  apply fold_rel with (R:=Equal); try red; auto.
+  apply fold_rel_ind with (R:=Equal); try red; auto.
    intros k e i i' H Hii' x.
    pattern (mem k m2); rewrite Hm2. (* UGLY, see with Matthieu *)
    destruct mem; rewrite Hii'; auto.
@@ -1727,7 +1834,7 @@ Module WProperties_fun (E:DecidableType)(M:WSfun E).
   intros m1 m1' Hm1 m2 m2' Hm2.
   setoid_replace (diff m1 m2) with (diff m1' m2);
    unfold diff, filter.
-  apply fold_rel with (R:=Equal); try red; auto.
+  apply fold_rel_ind with (R:=Equal); try red; auto.
    intros k e i i' H Hii' x.
    pattern (mem k m2); rewrite Hm2. (* idem *)
    destruct mem; simpl; rewrite Hii'; auto.

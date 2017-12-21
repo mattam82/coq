@@ -186,8 +186,8 @@ let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2
 	    error NotEqualInductiveAliases
   end;
   (* we check that records and their field names are preserved. *)
-  check (fun mib -> mib.mind_record) (fun x -> RecordFieldExpected x);
-  if mib1.mind_record then begin
+  check (fun mib -> mib.mind_record <> None) (fun x -> RecordFieldExpected x);
+  if mib1.mind_record <> None then begin
     let rec names_prod_letin t = match kind_of_term t with
       | Prod(n,_,t) -> n::(names_prod_letin t)
       | LetIn(n,_,_,t) -> n::(names_prod_letin t)

@@ -112,7 +112,7 @@ let pattern_of_constr sigma t =
             Evar (evk,args as ev) ->
               (match snd (Evd.evar_source evk sigma) with
                   MatchingVar (true,id) ->
-                    ctx := (id,None,existential_type sigma ev)::!ctx;
+                    ctx := (id,variable_body,existential_type sigma ev)::!ctx;
                     Some id
                 | _ -> None)
             | _ -> None
@@ -125,7 +125,7 @@ let pattern_of_constr sigma t =
     | Evar (evk,ctxt as ev) ->
         (match snd (Evd.evar_source evk sigma) with
           | MatchingVar (b,id) ->
-              ctx := (id,None,existential_type sigma ev)::!ctx;
+              ctx := (id,variable_body,existential_type sigma ev)::!ctx;
               assert (not b); PMeta (Some id)
           | GoalEvar -> PEvar (evk,Array.map pattern_of_constr ctxt)
           | _ -> PMeta None)
@@ -308,7 +308,7 @@ let rec pat_of_raw metas vars = function
       PIf (pat_of_raw metas vars c,
            pat_of_raw metas vars b1,pat_of_raw metas vars b2)
   | GLetTuple (loc,nal,(_,None),b,c) ->
-      let mkGLambda c na = GLambda (loc,na,Explicit,GHole (loc,Evd.InternalHole),c) in
+      let mkGLambda c na = GLambda (loc,na,(Lib.Explicit,Expl),GHole (loc,Evd.InternalHole),c) in
       let c = List.fold_left mkGLambda c nal in
       let cip =
 	{ cip_style = LetStyle;

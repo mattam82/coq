@@ -63,7 +63,7 @@ let constrain (n,(ids,m as x)) (names,terms as subst) =
 
 let add_binders na1 na2 (names,terms as subst) =
   match na1, na2 with
-  | Name id1, Name id2 ->
+  | Name id1, (Name id2,an) ->
       if List.mem_assoc id1 names then
         (Flags.if_warn Pp.msg_warning
           (str "Collision between bound variables of name " ++ pr_id id1);
@@ -81,7 +81,7 @@ let build_lambda toabstract stk (m : constr) =
     | (_, []) -> m
     | (n, (_,na,t)::tl) ->
 	if List.mem n toabstract then
-          buildrec (mkLambda (na,t,m)) (n+1) tl
+          buildrec (Constr.mkLambda (na,t,m)) (n+1) tl
         else
 	  buildrec (lift (-1) m) (n+1) tl
   in
@@ -98,8 +98,8 @@ let extract_bound_vars =
   | ([],_) -> []
   | (n::l,(na1,na2,_)::stk) when k = n ->
       begin match na1,na2 with
-      | Name id1,Name _ -> list_insert (<) id1 (aux (k+1) (l,stk))
-      | Name _,Anonymous -> anomaly "Unnamed bound variable"
+      | Name id1,((Name _),_) -> list_insert (<) id1 (aux (k+1) (l,stk))
+      | Name _,(Anonymous,_) -> anomaly "Unnamed bound variable"
       | Anonymous,_ -> raise PatternMatchingFailure
       end
   | (l,_::stk) -> aux (k+1) (l,stk)
@@ -109,7 +109,7 @@ let extract_bound_vars =
 let dummy_constr = mkProp
 
 let rec make_renaming ids = function
-  | (Name id,Name _,_)::stk ->
+  | (Name id,(Name _, _),_)::stk ->
       let renaming = make_renaming ids stk in
       (try mkRel (list_index id ids) :: renaming
        with Not_found -> dummy_constr :: renaming)
@@ -137,6 +137,16 @@ let merge_binding allow_bound_rels stk n cT subst =
       else
 	raise PatternMatchingFailure in
   constrain (n,c) subst
+
+open Constr
+
+let binder_annot_of n b =
+  match b with
+  | Variable (an, impl) -> (n, (an, impl))
+  | Definition (an, _) -> (n, (an, false))
+
+let binder_of_letbinder_annot (na, b) =
+  (na, (b, false))
 
 let matches_core convert allow_partial_app allow_bound_rels pat c =
   let conv = match convert with
@@ -179,16 +189,17 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
       | PApp (PApp (h, a1), a2), _ ->
           sorec stk subst (PApp(h,Array.append a1 a2)) t
 
-      | PApp (PMeta (Some n),args1), App (c2,args2) when allow_partial_app ->
+      | PApp (PMeta (Some n),args1), App (c2,an2,args2) when allow_partial_app ->
           let p = Array.length args2 - Array.length args1 in
           if p>=0 then
             let args21, args22 = array_chop p args2 in
-	    let c = mkApp(c2,args21) in
+	    let ans21, ans22 = array_chop p an2 in
+	    let c = mkApp(c2,ans21,args21) in
             let subst = merge_binding allow_bound_rels stk n c subst in
             array_fold_left2 (sorec stk) subst args1 args22
           else raise PatternMatchingFailure
 
-      | PApp (c1,arg1), App (c2,arg2) ->
+      | PApp (c1,arg1), App (c2,an2,arg2) ->
         (try array_fold_left2 (sorec stk) (sorec stk subst c1 c2) arg1 arg2
          with Invalid_argument _ -> raise PatternMatchingFailure)
 
@@ -201,7 +212,8 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
             (add_binders na1 na2 (sorec stk subst c1 c2)) d1 d2
 
       | PLetIn (na1,c1,d1), LetIn(na2,c2,t2,d2) ->
-	  sorec ((na1,na2,t2)::stk)
+	let na2 = binder_of_letbinder_annot na2 in
+	sorec ((na1,na2,t2)::stk)
             (add_binders na1 na2 (sorec stk subst c1 c2)) d1 d2
 
       | PIf (a1,b1,b1'), Case (ci,_,a2,[|b2;b2'|]) ->
@@ -211,9 +223,9 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
           let n' = rel_context_length ctx' in
 	  if noccur_between 1 n b2 & noccur_between 1 n' b2' then
 	    let s =
-	      List.fold_left (fun l (na,_,t) -> (Anonymous,na,t)::l) stk ctx in
+	      List.fold_left (fun l (na,b,t) -> (Anonymous,binder_annot_of na b,t)::l) stk ctx in
 	    let s' =
-	      List.fold_left (fun l (na,_,t) -> (Anonymous,na,t)::l) stk ctx' in
+	      List.fold_left (fun l (na,b,t) -> (Anonymous,binder_annot_of na b,t)::l) stk ctx' in
 	    let b1 = lift_pattern n b1 and b1' = lift_pattern n' b1' in
   	    sorec s' (sorec s (sorec stk subst a1 a2) b1 b2) b1' b2'
           else
@@ -230,7 +242,7 @@ let matches_core convert allow_partial_app allow_bound_rels pat c =
 	    assert (j < n2);
 	    sorec stk subst c br2.(j)
 	  in
-	  let chk_head = sorec stk (sorec stk subst a1 a2) p1 p2 in
+	  let chk_head = sorec stk (sorec stk subst a1 a2) p1 (case_pred p2) in
 	  List.fold_left chk_branch chk_head br1
 
       |	PFix c1, Fix _ when eq_constr (mkFix c1) cT -> subst
@@ -281,15 +293,16 @@ let sub_match ?(partial_app=false) ?(closed=true) pat c =
       authorized_occ partial_app closed pat c mk_ctx (fun () ->
         let mk_ctx = function [c1;c2] -> mkLetIn (x,c1,t,c2) | _ -> assert false
         in try_aux [c1;c2] mk_ctx next)
-  | App (c1,lc) ->
+  | App (c1,an,lc) ->
       authorized_occ partial_app closed pat c mk_ctx (fun () ->
         let topdown = true in
 	if partial_app then
           if topdown then
             let lc1 = Array.sub lc 0 (Array.length lc - 1) in
-            let app = mkApp (c1,lc1) in
+            let an1 = Array.sub an 0 (Array.length lc - 1) in
+            let app = mkApp (c1,an1,lc1) in
             let mk_ctx = function
-              | [app';c] -> mk_ctx (mkApp (app',[|c|]))
+              | [app';c] -> mk_ctx (mkApp (app',[|array_last an|],[|c|]))
               | _ -> assert false in
 	    try_aux [app;array_last lc] mk_ctx next
           else
@@ -297,17 +310,17 @@ let sub_match ?(partial_app=false) ?(closed=true) pat c =
               match args with
               | [] ->
                   let mk_ctx le =
-                    mk_ctx (mkApp (List.hd le, Array.of_list (List.tl le))) in
+                    mk_ctx (Term.mkApp (List.hd le, Array.of_list (List.tl le))) in
 	          try_aux (c1::Array.to_list lc) mk_ctx next
 	      | arg :: args ->
-                  let app = mkApp (app,[|arg|]) in
+                  let app = Term.mkApp (app,[|arg|]) in
                   let next () = aux2 app args next in
-                  let mk_ctx ce = mk_ctx (mkApp (ce, Array.of_list args)) in
+                  let mk_ctx ce = mk_ctx (Term.mkApp (ce, Array.of_list args)) in
                   aux app mk_ctx next in
             aux2 c1 (Array.to_list lc) next
         else
           let mk_ctx le =
-            mk_ctx (mkApp (List.hd le, Array.of_list (List.tl le))) in
+            mk_ctx (mkApp (List.hd le, an, Array.of_list (List.tl le))) in
 	  try_aux (c1::Array.to_list lc) mk_ctx next)
   | Case (ci,hd,c1,lc) ->
       authorized_occ partial_app closed pat c mk_ctx (fun () ->

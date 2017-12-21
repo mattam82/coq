@@ -113,9 +113,9 @@ open Proof_type
 open Redexpr
 open Refiner
 open Tacmach
-open Decl_proof_instr
 open Tactic_debug
-open Decl_mode
+(*open Decl_proof_instr*)
+(*open Decl_mode*)
 
 open Auto
 open Autorewrite

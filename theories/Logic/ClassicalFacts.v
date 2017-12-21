@@ -106,6 +106,7 @@ Qed.
 (************************************************************************)
 (** ** CC |- prop ext + A inhabited -> (A = A->A) -> A has fixpoint *)
 
+
 (** We successively show that:
 
    [prop_extensionality]
@@ -126,8 +127,14 @@ Proof.
   apply (Ext (A -> A) A); split; [ exact (fun _ => a) | exact (fun _ _ => a) ].
 Qed.
 
+Inductive eq_prop {A : Prop} (a : A) : A -> Prop :=
+| refl_eq_prop : eq_prop a a. 
+
+Implicit Arguments refl_eq_prop [[A] [a]].
+Infix "=p" := eq_prop (at level 90).
+
 Record retract (A B:Prop) : Prop :=
-  {f1 : A -> B; f2 : B -> A; f1_o_f2 : forall x:B, f1 (f2 x) = x}.
+  {f1 : A -> B; f2 : B -> A; f1_o_f2 : forall x:B, (f1 (f2 x)) =p x}.
 
 Lemma prop_ext_retract_A_A_imp_A :
   prop_extensionality -> forall A:Prop, inhabited A -> retract A (A -> A).
@@ -139,8 +146,8 @@ Proof.
 Qed.
 
 Record has_fixpoint (A:Prop) : Prop :=
-  {F : (A -> A) -> A; Fix : forall f:A -> A, F f = f (F f)}.
-
+  {F : (A -> A) -> A; Fix : forall f:A -> A, F f =p f (F f)}.
+Require Import Setoid.
 Lemma ext_prop_fixpoint :
   prop_extensionality -> forall A:Prop, inhabited A -> has_fixpoint A.
 Proof.
@@ -148,8 +155,8 @@ Proof.
   case (prop_ext_retract_A_A_imp_A Ext A a); intros g1 g2 g1_o_g2.
   exists (fun f => (fun x:A => f (g1 x x)) (g2 (fun x => f (g1 x x)))).
   intro f.
-  pattern (g1 (g2 (fun x:A => f (g1 x x)))) at 1 in |- *.
-  rewrite (g1_o_g2 (fun x:A => f (g1 x x))).
+  (* pattern (g1 (g2 (fun x:A => f (g1 x x)))) at 1 in |- *. *)
+  (* rewrite (g1_o_g2 (fun x:A => f (g1 x x))). *)
   reflexivity.
 Qed.
 
@@ -161,7 +168,7 @@ Qed.
 (** ** CC |- prop_ext /\ dep elim on bool -> proof-irrelevance  *)
 
 (** [proof_irrelevance] asserts equality of all proofs of a given formula *)
-Definition proof_irrelevance := forall (A:Prop) (a1 a2:A), a1 = a2.
+Definition proof_irrelevance := forall (A:Prop) (a1 a2:A), a1 =p a2.
 
 (** Assume that we have booleans with the property that there is at most 2
     booleans (which is equivalent to dependent case analysis). Consider
@@ -180,39 +187,42 @@ Section Proof_irrelevance_gen.
   Variable false : bool.
   Hypothesis bool_elim : forall C:Prop, C -> C -> bool -> C.
   Hypothesis
-    bool_elim_redl : forall (C:Prop) (c1 c2:C), c1 = bool_elim C c1 c2 true.
+    bool_elim_redl : forall (C:Prop) (c1 c2:C), c1 =p bool_elim C c1 c2 true.
   Hypothesis
-    bool_elim_redr : forall (C:Prop) (c1 c2:C), c2 = bool_elim C c1 c2 false.
+    bool_elim_redr : forall (C:Prop) (c1 c2:C), c2 =p bool_elim C c1 c2 false.
   Let bool_dep_induction :=
   forall P:bool -> Prop, P true -> P false -> forall b:bool, P b.
 
-  Lemma aux : prop_extensionality -> bool_dep_induction -> true = false.
+  Lemma aux : prop_extensionality -> bool_dep_induction -> true =p false.
   Proof.
-    intros Ext Ind.
-    case (ext_prop_fixpoint Ext bool true); intros G Gfix.
-    set (neg := fun b:bool => bool_elim bool false true b).
-    generalize (refl_equal (G neg)).
-    pattern (G neg) at 1 in |- *.
-    apply Ind with (b := G neg); intro Heq.
-    rewrite (bool_elim_redl bool false true).
-    change (true = neg true) in |- *; rewrite Heq; apply Gfix.
-    rewrite (bool_elim_redr bool false true).
-    change (neg false = false) in |- *; rewrite Heq; symmetry  in |- *;
-      apply Gfix.
-  Qed.
+    reflexivity.
+  Defined.
+  (*   intros Ext Ind. *)
+  (*   case (ext_prop_fixpoint Ext bool true); intros G Gfix. *)
+  (*   set (neg := fun b:bool => bool_elim bool false true b). *)
+  (*   generalize (refl_eq_prop (a:=G neg)). *)
+  (*   pattern (G neg) at 1 in |- *. *)
+  (*   apply Ind with (b := G neg); intro Heq. *)
+  (*   rewrite (bool_elim_redl bool false true). *)
+  (*   change (true = neg true) in |- *; rewrite Heq; apply Gfix. *)
+  (*   rewrite (bool_elim_redr bool false true). *)
+  (*   change (neg false = false) in |- *; rewrite Heq; symmetry  in |- *; *)
+  (*     apply Gfix. *)
+  (* Qed. *)
 
   Lemma ext_prop_dep_proof_irrel_gen :
     prop_extensionality -> bool_dep_induction -> proof_irrelevance.
-  Proof.
-    intros Ext Ind A a1 a2.
-    set (f := fun b:bool => bool_elim A a1 a2 b).
-    rewrite (bool_elim_redl A a1 a2).
-    change (f true = a2) in |- *.
-    rewrite (bool_elim_redr A a1 a2).
-    change (f true = f false) in |- *.
-    rewrite (aux Ext Ind).
-    reflexivity.
+  Proof. intros. intro. reflexivity.
   Qed.
+  (*   intros Ext Ind A a1 a2. *)
+  (*   set (f := fun b:bool => bool_elim A a1 a2 b). *)
+  (*   rewrite (bool_elim_redl A a1 a2). *)
+  (*   change (f true = a2) in |- *. *)
+  (*   rewrite (bool_elim_redr A a1 a2). *)
+  (*   change (f true = f false) in |- *. *)
+  (*   rewrite (aux Ext Ind). *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
 End Proof_irrelevance_gen.
 
@@ -220,6 +230,8 @@ End Proof_irrelevance_gen.
     proposition bool = (C:Prop)C->C->C but we cannot prove that it has at
     most 2 elements.
 *)
+
+(*
 
 Section Proof_irrelevance_Prop_Ext_CC.
 
@@ -568,3 +580,4 @@ Proof.
     exists x0; exact Hnot.
 Qed.
 
+*)

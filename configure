@@ -454,7 +454,7 @@ case $CAMLVERSION in
 	    echo "          Configuration script failed!"
 	    exit 1
 	fi;;
-    3.11.2|3.12*)
+    3.11.2|3.12*|4.*)
 	CAMLP4COMPAT="-loc loc" 
 	echo "You have Objective-Caml $CAMLVERSION. Good!";;
     *)
@@ -546,7 +546,7 @@ if [ "$usecamlp5" = "yes" ]; then
 
     camlp4oexec=`echo $camlp4oexec | sed -e 's/4/5/'`
     case `$camlp4oexec -v 2>&1` in
-	*4.0*|*5.00*)
+	*5.00*)
 	    echo "Camlp5 version < 5.01 not supported."
 	    echo "Configuration script failed!"
 	    exit 1;;

@@ -155,7 +155,7 @@ val concrete_clause_of : clause -> goal sigma -> concrete_clause
 
 type branch_args = {
   ity        : inductive;   (** the type we were eliminating on *)
-  largs      : constr list; (** its arguments *)
+  largs      : constr args_list; (** its arguments *)
   branchnum  : int;         (** the branch number *)
   pred       : constr;      (** the predicate we used *)
   nassums    : int;         (** the number of assumptions to be introduced *)

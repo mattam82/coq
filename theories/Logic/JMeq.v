@@ -41,7 +41,31 @@ Proof.
 destruct 2; trivial.
 Qed.
 
-Axiom JMeq_eq : forall (A:Type) (x y:A), JMeq x y -> x = y.
+(** [JMeq] is equivalent to [eq_dep Type (fun X => X)] *)
+
+Require Import Eqdep.
+
+Lemma JMeq_eq_dep_id :
+ forall (A B:Type) (x:A) (y:B), JMeq x y -> eq_dep Type (fun X => X) A x B y.
+Proof.
+destruct 1.
+apply eq_dep_intro.
+Defined.
+
+Lemma eq_dep_id_JMeq :
+ forall (A B:Type) (x:A) (y:B), eq_dep Type (fun X => X) A x B y -> JMeq x y.
+Proof.
+destruct 1.
+apply JMeq_refl.
+Defined.
+
+Lemma JMeq_eq : forall (A:Type) (x y:A), JMeq x y -> x = y.
+Proof.
+  intros.
+  apply JMeq_eq_dep_id in H.
+  apply eq_dep_eq in H.
+  assumption.
+Defined.
 
 Lemma JMeq_ind : forall (A:Type) (x:A) (P:A -> Prop),
   P x -> forall y, JMeq x y -> P y.
@@ -85,24 +109,6 @@ Proof.
 intros A x B f y H; case JMeq_eq with (1 := H); trivial.
 Qed.
 
-(** [JMeq] is equivalent to [eq_dep Type (fun X => X)] *)
-
-Require Import Eqdep.
-
-Lemma JMeq_eq_dep_id :
- forall (A B:Type) (x:A) (y:B), JMeq x y -> eq_dep Type (fun X => X) A x B y.
-Proof.
-destruct 1.
-apply eq_dep_intro.
-Qed.
-
-Lemma eq_dep_id_JMeq :
- forall (A B:Type) (x:A) (y:B), eq_dep Type (fun X => X) A x B y -> JMeq x y.
-Proof.
-destruct 1.
-apply JMeq_refl.
-Qed.
-
 (** [eq_dep U P p x q y] is strictly finer than [JMeq (P p) x (P q) y] *)
 
 Lemma eq_dep_JMeq :
@@ -115,8 +121,8 @@ Qed.
 Lemma eq_dep_strictly_stronger_JMeq :
  exists U P p q x y, JMeq x y /\ ~ eq_dep U P p x q y.
 Proof.
-exists bool. exists (fun _ => True). exists true. exists false.
-exists I. exists I.
+exists bool. exists (fun _ => unit). exists true. exists false.
+exists tt. exists tt.
 split.
 trivial.
 intro H.
@@ -128,7 +134,7 @@ Qed.
     is as strong as [eq_dep U P p x q y] (this uses [JMeq_eq]) *)
 
 Lemma JMeq_eq_dep : 
-  forall U (P:U->Prop) p q (x:P p) (y:P q), 
+  forall U (P:U->Type) p q (x:P p) (y:P q), 
   p = q -> JMeq x y -> eq_dep U P p x q y.
 Proof.
 intros.
@@ -136,7 +142,6 @@ destruct H.
 apply JMeq_eq in H0 as ->.
 reflexivity.
 Qed.
-
 
 (* Compatibility *)
 Notation sym_JMeq := JMeq_sym (only parsing).

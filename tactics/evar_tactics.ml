@@ -30,14 +30,14 @@ let instantiate n (ist,rawc) ido gl =
 	    match hloc with
 		InHyp ->
 		  (match decl with
-		      (_,None,typ) -> evar_list sigma typ
+		      (_,Variable _,typ) -> evar_list sigma typ
 		    | _ -> error
 			"Please be more specific: in type or value?")
 	      | InHypTypeOnly ->
 		  let (_, _, typ) = decl in evar_list sigma typ
 	      | InHypValueOnly ->
 		  (match decl with
-		      (_,Some body,_) -> evar_list sigma body
+		      (_,Definition (_, body),_) -> evar_list sigma body
 		    | _ -> error "Not a defined hypothesis.") in
     if List.length evl < n then
       error "Not enough uninstantiated existential variables.";

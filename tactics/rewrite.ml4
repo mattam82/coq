@@ -115,20 +115,20 @@ let proper_type = lazy (constr_of_global (Lazy.force proper_class).cl_impl)
 let proper_proxy_type = lazy (constr_of_global (Lazy.force proper_proxy_class).cl_impl)
 
 let is_applied_rewrite_relation env sigma rels t =
-  match kind_of_term t with
-  | App (c, args) when Array.length args >= 2 ->
+  let c, args = Constr.decompose_app_args t in
+    if Constr.args_length args >= 2 then
       let head = if isApp c then fst (destApp c) else c in
 	if eq_constr (Lazy.force coq_eq) head then None
 	else
 	  (try
-	      let params, args = array_chop (Array.length args - 2) args in
-	      let env' = Environ.push_rel_context rels env in
-	      let evd, evar = Evarutil.new_evar sigma env' (new_Type ()) in
-	      let inst = mkApp (Lazy.force rewrite_relation_class, [| evar; mkApp (c, params) |]) in
-	      let _ = Typeclasses.resolve_one_typeclass env' evd inst in
-		Some (it_mkProd_or_LetIn t rels)
-	  with _ -> None)
-  | _ -> None
+	     let params, args = Constr.chop_args (Constr.args_length args - 2) args in
+	     let env' = Environ.push_rel_context rels env in
+	     let evd, evar = Evarutil.new_evar sigma env' (new_Type ()) in
+	     let inst = mkApp (Lazy.force rewrite_relation_class, [| evar; Constr.app_args (c, params) |]) in
+	     let _ = Typeclasses.resolve_one_typeclass env' evd inst in
+	       Some (it_mkProd_or_LetIn t rels)
+	   with _ -> None)
+    else None
 
 let _ =
   Equality.register_is_applied_rewrite_relation is_applied_rewrite_relation
@@ -160,21 +160,21 @@ let build_signature evars env m (cstrs : (types * types option) option list)
   in
   let rec aux env evars ty l =
     let t = Reductionops.whd_betadeltaiota env (fst evars) ty in
-      match kind_of_term t, l with
-      | Prod (na, ty, b), obj :: cstrs ->
+      match Constr.kind_of_term t, l with
+      | Constr.Prod (na, ty, b), obj :: cstrs ->
 	  if noccurn 1 b (* non-dependent product *) then
 	    let ty = Reductionops.nf_betaiota (fst evars) ty in
 	    let (evars, b', arg, cstrs) = aux env evars (subst1 mkProp b) cstrs in
 	    let evars, relty = mk_relty evars env ty obj in
 	    let newarg = mkApp (Lazy.force respectful, [| ty ; b' ; relty ; arg |]) in
-	      evars, mkProd(na, ty, b), newarg, (ty, Some relty) :: cstrs
+	      evars, Constr.mkProd(na, ty, b), newarg, (ty, Some relty) :: cstrs
 	  else
-	    let (evars, b, arg, cstrs) = aux (Environ.push_rel (na, None, ty) env) evars b cstrs in
+	    let (evars, b, arg, cstrs) = aux (Environ.push_rel (var_decl_of na ty) env) evars b cstrs in
 	    let ty = Reductionops.nf_betaiota (fst evars) ty in
-	    let pred = mkLambda (na, ty, b) in
-	    let liftarg = mkLambda (na, ty, arg) in
+	    let pred = Constr.mkLambda (na, ty, b) in
+	    let liftarg = Constr.mkLambda (na, ty, arg) in
 	    let arg' = mkApp (Lazy.force forall_relation, [| ty ; pred ; liftarg |]) in
-	      if obj = None then evars, mkProd(na, ty, b), arg', (ty, None) :: cstrs
+	      if obj = None then evars, Constr.mkProd(na, ty, b), arg', (ty, None) :: cstrs
 	      else error "build_signature: no constraint can apply on a dependent argument"
       | _, obj :: _ -> anomaly "build_signature: not enough products"
       | _, [] ->
@@ -200,7 +200,7 @@ let find_class_proof proof_type proof_method env evars carrier relation =
     let goal = mkApp (Lazy.force proof_type, [| carrier ; relation |]) in
     let evars', c = Typeclasses.resolve_one_typeclass env evars goal in
       if extends_undefined evars evars' then raise Not_found
-      else mkApp (Lazy.force proof_method, [| carrier; relation; c |])
+      else Constr.mkApp (Lazy.force proof_method, [|Expl;Expl;Irr|], [| carrier; relation; c |])
   with e when Logic.catchable_exception e -> raise Not_found
 
 let get_reflexive_proof env = find_class_proof reflexive_type reflexive_proof env
@@ -236,19 +236,18 @@ let evd_convertible env evd x y =
   with _ -> false
 
 let rec decompose_app_rel env evd t = 
-  match kind_of_term t with
-  | App (f, args) -> 
-      if Array.length args > 1 then 
-	let fargs, args = array_chop (Array.length args - 2) args in
-	  mkApp (f, fargs), args
-      else 
-	let (f', args) = decompose_app_rel env evd args.(0) in
-	let ty = Typing.type_of env evd args.(0) in
-	let f'' = mkLambda (Name (id_of_string "x"), ty,
-	  mkLambda (Name (id_of_string "y"), lift 1 ty,
-	    mkApp (lift 2 f, [| mkApp (lift 2 f', [| mkRel 2; mkRel 1 |]) |])))
-	in (f'', args)
-  | _ -> error "The term provided is not an applied relation."
+  let f, args = Constr.decompose_app_args t in
+    if Constr.args_length args > 1 then 
+      let fargs, args = Constr.chop_args (Constr.args_length args - 2) args in
+	Constr.app_args (f, fargs), args
+    else if Constr.args_length args = 1 then
+      let (f', args) = decompose_app_rel env evd (snd args).(0) in
+      let ty = Typing.type_of env evd (snd args).(0) in
+      let f'' = mkLambda (Name (id_of_string "x"), ty,
+			  mkLambda (Name (id_of_string "y"), lift 1 ty,
+				    mkApp (lift 2 f, [| mkApp (lift 2 f', [| mkRel 2; mkRel 1 |]) |])))
+      in (f'', args)
+    else error "The term provided is not an applied relation."
 
 (*   let nc, c', cl = push_rel_context_to_named_context env c in *)
 (*   let env' = reset_with_named_context nc env in *)
@@ -259,7 +258,7 @@ let decompose_applied_relation env sigma flags orig (c,l) left2right =
   let find_rel ty =
     let eqclause = Clenv.make_clenv_binding_env_apply env sigma None (c',ty) l in
     let (equiv, args) = decompose_app_rel env eqclause.evd (Clenv.clenv_type eqclause) in
-    let c1 = args.(0) and c2 = args.(1) in 
+    let c1 = (snd args).(0) and c2 = (snd args).(1) in 
     let ty1, ty2 =
       Typing.type_of env eqclause.evd c1, Typing.type_of env eqclause.evd c2
     in
@@ -389,8 +388,9 @@ let unify_eqn env sigma hypinfo t =
     let res =
       if l2r then (prf, (car, rel, c1, c2))
       else
-	try (mkApp (get_symmetric_proof env env'.evd car rel,
-		   [| c1 ; c2 ; prf |]),
+	try (Constr.mkApp (get_symmetric_proof env env'.evd car rel,
+			   [| Expl; Expl; Irr |],
+			   [| c1 ; c2 ; prf |]),
 	    (car, rel, c2, c1))
 	with Not_found ->
 	  (prf, (car, inverse car rel, c2, c1))
@@ -472,7 +472,7 @@ let rec decomp_pointwise n c =
     | App (f, [| a; b; relb |]) when eq_constr f (Lazy.force pointwise_relation) ->
 	decomp_pointwise (pred n) relb
     | App (f, [| a; b; arelb |]) when eq_constr f (Lazy.force forall_relation) ->
-	decomp_pointwise (pred n) (Reductionops.beta_applist (arelb, [mkRel 1]))
+	decomp_pointwise (pred n) (Reductionops.beta_applist (arelb, [Expl], [mkRel 1]))
     | _ -> raise (Invalid_argument "decomp_pointwise")
 	
 let rec apply_pointwise rel = function
@@ -481,7 +481,7 @@ let rec apply_pointwise rel = function
       | App (f, [| a; b; relb |]) when eq_constr f (Lazy.force pointwise_relation) ->
 	  apply_pointwise relb args
       | App (f, [| a; b; arelb |]) when eq_constr f (Lazy.force forall_relation) ->
-	  apply_pointwise (Reductionops.beta_applist (arelb, [arg])) args
+	  apply_pointwise (Reductionops.beta_applist (arelb, [Expl], [arg])) args
       | _ -> raise (Invalid_argument "apply_pointwise"))
   | [] -> rel
 
@@ -502,16 +502,16 @@ let lift_cstr env sigma evars (args : constr list) c ty cstr =
   let rec aux env prod n = 
     if n = 0 then start env prod
     else
-      match kind_of_term (Reduction.whd_betadeltaiota env prod) with
-      | Prod (na, ty, b) ->
+      match Constr.kind_of_term (Reduction.whd_betadeltaiota env prod) with
+      | Constr.Prod (na, ty, b) ->
 	  if noccurn 1 b then
 	    let b' = lift (-1) b in
 	    let rb = aux env b' (pred n) in
 	      mkApp (Lazy.force pointwise_relation, [| ty; b'; rb |])
 	  else
-	    let rb = aux (Environ.push_rel (na, None, ty) env) b (pred n) in
+	    let rb = aux (Environ.push_rel (var_decl_of na ty) env) b (pred n) in
 	      mkApp (Lazy.force forall_relation, 
-		    [| ty; mkLambda (na, ty, b); mkLambda (na, ty, rb) |])
+		    [| ty; Constr.mkLambda (na, ty, b); Constr.mkLambda (na, ty, rb) |])
       | _ -> raise Not_found
   in 
   let rec find env c ty = function
@@ -570,7 +570,7 @@ let resolve_subrelation env avoid car rel prf rel' res =
 (*   with NotConvertible -> *)
     let app = mkApp (Lazy.force subrelation, [|car; rel; rel'|]) in
     let evars, subrel = new_cstr_evar res.rew_evars env app in
-    let appsub = mkApp (subrel, [| res.rew_from ; res.rew_to ; prf |]) in
+    let appsub = Constr.mkApp (subrel, [| Expl; Expl; Irr |], [| res.rew_from ; res.rew_to ; prf |]) in
       { res with
 	rew_prf = RewPrf (rel', appsub);
 	rew_evars = evars }
@@ -592,7 +592,8 @@ let resolve_morphism env avoid oldt m ?(fnewt=fun x -> x) args args' cstr evars 
     let cl_args = [| appmtype' ; signature ; appm |] in
     let app = mkApp (Lazy.force proper_type, cl_args) in
     let env' = Environ.push_named
-      (id_of_string "do_subrelation", Some (Lazy.force do_subrelation), Lazy.force apply_subrelation)
+      (id_of_string "do_subrelation", 
+       Definition (Irr, Lazy.force do_subrelation), Lazy.force apply_subrelation)
       env
     in
     let evars, morph = new_cstr_evar evars env' app in
@@ -663,10 +664,11 @@ let make_leibniz_proof c ty r =
     | RewPrf (rel, prf) -> 
 	let rel = mkApp (Lazy.force coq_eq, [| ty |]) in
 	let prf =
-	  mkApp (Lazy.force coq_f_equal,
-		[| r.rew_car; ty;
-		   mkLambda (Anonymous, r.rew_car, c);
-		   r.rew_from; r.rew_to; prf |])
+	  Constr.mkApp (Lazy.force coq_f_equal,
+			[| Expl; Expl; Expl; Expl; Expl; Irr |],
+			[| r.rew_car; ty;
+			   mkLambda (Anonymous, r.rew_car, c);
+			   r.rew_from; r.rew_to; prf |])
 	in RewPrf (rel, prf)
     | RewCast k -> r.rew_prf
   in
@@ -678,11 +680,13 @@ open Elimschemes
 let reset_env env =
   let env' = Global.env_of_context (Environ.named_context_val env) in
     Environ.push_rel_context (Environ.rel_context env) env'
+
+let (@@) = Constr.concat_argsl
       
 let fold_match ?(force=false) env sigma c =
   let (ci, p, c, brs) = destCase c in
   let cty = Retyping.get_type_of env sigma c in
-  let dep, pred, exists, sk = 
+  let dep, pred, exists, sortp, sortc, sk = 
     let env', ctx, body =
       let ctx, pred = decompose_lam_assum p in
       let env' = Environ.push_rel_context ctx env in
@@ -710,14 +714,19 @@ let fold_match ?(force=false) env sigma c =
     in 
     let exists = Ind_tables.check_scheme sk ci.ci_ind in
       if exists || force then
-	dep, pred, exists, Ind_tables.find_scheme sk ci.ci_ind
+	dep, pred, exists, sortp, sortc, Ind_tables.find_scheme sk ci.ci_ind
       else raise Not_found
   in
   let app =
+    let irrp = relevance_of_sorts_family sortp 
+    and irrc = relevance_of_sorts_family sortc in
     let ind, args = Inductive.find_rectype env cty in
-    let pars, args = list_chop ci.ci_npar args in
+    let pars, args = Constr.chop_argsl ci.ci_npar args in
     let meths = List.map (fun br -> br) (Array.to_list brs) in
-      applist (mkConst sk, pars @ [pred] @ meths @ args @ [c])
+    let methsann = list_make (List.length meths) irrp in
+      Constr.app_argsl (mkConst sk, 
+		 pars @@ ([Expl],[pred]) @@ 
+		 (methsann, meths) @@ args @@ ([irrc],[c]))
   in 
     sk, (if exists then env else reset_env env), app
       
@@ -737,8 +746,8 @@ let coerce env avoid cstr res =
 let subterm all flags (s : strategy) : strategy =
   let rec aux env avoid t ty cstr evars =
     let cstr' = Option.map (fun c -> (ty, Some c)) cstr in
-      match kind_of_term t with
-      | App (m, args) ->
+      match Constr.kind_of_term t with
+      | Constr.App (m, an, args) ->
 	  let rewrite_args success =
 	    let args', evars', progress =
 	      Array.fold_left
@@ -812,7 +821,7 @@ let subterm all flags (s : strategy) : strategy =
 		      | _ -> Some (Some res)
 	    else rewrite_args None
 	      
-      | Prod (n, x, b) when noccurn 1 b ->
+      | Constr.Prod (n, x, b) when noccurn 1 b ->
 	  let b = subst1 mkProp b in
 	  let tx = Typing.type_of env (goalevars evars) x and tb = Typing.type_of env (goalevars evars) b in
 	  let res = aux env avoid (mkApp (arrow_morphism tx tb, [| x; b |])) ty cstr evars in
@@ -834,8 +843,8 @@ let subterm all flags (s : strategy) : strategy =
       (* 		  in res, occ *)
       (* 		else *)
 
-      | Prod (n, dom, codom) ->
-	  let lam = mkLambda (n, dom, codom) in
+      | Constr.Prod (n, dom, codom) ->
+	  let lam = Constr.mkLambda (n, dom, codom) in
 	  let app, unfold = 
 	    if eq_constr ty mkProp then
 	      mkApp (Lazy.force coq_all, [| dom; lam |]), unfold_all
@@ -846,34 +855,34 @@ let subterm all flags (s : strategy) : strategy =
 	     | Some (Some r) -> Some (Some { r with rew_to = unfold r.rew_to })
 	     | _ -> res)
 
-      | Lambda (n, t, b) when flags.under_lambdas ->
-	  let n' = name_app (fun id -> Tactics.fresh_id_in_env avoid id env) n in
-	  let env' = Environ.push_rel (n', None, t) env in
+      | Constr.Lambda (n, t, b) when flags.under_lambdas ->
+	  let n' = map_binder (name_app (fun id -> Tactics.fresh_id_in_env avoid id env)) n in
+	  let env' = Environ.push_rel (var_decl_of n t) env in
 	  let b' = s env' avoid b (Typing.type_of env' (goalevars evars) b) (unlift_cstr env (goalevars evars) cstr) evars in
 	    (match b' with
 	    | Some (Some r) ->
 		let prf = match r.rew_prf with
 		  | RewPrf (rel, prf) ->
-		      let rel = pointwise_or_dep_relation n' t r.rew_car rel in
-		      let prf = mkLambda (n', t, prf) in
+		      let rel = pointwise_or_dep_relation (name_of n') t r.rew_car rel in
+		      let prf = Constr.mkLambda (n', t, prf) in
 			RewPrf (rel, prf)
 		  | x -> x
 		in
 		  Some (Some { r with
 		    rew_prf = prf;
-		    rew_car = mkProd (n, t, r.rew_car);
-		    rew_from = mkLambda(n, t, r.rew_from);
-		    rew_to = mkLambda (n, t, r.rew_to) })
+		    rew_car = Constr.mkProd (n, t, r.rew_car);
+		    rew_from = Constr.mkLambda(n, t, r.rew_from);
+		    rew_to = Constr.mkLambda (n, t, r.rew_to) })
 	    | _ -> b')
 
-      | Case (ci, p, c, brs) ->
+      | Constr.Case (ci, p, c, brs) ->
 	  let cty = Typing.type_of env (goalevars evars) c in
 	  let cstr' = Some (mkApp (Lazy.force coq_eq, [| cty |])) in
 	  let c' = s env avoid c cty cstr' evars in
 	  let res = 
 	    match c' with
 	    | Some (Some r) ->
-		let res = make_leibniz_proof (mkCase (ci, lift 1 p, mkRel 1, Array.map (lift 1) brs)) ty r in
+		let res = make_leibniz_proof (Constr.mkCase (ci, map_case_pred (lift 1) p, mkRel 1, Array.map (lift 1) brs)) ty r in
 		  Some (Some (coerce env avoid cstr res))
 	    | x ->
 	      if array_for_all ((=) 0) ci.ci_cstr_ndecls then
@@ -889,7 +898,7 @@ let subterm all flags (s : strategy) : strategy =
 		in
 		  match found with
 		  | Some r ->
-		    let ctxc = mkCase (ci, lift 1 p, lift 1 c, Array.of_list (List.rev (brs' x))) in
+		    let ctxc = Constr.mkCase (ci, map_case_pred (lift 1) p, lift 1 c, Array.of_list (List.rev (brs' x))) in
 		      Some (Some (make_leibniz_proof ctxc ty r))
 		  | None -> x
 	      else
@@ -1235,7 +1244,7 @@ let assert_replacing id newt tac =
 			fold_named_context
 			  (fun _ (n, b, t) inst ->
 			     if n = id then ev' :: inst
-			     else if b = None then mkVar n :: inst else inst)
+			     else if is_variable_body b then mkVar n :: inst else inst)
 			  env ~init:[]
 		      in
 		      let (e, args) = destEvar ev in
@@ -1255,7 +1264,7 @@ let cl_rewrite_clause_newtac ?abs strat clause =
 	| Some id, (undef, Some p, newt) ->
 	    assert_replacing id newt (Proofview.tclSENSITIVE (new_refine (undef, p)))
 	| Some id, (undef, None, newt) -> 
-	    Proofview.tclSENSITIVE (Goal.convert_hyp false (id, None, newt))
+	    Proofview.tclSENSITIVE (Goal.convert_hyp false (var_decl_of_name id newt))
 	| None, (undef, Some p, newt) ->
 	    let refable = Goal.Refinable.make
 	      (fun handle -> 
@@ -1469,7 +1478,7 @@ END
 let mkappc s l = CAppExpl (dummy_loc,(None,(Libnames.Ident (dummy_loc,id_of_string s))),l)
 
 let declare_an_instance n s args =
-  ((dummy_loc,Name n), Explicit,
+  ((dummy_loc,Name n), explicit_bk,
   CAppExpl (dummy_loc, (None, Qualid (dummy_loc, qualid_of_string s)),
 	   args))
 
@@ -1743,7 +1752,7 @@ let add_morphism glob binders m s n =
   init_setoid ();
   let instance_id = add_suffix n "_Proper" in
   let instance =
-    ((dummy_loc,Name instance_id), Explicit,
+    ((dummy_loc,Name instance_id), explicit_bk,
     CAppExpl (dummy_loc,
 	     (None, Qualid (dummy_loc, Libnames.qualid_of_string "Coq.Classes.Morphisms.Proper")),
 	     [cHole; s; m]))
@@ -1944,7 +1953,7 @@ let implify id gl =
   let binders,concl = decompose_prod_assum ctype in
   let ctype' =
     match binders with
-    | (_, None, ty as hd) :: tl when noccurn 1 concl ->
+    | (_, Variable _, ty as hd) :: tl when noccurn 1 concl ->
 	let env = Environ.push_rel_context tl (pf_env gl) in
 	let sigma = project gl in
 	let tyhd = Typing.type_of env sigma ty

@@ -207,8 +207,8 @@ let declare_class_instance gr ctx params =
   with e -> msgnl (str"Error defining instance := "++pr_constr def++str" : "++pr_constr typ++str"  "++Errors.print e)
 
 let rec iter_under_prod (f:rel_context->constr->unit) (ctx:rel_context) t = f ctx t;
-  match kind_of_term t with
-    | Prod (n,t,c) -> iter_under_prod f ((n,None,t)::ctx) c
+  match Constr.kind_of_term t with
+    | Constr.Prod (n,t,c) -> iter_under_prod f ((var_decl_of n t)::ctx) c
     | _ -> ()
 
 (* main search function: search for total instances containing gr, and
@@ -269,7 +269,7 @@ let declare_instance (k:global_reference -> rel_context -> constr list -> unit)
   let ngen = List.length gen in
   let (_,ctx,evm) = List.fold_left
     ( fun (i,ctx,evm) ev ->
-	let ctx = (Anonymous,None,lift (-i) (Evd.evar_concl(Evd.find evm ev)))::ctx in
+	let ctx = (var_decl_of_name Anonymous (lift (-i) (Evd.evar_concl(Evd.find evm ev))))::ctx in
 	let evm = subst_evar_in_evm ev (mkRel i) (Evd.remove evm ev) in
 	(i-1,ctx,evm)
     ) (ngen,[],evm) gen in

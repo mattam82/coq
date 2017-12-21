@@ -223,6 +223,8 @@ val array_fold_left2 :
   ('a -> 'b -> 'c -> 'a) -> 'a -> 'b array -> 'c array -> 'a
 val array_fold_left3 :
   ('a -> 'b -> 'c -> 'd -> 'a) -> 'a -> 'b array -> 'c array -> 'd array -> 'a
+val array_fold_left4 :
+  ('a -> 'b -> 'c -> 'd -> 'e -> 'a) -> 'a -> 'b array -> 'c array -> 'd array -> 'e array -> 'a
 val array_fold_left2_i :
   (int -> 'a -> 'b -> 'c -> 'a) -> 'a -> 'b array -> 'c array -> 'a
 val array_fold_left_from : int -> ('a -> 'b -> 'a) -> 'a -> 'b array -> 'a
@@ -231,6 +233,7 @@ val array_app_tl : 'a array -> 'a list -> 'a list
 val array_list_of_tl : 'a array -> 'a list
 val array_map_to_list : ('a -> 'b) -> 'a array -> 'b list
 val array_chop : int -> 'a array -> 'a array * 'a array
+val array_decompose_last : 'a array -> 'a array * 'a
 val array_smartmap : ('a -> 'a) -> 'a array -> 'a array
 val array_map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 val array_map2_i : (int -> 'a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array

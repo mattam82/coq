@@ -23,6 +23,10 @@ val xml_export : bool ref
 type load_proofs = Force | Lazy | Dont
 val load_proofs : load_proofs ref
 
+(* Allow universe cumulativity of Prop <= Type.
+   Incompatible with proof-irrelevance. *)
+val prop_type : bool ref
+
 val raw_print : bool ref
 val record_print : bool ref
 

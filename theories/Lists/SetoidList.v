@@ -832,7 +832,7 @@ compute.
 transitivity a; auto. symmetry; auto.
 rewrite <- IHl; auto.
 destruct (eqA_dec a a'); simpl in *.
-left; split; simpl; congruence.
+left; split; simpl. assumption. congruence.
 right. rewrite IHl; auto.
 Qed.
 

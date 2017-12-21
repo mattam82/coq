@@ -83,7 +83,7 @@ val error_number_branches_loc :
 
 val error_ill_typed_rec_body_loc :
   loc -> env -> Evd.evar_map ->
-      int -> name array -> unsafe_judgment array -> types array -> 'b
+      int -> name letbinder_annot array -> unsafe_judgment array -> types array -> 'b
 
 val error_not_a_type_loc :
   loc -> env -> Evd.evar_map -> unsafe_judgment -> 'b

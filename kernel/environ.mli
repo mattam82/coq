@@ -60,6 +60,8 @@ val push_rec_types   : rec_declaration -> env -> env
    raises [Not_found] if the index points out of the context *)
 val lookup_rel    : int -> env -> rel_declaration
 val evaluable_rel : int -> env -> bool
+val rel_value     : int -> env -> constr option
+val rel_body      : int -> env -> body
 
 (** {6 Recurrence on [rel_context] } *)
 
@@ -94,7 +96,8 @@ val lookup_named     : variable -> env -> named_declaration
 val lookup_named_val : variable -> named_context_val -> named_declaration
 val evaluable_named  : variable -> env -> bool
 val named_type : variable -> env -> types
-val named_body : variable -> env -> constr option
+val named_body : variable -> env -> body
+val named_value : variable -> env -> constr option
 
 (** {6 Recurrence on [named_context]: older declarations processed first } *)
 
@@ -131,6 +134,7 @@ exception NotEvaluableConst of const_evaluation_result
 
 val constant_value     : env -> constant -> constr
 val constant_type      : env -> constant -> constant_type
+val constant_relevance : env -> constant -> relevance
 val constant_opt_value : env -> constant -> constr option
 
 (** {5 Inductive types } *)
@@ -140,6 +144,9 @@ val add_mind : mutual_inductive -> mutual_inductive_body -> env -> env
 (** Looks up in the context of global inductive names 
    raises [Not_found] if the required path is not found *)
 val lookup_mind : mutual_inductive -> env -> mutual_inductive_body
+
+val lookup_ind : inductive -> env -> one_inductive_body
+val inductive_relevance : env -> inductive -> relevance
 
 (** {5 Modules } *)
 

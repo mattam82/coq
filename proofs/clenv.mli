@@ -120,16 +120,16 @@ val make_clenv_binding :
    [ccl] is [Meta n1=Meta n2]; if [n] is [Some 1], [lmetas] is [Meta n1]
    and [ccl] is [forall y, Meta n1=y -> y=Meta n1] *)
 val clenv_environments :
- evar_map -> int option -> types -> evar_map * constr list * types
+ evar_map -> int option -> types -> evar_map * constr args_list * types
 
 (** [clenv_environments_evars env sigma n t] does the same but returns
    a list of Evar's defined in [env] and extends [sigma] accordingly *)
 val clenv_environments_evars :
- env -> evar_map -> int option -> types -> evar_map * constr list * types
+ env -> evar_map -> int option -> types -> evar_map * constr args_list * types
 
 (** [clenv_conv_leq env sigma t c n] looks for c1...cn s.t. [t <= c c1...cn] *)
 val clenv_conv_leq :
- env -> evar_map -> types -> constr -> int -> constr list
+ env -> evar_map -> types -> constr -> int -> constr args_list
 
 (** if the clause is a product, add an extra meta for this product *)
 exception NotExtensibleClause

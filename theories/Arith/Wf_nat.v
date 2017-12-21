@@ -32,7 +32,7 @@ Proof.
   intros a ltSma.
   apply Acc_intro.
   unfold ltof in |- *; intros b ltfafb.
-  apply IHn.
+  refine (IHn _ _).
   apply lt_le_trans with (f a); auto with arith.
 Defined.
 

@@ -153,7 +153,7 @@ let build_newrecursive
         let arityc = Topconstr.prod_constr_expr arityc bl in
         let arity = Constrintern.interp_type sigma env0 arityc in
 	let impl = Constrintern.compute_internalization_data env0 Constrintern.Recursive arity [] in
-        (Environ.push_named (recname,None,arity) env, Idmap.add recname impl impls))
+        (Environ.push_named (var_decl_of_name recname arity) env, Idmap.add recname impl impls))
       (env0,Constrintern.empty_internalization_env) lnameargsardef in
   let recdef =
     (* Declare local notations *)
@@ -480,7 +480,7 @@ let register_mes fname rec_impls wf_mes_expr wf_rel_expr_opt wf_arg using_lemmas
 	    let b = Names.id_of_string "___b" in 
 	    Topconstr.mkLambdaC(
 	      [dummy_loc,Name a;dummy_loc,Name b],
-	      Topconstr.Default Lib.Explicit,
+	      Topconstr.default_binder_kind,
 	      wf_arg_type,
 	      Topconstr.mkAppC(wf_rel_expr,
 			       [

@@ -61,7 +61,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
  (*CSC: destroyed using Environ.j_type. Moreover I am pretty sure that the *)
  (*CSC: functions used do checks that we do not need                       *)
  let rec execute env sigma cstr expectedty =
-  let module T = Term in
+  let module T = Term.Constr in
   let module E = Environ in
    (* the type part is the synthesized type *)
    let judgement =
@@ -73,7 +73,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
      | T.Evar ((n,l) as ev) ->
         let ty = Unshare.unshare (Evd.existential_type sigma ev) in
         let jty = execute env sigma ty None in
-        let jty = assumption_of_judgment env sigma jty in
+        let jty,_ = assumption_of_judgment env sigma jty in
         let evar_context =
 	  E.named_context_of_val (Evd.find sigma n).Evd.evar_hyps in
          let rec iter actual_args evar_context =
@@ -87,7 +87,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
                 (function (m,bo,ty) ->
                   (* Warning: the substitution should be performed also on bo *)
                   (* This is not done since bo is not used later yet          *)
-                  (m,bo,Unshare.unshare (T.replace_vars [n,he1] ty))
+                  (m,bo,Unshare.unshare (Term.replace_vars [n,he1] ty))
                 ) tl2
               in
                iter tl1 tl2'
@@ -116,8 +116,8 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
         let expectedtype =
          Reduction.whd_betadeltaiota env (Retyping.get_type_of env sigma c) in
         let cj = execute env sigma c (Some expectedtype) in
-        let pj = execute env sigma p None in
-        let (expectedtypes,_,_) =
+        let pj = execute env sigma (Term.case_pred p) None in
+        let (expectedtypes,_,_,_) =
          let indspec = Inductive.find_rectype env cj.Environ.uj_type in
           Inductive.type_case_branches env indspec pj cj.Environ.uj_val
         in
@@ -130,17 +130,17 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
      | T.Fix ((vn,i as vni),recdef) ->
         let (_,tys,_ as recdef') = execute_recdef env sigma recdef in
         let fix = (vni,recdef') in
-        E.make_judge (T.mkFix fix) tys.(i)
+        E.make_judge (Term.mkFix fix) tys.(i)
 
      | T.CoFix (i,recdef) ->
         let (_,tys,_ as recdef') = execute_recdef env sigma recdef in
         let cofix = (i,recdef') in
-        E.make_judge (T.mkCoFix cofix) tys.(i)
+        E.make_judge (Term.mkCoFix cofix) tys.(i)
 
-     | T.Sort (T.Prop c) ->
+     | T.Sort (Term.Prop c) ->
         Typeops.judge_of_prop_contents c
 
-     | T.Sort (T.Type u) ->
+     | T.Sort (Term.Type u) ->
 (*CSC: In case of need, I refresh the universe. But exportation of the   *)
 (*CSC: right universe level information is destroyed. It must be changed *)
 (*CSC: again once Judicael will introduce his non-bugged algebraic       *)
@@ -152,7 +152,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
   Typeops.judge_of_type (Termops.new_univ ())
 )
 
-     | T.App (f,args) ->
+     | T.App (f,an,args) ->
         let expected_head =
          Reduction.whd_betadeltaiota env (Retyping.get_type_of env sigma f) in
         let j = execute env sigma f (Some expected_head) in
@@ -164,19 +164,19 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
               match T.kind_of_term (Reduction.whd_betadeltaiota env typ) with
                  T.Prod (_,c1,c2) ->
                   (Some (Reductionops.nf_beta sigma c1)) ::
-                   (aux (T.subst1 hj c2) restjl)
+                   (aux (Term.subst1 hj c2) restjl)
                | _ -> assert false
          in
           Array.of_list (aux j.Environ.uj_type (Array.to_list args))
         in
         let jl = execute_array env sigma args expected_args in
-        let (j,_) = Typeops.judge_of_apply env j jl in
+        let (j,_) = Typeops.judge_of_apply env j an jl in
          j
 
      | T.Lambda (name,c1,c2) ->
         let j = execute env sigma c1 None in
         let var = type_judgment env sigma j in
-        let env1 = E.push_rel (name,None,var.E.utj_val) env in
+        let env1 = E.push_rel (Term.var_decl_of name var.E.utj_val) env in
         let expectedc2type =
          match expectedty with
             None -> None
@@ -192,14 +192,14 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
      | T.Prod (name,c1,c2) ->
         let j = execute env sigma c1 None in
         let varj = type_judgment env sigma j in
-        let env1 = E.push_rel (name,None,varj.E.utj_val) env in
+        let env1 = E.push_rel (Term.var_decl_of name varj.E.utj_val) env in
         let j' = execute env1 sigma c2 None in
         (match type_judgment_cprop env1 sigma j' with
             Some varj' -> Typeops.judge_of_product env name varj varj'
           | None ->
              (* CProp found *)
              { Environ.uj_val = T.mkProd (name, j.Environ.uj_val, j'.Environ.uj_val);
-               Environ.uj_type = T.mkConst cprop })
+               Environ.uj_type = Term.mkConst cprop })
 
      | T.LetIn (name,c1,c2,c3) ->
 (*CSC: What are the right expected types for the source and *)
@@ -208,7 +208,7 @@ let double_type_of env sigma cstr expectedty subterms_to_types =
         let j2 = execute env sigma c2 None in
         let j2 = type_judgment env sigma j2 in
         let env1 =
-         E.push_rel (name,Some j1.E.uj_val,j2.E.utj_val) env
+         E.push_rel (Term.def_decl_of name j1.E.uj_val j2.E.utj_val) env
         in
          let j3 = execute env1 sigma c3 None in
           Typeops.judge_of_letin env name j1 j2 j3
@@ -250,13 +250,13 @@ if Acic.CicHash.mem subterms_to_types cstr then
    let larj =
     execute_array env sigma lar (Array.make length None) in
    let lara = Array.map (assumption_of_judgment env sigma) larj in
-   let env1 = Environ.push_rec_types (names,lara,vdef) env in
+   let env1 = Environ.push_rec_types (names,Array.map fst lara,vdef) env in
    let expectedtypes =
     Array.map (function i -> Some (Term.lift length i)) lar
    in
    let vdefj = execute_array env1 sigma vdef expectedtypes in
    let vdefv = Array.map Environ.j_val vdefj in
-   (names,lara,vdefv)
+   (names,Array.map fst lara,vdefv)
 
  and execute_array env sigma v expectedtypes =
    let jl =

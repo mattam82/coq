@@ -144,27 +144,26 @@ Module OrderedTypeFacts (Import O: OrderedType).
   Hint Resolve eq_not_gt lt_antirefl lt_not_gt.
 
   Lemma elim_compare_eq :
-   forall x y : t,
-   eq x y -> exists H : eq x y, compare x y = EQ H.
+   forall (x y : t) (H : eq x y), compare x y = EQ H.
   Proof.
    intros; case (compare x y); intros H'; try (exfalso; order).
-   exists H'; auto.
+   auto.
   Qed.
 
   Lemma elim_compare_lt :
    forall x y : t,
-   lt x y -> exists H : lt x y, compare x y = LT H.
+   forall H : lt x y, compare x y = LT H.
   Proof.
    intros; case (compare x y); intros H'; try (exfalso; order).
-   exists H'; auto.
+   auto.
   Qed.
 
   Lemma elim_compare_gt :
    forall x y : t,
-   lt y x -> exists H : lt y x, compare x y = GT H.
+   forall H : lt y x, compare x y = GT H.
   Proof.
    intros; case (compare x y); intros H'; try (exfalso; order).
-   exists H'; auto.
+   auto.
   Qed.
 
   Ltac elim_comp :=

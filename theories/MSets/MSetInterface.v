@@ -469,7 +469,7 @@ Module WRaw2SetsOn (E:DecidableType)(M:WRawSets E) <: WSetsOn E.
    let p := M.partition f s in (Mkt (fst p), Mkt (snd p)).
 
  Instance In_compat : Proper (E.eq==>eq==>iff) In.
- Proof. repeat red. intros; apply M.In_compat; congruence. Qed.
+ Proof. repeat red. intros; apply M.In_compat; try assumption. congruence. Qed.
 
  Definition eq : t -> t -> Prop := Equal.
 
@@ -481,7 +481,7 @@ Module WRaw2SetsOn (E:DecidableType)(M:WRawSets E) <: WSetsOn E.
   intros (s,Hs) (s',Hs').
   change ({M.Equal s s'}+{~M.Equal s s'}).
   destruct (M.equal s s') as [ ]_eqn:H; [left|right];
-   rewrite <- M.equal_spec; congruence.
+   rewrite <- M.equal_spec; auto; congruence.
  Defined.
 
 

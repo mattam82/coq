@@ -147,7 +147,7 @@ let interp_justification_items sigma env =
 
 let interp_constr check_sort sigma env c =
   if check_sort then
-    understand_type sigma env (fst c)
+    fst (understand_type sigma env (fst c))
   else
     understand sigma env (fst c)
 
@@ -185,11 +185,11 @@ let interp_constr_or_thesis check_sort sigma env = function
 let abstract_one_hyp inject h glob =
   match h with
       Hvar (loc,(id,None)) ->
-	GProd (dummy_loc,Name id, Explicit, GHole (loc,Evd.BinderType (Name id)), glob)
+	GProd (dummy_loc,Name id, explicit_bk, GHole (loc,Evd.BinderType (Name id)), glob)
     | Hvar (loc,(id,Some typ)) ->
-	GProd (dummy_loc,Name id, Explicit, fst typ, glob)
+	GProd (dummy_loc,Name id, explicit_bk, fst typ, glob)
     | Hprop st ->
-	GProd (dummy_loc,st.st_label, Explicit, inject st.st_it, glob)
+	GProd (dummy_loc,st.st_label, explicit_bk, inject st.st_it, glob)
 
 let glob_constr_of_hyps inject hyps head =
   List.fold_right (abstract_one_hyp inject) hyps head
@@ -251,14 +251,14 @@ let rec glob_of_pat =
 let prod_one_hyp = function
     (loc,(id,None)) ->
       (fun glob ->
-	 GProd (dummy_loc,Name id, Explicit,
+	 GProd (dummy_loc,Name id, explicit_bk,
 		GHole (loc,Evd.BinderType (Name id)), glob))
   | (loc,(id,Some typ)) ->
       (fun glob ->
-	 GProd (dummy_loc,Name id, Explicit, fst typ, glob))
+	 GProd (dummy_loc,Name id, explicit_bk, fst typ, glob))
 
 let prod_one_id (loc,id) glob =
-  GProd (dummy_loc,Name id, Explicit,
+  GProd (dummy_loc,Name id, explicit_bk,
 	 GHole (loc,Evd.BinderType (Name id)), glob)
 
 let let_in_one_alias (id,pat) glob =
@@ -402,7 +402,7 @@ let interp_suffices_clause sigma env (hyps,cot)=
     match hyp with
 	(Hprop st | Hvar st) ->
 	  match st.st_label with
-	      Name id -> Environ.push_named (id,None,st.st_it) env0
+	      Name id -> Environ.push_named (id,variable_body,st.st_it) env0
 	    | _ -> env in
   let nenv = List.fold_right push_one locvars env in
     nenv,res
@@ -414,11 +414,11 @@ let interp_casee sigma env = function
 let abstract_one_arg = function
     (loc,(id,None)) ->
       (fun glob ->
-	 GLambda (dummy_loc,Name id, Explicit,
+	 GLambda (dummy_loc,Name id, explicit_bk,
 		GHole (loc,Evd.BinderType (Name id)), glob))
   | (loc,(id,Some typ)) ->
       (fun glob ->
-	 GLambda (dummy_loc,Name id, Explicit, fst typ, glob))
+	 GLambda (dummy_loc,Name id, explicit_bk, fst typ, glob))
 
 let glob_constr_of_fun args body =
   List.fold_right abstract_one_arg args (fst body)

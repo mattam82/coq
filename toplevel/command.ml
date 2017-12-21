@@ -31,14 +31,15 @@ open Evarutil
 open Evarconv
 open Notation
 open Indschemes
+open Constr
 
 let rec under_binders env f n c =
   if n = 0 then f env Evd.empty c else
-    match kind_of_term c with
-      | Lambda (x,t,c) ->
-	  mkLambda (x,t,under_binders (push_rel (x,None,t) env) f (n-1) c)
-      | LetIn (x,b,t,c) ->
-	  mkLetIn (x,b,t,under_binders (push_rel (x,Some b,t) env) f (n-1) c)
+    match Constr.kind_of_term c with
+      | Constr.Lambda (x,t,c) ->
+	  Constr.mkLambda (x,t,under_binders (push_rel (var_decl_of x t) env) f (n-1) c)
+      | Constr.LetIn (x,b,t,c) ->
+	  Constr.mkLetIn (x,b,t,under_binders (push_rel (def_decl_of x b t) env) f (n-1) c)
       | _ -> assert false
 
 let rec complete_conclusion a cs = function
@@ -196,11 +197,11 @@ let declare_assumptions idl is_coe k c imps impl_is_on nl =
 (* 3b| Mutual inductive definitions *)
 
 let push_named_types env idl tl =
-  List.fold_left2 (fun env id t -> Environ.push_named (id,None,t) env)
+  List.fold_left2 (fun env id t -> Environ.push_named (var_decl_of_name id t) env)
     env idl tl
 
 let push_types env idl tl =
-  List.fold_left2 (fun env id t -> Environ.push_rel (Name id,None,t) env)
+  List.fold_left2 (fun env id t -> Environ.push_rel (var_decl_of_name (Name id) t) env)
     env idl tl
 
 type structured_one_inductive_expr = {
@@ -233,8 +234,8 @@ let mk_mltype_data evdref env assums arity indname =
   (is_ml_type,indname,assums)
 
 let prepare_param = function
-  | (na,None,t) -> out_name na, LocalAssum t
-  | (na,Some b,_) -> out_name na, LocalDef b
+  | (na,Term.Variable _,t) -> out_name na, LocalAssum t
+  | (na,Term.Definition (_, b),_) -> out_name na, LocalDef b
 
 let interp_ind_arity evdref env ind =
   interp_type_evars_impls ~evdref env ind.ind_arity
@@ -257,7 +258,7 @@ let interp_mutual_inductive (paramsl,indl) notations finite =
   let indnames = List.map (fun ind -> ind.ind_name) indl in
 
   (* Names of parameters as arguments of the inductive type (defs removed) *)
-  let assums = List.filter(fun (_,b,_) -> b=None) ctx_params in
+  let assums = List.filter(fun (_,b,_) -> is_variable_body b) ctx_params in
   let params = List.map (fun (na,_,_) -> out_name na) assums in
 
   (* Interpret the arities *)
@@ -513,8 +514,8 @@ let declare_fix kind f def t imps =
 let _ = Obligations.declare_fix_ref := declare_fix
 
 let prepare_recursive_declaration fixnames fixtypes fixdefs =
-  let defs = List.map (subst_vars (List.rev fixnames)) fixdefs in
-  let names = List.map (fun id -> Name id) fixnames in
+  let defs = List.map (subst_vars (List.rev_map fst fixnames)) fixdefs in
+  let names = List.map (fun (id, rel) -> Name id, rel) fixnames in
   (Array.of_list names, Array.of_list fixtypes, Array.of_list defs)
 
 (* Jump over let-bindings. *)
@@ -551,7 +552,7 @@ let fix_sub_ref = make_ref fixsub_module "Fix_sub"
 let measure_on_R_ref = make_ref fixsub_module "MR"
 let well_founded = init_constant ["Init"; "Wf"] "well_founded"
 let mkSubset name typ prop =
-  mkApp ((delayed_force build_sigma).typ,
+  mkExplApp ((delayed_force build_sigma).typ,
 	 [| typ; mkLambda (name, typ, prop) |])
 let sigT = Lazy.lazy_from_fun build_sigma_type
 
@@ -560,31 +561,32 @@ let lt_ref = make_qref "Init.Peano.lt"
 
 let rec telescope = function
   | [] -> assert false
-  | [(n, None, t)] -> t, [n, Some (mkRel 1), t], mkRel 1
-  | (n, None, t) :: tl ->
+  | [(n, Term.Variable (ann,_), t)] -> t, [n, Term.Definition (ann, mkRel 1), t], mkRel 1
+  | (n, Term.Variable (ann,_), t) :: tl ->
       let ty, tys, (k, constr) =
 	List.fold_left
 	  (fun (ty, tys, (k, constr)) (n, b, t) ->
-	    let pred = mkLambda (n, t, ty) in
-	    let sigty = mkApp ((Lazy.force sigT).typ, [|t; pred|]) in
-	    let intro = mkApp ((Lazy.force sigT).intro, [|lift k t; lift k pred; mkRel k; constr|]) in
+	    let pred = mkLambda ((n,(annot_of_body b,false)), t, ty) in
+	    let sigty = mkExplApp ((Lazy.force sigT).typ, [|t; pred|]) in
+	    let intro = mkExplApp ((Lazy.force sigT).intro, 
+				   [|lift k t; lift k pred; mkRel k; constr|]) in
 	      (sigty, pred :: tys, (succ k, intro)))
 	  (t, [], (2, mkRel 1)) tl
       in
       let (last, subst) = List.fold_right2
 	(fun pred (n, b, t) (prev, subst) ->
-	  let proj1 = applistc (Lazy.force sigT).proj1 [t; pred; prev] in
-	  let proj2 = applistc (Lazy.force sigT).proj2 [t; pred; prev] in
-	    (lift 1 proj2, (n, Some proj1, t) :: subst))
+	  let proj1 = Term.applistc (Lazy.force sigT).proj1 [t; pred; prev] in
+	  let proj2 = Term.applistc (Lazy.force sigT).proj2 [t; pred; prev] in
+	    (lift 1 proj2, (n, Term.Definition (Expl, proj1), t) :: subst))
 	(List.rev tys) tl (mkRel 1, [])
-      in ty, ((n, Some last, t) :: subst), constr
+      in ty, ((n, Term.Definition (ann, last), t) :: subst), constr
 
-  | (n, Some b, t) :: tl -> let ty, subst, term = telescope tl in
-      ty, ((n, Some b, t) :: subst), lift 1 term
+  | (n, (Term.Definition _ as b), t) :: tl -> let ty, subst, term = telescope tl in
+      ty, ((n, b, t) :: subst), lift 1 term
 
 let nf_evar_context isevars ctx =
   List.map (fun (n, b, t) ->
-    (n, Option.map (Evarutil.nf_evar isevars) b, Evarutil.nf_evar isevars t)) ctx
+    (n, map_body (Evarutil.nf_evar isevars) b, Evarutil.nf_evar isevars t)) ctx
 
 let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
   Coqlib.check_required_library ["Coq";"Program";"Wf"];
@@ -598,7 +600,7 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
   let full_arity = it_mkProd_or_LetIn top_arity binders_rel in
   let argtyp, letbinders, make = telescope binders_rel in
   let argname = id_of_string "recarg" in
-  let arg = (Name argname, None, argtyp) in
+  let arg = (Name argname, Term.Variable (Expl,false), argtyp) in
   let binders = letbinders @ [arg] in
   let binders_env = push_rel_context binders_rel env in
   let rel, _ = interp_constr_evars_impls ~evdref:isevars env r in
@@ -612,7 +614,7 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
       try
 	let ctx, ar = Reductionops.splay_prod_n env !isevars 2 relty in
 	  match ctx, kind_of_term ar with
-	  | [(_, None, t); (_, None, u)], Sort (Prop Null)
+	  | [(_, Term.Variable _, t); (_, Term.Variable _, u)], Sort (Prop Null)
 	      when Reductionops.is_conv env !isevars t u -> t
 	  | _, _ -> error ()
       with _ -> error ()
@@ -624,45 +626,48 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
       it_mkLambda_or_LetIn measure binders
     in
     let comb = constr_of_global (delayed_force measure_on_R_ref) in
-    let wf_rel = mkApp (comb, [| argtyp; relargty; rel; measure |]) in
+    let wf_rel = mkExplApp (comb, [| argtyp; relargty; rel; measure |]) in
     let wf_rel_fun x y =
-      mkApp (rel, [| subst1 x measure_body;
+      mkExplApp (rel, [| subst1 x measure_body;
  		     subst1 y measure_body |])
     in wf_rel, wf_rel_fun, measure
   in
-  let wf_proof = mkApp (delayed_force well_founded, [| argtyp ; wf_rel |]) in
+  let wf_proof = mkExplApp (delayed_force well_founded, [| argtyp ; wf_rel |]) in
   let argid' = id_of_string (string_of_id argname ^ "'") in
-  let wfarg len = (Name argid', None,
-  		   mkSubset (Name argid') argtyp
+  let argidbinder = binder_annot_of (Name argid') in
+  let wfarg len = (Name argid', variable_body,
+  		   mkSubset argidbinder argtyp
 		    (wf_rel_fun (mkRel 1) (mkRel (len + 1))))
   in
   let intern_bl = wfarg 1 :: [arg] in
   let _intern_env = push_rel_context intern_bl env in
   let proj = (delayed_force build_sigma).Coqlib.proj1 in
-  let wfargpred = mkLambda (Name argid', argtyp, wf_rel_fun (mkRel 1) (mkRel 3)) in
+  let wfargpred = mkLambda (argidbinder, argtyp, wf_rel_fun (mkRel 1) (mkRel 3)) in
   let projection = (* in wfarg :: arg :: before *)
-    mkApp (proj, [| argtyp ; wfargpred ; mkRel 1 |])
+    mkExplApp (proj, [| argtyp ; wfargpred ; mkRel 1 |])
   in
   let top_arity_let = it_mkLambda_or_LetIn top_arity letbinders in
   let intern_arity = substl [projection] top_arity_let in
   (* substitute the projection of wfarg for something,
      now intern_arity is in wfarg :: arg *)
   let intern_fun_arity_prod = it_mkProd_or_LetIn intern_arity [wfarg 1] in
-  let intern_fun_binder = (Name (add_suffix recname "'"), None, intern_fun_arity_prod) in
+  let intern_fun_binder = (Name (add_suffix recname "'"), variable_body, intern_fun_arity_prod) in
   let curry_fun =
-    let wfpred = mkLambda (Name argid', argtyp, wf_rel_fun (mkRel 1) (mkRel (2 * len + 4))) in
-    let arg = mkApp ((delayed_force build_sigma).intro, [| argtyp; wfpred; lift 1 make; mkRel 1 |]) in
-    let app = mkApp (mkRel (2 * len + 2 (* recproof + orig binders + current binders *)), [| arg |]) in
-    let rcurry = mkApp (rel, [| measure; lift len measure |]) in
-    let lam = (Name (id_of_string "recproof"), None, rcurry) in
+    let wfpred = mkLambda (argidbinder, argtyp, wf_rel_fun (mkRel 1) (mkRel (2 * len + 4))) in
+    let arg = mkApp ((delayed_force build_sigma).intro, 
+		     [| Expl; Expl; Expl; Irr |],
+		     [| argtyp; wfpred; lift 1 make; mkRel 1 |]) in
+    let app = mkExplApp (mkRel (2 * len + 2 (* recproof + orig binders + current binders *)), [| arg |]) in
+    let rcurry = mkExplApp (rel, [| measure; lift len measure |]) in
+    let lam = (Name (id_of_string "recproof"), variable_body, rcurry) in
     let body = it_mkLambda_or_LetIn app (lam :: binders_rel) in
     let ty = it_mkProd_or_LetIn (lift 1 top_arity) (lam :: binders_rel) in
-      (Name recname, Some body, ty)
+      (Name recname, definition_body body, ty)
   in
   let fun_bl = intern_fun_binder :: [arg] in
   let lift_lets = Termops.lift_rel_context 1 letbinders in
   let intern_body =
-    let ctx = (Name recname, None, pi3 curry_fun) :: binders_rel in
+    let ctx = (Name recname, variable_body, pi3 curry_fun) :: binders_rel in
     let (r, l, impls, scopes) =
       Constrintern.compute_internalization_data env
 	Constrintern.Recursive full_arity impls 
@@ -674,13 +679,14 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
 	(push_rel_context ctx env) body (lift 1 top_arity)
   in
   let intern_body_lam = it_mkLambda_or_LetIn intern_body (curry_fun :: lift_lets @ fun_bl) in
-  let prop = mkLambda (Name argname, argtyp, top_arity_let) in
+  let prop = mkLambda (binder_annot_of (Name argname), argtyp, top_arity_let) in
   let def =
     mkApp (constr_of_global (delayed_force fix_sub_ref),
-	  [| argtyp ; wf_rel ;
-	     Evarutil.e_new_evar isevars env 
-	       ~src:(dummy_loc, Evd.QuestionMark (Evd.Define false)) wf_proof;
-	     prop ; intern_body_lam |])
+	   [| Expl; Expl; Irr; Expl; Expl |],
+	   [| argtyp ; wf_rel ;
+	      Evarutil.e_new_evar isevars env 
+	      ~src:(dummy_loc, Evd.QuestionMark (Evd.Define false)) wf_proof;
+	      prop ; intern_body_lam |])
   in
   let _ = isevars := Evarutil.nf_evar_map !isevars in
   let binders_rel = nf_evar_context !isevars binders_rel in
@@ -690,7 +696,7 @@ let build_wellfounded (recname,n,bl,arityc,body) r measure notation =
     if List.length binders_rel > 1 then
       let name = add_suffix recname "_func" in
       let hook l gr = 
-	let body = it_mkLambda_or_LetIn (mkApp (constr_of_global gr, [|make|])) binders_rel in
+	let body = it_mkLambda_or_LetIn (mkExplApp (constr_of_global gr, [|make|])) binders_rel in
 	let ty = it_mkProd_or_LetIn top_arity binders_rel in
 	let ce =
           { const_entry_body = Evarutil.nf_evar !isevars body;
@@ -742,11 +748,11 @@ let interp_recursive isfix fixl notations =
 	 if Flags.is_program_mode () then
 	   let sort = Retyping.get_type_of env !evdref t in
 	   let fixprot =
-	     try mkApp (delayed_force fix_proto, [|sort; t|])
+	     try mkExplApp (delayed_force fix_proto, [|sort; t|])
 	     with e -> t
 	   in
-	     (id,None,fixprot) :: env'
-	 else (id,None,t) :: env')
+	     (id,variable_body,fixprot) :: env'
+	 else (id,variable_body,t) :: env')
       [] fixnames fixtypes
   in
   let env_rec = push_named_context rec_sign env in
@@ -798,7 +804,11 @@ let declare_fixpoint ((fixnames,fixdefs,fixtypes),fiximps) indexes ntns =
   else begin
     (* We shortcut the proof process *)
     let fixdefs = List.map Option.get fixdefs in
-    let fixdecls = prepare_recursive_declaration fixnames fixtypes fixdefs in
+    let declfixnames = List.map2 (fun n ty ->
+			      let rel = Retyping.get_relevance_of (Global.env ()) Evd.empty ty in
+				(n, rel)) fixnames fixtypes 
+    in      
+    let fixdecls = prepare_recursive_declaration declfixnames fixtypes fixdefs in
     let indexes = search_guard dummy_loc (Global.env()) indexes fixdecls in
     let fiximps = List.map (fun (n,r,p) -> r) fiximps in
     let fixdecls =
@@ -823,7 +833,11 @@ let declare_cofixpoint ((fixnames,fixdefs,fixtypes),fiximps) ntns =
   else begin
     (* We shortcut the proof process *)
     let fixdefs = List.map Option.get fixdefs in
-    let fixdecls = prepare_recursive_declaration fixnames fixtypes fixdefs in
+    let declfixnames = List.map2 (fun n ty ->
+			      let rel = Retyping.get_relevance_of (Global.env ()) Evd.empty ty in
+				(n, rel)) fixnames fixtypes 
+    in      
+    let fixdecls = prepare_recursive_declaration declfixnames fixtypes fixdefs in
     let fixdecls = list_map_i (fun i _ -> mkCoFix (i,fixdecls)) 0 fixnames in
     let fiximps = List.map (fun (len,imps,idx) -> imps) fiximps in
     ignore (list_map4 (declare_fix CoFixpoint) fixnames fixdecls fixtypes fiximps);
@@ -902,7 +916,7 @@ let do_program_recursive fixkind fixl ntns =
   let defs = list_map4 collect_evars fixnames fixdefs fixtypes fiximps in
     if isfix then begin
       let possible_indexes = List.map compute_possible_guardness_evidences info in
-      let fixdecls = Array.of_list (List.map (fun x -> Name x) fixnames),
+      let fixdecls = Array.of_list (List.map (fun x -> Name x, Expl) fixnames),
 	Array.of_list fixtypes,
 	Array.of_list (List.map (subst_vars (List.rev fixnames)) fixdefs)
       in

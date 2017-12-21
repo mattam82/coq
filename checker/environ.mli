@@ -33,6 +33,8 @@ val lookup_digest : env -> dir_path -> Digest.t
 (* de Bruijn variables *)
 val rel_context : env -> rel_context
 val lookup_rel : int -> env -> rel_declaration
+val lookup_rel_body : int -> env -> constr option
+
 val push_rel : rel_declaration -> env -> env
 val push_rel_context : rel_context -> env -> env
 val push_rec_types : name array * constr array * 'a -> env -> env
@@ -41,6 +43,7 @@ val push_rec_types : name array * constr array * 'a -> env -> env
 val named_context : env -> named_context
 val push_named : named_declaration -> env -> env
 val lookup_named : identifier -> env -> named_declaration
+val lookup_named_body : identifier -> env -> constr option
 val named_type : identifier -> env -> constr
 
 (* Universes *)

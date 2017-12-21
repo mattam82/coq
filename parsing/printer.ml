@@ -66,7 +66,7 @@ let pr_constr_under_binders_env_gen pr env (ids,c) =
   (* Warning: clashes can occur with variables of same name in env but *)
   (* we also need to preserve the actual names of the patterns *)
   (* So what to do? *)
-  let assums = List.map (fun id -> (Name id,(* dummy *) mkProp)) ids in
+  let assums = List.map (fun id -> (binder_annot_of (Name id),(* dummy *) mkProp)) ids in
   pr (Termops.push_rels_assum assums env) c
 
 let pr_constr_under_binders_env = pr_constr_under_binders_env_gen pr_constr_env
@@ -143,30 +143,35 @@ let pr_pattern t = pr_pattern_env (Global.env()) empty_names_context t*)
 (**********************************************************************)
 (* Contexts and declarations                                          *)
 
+let pr_ann_id ann id =
+  match ann with
+  | Expl -> pr_id id
+  | Irr -> str"[" ++ pr_id id ++ str"]"
+
 let pr_var_decl env (id,c,typ) =
-  let pbody = match c with
-    | None ->  (mt ())
-    | Some c ->
+  let ann, pbody = match c with
+    | Variable (rel, _) -> rel, (mt ())
+    | Definition (rel, c) ->
 	(* Force evaluation *)
 	let pb = pr_lconstr_env env c in
 	let pb = if isCast c then surround pb else pb in
-	(str" := " ++ pb ++ cut () ) in
+	rel, (str" := " ++ pb ++ cut () ) in
   let pt = pr_ltype_env env typ in
   let ptyp = (str" : " ++ pt) in
-  (pr_id id ++ hov 0 (pbody ++ ptyp))
+  (pr_ann_id ann id ++ hov 0 (pbody ++ ptyp))
 
 let pr_rel_decl env (na,c,typ) =
-  let pbody = match c with
-    | None -> mt ()
-    | Some c ->
+  let ann, pbody = match c with
+    | Variable (rel, _) -> rel, mt ()
+    | Definition (rel, c) ->
 	(* Force evaluation *)
 	let pb = pr_lconstr_env env c in
 	let pb = if isCast c then surround pb else pb in
-	(str":=" ++ spc () ++ pb ++ spc ()) in
+	rel, (str":=" ++ spc () ++ pb ++ spc ()) in
   let ptyp = pr_ltype_env env typ in
   match na with
   | Anonymous -> hov 0 (str"<>" ++ spc () ++ pbody ++ str":" ++ spc () ++ ptyp)
-  | Name id -> hov 0 (pr_id id ++ spc () ++ pbody ++ str":" ++ spc () ++ ptyp)
+  | Name id -> hov 0 (pr_ann_id ann id ++ spc () ++ pbody ++ str":" ++ spc () ++ ptyp)
 
 
 (* Prints out an "env" in a nice format.  We print out the
@@ -504,10 +509,10 @@ let pr_prim_rule = function
   | Convert_concl (c,_) ->
       (str"change "  ++ pr_constr c)
 
-  | Convert_hyp (id,None,t) ->
+  | Convert_hyp (id,Variable _,t) ->
       (str"change "  ++ pr_constr t  ++ spc ()  ++ str"in "  ++ pr_id id)
 
-  | Convert_hyp (id,Some c,t) ->
+  | Convert_hyp (id,Definition (_, c),t) ->
       (str"change "  ++ pr_constr c  ++ spc ()  ++ str"in "
        ++ pr_id id ++ str" (type of "  ++ pr_id id ++ str ")")
 
@@ -693,7 +698,7 @@ let print_record env mind mib =
 	  pr_lconstr_env envpar c) fields) ++ str" }")
 
 let pr_mutual_inductive_body env mind mib =
-  if mib.mind_record & not !Flags.raw_print then
+  if mib.mind_record <> None & not !Flags.raw_print then
     print_record env mind mib
   else
     print_mutual_inductive env mind mib

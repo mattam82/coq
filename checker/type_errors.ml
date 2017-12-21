@@ -59,6 +59,7 @@ type type_error =
   | IllFormedRecBody of guard_error * name array * int
   | IllTypedRecBody of
       int * name array * unsafe_judgment array * constr array
+  | IrrelevanceMismatch of types * relevance * relevance
 
 exception TypeError of env * type_error
 
@@ -107,4 +108,5 @@ let error_ill_formed_rec_body env why lna i =
 let error_ill_typed_rec_body env i lna vdefj vargs =
   raise (TypeError (env, IllTypedRecBody (i,lna,vdefj,vargs)))
 
-
+let error_irrelevance_mismatch env ty rel rel' =
+  raise (TypeError (env, IrrelevanceMismatch (ty, rel, rel')))

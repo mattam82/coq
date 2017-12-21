@@ -732,7 +732,7 @@ let new_state_var typ state =
   let id = pf_get_new_id __eps__ state.gls in
   let {it=gl ; sigma=sigma} = state.gls in
   let new_hyps =
-    Environ.push_named_context_val (id,None,typ) (Goal.V82.hyps sigma gl) in
+    Environ.push_named_context_val (id,variable_body,typ) (Goal.V82.hyps sigma gl) in
   let gls = Goal.V82.new_goal_with sigma gl new_hyps in
     state.gls<- gls;
     id

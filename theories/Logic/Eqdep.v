@@ -23,8 +23,16 @@ Require Export EqdepFacts.
 
 Module Eq_rect_eq.
 
-Axiom eq_rect_eq :
-  forall (U:Type) (p:U) (Q:U -> Type) (x:Q p) (h:p = p), x = eq_rect p Q x p h.
+  Lemma eq_rect_eq :
+    forall (U:Type) (p:U) (Q:U -> Type) (x:Q p) (h:p = p), x = eq_rect p Q x p h.
+  Proof.
+    intros.
+    change h with (eq_refl p).
+    simpl. reflexivity.
+  Qed.
+
+(* Axiom eq_rect_eq : *)
+(*   forall (U:Type) (p:U) (Q:U -> Type) (x:Q p) (h:p = p), x = eq_rect p Q x p h. *)
 
 End Eq_rect_eq.
 

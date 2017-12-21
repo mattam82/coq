@@ -143,7 +143,7 @@ and nf_whd env whd typ =
       let dom = nf_vtype env (dom p) in
       let name = Name (id_of_string "x") in
       let vc = body_of_vfun (nb_rel env) (codom p) in
-      let codom = nf_vtype (push_rel (name,None,dom) env) vc  in
+      let codom = nf_vtype (push_rel (var_decl_of (binder_annot_of name) dom) env) vc  in
       mkProd(name,dom,codom)
   | Vfun f -> nf_fun env f typ
   | Vfix(f,None) -> nf_fix env f
@@ -208,7 +208,7 @@ and nf_predicate env ind mip params v pT =
       let vb = body_of_vfun k f in
       let name,dom,codom = try decompose_prod env pT with _ -> exit 121 in
       let dep,body =
-	nf_predicate (push_rel (name,None,dom) env) ind mip params vb codom in
+	nf_predicate (push_rel (var_decl_of_name name dom) env) ind mip params vb codom in
       dep, mkLambda(name,dom,body)
   | Vfun f, _ ->
       let k = nb_rel env in
@@ -218,7 +218,7 @@ and nf_predicate env ind mip params v pT =
       let rargs = Array.init n (fun i -> mkRel (n-i)) in
       let params = if n=0 then params else Array.map (lift n) params in
       let dom = mkApp(mkInd ind,Array.append params rargs) in
-      let body = nf_vtype (push_rel (name,None,dom) env) vb in
+      let body = nf_vtype (push_rel (var_decl_of_name name dom) env) vb in
       true, mkLambda(name,dom,body)
   | _, _ -> false, nf_val env v crazy_type
 
@@ -252,7 +252,7 @@ and nf_fun env f typ =
     with _ ->
       raise (Type_errors.TypeError(env,Type_errors.ReferenceVariables typ))
   in
-  let body = nf_val (push_rel (name,None,dom) env) vb codom in
+  let body = nf_val (push_rel (var_decl_of_name name dom) env) vb codom in
   mkLambda(name,dom,body)
 
 and nf_fix env f =
@@ -262,7 +262,8 @@ and nf_fix env f =
   let vb, vt = reduce_fix k f in
   let ndef = Array.length vt in
   let ft = Array.map (fun v -> nf_val env v crazy_type) vt in
-  let name = Array.init ndef (fun _ -> (Name (id_of_string "Ffix"))) in
+  let name = Array.init ndef 
+    (fun _ -> letbinder_annot_of (Name (id_of_string "Ffix"))) in
   let env = push_rec_types (name,ft,ft) env in
   let fb = Util.array_map2 (fun v t -> nf_fun env v t) vb ft in
   mkFix ((rec_args,init),(name,ft,fb))
@@ -280,7 +281,8 @@ and nf_cofix env cf =
   let vb,vt = reduce_cofix k cf in
   let ndef = Array.length vt in
   let cft = Array.map (fun v -> nf_val env v crazy_type) vt in
-  let name = Array.init ndef (fun _ -> (Name (id_of_string "Fcofix"))) in
+  let name = Array.init ndef 
+    (fun _ -> letbinder_annot_of (Name (id_of_string "Fcofix"))) in
   let env = push_rec_types (name,cft,cft) env in
   let cfb = Util.array_map2 (fun v t -> nf_val env v t) vb cft in
   mkCoFix (init,(name,cft,cfb))

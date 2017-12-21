@@ -78,7 +78,7 @@ let kind_of_head env t =
       (try on_subterm k l b (variable_head id)
        with Not_found ->
         (* a goal variable *)
-        match pi2 (lookup_named id env) with
+        match constr_of_body (pi2 (lookup_named id env)) with
         | Some c -> aux k l c b
         | None -> NotImmediatelyComputableHead)
   | Const cst ->
@@ -127,7 +127,7 @@ let compute_head = function
      | None -> RigidHead (RigidParameter cst)
      | Some c -> kind_of_head (Global.env()) c)
 | EvalVarRef id ->
-    (match pi2 (Global.lookup_named id) with
+    (match constr_of_body (pi2 (Global.lookup_named id)) with
      | Some c when not (Decls.variable_opacity id) ->
            kind_of_head (Global.env()) c
      | _ ->

@@ -44,6 +44,8 @@
 (**********************************************************************)
 (** * Pred. Ext. + Rel. Axiom of Choice -> Excluded-Middle       *)
 
+(*
+
 Section PredExt_RelChoice_imp_EM.
 
 (** The axiom of extensionality for predicates *)
@@ -300,3 +302,4 @@ Proof.
 Qed.
 
 End ExtensionalEpsilon_imp_EM.
+*)

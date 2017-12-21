@@ -55,7 +55,7 @@ let is_evaluable env = function
 
 let value_of_evaluable_ref env = function
   | EvalConstRef con -> constant_value env con
-  | EvalVarRef id -> Option.get (pi2 (lookup_named id env))
+  | EvalVarRef id -> Option.get (named_value id env)
 
 let constr_of_evaluable_ref = function
   | EvalConstRef con -> mkConst con
@@ -97,12 +97,8 @@ let destEvalRef c = match kind_of_term c with
 
 let reference_opt_value sigma env = function
   | EvalConst cst -> constant_opt_value env cst
-  | EvalVar id ->
-      let (_,v,_) = lookup_named id env in
-      v
-  | EvalRel n ->
-      let (_,v,_) = lookup_rel n env in
-      Option.map (lift n) v
+  | EvalVar id -> named_value id env
+  | EvalRel n -> Option.map (lift n) (rel_value n env)
   | EvalEvar ev -> Evd.existential_opt_value sigma ev
 
 exception NotEvaluable
@@ -224,7 +220,7 @@ let invert_name labs l na0 env sigma ref = function
 		| None -> None
 		| Some c ->
 		    let labs',ccl = decompose_lam c in
-		    let _, l' = whd_betalet_stack sigma ccl in
+		    let _, (_, l') = whd_betalet_stack sigma ccl in
 		    let labs' = List.map snd labs' in
 		    if labs' = labs & l = l' then Some (minfxargs,ref)
                     else None
@@ -238,10 +234,10 @@ let invert_name labs l na0 env sigma ref = function
 
 let compute_consteval_direct sigma env ref =
   let rec srec env n labs c =
-    let c',l = whd_betadelta_stack env sigma c in
+    let c',(_,l) = whd_betadelta_stack env sigma c in
     match kind_of_term c' with
-      | Lambda (id,t,g) when l=[] ->
-	  srec (push_rel (id,None,t) env) (n+1) (t::labs) g
+      | Lambda (id,t,g) when l = [] ->
+	  srec (push_rel (var_decl_of_name id t) env) (n+1) (t::labs) g
       | Fix fix ->
 	  (try check_fix_reversibility labs l fix
 	  with Elimconst -> NotAnElimination)
@@ -254,11 +250,11 @@ let compute_consteval_direct sigma env ref =
 
 let compute_consteval_mutual_fix sigma env ref =
   let rec srec env minarg labs ref c =
-    let c',l = whd_betalet_stack sigma c in
+    let c',(a,l) = whd_betalet_stack sigma c in
     let nargs = List.length l in
     match kind_of_term c' with
       | Lambda (na,t,g) when l=[] ->
-	  srec (push_rel (na,None,t) env) (minarg+1) (t::labs) ref g
+	  srec (push_rel (var_decl_of_name na t) env) (minarg+1) (t::labs) ref g
       | Fix ((lv,i),(names,_,_)) ->
 	  (* Last known constant wrapping Fix is ref = [labs](Fix l) *)
 	  (match compute_consteval_direct sigma env ref with
@@ -267,7 +263,10 @@ let compute_consteval_mutual_fix sigma env ref =
 	     | EliminationFix (minarg',minfxargs,infos) ->
 		 let refs =
 		   Array.map
-		     (invert_name labs l names.(i) env sigma ref) names in
+		     (fun n -> 
+			invert_name labs l (letname_of names.(i)) env sigma ref
+			  (letname_of n)) names 
+		 in
 		 let new_minarg = max (minarg'+minarg-nargs) minarg' in
 		 EliminationMutualFix (new_minarg,ref,(refs,infos))
 	     | _ -> assert false)
@@ -324,7 +323,9 @@ let reference_eval sigma env = function
 let x = Name (id_of_string "x")
 
 let make_elim_fun (names,(nbfix,lv,n)) largs =
-  let lu = list_firstn n (list_of_stack largs) in
+  let ans, lu = list_of_stack largs in
+  let ans = list_firstn n ans in
+  let lu = list_firstn n lu in
   let p = List.length lv in
   let lyi = List.map fst lv in
   let la =
@@ -338,7 +339,7 @@ let make_elim_fun (names,(nbfix,lv,n)) largs =
     match names.(i) with
       | None -> None
       | Some (minargs,ref) ->
-          let body = applistc (mkEvalRef ref) la in
+          let body = Constr.app_argslc (mkEvalRef ref) (ans,la) in
           let g =
             list_fold_left_i (fun q (* j = n+1-q *) c (ij,tij) ->
               let subst = List.map (lift (-q)) (list_firstn (n-ij) la) in
@@ -371,7 +372,8 @@ let substl_with_function subst constr =
                   evd := Evd.add !evd !cnt
                     (Evd.make_evar
                       (val_of_named_context
-                        [(vfx,None,dummy);(vfun,None,dummy)])
+                        [(var_decl_of_name vfx dummy);
+			 (var_decl_of_name vfun dummy)])
                       dummy);
                   minargs := Intmap.add !cnt min !minargs;
                   lift k (mkEvar(!cnt,[|fx;ref|]))
@@ -461,18 +463,20 @@ let contract_cofix_use_function env sigma f
   substl_checking_arity env (List.rev subbodies)
     (nf_beta sigma bodies.(bodynum))
 
+open Constr
+
 let reduce_mind_case_use_function func env sigma mia =
   match kind_of_term mia.mconstr with
     | Construct(ind_sp,i) ->
-	let real_cargs = list_skipn mia.mci.ci_npar mia.mcargs in
-	applist (mia.mlf.(i-1), real_cargs)
+	let real_cargs = Constr.argsl_skipn mia.mci.ci_npar mia.mcargs in
+	Constr.app_argsl (mia.mlf.(i-1), real_cargs)
     | CoFix (bodynum,(names,_,_) as cofix) ->
 	let build_cofix_name =
 	  if isConst func then
-            let minargs = List.length mia.mcargs in
+            let minargs = argsl_length mia.mcargs in
 	    fun i ->
 	      if i = bodynum then Some (minargs,func)
-	      else match names.(i) with
+	      else match letname_of names.(i) with
 		| Anonymous -> None
 		| Name id ->
 		    (* In case of a call to another component of a block of
@@ -490,7 +494,7 @@ let reduce_mind_case_use_function func env sigma mia =
 	    fun _ -> None in
 	let cofix_def =
           contract_cofix_use_function env sigma build_cofix_name cofix in
-	mkCase (mia.mci, mia.mP, applist(cofix_def,mia.mcargs), mia.mlf)
+	mkCase (mia.mci, mia.mP, app_argsl(cofix_def,mia.mcargs), mia.mlf)
     | _ -> assert false
 
 let special_red_case env sigma whfun (ci, p, c, lf)  =
@@ -629,7 +633,7 @@ let rec red_elim_const env sigma ref largs =
 	let c = reference_value sigma env ref in
 	let c', lrest = whd_betadelta_state env sigma (c,largs) in
 	let whfun = whd_simpl_state env sigma in
-        (special_red_case env sigma whfun (destCase c'), lrest)
+        (special_red_case env sigma whfun (Constr.destCase c'), lrest)
     | EliminationFix (min,minfxargs,infos) when nargs >= min ->
 	let c = reference_value sigma env ref in
 	let d, lrest = whd_betadelta_state env sigma (c,largs) in
@@ -672,7 +676,7 @@ and whd_simpl_state env sigma s =
              | None -> s
              | Some (a,rest) -> stacklam redrec [a] c rest)
       | LetIn (n,b,t,c) -> stacklam redrec [b] c stack
-      | App (f,cl) -> redrec (f, append_stack cl stack)
+      | App (f,ans,cl) -> redrec (f, append_stack ans cl stack)
       | Cast (c,_,_) -> redrec (c, stack)
       | Case (ci,p,c,lf) ->
           (try
@@ -690,7 +694,7 @@ and whd_simpl_state env sigma s =
             let hd, _ as s' = redrec (red_elim_const env sigma ref stack) in
             let rec is_case x = match kind_of_term x with
               | Lambda (_,_, x) | LetIn (_,_,_, x) | Cast (x, _,_) -> is_case x
-              | App (hd, _) -> is_case hd
+              | App (hd, _, _) -> is_case hd
               | Case _ -> true
               | _ -> false in
             if dont_expose_case ref && is_case hd then raise Redelimination
@@ -726,19 +730,19 @@ let try_red_product env sigma c =
   let simpfun = clos_norm_flags betaiotazeta env sigma in
   let rec redrec env x =
     match kind_of_term x with
-      | App (f,l) ->
+      | App (f,ans,l) ->
           (match kind_of_term f with
              | Fix fix ->
-                 let stack = append_stack l empty_stack in
+                 let stack = append_stack ans l empty_stack in
                  (match fix_recarg fix stack with
                     | None -> raise Redelimination
                     | Some (recargnum,recarg) ->
                         let recarg' = redrec env recarg in
                         let stack' = stack_assign stack recargnum recarg' in
                         simpfun (app_stack (f,stack')))
-             | _ -> simpfun (appvect (redrec env f, l)))
+             | _ -> simpfun (app_args (redrec env f, (ans,l))))
       | Cast (c,_,_) -> redrec env c
-      | Prod (x,a,b) -> mkProd (x, a, redrec (push_rel (x,None,a) env) b)
+      | Prod (x,a,b) -> mkProd (x, a, redrec (push_rel (var_decl_of x a) env) b)
       | LetIn (x,a,b,t) -> redrec env (subst1 a t)
       | Case (ci,p,d,lf) -> simpfun (mkCase (ci,p,redrec env d,lf))
       | _ when isEvalRef env x ->
@@ -839,7 +843,7 @@ let simpl env sigma c = strong whd_simpl env sigma c
 
 let matches_head c t =
   match kind_of_term t with
-    | App (f,_) -> matches c f
+    | App (f,_,_) -> matches c f
     | _ -> raise PatternMatchingFailure
 
 let contextually byhead ((nowhere_except_in,locs),c) f env sigma t =
@@ -858,8 +862,8 @@ let contextually byhead ((nowhere_except_in,locs),c) f env sigma t =
 	f subst env sigma t
       else if byhead then
 	(* find other occurrences of c in t; TODO: ensure left-to-right *)
-        let (f,l) = destApp t in
-	mkApp (f, array_map_left (traverse envc) l)
+        let (f,a,l) = destApp t in
+	mkApp (f, a, array_map_left (traverse envc) l)
       else
 	t
     with PatternMatchingFailure ->
@@ -965,18 +969,20 @@ let compute = cbv_betadeltaiota
 
 let abstract_scheme env sigma (locc,a) c =
   let ta = Retyping.get_type_of env sigma a in
+  let rel = Retyping.get_relevance_of env sigma ta in
   let na = named_hd env ta Anonymous in
+  let binder = (na,(rel,false)) in
   if occur_meta ta then error "Cannot find a type for the generalisation.";
   if occur_meta a then
-    mkLambda (na,ta,c)
+    mkLambda (binder,ta,c)
   else
-    mkLambda (na,ta,subst_closed_term_occ locc a c)
+    mkLambda (binder,ta,subst_closed_term_occ locc a c)
 
 let pattern_occs loccs_trm env sigma c =
   let abstr_trm = List.fold_right (abstract_scheme env sigma) loccs_trm c in
   try
     let _ = Typing.type_of env sigma abstr_trm in
-    applist(abstr_trm, List.map snd loccs_trm)
+    Term.applist(abstr_trm, List.map snd loccs_trm)
   with Type_errors.TypeError (env',t) ->
     raise (ReductionTacticError (InvalidAbstraction (env,abstr_trm,(env',t))))
 
@@ -988,18 +994,19 @@ let pattern_occs loccs_trm env sigma c =
 let reduce_to_ind_gen allow_product env sigma t =
   let rec elimrec env t l =
     let t = hnf_constr env sigma t in
-    match kind_of_term (fst (decompose_app t)) with
+    match kind_of_term (pi1 (decompose_app t)) with
       | Ind ind-> (ind, it_mkProd_or_LetIn t l)
       | Prod (n,ty,t') ->
 	  if allow_product then
-	    elimrec (push_rel (n,None,ty) env) t' ((n,None,ty)::l)
+	    let decl = var_decl_of n ty in
+	    elimrec (push_rel decl env) t' (decl::l)
 	  else
 	    errorlabstrm "" (str"Not an inductive definition.")
       | _ ->
 	  (* Last chance: we allow to bypass the Opaque flag (as it
 	     was partially the case between V5.10 and V8.1 *)
 	  let t' = whd_betadeltaiota env sigma t in
-	  match kind_of_term (fst (decompose_app t')) with
+	  match kind_of_term (pi1 (decompose_app t')) with
 	    | Ind ind-> (ind, it_mkProd_or_LetIn t' l)
 	    | _ -> errorlabstrm "" (str"Not an inductive product.")
   in
@@ -1010,7 +1017,7 @@ let reduce_to_atomic_ind x = reduce_to_ind_gen false x
 
 let rec find_hnf_rectype env sigma t =
   let ind,t = reduce_to_atomic_ind env sigma t in
-  ind, snd (decompose_app t)
+  ind, snd (decompose_app_argsl t)
 
 (* Reduce the weak-head redex [beta,iota/fix/cofix[all],cast,zeta,simpl/delta]
    or raise [NotStepReducible] if not a weak-head redex *)
@@ -1024,7 +1031,7 @@ let one_step_reduce env sigma c =
           (match decomp_stack stack with
              | None      -> raise NotStepReducible
              | Some (a,rest) -> (subst1 a c, rest))
-      | App (f,cl) -> redrec (f, append_stack cl stack)
+      | App (f,ans,cl) -> redrec (f, append_stack ans cl stack)
       | LetIn (_,f,_,cl) -> (subst1 f cl,stack)
       | Cast (c,_,_) -> redrec (c,stack)
       | Case (ci,p,c,lf) ->
@@ -1066,7 +1073,8 @@ let reduce_to_ref_gen allow_product env sigma ref t =
     match kind_of_term c with
       | Prod (n,ty,t') ->
 	  if allow_product then
-	    elimrec (push_rel (n,None,t) env) t' ((n,None,ty)::l)
+	    let decl = var_decl_of n ty in
+	    elimrec (push_rel decl env) t' (decl::l)
 	  else
 	     errorlabstrm ""
 	       (str "Cannot recognize an atomic statement based on " ++

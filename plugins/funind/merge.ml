@@ -836,7 +836,7 @@ let merge_rec_params_and_arity prms1 prms2 shift (concl:constr) =
     List.fold_left
       (fun (acc,env) (nm,_,c) ->
         let typ = Constrextern.extern_constr false env c in
-        let newenv = Environ.push_rel (nm,None,c) env in
+        let newenv = Environ.push_rel (var_decl_of_name nm c) env in
         CProdN (dummy_loc, [[(dummy_loc,nm)],Topconstr.default_binder_kind,typ] , acc) , newenv)
       (concl,Global.env())
       (shift.funresprms2 @ shift.funresprms1
@@ -864,20 +864,20 @@ let glob_constr_list_to_inductive_expr prms1 prms2 mib1 mib2 shift
 
 let mkProd_reldecl (rdecl:rel_declaration) (t2:glob_constr) =
   match rdecl with
-    | (nme,None,t) ->
+    | (nme,Variable _,t) ->
         let traw = Detyping.detype false [] [] t in
-        GProd (dummy_loc,nme,Explicit,traw,t2)
-    | (_,Some _,_) -> assert false
+        GProd (dummy_loc,nme,explicit_bk,traw,t2)
+    | (_,Definition _,_) -> assert false
 
 
 
 
 let mkProd_reldecl (rdecl:rel_declaration) (t2:glob_constr) =
   match rdecl with
-    | (nme,None,t) ->
+    | (nme,Variable _,t) ->
         let traw = Detyping.detype false [] [] t in
-        GProd (dummy_loc,nme,Explicit,traw,t2)
-    | (_,Some _,_) -> assert false
+        GProd (dummy_loc,nme,explicit_bk,traw,t2)
+    | (_,Definition _,_) -> assert false
 
 
 (** [merge_inductive ind1 ind2 lnk] merges two graphs, linking
@@ -990,7 +990,7 @@ let funify_branches relinfo nfuns branch =
       | Rel i -> let reali = i-shift in (reali>=0 && reali<relinfo.nbranches)
       | _ -> false in
   (* FIXME: *)
-  (Anonymous,Some mkProp,mkProp)
+  (def_decl_of_name Anonymous mkProp mkProp)
 
 
 let relprinctype_to_funprinctype relprinctype nfuns =

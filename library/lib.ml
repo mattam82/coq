@@ -397,7 +397,7 @@ let find_opening_node id =
 *)
 type binding_kind = Explicit | Implicit
 
-type variable_info = Names.identifier * binding_kind * Term.constr option * Term.types
+type variable_info = Names.identifier * binding_kind * Term.body * Term.types
 type variable_context = variable_info list
 type abstr_list = variable_context Names.Cmap.t * variable_context Names.Mindmap.t
 
@@ -422,12 +422,12 @@ let extract_hyps (secs,ohyps) =
 
 let instance_from_variable_context sign =
   let rec inst_rec = function
-    | (id,b,None,_) :: sign -> id :: inst_rec sign
+    | (id,b,Term.Variable _,_) :: sign -> id :: inst_rec sign
     | _ :: sign -> inst_rec sign
     | [] -> [] in
   Array.of_list (inst_rec sign)
 
-let named_of_variable_context = List.map (fun (id,_,b,t) -> (id,b,t))
+let named_of_variable_context = List.map (fun (id,k,b,t) -> (id,b,t))
 
 let add_section_replacement f g hyps =
   match !sectab with

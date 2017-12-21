@@ -115,18 +115,18 @@ Proof.
 intros n; unfold dmemo_get, dmemo_list.
 rewrite (memo_get_correct memo_val mf n); simpl.
 case (is_eq n n); simpl; auto; intros e.
-assert (e = refl_equal n).
- apply eq_proofs_unicity.
- induction x as [| x Hx]; destruct y as [| y].
- left; auto.
- right; intros HH; discriminate HH.
- right; intros HH; discriminate HH.
- case (Hx y).
-   intros HH; left; case HH; auto.
- intros HH; right; intros HH1; case HH.
- injection HH1; auto.
-rewrite H; auto.
-Qed.
+(* assert (e = refl_equal n). *)
+(*  apply eq_proofs_unicity. *)
+(*  induction x as [| x Hx]; destruct y as [| y]. *)
+(*  left; auto. *)
+(*  right; intros HH; discriminate HH. *)
+(*  right; intros HH; discriminate HH. *)
+(*  case (Hx y). *)
+(*    intros HH; left; case HH; auto. *)
+(*  intros HH; right; intros HH1; case HH. *)
+(*  injection HH1; auto. *)
+(* rewrite H; auto. *)
+Qed. 
 
 (** Finally, a version with both dependency and iterator *)
 
@@ -144,17 +144,6 @@ Proof.
 intros n; unfold dmemo_get, dimemo_list.
 rewrite (imemo_get_correct memo_val mf mg); simpl.
 case (is_eq n n); simpl; auto; intros e.
-assert (e = refl_equal n).
- apply eq_proofs_unicity.
- induction x as [| x Hx]; destruct y as [| y].
- left; auto.
- right; intros HH; discriminate HH.
- right; intros HH; discriminate HH.
- case (Hx y).
-   intros HH; left; case HH; auto.
- intros HH; right; intros HH1; case HH.
- injection HH1; auto.
-rewrite H; auto.
 intros n1; unfold mf; rewrite Hg_correct; auto.
 Qed.
 

@@ -116,7 +116,7 @@ Lemma eq_sigT_eq_dep :
   forall (U:Type) (P:U -> Type) (p q:U) (x:P p) (y:P q),
     existT P p x = existT P q y -> eq_dep p x q y.
 Proof.
-  intros.
+  intros. 
   dependent rewrite H.
   apply eq_dep_intro.
 Qed.
@@ -139,6 +139,8 @@ Qed.
 
 Notation equiv_eqex_eqdep := eq_sigT_iff_eq_dep (only parsing). (* Compat *)
 
+(* Uses Prop included in Type *)
+(*
 Lemma eq_sig_eq_dep :
   forall (U:Prop) (P:U -> Prop) (p q:U) (x:P p) (y:P q),
     exist P p x = exist P q y -> eq_dep p x q y.
@@ -147,7 +149,8 @@ Proof.
   dependent rewrite H.
   apply eq_dep_intro.
 Qed.
-
+*)
+(*
 Lemma eq_dep_eq_sig :
   forall (U:Prop) (P:U -> Prop) (p q:U) (x:P p) (y:P q),
     eq_dep p x q y -> exist P p x = exist P q y.
@@ -161,22 +164,22 @@ Lemma eq_sig_iff_eq_dep :
 Proof.
   split; auto using eq_sig_eq_dep, eq_dep_eq_sig.
 Qed.
-
+*)
 (** Dependent equality is equivalent to a dependent pair of equalities *)
 
 Set Implicit Arguments.
 
-Lemma eq_sigT_sig_eq : forall X P (x1 x2:X) H1 H2, existT P x1 H1 = existT P x2 H2 <-> {H:x1=x2 | rew H in H1 = H2}.
-Proof.
-  intros; split; intro H.
-  - change x2 with (projT1 (existT P x2 H2)).
-    change H2 with (projT2 (existT P x2 H2)) at 5.
-    destruct H. simpl.
-    exists eq_refl.
-    reflexivity.
-  - destruct H as (->,<-).
-    reflexivity.
-Defined.
+(* Lemma eq_sigT_sig_eq : forall X P (x1 x2:X) H1 H2, existT P x1 H1 = existT P x2 H2 <-> {H:x1=x2 | rew H in H1 = H2}. *)
+(* Proof. *)
+(*   intros; split; intro H. *)
+(*   - change x2 with (projT1 (existT P x2 H2)). *)
+(*     change H2 with (projT2 (existT P x2 H2)) at 5. *)
+(*     destruct H. simpl. *)
+(*     exists eq_refl. *)
+(*     reflexivity. *)
+(*   - destruct H as (->,<-). *)
+(*     reflexivity. *)
+(* Defined. *)
 
 Lemma eq_sigT_fst :
   forall X P (x1 x2:X) H1 H2 (H:existT P x1 H1 = existT P x2 H2), x1 = x2.
@@ -193,30 +196,30 @@ Proof.
   intros.
   unfold eq_sigT_fst.
   change x2 with (projT1 (existT P x2 H2)).
-  change H2 with (projT2 (existT P x2 H2)) at 3.
+  change H2 with (projT2 (existT P x2 H2)) at 5.
   destruct H.
   reflexivity.
 Defined.
 
-Lemma eq_sig_fst :
-  forall X P (x1 x2:X) H1 H2 (H:exist P x1 H1 = exist P x2 H2), x1 = x2.
-Proof.
-  intros.
-  change x2 with (proj1_sig (exist P x2 H2)).
-  destruct H.
-  reflexivity.
-Defined.
+(* Lemma eq_sig_fst : *)
+(*   forall X P (x1 x2:X) H1 H2 (H:exist P x1 H1 = exist P x2 H2), x1 = x2. *)
+(* Proof. *)
+(*   intros. *)
+(*   change x2 with (proj1_sig (exist P x2 H2)). *)
+(*   destruct H. *)
+(*   reflexivity. *)
+(* Defined. *)
 
-Lemma eq_sig_snd :
-  forall X P (x1 x2:X) H1 H2 (H:exist P x1 H1 = exist P x2 H2), rew (eq_sig_fst H) in H1 = H2.
-Proof.
-  intros.
-  unfold eq_sig_fst, eq_ind.
-  change x2 with (proj1_sig (exist P x2 H2)).
-  change H2 with (proj2_sig (exist P x2 H2)) at 3.
-  destruct H.
-  reflexivity.
-Defined.
+(* Lemma eq_sig_snd : *)
+(*   forall X P (x1 x2:X) H1 H2 (H:exist P x1 H1 = exist P x2 H2), rew (eq_sig_fst H) in H1 = H2. *)
+(* Proof. *)
+(*   intros. *)
+(*   unfold eq_sig_fst, eq_ind. *)
+(*   change x2 with (proj1_sig (exist P x2 H2)). *)
+(*   change H2 with (proj2_sig (exist P x2 H2)) at 3. *)
+(*   destruct H. *)
+(*   reflexivity. *)
+(* Defined. *)
 
 Unset Implicit Arguments.
 
@@ -227,6 +230,10 @@ Hint Immediate eq_dep_sym: core.
 
 (************************************************************************)
 (** * Eq_rect_eq <-> Eq_dep_eq <-> UIP <-> UIP_refl <-> K          *)
+Unset Elimination Schemes.
+Inductive eq_proofs (U : Prop) (p : U) : U -> Prop :=
+  refl_eq_prop : eq_proofs U p p.
+Set Elimination Schemes.
 
 Section Equivalences.
 
@@ -245,12 +252,17 @@ Section Equivalences.
   (** Uniqueness of Identity Proofs (UIP) *)
 
   Definition UIP_ :=
-    forall (x y:U) (p1 p2:x = y), p1 = p2.
+    forall (x y:U) (p1 p2:x = y), eq_proofs _ p1 p2.
+  Lemma uip : UIP_.
+  Proof.
+    red; intros.
+    apply refl_eq_prop.
+  Qed.
 
   (** Uniqueness of Reflexive Identity Proofs *)
 
-  Definition UIP_refl_ :=
-    forall (x:U) (p:x = x), p = refl_equal x.
+  (* Definition UIP_refl_ := *)
+  (*   forall (x:U) (p:x = x), p = refl_equal x. *)
 
   (** Streicher's axiom K *)
 
@@ -279,27 +291,30 @@ Section Equivalences.
 
   Lemma eq_dep_eq__UIP : Eq_dep_eq -> UIP_.
   Proof.
-    intro eq_dep_eq; red.
-    intros; apply eq_dep_eq with (P := fun y => x = y).
-    elim p2 using eq_indd.
-    elim p1 using eq_indd.
-    apply eq_dep_intro.
+    intros; apply uip.
   Qed.
+  (*   intro eq_dep_eq; red.  *)
+  (*   intros. specialize (eq_dep_eq (fun y => x = y)). *)
+  (*   apply eq_dep_eq. *)
+  (*   elim p2 using eq_indd. *)
+  (*   elim p1 using eq_indd. *)
+  (*   apply eq_dep_intro. *)
+  (* Qed. *)
 
   (** Uniqueness of Reflexive Identity Proofs is a direct instance of UIP *)
 
-  Lemma UIP__UIP_refl : UIP_ -> UIP_refl_.
-  Proof.
-    intro UIP; red; intros; apply UIP.
-  Qed.
+  (* Lemma UIP__UIP_refl : UIP_ -> UIP_refl_. *)
+  (* Proof. *)
+  (*   intro UIP; red; intros; apply UIP. *)
+  (* Qed. *)
 
   (** Streicher's axiom K is a direct consequence of Uniqueness of
       Reflexive Identity Proofs *)
 
-  Lemma UIP_refl__Streicher_K : UIP_refl_ -> Streicher_K_.
-  Proof.
-    intro UIP_refl; red; intros; rewrite UIP_refl; assumption.
-  Qed.
+  (* Lemma UIP_refl__Streicher_K : UIP_refl_ -> Streicher_K_. *)
+  (* Proof. *)
+  (*   intro UIP_refl; red; intros; rewrite UIP_refl; assumption. *)
+  (* Qed. *)
 
   (** We finally recover from K the Invariance by Substitution of
       Reflexive Equality Proofs *)
@@ -384,20 +399,20 @@ Proof (eq_rect_eq__eq_dep_eq U eq_rect_eq).
 (** Uniqueness of Identity Proofs (UIP) is a consequence of *)
 (** Injectivity of Dependent Equality *)
 
-Lemma UIP : forall (x y:U) (p1 p2:x = y), p1 = p2.
-Proof (eq_dep_eq__UIP U eq_dep_eq).
+(* Lemma UIP : forall (x y:U) (p1 p2:x = y), p1 = p2. *)
+(* Proof (eq_dep_eq__UIP U eq_dep_eq). *)
 
 (** Uniqueness of Reflexive Identity Proofs is a direct instance of UIP *)
 
-Lemma UIP_refl : forall (x:U) (p:x = x), p = refl_equal x.
-Proof (UIP__UIP_refl U UIP).
+(* Lemma UIP_refl : forall (x:U) (p:x = x), p = refl_equal x. *)
+(* Proof (UIP__UIP_refl U UIP). *)
 
 (** Streicher's axiom K is a direct consequence of Uniqueness of
     Reflexive Identity Proofs *)
 
-Lemma Streicher_K :
-  forall (x:U) (P:x = x -> Prop), P (refl_equal x) -> forall p:x = x, P p.
-Proof (UIP_refl__Streicher_K U UIP_refl).
+(* Lemma Streicher_K : *)
+(*   forall (x:U) (P:x = x -> Prop), P (refl_equal x) -> forall p:x = x, P p. *)
+(* Proof (UIP_refl__Streicher_K U UIP_refl). *)
 
 End Axioms.
 

@@ -57,9 +57,13 @@ let lookup_rel n env =
   lookup_rel n env.env_rel_context
 
 let evaluable_rel n env =
-  match lookup_rel n env with
-  | (_,Some _,_) -> true
-  | _ -> false
+  evaluable_rel n env.env_rel_context
+
+let rel_value n env = 
+  body_of_rel n env.env_rel_context
+
+let rel_body n env = 
+  rel_body n env.env_rel_context
 
 let nb_rel env = env.env_nb_rel
 
@@ -68,8 +72,11 @@ let push_rel = push_rel
 let push_rel_context ctxt x = Sign.fold_rel_context push_rel ctxt ~init:x
 
 let push_rec_types (lna,typarray,_) env =
-  let ctxt = array_map2_i (fun i na t -> (na, None, lift i t)) lna typarray in
-  Array.fold_left (fun e assum -> push_rel assum e) env ctxt
+  let ctxt = array_map2_i (fun i (na, irr) t -> 
+			   (na, Variable (irr,false), lift i t))
+    lna typarray 
+  in
+    Array.fold_left (fun e assum -> push_rel assum e) env ctxt
 
 let fold_rel_context f env ~init =
   let rec fold_right env =
@@ -94,7 +101,7 @@ let named_vals_of_val = snd
    *** /!\ ***   [f t] should be convertible with t *)
 let map_named_val f (ctxt,ctxtv) =
   let ctxt =
-    List.map (fun (id,body,typ) -> (id, Option.map f body, f typ)) ctxt in
+    List.map (fun (id,body,typ) -> (id, map_body f body, f typ)) ctxt in
   (ctxt,ctxtv)
 
 let empty_named_context = empty_named_context
@@ -106,7 +113,6 @@ let push_named_context_val = push_named_context_val
 let val_of_named_context ctxt =
   List.fold_right push_named_context_val ctxt empty_named_context_val
 
-
 let lookup_named id env = Sign.lookup_named id env.env_named_context
 let lookup_named_val id (ctxt,_) = Sign.lookup_named id ctxt
 
@@ -115,16 +121,10 @@ let eq_named_context_val c1 c2 =
 
 (* A local const is evaluable if it is defined  *)
 
-let named_type id env =
-  let (_,_,t) = lookup_named id env in t
-
-let named_body id env =
-  let (_,b,_) = lookup_named id env in b
-
-let evaluable_named id env =
-  match named_body id env with
-  | Some _      -> true
-  | _          -> false
+let named_type id env = Sign.named_type id env.env_named_context
+let evaluable_named id env = Sign.evaluable_named id env.env_named_context
+let named_body id env = Sign.named_body id env.env_named_context
+let named_value id env = Sign.named_value id env.env_named_context
 
 let reset_with_named_context (ctxt,ctxtv) env =
   { env with
@@ -166,6 +166,13 @@ let constant_type env kn =
   let cb = lookup_constant kn env in
     cb.const_type
 
+let constant_relevance env kn =
+  let cb = lookup_constant kn env in
+    match cb.const_type with
+    | PolymorphicArity _ -> Expl
+    | NonPolymorphicType (_, r) -> r
+
+
 type const_evaluation_result = NoBody | Opaque
 
 exception NotEvaluableConst of const_evaluation_result
@@ -188,6 +195,16 @@ let evaluable_constant cst env =
 
 (* Mutual Inductives *)
 let lookup_mind = lookup_mind
+
+let lookup_ind (mind, i) env = 
+  let mind = lookup_mind mind env in
+    mind.mind_packets.(i)
+
+let inductive_relevance env i = 
+  let ibody = lookup_ind i env in
+  match ibody.mind_arity with
+  | Polymorphic _ -> Expl
+  | Monomorphic ar -> relevance_of_sort ar.mind_sort
   
 let add_mind kn mib env =
   let new_inds = Mindmap_env.add kn mib env.env_globals.env_inductives in
@@ -254,10 +271,7 @@ let keep_hyps env needed =
     Sign.fold_named_context_reverse
       (fun need (id,copt,t) ->
         if Idset.mem id need then
-          let globc =
-	    match copt with
-	      | None -> Idset.empty
-	      | Some c -> global_vars_set env c in
+          let globc = Term.cata_body (global_vars_set env) Idset.empty copt in
 	  Idset.union
             (global_vars_set env t)
 	    (Idset.union globc need)

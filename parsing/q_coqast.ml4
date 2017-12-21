@@ -119,9 +119,16 @@ let mlexpr_of_explicitation = function
   | Topconstr.ExplByName id -> <:expr< Topconstr.ExplByName $mlexpr_of_ident id$ >>
   | Topconstr.ExplByPos (n,_id) -> <:expr< Topconstr.ExplByPos $mlexpr_of_int n$ >>
 
-let mlexpr_of_binding_kind = function
-  | Glob_term.Implicit -> <:expr< Glob_term.Implicit >>
-  | Glob_term.Explicit -> <:expr< Glob_term.Explicit >>
+let mlexpr_of_lib_binding_kind = function
+  | Lib.Implicit -> <:expr< Glob_term.Implicit >>
+  | Lib.Explicit -> <:expr< Glob_term.Explicit >>
+
+let mlexpr_of_relevance = function
+  | Term.Irr -> <:expr< Term.Irr >>
+  | Term.Expl -> <:expr< Term.Expl >>
+
+let mlexpr_of_binding_kind r = 
+  <:expr< $mlexpr_of_pair mlexpr_of_lib_binding_kind mlexpr_of_relevance r$ >>
 
 let mlexpr_of_binder_kind = function
   | Topconstr.Default b -> <:expr< Topconstr.Default $mlexpr_of_binding_kind b$ >>

@@ -32,6 +32,8 @@ type load_proofs = Force | Lazy | Dont
 
 let load_proofs = ref Lazy
 
+let prop_type = ref false
+
 let raw_print = ref false
 
 let record_print = ref true

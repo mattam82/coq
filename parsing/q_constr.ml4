@@ -49,9 +49,9 @@ EXTEND
   constr:
     [ "200" RIGHTA
       [ LIDENT "forall"; id = ident; ":"; c1 = constr; ","; c2 = constr ->
-        <:expr< Glob_term.GProd ($dloc$,Name $id$,Glob_term.Explicit,$c1$,$c2$) >>
+        <:expr< Glob_term.GProd ($dloc$,Name $id$,Glob_term.explicit_bk,$c1$,$c2$) >>
       | "fun"; id = ident; ":"; c1 = constr; "=>"; c2 = constr ->
-        <:expr< Glob_term.GLambda ($dloc$,Name $id$,Glob_term.Explicit,$c1$,$c2$) >>
+        <:expr< Glob_term.GLambda ($dloc$,Name $id$,Glob_term.explicit_bk,$c1$,$c2$) >>
       | "let"; id = ident; ":="; c1 = constr; "in"; c2 = constr ->
         <:expr< Glob_term.RLetin ($dloc$,Name $id$,$c1$,$c2$) >>
       (* fix todo *)
@@ -61,7 +61,7 @@ EXTEND
         <:expr< Glob_term.GCast($dloc$,$c1$,DEFAULTcast,$c2$) >> ]
     | "90" RIGHTA
       [ c1 = constr; "->"; c2 = SELF ->
-        <:expr< Glob_term.GProd ($dloc$,Anonymous,Glob_term.Explicit,$c1$,$c2$) >> ]
+        <:expr< Glob_term.GProd ($dloc$,Anonymous,Glob_term.explicit_bk,$c1$,$c2$) >> ]
     | "75" RIGHTA
       [ "~"; c = constr ->
         apply_ref <:expr< coq_not_ref >> [c] ]

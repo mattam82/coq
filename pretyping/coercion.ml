@@ -30,6 +30,7 @@ open Evarconv
 open Retyping
 open Evd
 open Termops
+open Constr
 
 (* Typing operations dealing with coercions *)
 exception NoCoercion
@@ -37,7 +38,7 @@ exception NoCoercion
 (* Here, funj is a coercion therefore already typed in global context *)
 let apply_coercion_args env argl funj =
   let rec apply_rec acc typ = function
-    | [] -> { uj_val = applist (j_val funj,argl);
+    | [] -> { uj_val = app_argsl (j_val funj,argl);
 	      uj_type = typ }
     | h::restl ->
 	(* On devrait pouvoir s'arranger pour qu'on n'ait pas à faire hnf_constr *)
@@ -47,7 +48,7 @@ let apply_coercion_args env argl funj =
 	    apply_rec (h::acc) (subst1 h c2) restl
 	| _ -> anomaly "apply_coercion_args"
   in
-    apply_rec [] funj.uj_type argl
+    apply_rec [] funj.uj_type (args_of argl)
 
 (* appliquer le chemin de coercions de patterns p *)
 let apply_pattern_coercion loc pat p =
@@ -77,7 +78,7 @@ let make_name s = Name (id_of_string s)
 
 let rec disc_subset x =
   match kind_of_term x with
-  | App (c, l) ->
+  | App (c, a, l) ->
       (match kind_of_term c with
        Ind i ->
 	 let len = Array.length l in
@@ -112,6 +113,7 @@ let rec mu env isevars t =
 	  (Some (fun x ->
 		   app_opt env isevars 
 		     f (mkApp (delayed_force sig_proj1,
+			       [| Expl; Expl; Expl |],
 			       [| u; p; x |]))),
 	   ct)
       | None -> (None, v)
@@ -130,7 +132,7 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
     let subco () = subset_coerce env isevars x y in
     let dest_prod c =
       match Reductionops.splay_prod_n env ( !isevars) 1 c with
-      | [(na,b,t)], c -> (na,t), c
+      | [(na,Variable (an,impl),t)], c -> ((na,(an,impl)), t), c
       | _ -> raise NoSubtacCoercion
     in
     let rec coerce_application typ typ' c c' l l' =
@@ -155,10 +157,11 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 		  (List.rev (Array.to_list (Array.sub l (succ i) (len - (succ i)))))
 		in
 		let args = List.rev (restargs @ mkRel 1 :: List.map (lift 1) tele) in
-		let pred = mkLambda (n, eqT, applistc (lift 1 c) args) in
-		let eq = mkApp (delayed_force coq_eq_ind, [| eqT; hdx; hdy |]) in
+		let pred = mkLambda (n, eqT, Term.applistc (lift 1 c) args) in
+		let eq = Term.mkApp (delayed_force coq_eq_ind, [| eqT; hdx; hdy |]) in
 		let evar = make_existential loc env isevars eq in
 		let eq_app x = mkApp (delayed_force coq_eq_rect,
+				      [| Expl; Expl; Expl; Expl; Expl; Irr |],
 				      [| eqT; hdx; pred; x; hdy; evar|]) in
 		  aux (hdy :: tele) (subst1 hdx restT) 
 		    (subst1 hdy restT') (succ i)  (fun x -> eq_app (co x))
@@ -177,8 +180,10 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 	   | Type x, Type y when x = y -> None (* false *)
 	   | _ -> subco ())
       | Prod (name, a, b), Prod (name', a', b') ->
-	  let name' = Name (Namegen.next_ident_away (id_of_string "x") (Termops.ids_of_context env)) in
-	  let env' = push_rel (name', None, a') env in
+	  let name'' = 
+	    Name (Namegen.next_ident_away (id_of_string "x") (Termops.ids_of_context env)) 
+	  in
+	  let env' = push_rel (var_decl_of (set_binder name' name'') a') env in
 	  let c1 = coerce_unify env' (lift 1 a') (lift 1 a) in
 	    (* env, x : a' |- c1 : lift 1 a' > lift 1 a *)
 	  let coec1 = app_opt env' isevars c1 (mkRel 1) in
@@ -192,9 +197,9 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 		   (fun f ->
 		      mkLambda (name', a',
 				app_opt env' isevars c2
-				  (mkApp (Term.lift 1 f, [| coec1 |])))))
+				  (mkApp (Term.lift 1 f, [| Expl |], [| coec1 |])))))
 
-      | App (c, l), App (c', l') ->
+      | App (c, a, l), App (c', a', l') ->
 	  (match kind_of_term c, kind_of_term c' with
 	   Ind i, Ind i' -> (* Inductive types *)
 	     let len = Array.length l in
@@ -228,7 +233,7 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 		       | _ -> raise NoSubtacCoercion
 		     in
 		     let (pb, b), (pb', b') = remove_head a pb, remove_head a' pb' in
-		     let env' = push_rel (make_name "x", None, a) env in
+		     let env' = push_rel (var_decl_of_name (make_name "x") a) env in
 		     let c2 = coerce_unify env' b b' in
 		       match c1, c2 with
 		       | None, None -> None
@@ -236,12 +241,14 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 			   Some
 			     (fun x ->
 				let x, y =
-				  app_opt env' isevars c1 (mkApp (delayed_force sigT_proj1,
-								  [| a; pb; x |])),
-				  app_opt env' isevars c2 (mkApp (delayed_force sigT_proj2,
-								  [| a; pb; x |]))
+				  app_opt env' isevars c1 
+				    (mkExplApp (delayed_force sigT_proj1,
+						[| a; pb; x |])),
+				  app_opt env' isevars c2
+				    (mkExplApp (delayed_force sigT_proj2,
+						[| a; pb; x |]))
 				in
-				  mkApp (delayed_force sigT_intro, [| a'; pb'; x ; y |]))
+				  mkExplApp (delayed_force sigT_intro, [| a'; pb'; x ; y |]))
 		   end
 		 else
 		   begin
@@ -256,12 +263,14 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 			   Some
 			     (fun x ->
 				let x, y =
-				  app_opt env isevars c1 (mkApp (delayed_force prod_proj1,
-								 [| a; b; x |])),
-				  app_opt env isevars c2 (mkApp (delayed_force prod_proj2,
-								 [| a; b; x |]))
+				  app_opt env isevars c1 
+				    (mkExplApp (delayed_force prod_proj1,
+						[| a; b; x |])),
+				  app_opt env isevars c2 
+				    (mkExplApp (delayed_force prod_proj2,
+						[| a; b; x |]))
 				in
-				  mkApp (delayed_force prod_intro, [| a'; b'; x ; y |]))
+				  mkExplApp (delayed_force prod_intro, [| a'; b'; x ; y |]))
 		   end
 	       else
 		 if i = i' && len = Array.length l' then
@@ -292,8 +301,8 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
     Some (u, p) ->
       let c = coerce_unify env u y in
       let f x =
-	app_opt env isevars c (mkApp (delayed_force sig_proj1,
-				      [| u; p; x |]))
+	app_opt env isevars c (mkExplApp (delayed_force sig_proj1,
+					  [| u; p; x |]))
       in Some f
     | None ->
 	match disc_subset y with
@@ -302,10 +311,11 @@ and coerce loc env isevars (x : Term.constr) (y : Term.constr)
 	    Some
 	      (fun x ->
 		 let cx = app_opt env isevars c x in
-		 let evar = make_existential loc env isevars (mkApp (p, [| cx |]))
+		 let evar = make_existential loc env isevars (mkExplApp (p, [| cx |]))
 		 in
 		   (mkApp
 		      (delayed_force sig_intro,
+		       [| Expl; Expl; Expl; Irr |],
 		       [| u; p; cx; evar |])))
 	| None ->
 	    raise NoSubtacCoercion
@@ -331,7 +341,9 @@ let apply_coercion env sigma p hj typ_cl =
     fst (List.fold_left
            (fun (ja,typ_cl) i ->
 	      let fv,isid = coercion_value i in
-	      let argl = (class_args_of env sigma typ_cl)@[ja.uj_val] in
+	      let rel = Retyping.get_relevance_of env sigma ja.uj_type in
+	      let argl = concat_argsl (class_args_of env sigma typ_cl)
+ 		  ([rel],[ja.uj_val]) in
 	      let jres = apply_coercion_args env argl fv in
 		(if isid then
 		   { uj_val = ja.uj_val; uj_type = jres.uj_type }
@@ -441,22 +453,25 @@ let rec inh_conv_coerce_to_fail loc env evd rigidonly v t c1 =
 	  (* has type forall (x:u1), u2 (with v' recursively obtained) *)
           (* Note: we retype the term because sort-polymorphism may have *)
           (* weaken its type *)
-	  let name = match name with
-	    | Anonymous -> Name (id_of_string "x")
-	    | _ -> name in
-	  let env1 = push_rel (name,None,u1) env in
-	  let (evd', v1) =
-	    inh_conv_coerce_to_fail loc env1 evd rigidonly
-              (Some (mkRel 1)) (lift 1 u1) (lift 1 t1) in
-          let v1 = Option.get v1 in
-	  let v2 = Option.map (fun v -> beta_applist (lift 1 v,[v1])) v in
-	  let t2 = match v2 with
-	    | None -> subst_term v1 t2
-	    | Some v2 -> Retyping.get_type_of env1 evd' v2 in
-	  let (evd'',v2') = inh_conv_coerce_to_fail loc env1 evd' rigidonly v2 t2 u2 in
-	    (evd'', Option.map (fun v2' -> mkLambda (name, u1, v2')) v2')
+ 	let name = 
+ 	  map_binder (function
+ 			| Anonymous -> Name (id_of_string "x")
+ 			| n -> n)
+ 	    name 
+ 	in
+ 	let env1 = push_rel (var_decl_of name u1) env in
+	let (evd', v1) =
+	  inh_conv_coerce_to_fail loc env1 evd rigidonly
+          (Some (mkRel 1)) (lift 1 u1) (lift 1 t1) in
+        let v1 = Option.get v1 in
+	let v2 = Option.map (fun v -> beta_applist (lift 1 v,[annot_of name],[v1])) v in
+	let t2 = match v2 with
+	  | None -> subst_term v1 t2
+	  | Some v2 -> Retyping.get_type_of env1 evd' v2 in
+	let (evd'',v2') = inh_conv_coerce_to_fail loc env1 evd' rigidonly v2 t2 u2 in
+	  (evd'', Option.map (fun v2' -> mkLambda (name, u1, v2')) v2')
       | _ -> raise NoCoercion
-
+	
 (* Look for cj' obtained from cj by inserting coercions, s.t. cj'.typ = t *)
 let inh_conv_coerce_to_gen rigidonly loc env evd cj t =
   let (evd', val') =

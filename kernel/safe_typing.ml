@@ -253,15 +253,15 @@ let safe_push_named (id,_,_ as d) env =
   Environ.push_named d env
 
 let push_named_def (id,b,topt) senv =
-  let (c,typ,cst) = translate_local_def senv.env (b,topt) in
+  let (c,typ,rel,cst) = translate_local_def senv.env (b,topt) in
   let senv' = add_constraints cst senv in
-  let env'' = safe_push_named (id,Some c,typ) senv'.env in
+  let env'' = safe_push_named (id,Definition (rel,c),typ) senv'.env in
   (cst, {senv' with env=env''})
 
 let push_named_assum (id,t) senv =
-  let (t,cst) = translate_local_assum senv.env t in
+  let (t,rel,cst) = translate_local_assum senv.env t in
   let senv' = add_constraints cst senv in
-  let env'' = safe_push_named (id,None,t) senv'.env in
+  let env'' = safe_push_named (id,Variable (rel,false),t) senv'.env in
   (cst, {senv' with env=env''})
 
 

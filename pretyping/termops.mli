@@ -37,10 +37,10 @@ val print_rel_context : env -> std_ppcmds
 val print_env : env -> std_ppcmds
 
 (** about contexts *)
-val push_rel_assum : name * types -> env -> env
-val push_rels_assum : (name * types) list -> env -> env
+val push_rel_assum : name binder_annot * types -> env -> env
+val push_rels_assum : (name binder_annot * types) list -> env -> env
 val push_named_rec_types : name array * types array * 'a -> env -> env
-val lookup_rel_id : identifier -> rel_context -> int * constr option * types
+val lookup_rel_id : identifier -> rel_context -> int * body * types
 
 (** builds argument lists matching a block of binders or a context *)
 val rel_vect : int -> int -> constr array
@@ -95,6 +95,8 @@ val iter_constr_with_full_binders :
 val strip_head_cast : constr -> constr
 val drop_extra_implicit_args : constr -> constr
 
+val destBinApp : constr -> constr * (relevance * constr)
+
 (** occur checks *)
 exception Occur
 val occur_meta : types -> bool
@@ -104,11 +106,11 @@ val occur_const : constant -> types -> bool
 val occur_evar : existential_key -> types -> bool
 val occur_var : env -> identifier -> types -> bool
 val occur_var_in_decl :
-  env ->
-  identifier -> 'a * types option * types -> bool
+  env -> identifier -> 'a declaration -> bool
 val free_rels : constr -> Intset.t
 val dependent : constr -> constr -> bool
 val dependent_no_evar : constr -> constr -> bool
+val dependent_in_decl : constr -> 'a declaration -> bool
 val count_occurrences : constr -> constr -> int
 val collect_metas : constr -> int list
 val collect_vars : constr -> Idset.t (** for visible vars only *)
@@ -228,10 +230,15 @@ val last_arg : constr -> constr
 (** Force the decomposition of a term as an applicative one *)
 val decompose_app_vect : constr -> constr * constr array
 
-val adjust_app_list_size : constr -> constr list -> constr -> constr list ->
-  (constr * constr list * constr * constr list)
-val adjust_app_array_size : constr -> constr array -> constr -> constr array ->
-  (constr * constr array * constr * constr array)
+(* val adjust_app_list_size : constr -> constr list -> constr -> constr list -> *)
+(*   (constr * constr list * constr * constr list) *)
+(* val adjust_app_array_size : constr -> constr array -> constr -> constr array -> *)
+(*   (constr * constr array * constr * constr array) *)
+
+val adjust_app_list_size : constr -> constr args_list -> constr -> constr args_list ->
+  (constr * constr args_list * constr * constr args_list)
+val adjust_app_array_size : constr -> constr args -> constr -> constr args ->
+  (constr * constr args * constr * constr args)
 
 (** name contexts *)
 type names_context = name list

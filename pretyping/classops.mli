@@ -50,7 +50,7 @@ val class_info_from_index : cl_index -> cl_typ * cl_info_typ
 
 (** [find_class_type env sigma c] returns the head reference of [c] and its
    arguments *)
-val find_class_type : evar_map -> types -> cl_typ * constr list
+val find_class_type : evar_map -> types -> cl_typ * constr args_list
 
 (** raises [Not_found] if not convertible to a class *)
 val class_of : env -> evar_map -> types -> types * cl_index
@@ -58,7 +58,7 @@ val class_of : env -> evar_map -> types -> types * cl_index
 (** raises [Not_found] if not mapped to a class *)
 val inductive_class_of : inductive -> cl_index
 
-val class_args_of : env -> evar_map -> types -> constr list
+val class_args_of : env -> evar_map -> types -> constr args_list
 
 (** {6 [declare_coercion] adds a coercion in the graph of coercion paths } *)
 val declare_coercion :

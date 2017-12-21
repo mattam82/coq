@@ -567,7 +567,7 @@ GEXTEND Gram
 	  VernacContext c
 
       | IDENT "Instance"; namesup = instance_name; ":";
-	 expl = [ "!" -> Glob_term.Implicit | -> Glob_term.Explicit ] ; t = operconstr LEVEL "200";
+	 expl = [ "!" -> Glob_term.implicit_bk | -> Glob_term.explicit_bk ] ; t = operconstr LEVEL "200";
 	 pri = OPT [ "|"; i = natural -> i ] ;
 	 props = [ ":="; "{"; r = record_declaration; "}" -> Some r |
 	     ":="; c = lconstr -> Some c | -> None ] ->
@@ -713,7 +713,7 @@ GEXTEND Gram
 
       (* Hack! Should be in grammar_ext, but camlp4 factorize badly *)
       | IDENT "Declare"; IDENT "Instance"; namesup = instance_name; ":";
-	 expl = [ "!" -> Glob_term.Implicit | -> Glob_term.Explicit ] ; t = operconstr LEVEL "200";
+	 expl = [ "!" -> Glob_term.implicit_bk | -> Glob_term.explicit_bk ] ; t = operconstr LEVEL "200";
 	 pri = OPT [ "|"; i = natural -> i ] ->
 	   VernacInstance (true, not (use_section_locality ()),
 			   snd namesup, (fst namesup, expl, t),

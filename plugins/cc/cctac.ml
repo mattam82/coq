@@ -35,6 +35,7 @@ let constant dir s = lazy (Coqlib.gen_constant "CC" dir s)
 let _f_equal = constant ["Init";"Logic"] "f_equal"
 
 let _eq_rect = constant ["Init";"Logic"] "eq_rect"
+let _eq_ind = constant ["Init";"Logic"] "eq_ind"
 
 let _refl_equal = constant ["Init";"Logic"] "refl_equal"
 
@@ -156,7 +157,7 @@ let rec quantified_atom_of_constr env sigma nrels term =
 	  let patts=patterns_of_constr env sigma nrels atom in
 	      `Nrule patts
 	else 
-	  quantified_atom_of_constr (Environ.push_rel (id,None,atom) env) sigma (succ nrels) ff
+	  quantified_atom_of_constr (Environ.push_rel (id,variable_body,atom) env) sigma (succ nrels) ff
     | _ ->  
 	let patts=patterns_of_constr env sigma nrels term in
 	    `Rule patts
@@ -171,7 +172,7 @@ let litteral_of_constr env sigma term=
 	else
 	  begin
 	    try 
-	      quantified_atom_of_constr (Environ.push_rel (id,None,atom) env) sigma 1 ff  
+	      quantified_atom_of_constr (Environ.push_rel (id,variable_body,atom) env) sigma 1 ff  
 	    with Not_found ->
 	      `Other (decompose_term env sigma term)
 	  end
@@ -192,24 +193,24 @@ let rec make_prb gls depth additionnal_terms =
 	 let t = decompose_term env sigma c in
 	   ignore (add_term state t)) additionnal_terms;
     List.iter
-      (fun (id,_,e) ->
+      (fun (id,b,e) ->
 	 begin
 	   let cid=mkVar id in
 	   match litteral_of_constr env sigma e with
 	       `Eq (t,a,b) -> add_equality state cid a b
 	     | `Neq (t,a,b) -> add_disequality state (Hyp cid) a b
 	     | `Other ph ->
-		 List.iter
-		   (fun (cidn,nh) ->
-		      add_disequality state (HeqnH (cid,cidn)) ph nh)
-		   !neg_hyps;
-		 pos_hyps:=(cid,ph):: !pos_hyps
+	       List.iter
+	         (fun (cidn,nh) ->
+		  add_disequality state (HeqnH (cid,cidn)) ph nh)
+	       !neg_hyps;
+	       pos_hyps:=(cid,ph):: !pos_hyps
 	     | `Nother nh ->
-		 List.iter
-		   (fun (cidp,ph) ->
-		      add_disequality state (HeqnH (cidp,cid)) ph nh)
-		   !pos_hyps;
-		 neg_hyps:=(cid,nh):: !neg_hyps
+	       List.iter
+	         (fun (cidp,ph) ->
+		  add_disequality state (HeqnH (cidp,cid)) ph nh)
+	       !pos_hyps;
+	       neg_hyps:=(cid,nh):: !neg_hyps
 	     | `Rule patts -> add_quant state id true patts
 	     | `Nrule patts -> add_quant state id false patts
 	 end) (Environ.named_context_of_val (Goal.V82.hyps gls.sigma gls.it));
@@ -331,6 +332,8 @@ let refute_tac c t1 t2 p gls =
 let convert_to_goal_tac c t1 t2 p gls =
   let tt1=constr_of_term t1 and tt2=constr_of_term t2 in
   let sort = Termops.refresh_universes (pf_type_of gls tt2) in
+    if sort = mkSort (Prop Null) then assumption gls
+    else
   let neweq=mkApp(Lazy.force _eq,[|sort;tt1;tt2|]) in
   let e=pf_get_new_id (id_of_string "e") gls in
   let x=pf_get_new_id (id_of_string "X") gls in
@@ -352,18 +355,21 @@ let discriminate_tac cstr p gls =
   let t1=constr_of_term p.p_lhs and t2=constr_of_term p.p_rhs in
   let intype = Termops.refresh_universes (pf_type_of gls t1) in
   let concl=pf_concl gls in
-  let outsort = mkType (Termops.new_univ ()) in
+  let sort=mkSort (pf_apply Retyping.get_sort_of gls concl) in
+  let eq_elim = if Term.is_Prop sort then _eq_ind else _eq_rect in
+  let sort () = Termops.refresh_universes sort in
+  let outsort = sort () in
   let xid=pf_get_new_id (id_of_string "X") gls in
   let tid=pf_get_new_id (id_of_string "t") gls in
   let identity=mkLambda(Name xid,outsort,mkLambda(Name tid,mkRel 1,mkRel 1)) in
   let trivial=pf_type_of gls identity in
-  let outtype = mkType (Termops.new_univ ()) in
+  let outtype = sort () in
   let pred=mkLambda(Name xid,outtype,mkRel 1) in
   let hid=pf_get_new_id (id_of_string "Heq") gls in
   let proj=build_projection intype outtype cstr trivial concl gls in
   let injt=mkApp (Lazy.force _f_equal,
 		  [|intype;outtype;proj;t1;t2;mkVar hid|]) in
-  let endt=mkApp (Lazy.force _eq_rect,
+  let endt=mkApp (Lazy.force eq_elim,
 		  [|outtype;trivial;pred;identity;concl;injt|]) in
   let neweq=mkApp(Lazy.force _eq,[|intype;t1;t2|]) in
     tclTHENS (assert_tac (Name hid) neweq)

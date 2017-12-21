@@ -93,7 +93,7 @@ Function mem (k : key) (s : t elt) {struct s} : bool :=
 Lemma mem_1 : forall m (Hm:Sort m) x, In x m -> mem x m = true.
 Proof.
  intros m Hm x; generalize Hm; clear Hm.
- functional induction (mem x m);intros sorted belong1;trivial.
+ functional induction (mem x m); intros sorted belong1;trivial.
 
  inversion belong1. inversion H.
 

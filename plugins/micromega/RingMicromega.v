@@ -414,7 +414,7 @@ Proof.
   simpl ; intros.
   destruct (nth_in_or_default n l (Pc cO, Equal)).
   (* index is in bounds *)
-  apply H ; congruence.
+  apply H. injection H0. now intros <-. 
   (* index is out-of-bounds *)
   inversion H0.
   rewrite e. simpl.
@@ -635,7 +635,7 @@ destruct op; simpl ;
 destruct p ; simpl; try discriminate H1;
 try rewrite <- addon.(SORrm).(morph0); trivial.
 now apply cneqb_sound.
-apply addon.(SORrm).(morph_eq) in H1. congruence.
+apply addon.(SORrm).(morph_eq) in H1. congruence. 
 apply cleb_sound in H1. now apply -> (Rle_ngt sor).
 apply cltb_sound in H1. now apply -> (Rlt_nge sor).
 Qed.

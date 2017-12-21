@@ -26,6 +26,8 @@ open Library
 open Mod_subst
 open Reductionops
 
+open Constr
+
 (*s A structure S is a non recursive inductive type with a single
    constructor (the name of which defaults to Build_S) *)
 
@@ -183,10 +185,10 @@ that maps the pair (Li,ci) to the following data
 type obj_typ = {
   o_DEF : constr;
   o_INJ : int;      (* position of trivial argument (negative= none) *)
-  o_TABS : constr list;    (* ordered *)
-  o_TPARAMS : constr list; (* ordered *)
+  o_TABS : constr args_list;    (* ordered *)
+  o_TPARAMS : constr args_list; (* ordered *)
   o_NPARAMS : int;
-  o_TCOMPS : constr list } (* ordered *)
+  o_TCOMPS : constr args_list } (* ordered *)
 
 type cs_pattern =
     Const_cs of global_reference
@@ -206,17 +208,18 @@ let keep_true_projections projs kinds =
 
 let cs_pattern_of_constr t =
   match kind_of_term t with
-      App (f,vargs) ->
+      App (f,vans,vargs) ->
 	begin
-	  try  Const_cs (global_of_constr f) , -1, Array.to_list vargs with
+	  try  Const_cs (global_of_constr f) , -1, (Array.to_list vans, Array.to_list vargs) with
 	      _ -> raise Not_found
 	end
-    | Rel n -> Default_cs, pred n, []
-    | Prod (_,a,b) when not (Termops.dependent (mkRel 1) b) -> Prod_cs, -1, [a; Termops.pop b]
-    | Sort s -> Sort_cs (family_of_sort s), -1, []
+    | Rel n -> Default_cs, pred n, ([],[])
+    | Prod (na,a,b) when not (Termops.dependent (mkRel 1) b) ->
+      Prod_cs, -1, ([annot_of na; Expl], [a; Termops.pop b])
+    | Sort s -> Sort_cs (family_of_sort s), -1, ([], [])
     | _ ->
 	begin
-	  try  Const_cs (global_of_constr t) , -1, [] with
+	  try  Const_cs (global_of_constr t) , -1, ([],[]) with
 	      _ -> raise Not_found
 	end
 
@@ -225,13 +228,13 @@ let compute_canonical_projections (con,ind) =
   let v = mkConst con in
   let c = Environ.constant_value (Global.env()) con in
   let lt,t = Reductionops.splay_lam (Global.env()) Evd.empty c in
-  let lt = List.rev (List.map snd lt) in
-  let args = snd (decompose_app t) in
+  let lt = List.rev (List.map (fun (b, t) -> annot_of b, t) lt) in
+  let args = snd (Constr.decompose_app_argsl t) in
   let { s_EXPECTEDPARAM = p; s_PROJ = lpj; s_PROJKIND = kl } =
     lookup_structure ind in
-  let params, projs = list_chop p args in
+  let params, projs = chop_argsl p args in
   let lpj = keep_true_projections lpj kl in
-  let lps = List.combine lpj projs in
+  let lps = List.combine lpj (snd projs) in
   let comp =
     List.fold_left
       (fun l (spopt,t) -> (* comp=components *)
@@ -254,8 +257,8 @@ let compute_canonical_projections (con,ind) =
       [] lps in
   List.map (fun (refi,c,inj,argj) ->
     (refi,c),
-    {o_DEF=v; o_INJ=inj; o_TABS=lt;
-     o_TPARAMS=params; o_NPARAMS=List.length params; o_TCOMPS=argj})
+    {o_DEF=v; o_INJ=inj; o_TABS=List.split lt;
+     o_TPARAMS=params; o_NPARAMS=argsl_length params; o_TCOMPS=argj})
     comp
 
 let pr_cs_pattern = function
@@ -319,8 +322,8 @@ let check_and_decompose_canonical_structure ref =
     | Some vc -> vc
     | None -> error_not_structure ref in
   let body = snd (splay_lam (Global.env()) Evd.empty vc) in
-  let f,args = match kind_of_term body with
-    | App (f,args) -> f,args
+  let f,ans,args = match kind_of_term body with
+    | App (f,ans,args) -> f,ans,args
     | _ -> error_not_structure ref in
   let indsp = match kind_of_term f with
     | Construct (indsp,1) -> indsp
@@ -337,12 +340,12 @@ let declare_canonical_structure ref =
 let lookup_canonical_conversion (proj,pat) =
   List.assoc pat (Refmap.find proj !object_table)
 
-let is_open_canonical_projection env sigma (c,args) =
+let is_open_canonical_projection env sigma (c,(_,args)) =
   try
     let n = find_projection_nparams (global_of_constr c) in
     try
       let arg = whd_betadeltaiota env sigma (List.nth args n) in
-      let hd = match kind_of_term arg with App (hd, _) -> hd | _ -> arg in
+      let hd = match kind_of_term arg with App (hd, _, _) -> hd | _ -> arg in
       not (isConstruct hd) 
     with Failure _ -> false
   with Not_found -> false

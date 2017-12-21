@@ -252,8 +252,8 @@ Notation EpsilonStatement :=
 
 (** Subclassical schemes *)
 
-Definition ProofIrrelevance :=
-  forall (A:Prop) (a1 a2:A), a1 = a2.
+(* Definition ProofIrrelevance := *)
+(*   forall (A:Prop) (a1 a2:A), a1 = a2. *)
 
 Definition IndependenceOfGeneralPremises :=
   forall (A:Type) (P:A -> Prop) (Q:Prop),
@@ -340,26 +340,26 @@ Qed.
 (**********************************************************************)
 (** ** AC_rel + PI -> GAC_rel and AC_rel + IGP -> GAC_rel and GAC_rel = OAC_rel *)
 
-Lemma rel_choice_and_proof_irrel_imp_guarded_rel_choice :
-  RelationalChoice -> ProofIrrelevance -> GuardedRelationalChoice.
-Proof.
-  intros rel_choice proof_irrel.
-  red in |- *; intros A B P R H.
-  destruct (rel_choice _ _ (fun (x:sigT P) (y:B) => R (projT1 x) y)) as (R',(HR'R,H0)).
-  intros (x,HPx).
-  destruct (H x HPx) as (y,HRxy).
-  exists y; exact HRxy.
-  set (R'' := fun (x:A) (y:B) => exists H : P x, R' (existT P x H) y).
-  exists R''; split.
-  intros x y (HPx,HR'xy).
-    change x with (projT1 (existT P x HPx)); apply HR'R; exact HR'xy.
-  intros x HPx.
-  destruct (H0 (existT P x HPx)) as (y,(HR'xy,Huniq)).
-  exists y; split. exists HPx; exact HR'xy.
-  intros y' (H'Px,HR'xy').
-    apply Huniq.
-    rewrite proof_irrel with (a1 := HPx) (a2 := H'Px); exact HR'xy'.
-Qed.
+(* Lemma rel_choice_and_proof_irrel_imp_guarded_rel_choice : *)
+(*   RelationalChoice -> ProofIrrelevance -> GuardedRelationalChoice. *)
+(* Proof. *)
+(*   intros rel_choice proof_irrel. *)
+(*   red in |- *; intros A B P R H. *)
+(*   destruct (rel_choice _ _ (fun (x:sigT P) (y:B) => R (projT1 x) y)) as (R',(HR'R,H0)). *)
+(*   intros (x,HPx). *)
+(*   destruct (H x HPx) as (y,HRxy). *)
+(*   exists y; exact HRxy. *)
+(*   set (R'' := fun (x:A) (y:B) => exists H : P x, R' (existT P x H) y). *)
+(*   exists R''; split. *)
+(*   intros x y (HPx,HR'xy). *)
+(*     change x with (projT1 (existT P x HPx)); apply HR'R; exact HR'xy. *)
+(*   intros x HPx. *)
+(*   destruct (H0 (existT P x HPx)) as (y,(HR'xy,Huniq)). *)
+(*   exists y; split. exists HPx; exact HR'xy. *)
+(*   intros y' (H'Px,HR'xy'). *)
+(*     apply Huniq. *)
+(*     rewrite proof_irrel with (a1 := HPx) (a2 := H'Px); exact HR'xy'. *)
+(* Qed. *)
 
 Lemma rel_choice_indep_of_general_premises_imp_guarded_rel_choice :
   forall A B, inhabited B -> RelationalChoice_on A B ->
@@ -382,13 +382,13 @@ Proof.
   exists R'; firstorder.
 Qed.
 
-Lemma subset_types_imp_guarded_rel_choice_iff_rel_choice :
-  ProofIrrelevance -> (GuardedRelationalChoice <-> RelationalChoice).
-Proof.
-  intuition auto using
-    guarded_rel_choice_imp_rel_choice,
-    rel_choice_and_proof_irrel_imp_guarded_rel_choice.
-Qed.
+(* Lemma subset_types_imp_guarded_rel_choice_iff_rel_choice : *)
+(*   ProofIrrelevance -> (GuardedRelationalChoice <-> RelationalChoice). *)
+(* Proof. *)
+(*   intuition auto using *)
+(*     guarded_rel_choice_imp_rel_choice, *)
+(*     rel_choice_and_proof_irrel_imp_guarded_rel_choice. *)
+(* Qed. *)
 
 (** OAC_rel = GAC_rel *)
 
@@ -542,10 +542,10 @@ Proof.
 Qed.
 
 Theorem constructive_indefinite_description_and_small_drinker_iff_epsilon :
-  (SmallDrinker'sParadox * ConstructiveIndefiniteDescription ->
+  (SmallDrinker'sParadox -> ConstructiveIndefiniteDescription ->
   EpsilonStatement) *
   (EpsilonStatement ->
-   SmallDrinker'sParadox * ConstructiveIndefiniteDescription).
+   (* SmallDrinker'sParadox * *) ConstructiveIndefiniteDescription).
 Proof.
   intuition auto using
     epsilon_imp_constructive_indefinite_description,
@@ -637,7 +637,7 @@ Proof.
   intros x. destruct (H x) as (y,Hy).
   exists (existT (fun x => B x) x y). split; trivial.
   exists (fun x => eq_rect _ _ (projT2 (f x)) _ (proj1_inf (Hf x))).
-  intro x; destruct (Hf x) as (Heq,HR) using and_indd.
+  intro x. destruct (Hf x) as (Heq,HR) using and_indd.
   destruct (f x); simpl in *.
   destruct Heq using eq_indd; trivial.
 Qed.
@@ -705,16 +705,16 @@ Lemma relative_non_contradiction_of_indefinite_descr :
 Proof.
   intros C H AC_fun.
   assert (AC_depfun := non_dep_dep_functional_choice AC_fun).
-  pose (A0 := { A:Type & { P:A->Prop & exists x, P x }}).
+  pose (A0 := { A:Type & { P:A->Prop | exists x, P x }}).
   pose (B0 := fun x:A0 => projT1 x).
-  pose (R0 := fun x:A0 => fun y:B0 x => projT1 (projT2 x) y).
-  pose (H0 := fun x:A0 => projT2 (projT2 x)).
+  pose (R0 := fun x:A0 => fun y:B0 x => proj1_sig (projT2 x) y).
+  pose (H0 := fun x:A0 => proj2_sig (projT2 x)).
   destruct (AC_depfun A0 B0 R0 H0) as (f, Hf).
   apply H.
   intros A P H'.
-  exists (f (existT _ A (existT _ P H'))).
-  pose (Hf' := Hf (existT _ A (existT _ P H'))).
-  assumption.
+  set (fapp:=f (existT _ A (exist _ P H'))).
+  pose (Hf' := Hf (existT _ A (exist _ P H'))).
+  exists fapp. assumption.
 Qed.
 
 Lemma constructive_indefinite_descr_fun_choice :
@@ -734,15 +734,15 @@ Lemma relative_non_contradiction_of_definite_descr :
 Proof.
   intros C H FunReify.
   assert (DepFunReify := non_dep_dep_functional_rel_reification FunReify).
-  pose (A0 := { A:Type & { P:A->Prop & exists! x, P x }}).
+  pose (A0 := { A:Type & { P:A->Prop | exists! x, P x }}).
   pose (B0 := fun x:A0 => projT1 x).
-  pose (R0 := fun x:A0 => fun y:B0 x => projT1 (projT2 x) y).
-  pose (H0 := fun x:A0 => projT2 (projT2 x)).
+  pose (R0 := fun x:A0 => fun y:B0 x => proj1_sig (projT2 x) y).
+  pose (H0 := fun x:A0 => proj2_sig (projT2 x)).
   destruct (DepFunReify A0 B0 R0 H0) as (f, Hf).
   apply H.
   intros A P H'.
-  exists (f (existT _ A (existT _ P H'))).
-  pose (Hf' := Hf (existT _ A (existT _ P H'))).
+  exists (f (existT _ A (exist _ P H'))).
+  pose (Hf' := Hf (existT _ A (exist _ P H'))).
   assumption.
 Qed.
 

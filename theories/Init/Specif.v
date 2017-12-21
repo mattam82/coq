@@ -36,6 +36,7 @@ Inductive sigT (A:Type) (P:A -> Type) : Type :=
 Inductive sigT2 (A:Type) (P Q:A -> Type) : Type :=
     existT2 : forall x:A, P x -> Q x -> sigT2 P Q.
 
+
 (* Notations *)
 
 Arguments sig (A P)%type.
@@ -107,14 +108,17 @@ End Projections.
 
 (** [sigT] of a predicate is equivalent to [sig] *)
 
+(* Shouldn't typecheck anymore with Prop not included in Type *)
+(*
 Lemma sig_of_sigT : forall (A:Type) (P:A->Prop), sigT P -> sig P.
-Proof. destruct 1 as (x,H); exists x; trivial. Defined.
+Proof. destruct 1 as (x,H). exists x; trivial. Defined.
 
 Lemma sigT_of_sig : forall (A:Type) (P:A->Prop), sig P -> sigT P.
 Proof. destruct 1 as (x,H); exists x; trivial. Defined.
 
 Coercion sigT_of_sig : sig >-> sigT.
 Coercion sig_of_sigT : sigT >-> sig.
+*)
 
 (** [sumbool] is a boolean type equipped with the justification of
     their value *)

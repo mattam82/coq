@@ -63,7 +63,7 @@ val constr_of_pat :
            Names.identifier list ->
            Glob_term.cases_pattern *
            (Term.rel_declaration list * Term.constr *
-            (Term.types * Term.constr list) * Glob_term.cases_pattern) *
+            (Term.types * constr args_list) * Glob_term.cases_pattern) *
            Names.identifier list
 
 type 'a rhs =
@@ -83,7 +83,7 @@ type 'a matrix = 'a equation list
 
 (* 1st argument of IsInd is the original ind before extracting the summary *)
 type tomatch_type =
-  | IsInd of types * inductive_type * name list
+  | IsInd of types * relevance * inductive_type * name list
   | NotInd of constr option * types
 
 type tomatch_status =

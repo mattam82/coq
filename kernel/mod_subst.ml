@@ -18,6 +18,7 @@ open Errors
 open Util
 open Names
 open Term
+open Constr
 
 (* For Inline, the int is an inlining level, and the constr (if present)
    is the term into which we should inline *)
@@ -338,7 +339,7 @@ let rec map_kn f f' c =
 	    let kn' = f kn in
 	    if kn'==kn then ci.ci_ind else kn',i
 	  in
-	  let p' = func p in
+	  let p' = smartmap_case_pred func p in
 	  let ct' = func ct in
 	  let l' = array_smartmap func l in
 	    if (ci.ci_ind==ci_ind && p'==p
@@ -367,11 +368,11 @@ let rec map_kn f f' c =
 	  let b'= func b in
 	    if (t'==t && ct'==ct && b==b') then c
 	    else mkLetIn (na, b', t', ct')
-      | App (ct,l) ->
+      | App (ct,an,l) ->
 	  let ct' = func ct in
 	  let l' = array_smartmap func l in
 	    if (ct'== ct && l'==l) then c
-	    else mkApp (ct',l')
+	    else mkApp (ct',an,l')
       | Evar (e,l) ->
 	  let l' = array_smartmap func l in
 	    if (l'==l) then c

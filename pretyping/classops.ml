@@ -148,8 +148,8 @@ let find_class_type sigma t =
     | Var id -> CL_SECVAR id, args
     | Const sp -> CL_CONST sp, args
     | Ind ind_sp -> CL_IND ind_sp, args
-    | Prod (_,_,_) -> CL_FUN, []
-    | Sort _ -> CL_SORT, []
+    | Prod (_,_,_) -> CL_FUN, ([],[])
+    | Sort _ -> CL_SORT, ([],[])
     |  _ -> raise Not_found
 
 
@@ -184,7 +184,7 @@ let class_of env sigma t =
       let (i, { cl_param = n1 } ) = class_info cl in
       (t, n1, i, args)
   in
-  if List.length args = n1 then t, i else raise Not_found
+  if Constr.argsl_length args = n1 then t, i else raise Not_found
 
 let inductive_class_of ind = fst (class_info (CL_IND ind))
 
@@ -219,14 +219,14 @@ let apply_on_class_of env sigma t cont =
   try
     let (cl,args) = find_class_type sigma t in
     let (i, { cl_param = n1 } ) = class_info cl in
-    if List.length args <> n1 then raise Not_found;
+    if Constr.argsl_length args <> n1 then raise Not_found;
     t, cont i
   with Not_found ->
     (* Is it worth to be more incremental on the delta steps? *)
     let t = Tacred.hnf_constr env sigma t in
     let (cl, args) = find_class_type sigma t in
     let (i, { cl_param = n1 } ) = class_info cl in
-    if List.length args <> n1 then raise Not_found;
+    if Constr.argsl_length args <> n1 then raise Not_found;
     t, cont i
 
 let lookup_path_between env sigma (s,t) =

@@ -27,7 +27,7 @@ type polymorphic_arity = {
 }
 
 type constant_type =
-  | NonPolymorphicType of types
+  | NonPolymorphicType of types * relevance
   | PolymorphicArity of rel_context * polymorphic_arity
 
 type constr_substituted
@@ -144,6 +144,8 @@ type one_inductive_body = {
 
     mind_nf_lc : types array; (** Head normalized constructor types so that their conclusion is atomic *)
 
+    mind_singleton_cond : constr array option;
+
     mind_consnrealdecls : int array;
  (** Length of the signature of the constructors (with let, w/o params)
     (not used in the kernel) *)
@@ -163,7 +165,7 @@ type mutual_inductive_body = {
 
     mind_packets : one_inductive_body array;  (** The component of the mutual inductive block *)
 
-    mind_record : bool;  (** Whether the inductive type has been declared as a record *)
+    mind_record : constr option;  (** Whether the inductive type has been declared as a record *)
 
     mind_finite : bool;  (** Whether the type is inductive or coinductive *)
 

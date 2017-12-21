@@ -65,6 +65,36 @@ val eq_constr : constr -> constr -> bool
 
 type types = constr
 
+type relevance = Expl | Irr
+type implicit = bool
+
+type annot = relevance
+type 'a binder_annot = 'a * (annot * implicit)
+type 'a letbinder_annot = 'a * annot
+type 'a application = 'a * annot array * 'a array
+type 'a application_list = 'a * annot list * 'a list
+
+type 'a args = annot array * 'a array
+type 'a args_list = annot list * 'a list
+
+val relevance_of_sort : sorts -> relevance
+val relevance_of_sorts_family : sorts_family -> relevance
+
+type 'a case_pred
+
+val case_pred : 'a case_pred -> 'a
+val case_pred_annot : 'a case_pred -> annot
+val case_pred_type : 'a case_pred -> 'a array option
+val mk_case_pred : ('a * annot * 'a array option) -> 'a case_pred
+
+val map_case_pred : ('a -> 'b) -> ('a case_pred -> 'b case_pred)
+val smartmap_case_pred : ('a -> 'a) -> ('a case_pred -> 'a case_pred)
+val iter_case_pred : ('a -> unit) -> ('a case_pred -> unit)
+val fold_case_pred : ('a -> 'b -> 'a) -> 'a -> 'b case_pred -> 'a
+val fold_case_pred2 : ('a -> 'b -> 'b -> 'a) -> 'a -> 'b case_pred -> 'b case_pred -> 'a
+val smartfold_case_pred : ('a -> 'b -> 'a * 'b) -> 'a case_pred -> 'b -> 'a case_pred * 'b
+
+
 (** {5 Functions for dealing with constr terms. }
   The following functions are intended to simplify and to uniform the
   manipulation of terms. Some of these functions may be overlapped with
@@ -102,6 +132,7 @@ val mkCast : constr * cast_kind * constr -> constr
 (** Constructs the product [(x:t1)t2] *)
 val mkProd : name * types * types -> types
 val mkNamedProd : identifier -> types -> types -> types
+val mkFullNamedProd : identifier binder_annot -> types -> types -> types
 
 (** non-dependent product [t1 -> t2], an alias for
    [forall (_:t1), t2]. Beware [t_2] is NOT lifted.
@@ -112,10 +143,12 @@ val mkArrow : types -> types -> constr
 (** Constructs the abstraction \[x:t{_ 1}\]t{_ 2} *)
 val mkLambda : name * types * constr -> constr
 val mkNamedLambda : identifier -> types -> constr -> constr
+val mkFullNamedLambda : identifier binder_annot -> types -> constr -> constr
 
 (** Constructs the product [let x = t1 : t2 in t3] *)
 val mkLetIn : name * constr * types * constr -> constr
 val mkNamedLetIn : identifier -> constr -> types -> constr -> constr
+val mkFullNamedLetIn : identifier letbinder_annot -> constr -> types -> constr -> constr
 
 (** [mkApp (f,[| t_1; ...; t_n |]] constructs the application
    {% $(f~t_1~\dots~t_n)$ %}. *)
@@ -161,7 +194,7 @@ val mkCase : case_info * constr * constr * constr array -> constr
 
    where the length of the {% $ %}j{% $ %}th context is {% $ %}ij{% $ %}.
 *)
-type rec_declaration = name array * types array * constr array
+type rec_declaration = name letbinder_annot array * types array * constr array
 type fixpoint = (int array * int) * rec_declaration
 val mkFix : fixpoint -> constr
 
@@ -186,11 +219,95 @@ val mkCoFix : cofixpoint -> constr
    the same order (i.e. last argument first) *)
 type 'constr pexistential = existential_key * 'constr array
 type ('constr, 'types) prec_declaration =
-    name array * 'types array * 'constr array
+    name letbinder_annot array * 'types array * 'constr array
 type ('constr, 'types) pfixpoint =
     (int array * int) * ('constr, 'types) prec_declaration
 type ('constr, 'types) pcofixpoint =
     int * ('constr, 'types) prec_declaration
+
+
+module Constr : sig
+  
+  (* [Var] is used for named variables and [Rel] for variables as
+     de Bruijn indices. *)
+  type ('constr, 'types) kind_of_term =
+    | Rel       of int
+    | Var       of identifier
+    | Meta      of metavariable
+    | Evar      of 'constr pexistential
+    | Sort      of sorts
+    | Cast      of 'constr * cast_kind * 'types
+    | Prod      of name binder_annot * 'types * 'types
+    | Lambda    of name binder_annot * 'types * 'constr
+    | LetIn     of name letbinder_annot * 'constr * 'types * 'constr
+    | App       of 'constr application
+    | Const     of constant
+    | Ind       of inductive
+    | Construct of constructor
+    | Case      of case_info * 'constr case_pred * 'constr * 'constr array
+    | Fix       of ('constr, 'types) pfixpoint
+    | CoFix     of ('constr, 'types) pcofixpoint
+      
+  val kind_of_term : constr -> (constr, types) kind_of_term
+
+  val mkProd : name binder_annot * types * types -> types
+  val mkArrow : annot -> types -> types -> types
+  val mkLetIn : name letbinder_annot * constr * types * constr -> constr
+  val mkLambda : name binder_annot * types * constr -> constr
+  val mkApp : constr application -> constr
+  val mkExplApp : constr * constr array -> constr
+
+  val mkCase : case_info * constr case_pred * constr * constr array -> constr
+
+  val destProd : types -> name binder_annot * types * types
+  val destLambda : constr -> name binder_annot * types * constr
+  val destLetIn : constr -> name letbinder_annot * types * constr * constr
+  val destApp : constr -> constr application
+  val destCase : constr -> case_info * constr case_pred * constr * constr array
+
+  val decompose_app : constr -> constr application_list
+  val decompose_app_args : constr -> constr * constr args
+  val recompose_app : constr -> (annot * constr) list -> constr
+      
+  val map_args : ('a -> 'b) -> 'a args -> 'b args    
+  val app_args : (constr * constr args) -> constr    
+  val concat_args : 'a args -> 'a args -> 'a args
+  val empty_args : constr args
+
+  val decompose_app_argsl : constr -> constr * constr args_list
+  val chop_argsl : int -> 'a args_list -> 'a args_list * 'a args_list
+  val map_argsl : ('a -> 'b) -> 'a args_list -> 'b args_list
+  val app_argslc : constr -> constr args_list -> constr
+  val app_argsl : (constr * constr args_list) -> constr
+  val concat_argsl : 'a args_list -> 'a args_list -> 'a args_list
+  val rev_argsl : 'a args_list -> 'a args_list
+
+  val empty_argsl : 'a args_list
+  val is_empty_argsl : 'a args_list -> bool
+  val argsl_length : 'a args_list -> int
+  val argsl_skipn : int -> 'a args_list -> 'a args_list
+  val argsl_firstn : int -> 'a args_list -> 'a args_list
+    
+  val args_length : 'a args -> int
+  val chop_args : int -> 'a args -> 'a args * 'a args
+
+  val args_of : constr args_list -> constr list
+
+  val applist : constr application_list -> constr
+  val applistc : constr -> annot list -> constr list -> constr
+
+  val appvect : constr application -> constr
+    
+  val decompose_prod : constr -> (name binder_annot * constr) list * constr
+  val decompose_lam : constr -> (name binder_annot * constr) list * constr
+
+  (** [compose_lam l b]
+      @return [fun (x_1:T_1)...(x_n:T_n) => b]
+      where [l] is [(x_n,T_n)...(x_1,T_1)].
+      Inverse of [it_destLam] *)
+  val compose_lam : (name binder_annot * constr) list -> constr -> constr
+
+end
 
 type ('constr, 'types) kind_of_term =
   | Rel       of int
@@ -333,14 +450,60 @@ val destCoFix : constr -> cofixpoint
     (in the latter case, [na] is of type [name] but just for printing
     purpose) *)
 
-type named_declaration = identifier * constr option * types
-type rel_declaration = name * constr option * types
+type body = 
+  | Variable of (annot * implicit)
+  | Definition of annot * constr
+
+val variable_body : body
+val definition_body : constr -> body
+val constr_of_body : body -> constr option
+val is_variable_body : body -> bool
+val annot_of_body : body -> annot
+
+
+val map_body : (constr -> constr) -> body -> body
+val smartmap_body : (constr -> constr) -> body -> body
+val iter_body : (constr -> unit) -> body -> unit
+val cata_body : (constr -> 'a) -> 'a -> body -> 'a
+val fold_body : ('a -> constr -> 'a) -> 'a -> body -> 'a
+val fold_right_body : (constr -> 'a -> 'a) -> body -> 'a -> 'a
+val compare_body : (constr -> constr -> bool) -> body -> body -> bool
+
+val anonymous : name binder_annot
+
+type 'a declaration = 'a * body * types
+type named_declaration = identifier declaration
+type rel_declaration = name declaration
+
+val name_of : 'a binder_annot -> 'a
+val letname_of : 'a letbinder_annot -> 'a
+
+val annot_of : 'a binder_annot -> annot
+val letannot_of : 'a letbinder_annot -> annot
+
+val binder_annot_of : 'a -> 'a binder_annot
+val letbinder_annot_of : 'a -> 'a letbinder_annot
+
+val map_binder : ('a -> 'b) -> 'a binder_annot -> 'b binder_annot
+val map_letbinder : ('a -> 'b) -> 'a letbinder_annot -> 'b letbinder_annot
+
+val set_binder : 'a binder_annot -> 'b -> 'b binder_annot
+
+val var_decl_of : 'a binder_annot -> types -> 'a declaration
+val def_decl_of : 'a letbinder_annot -> constr -> types -> 'a declaration
+val fix_decl_of : 'a letbinder_annot -> types -> 'a declaration
+
+val annot_of_decl : 'a declaration -> annot
+
+val var_decl_of_name : 'a -> types -> 'a declaration
+val def_decl_of_name : 'a -> constr -> types -> 'a declaration
 
 val map_named_declaration :
   (constr -> constr) -> named_declaration -> named_declaration
 val map_rel_declaration :
   (constr -> constr) -> rel_declaration -> rel_declaration
 
+val fold_declaration : (constr -> 'a -> 'a) -> 'b declaration -> 'a -> 'a  
 val fold_named_declaration :
   (constr -> 'a -> 'a) -> named_declaration -> 'a -> 'a
 val fold_rel_declaration :
@@ -371,6 +534,10 @@ val empty_rel_context : rel_context
 val add_rel_decl : rel_declaration -> rel_context -> rel_context
 
 val lookup_rel : int -> rel_context -> rel_declaration
+val evaluable_rel : int -> rel_context -> bool
+val body_of_rel : int -> rel_context -> constr option
+val rel_body : int -> rel_context -> body
+
 val rel_context_length : rel_context -> int
 val rel_context_nhyps : rel_context -> int
 
@@ -392,6 +559,9 @@ val applist : constr * constr list -> constr
 val applistc : constr -> constr list -> constr
 val appvect : constr * constr array -> constr
 val appvectc : constr -> constr array -> constr
+
+val extended_rel_applist : int -> rel_context -> constr args_list
+val extended_rel_appvect : int -> rel_context -> constr args
 
 (** [prodn n l b] = [forall (x_1:T_1)...(x_n:T_n), b]
    where [l] is [(x_n,T_n)...(x_1,T_1)...]. *)

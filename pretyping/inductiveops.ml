@@ -17,6 +17,7 @@ open Sign
 open Declarations
 open Environ
 open Reductionops
+open Constr
 
 (* The following three functions are similar to the ones defined in
    Inductive, but they expect an env *)
@@ -42,34 +43,33 @@ let arities_of_constructors env ind =
   Inductive.arities_of_constructors ind specif
 
 (* [inductive_family] = [inductive_instance] applied to global parameters *)
-type inductive_family = inductive * constr list
+type inductive_family = inductive * constr args_list
 
-let make_ind_family (mis, params) = (mis,params)
+let make_ind_family (mis,params) = (mis,params)
 let dest_ind_family (mis,params) = (mis,params)
 
-let map_ind_family f (mis,params) = (mis, List.map f params)
+let map_ind_family f (mis,params) = (mis, map_argsl f params)
 
 let liftn_inductive_family n d = map_ind_family (liftn n d)
 let lift_inductive_family n = liftn_inductive_family n 1
 
 let substnl_ind_family l n = map_ind_family (substnl l n)
 
-
-type inductive_type = IndType of inductive_family * constr list
+type inductive_type = IndType of inductive_family * constr args_list
 
 let make_ind_type (indf, realargs) = IndType (indf,realargs)
 let dest_ind_type (IndType (indf,realargs)) = (indf,realargs)
 
 let map_inductive_type f (IndType (indf, realargs)) =
-  IndType (map_ind_family f indf, List.map f realargs)
+  IndType (map_ind_family f indf, map_argsl f realargs)
 
 let liftn_inductive_type n d = map_inductive_type (liftn n d)
 let lift_inductive_type n = liftn_inductive_type n 1
 
 let substnl_ind_type l n = map_inductive_type (substnl l n)
 
-let mkAppliedInd (IndType ((ind,params), realargs)) =
-  applist (mkInd ind,params@realargs)
+let mkAppliedInd (IndType ((ind,(ans,params)),(ans',realargs))) =
+  Constr.applist (mkInd ind,ans@ans',params@realargs)
 
 (* Does not consider imbricated or mutually recursive types *)
 let mis_is_recursive_subset listind rarg =
@@ -185,28 +185,28 @@ let make_case_info env ind style =
 
 type constructor_summary = {
   cs_cstr : constructor;
-  cs_params : constr list;
+  cs_params : constr args_list;
   cs_nargs : int;
   cs_args : rel_context;
-  cs_concl_realargs : constr array
+  cs_concl_realargs : constr args;
 }
 
 let lift_constructor n cs = {
   cs_cstr = cs.cs_cstr;
-  cs_params = List.map (lift n) cs.cs_params;
+  cs_params = map_argsl (lift n) cs.cs_params;
   cs_nargs = cs.cs_nargs;
   cs_args = lift_rel_context n cs.cs_args;
-  cs_concl_realargs = Array.map (liftn n (cs.cs_nargs+1)) cs.cs_concl_realargs
+  cs_concl_realargs = map_args (liftn n (cs.cs_nargs+1)) cs.cs_concl_realargs
 }
 (* Accept less parameters than in the signature *)
 
 let instantiate_params t args sign =
   let rec inst s t = function
-    | ((_,None,_)::ctxt,a::args) ->
+    | ((_,Variable _,_)::ctxt,a::args) ->
 	(match kind_of_term t with
 	   | Prod(_,_,t) -> inst (a::s) t (ctxt,args)
 	   | _ -> anomaly"instantiate_params: type, ctxt and args mismatch")
-    | ((_,(Some b),_)::ctxt,args) ->
+    | ((_,(Definition (_, b)),_)::ctxt,args) ->
 	(match kind_of_term t with
 	   | LetIn(_,_,_,t) -> inst ((substl s b)::s) t (ctxt,args)
 	   | _ -> anomaly"instantiate_params: type, ctxt and args mismatch")
@@ -214,18 +214,19 @@ let instantiate_params t args sign =
     | _ -> anomaly"instantiate_params: type, ctxt and args mismatch"
   in inst [] t (List.rev sign,args)
 
-let get_constructor (ind,mib,mip,params) j =
+let get_constructor (ind,mib,mip,(ans,params)) j =
   assert (j <= Array.length mip.mind_consnames);
   let typi = mis_nf_constructor_type (ind,mib,mip) j in
   let typi = instantiate_params typi params mib.mind_params_ctxt in
   let (args,ccl) = decompose_prod_assum typi in
-  let (_,allargs) = decompose_app ccl in
+  let (_,allans,allargs) = decompose_app ccl in
+  let vans = list_skipn (List.length params) allans in
   let vargs = list_skipn (List.length params) allargs in
   { cs_cstr = ith_constructor_of_inductive ind j;
-    cs_params = params;
+    cs_params = ans, params;
     cs_nargs = rel_context_length args;
     cs_args = args;
-    cs_concl_realargs = Array.of_list vargs }
+    cs_concl_realargs = Array.of_list vans, Array.of_list vargs }
 
 let get_constructors env (ind,params) =
   let (mib,mip) = Inductive.lookup_mind_specif env ind in
@@ -242,13 +243,17 @@ let substnl_rel_context subst n sign =
 
 let substl_rel_context subst = substnl_rel_context subst 0
 
-let rec instantiate_context sign args =
+let rec instantiate_context sign (_,args) =
   let rec aux subst = function
-  | (_,None,_)::sign, a::args -> aux (a::subst) (sign,args)
-  | (_,Some b,_)::sign, args -> aux (substl subst b::subst) (sign,args)
+  | (_,Variable _,_)::sign, a::args -> aux (a::subst) (sign,args)
+  | (_,Definition (_, b),_)::sign, args -> aux (substl subst b::subst) (sign,args)
   | [], [] -> subst
   | _ -> anomaly "Signature/instance mismatch in inductive family"
   in aux [] (List.rev sign,args)
+
+let get_sort_family env ind = 
+  let (mib,mip) = Inductive.lookup_mind_specif env ind in
+    Inductive.inductive_sort_family mip
 
 let get_arity env (ind,params) =
   let (mib,mip) = Inductive.lookup_mind_specif env ind in
@@ -258,7 +263,7 @@ let get_arity env (ind,params) =
        parameters *)
     let parsign = mib.mind_params_ctxt in
     let nnonrecparams = mib.mind_nparams - mib.mind_nparams_rec in
-    if List.length params = rel_context_nhyps parsign - nnonrecparams then
+    if List.length (snd params) = rel_context_nhyps parsign - nnonrecparams then
       snd (list_chop nnonrecparams mib.mind_params_ctxt)
     else
       parsign in
@@ -269,26 +274,28 @@ let get_arity env (ind,params) =
 
 (* Functions to build standard types related to inductive *)
 let build_dependent_constructor cs =
-  applist
-    (mkConstruct cs.cs_cstr,
-     (List.map (lift cs.cs_nargs) cs.cs_params)
-      @(extended_rel_list 0 cs.cs_args))
+  app_argslc (mkConstruct cs.cs_cstr)
+  (concat_argsl
+   (map_argsl (lift cs.cs_nargs) cs.cs_params)
+   (extended_rel_applist 0 cs.cs_args))
 
 let build_dependent_inductive env ((ind, params) as indf) =
-  let arsign,_ = get_arity env indf in
+  let arsign,sf = get_arity env indf in
   let nrealargs = List.length arsign in
-  applist
-    (mkInd ind,
-     (List.map (lift nrealargs) params)@(extended_rel_list 0 arsign))
+  app_argslc (mkInd ind)
+    (concat_argsl
+     (map_argsl (lift nrealargs) params)
+     (extended_rel_applist 0 arsign))
 
 (* builds the arity of an elimination predicate in sort [s] *)
 
 let make_arity_signature env dep indf =
-  let (arsign,_) = get_arity env indf in
+  let (arsign,sf) = get_arity env indf in
   if dep then
     (* We need names everywhere *)
-    name_context env
-      ((Anonymous,None,build_dependent_inductive env indf)::arsign)
+    let ty = build_dependent_inductive env indf in
+      name_context env
+	((var_decl_of (Anonymous,(relevance_of_sorts_family sf, false)) ty)::arsign)
       (* Costly: would be better to name once for all at definition time *)
   else
     (* No need to enforce names *)
@@ -298,10 +305,11 @@ let make_arity env dep indf s = mkArity (make_arity_signature env dep indf, s)
 
 (* [p] is the predicate and [cs] a constructor summary *)
 let build_branch_type env dep p cs =
-  let base = appvect (lift cs.cs_nargs p, cs.cs_concl_realargs) in
+  let base = app_args (lift cs.cs_nargs p, cs.cs_concl_realargs) in
   if dep then
-    it_mkProd_or_LetIn_name env
-      (applist (base,[build_dependent_constructor cs]))
+    let sf = get_sort_family env (fst cs.cs_cstr) in
+      it_mkProd_or_LetIn_name env
+      (applist (base,[relevance_of_sorts_family sf],[build_dependent_constructor cs]))
       cs.cs_args
   else
     it_mkProd_or_LetIn base cs.cs_args
@@ -309,40 +317,41 @@ let build_branch_type env dep p cs =
 (**************************************************)
 
 let extract_mrectype t =
-  let (t, l) = decompose_app t in
+  let (t, a, l) = decompose_app t in
   match kind_of_term t with
-    | Ind ind -> (ind, l)
+    | Ind ind -> (ind, (a, l))
     | _ -> raise Not_found
 
 let find_mrectype env sigma c =
-  let (t, l) = decompose_app (whd_betadeltaiota env sigma c) in
+  let (t, a, l) = decompose_app (whd_betadeltaiota env sigma c) in
   match kind_of_term t with
-    | Ind ind -> (ind, l)
+    | Ind ind -> (ind, (a, l))
     | _ -> raise Not_found
 
 let find_rectype env sigma c =
-  let (t, l) = decompose_app (whd_betadeltaiota env sigma c) in
+  let (t, a, l) = decompose_app (whd_betadeltaiota env sigma c) in
   match kind_of_term t with
     | Ind ind ->
         let (mib,mip) = Inductive.lookup_mind_specif env ind in
+        let (parans,rargsans) = list_chop mib.mind_nparams a in
         let (par,rargs) = list_chop mib.mind_nparams l in
-        IndType((ind, par),rargs)
+        IndType((ind, (parans,par)),(rargsans,rargs))
     | _ -> raise Not_found
 
 let find_inductive env sigma c =
-  let (t, l) = decompose_app (whd_betadeltaiota env sigma c) in
+  let (t, a, l) = decompose_app (whd_betadeltaiota env sigma c) in
   match kind_of_term t with
     | Ind ind
         when (fst (Inductive.lookup_mind_specif env ind)).mind_finite ->
-        (ind, l)
+        (ind, (a, l))
     | _ -> raise Not_found
 
 let find_coinductive env sigma c =
-  let (t, l) = decompose_app (whd_betadeltaiota env sigma c) in
+  let (t, a, l) = decompose_app (whd_betadeltaiota env sigma c) in
   match kind_of_term t with
     | Ind ind
         when not (fst (Inductive.lookup_mind_specif env ind)).mind_finite ->
-        (ind, l)
+        (ind, (a, l))
     | _ -> raise Not_found
 
 
@@ -353,10 +362,10 @@ let find_coinductive env sigma c =
 let is_predicate_explicitly_dep env pred arsign =
   let rec srec env pval arsign =
     let pv' = whd_betadeltaiota env Evd.empty pval in
-    match kind_of_term pv', arsign with
-      | Lambda (na,t,b), (_,None,_)::arsign ->
+    match Constr.kind_of_term pv', arsign with
+      | Constr.Lambda (na,t,b), (_,Variable _,_)::arsign ->
 	  srec (push_rel_assum (na,t) env) b arsign
-      | Lambda (na,_,_), _ ->
+      | Constr.Lambda (na,_,_), _ ->
 
        (* The following code has an impact on the introduction names
 	  given by the tactics "case" and "inversion": when the
@@ -379,7 +388,7 @@ let is_predicate_explicitly_dep env pred arsign =
           check whether the predicate is actually dependent or not
           would indeed be more natural! *)
 
-	  na <> Anonymous
+	  name_of na <> Anonymous
 
       | _ -> anomaly "Non eta-expanded dep-expanded \"match\" predicate"
   in
@@ -407,10 +416,11 @@ let type_case_branches_with_names env indspec p c =
   let (ind,args) = indspec in
   let (mib,mip as specif) = Inductive.lookup_mind_specif env ind in
   let nparams = mib.mind_nparams in
-  let (params,realargs) = list_chop nparams args in
+  let (params,realargs) = chop_argsl nparams args in
   let lbrty = Inductive.build_branches_type ind specif params p in
   (* Build case type *)
-  let conclty = Reduction.beta_appvect p (Array.of_list (realargs@[c])) in
+  let conclty = Reduction.beta_app_argsl p 
+    (concat_argsl realargs ([Expl],[c])) in
   (* Adjust names *)
   if is_elim_predicate_explicitly_dependent env p (ind,params) then
     (set_pattern_names env ind lbrty, conclty)
@@ -418,10 +428,13 @@ let type_case_branches_with_names env indspec p c =
 
 (* Type of Case predicates *)
 let arity_of_case_predicate env (ind,params) dep k =
-  let arsign,_ = get_arity env (ind,params) in
+  let arsign,sf = get_arity env (ind,params) in
   let mind = build_dependent_inductive env (ind,params) in
-  let concl = if dep then mkArrow mind (mkSort k) else mkSort k in
-  it_mkProd_or_LetIn concl arsign
+  let concl = 
+    if dep then 
+      Constr.mkArrow (relevance_of_sorts_family sf) mind (mkSort k) 
+    else mkSort k 
+  in it_mkProd_or_LetIn concl arsign
 
 (***********************************************)
 (* Inferring the sort of parameters of a polymorphic inductive type
@@ -431,11 +444,11 @@ let arity_of_case_predicate env (ind,params) dep k =
    that appear in the type of the inductive by the sort of the
    conclusion, and the other ones by fresh universes. *)
 let rec instantiate_universes env scl is = function
-  | (_,Some _,_ as d)::sign, exp ->
+  | (_,Definition _,_ as d)::sign, exp ->
       d :: instantiate_universes env scl is (sign, exp)
   | d::sign, None::exp ->
       d :: instantiate_universes env scl is (sign, exp)
-  | (na,None,ty)::sign, Some u::exp ->
+  | (na,(Variable _ as ann),ty)::sign, Some u::exp ->
       let ctx,_ = Reduction.dest_arity env ty in
       let s =
 	(* Does the sort of parameter [u] appear in (or equal)
@@ -445,7 +458,7 @@ let rec instantiate_universes env scl is = function
         else
           (* unconstriained sort: replace by fresh universe *)
           new_Type_sort() in
-      (na,None,mkArity(ctx,s)):: instantiate_universes env scl is (sign, exp)
+      ((na, ann, mkArity(ctx,s))):: instantiate_universes env scl is (sign, exp)
   | sign, [] -> sign (* Uniform parameters are exhausted *)
   | [], _ -> assert false
 

@@ -118,7 +118,7 @@ let generate_type g_to_f f graph i =
   let nb_args = List.length fun_ctxt in
   let args_from_decl i decl =
     match decl with
-      | (_,Some _,_) -> incr i; failwith "args_from_decl"
+      | (_,Definition _,_) -> incr i; failwith "args_from_decl"
       | _ -> let j = !i in incr i;mkRel (nb_args - j  + 1)
   in
   (*i We need to name the vars [res] and [fv] i*)
@@ -152,7 +152,7 @@ let generate_type g_to_f f graph i =
   let graph_applied =
     let args_and_res_as_rels =
       let i = ref 0 in
-      Array.of_list ((map_succeed (args_from_decl i) (List.rev ((Name res_id,None,res_type)::fun_ctxt))) )
+      Array.of_list ((map_succeed (args_from_decl i) (List.rev (var_decl_of_name (Name res_id) res_type::fun_ctxt))) )
     in
     let args_and_res_as_rels =
       Array.mapi (fun i c -> if i <> Array.length args_and_res_as_rels - 1 then lift 1 c else c) args_and_res_as_rels
@@ -163,12 +163,13 @@ let generate_type g_to_f f graph i =
     \[\forall (x_1:t_1)\ldots(x_n:t_n), let fv := f x_1\ldots x_n in, forall res,  \]
     i*)
   let pre_ctxt =
-    (Name res_id,None,lift 1 res_type)::(Name fv_id,Some (mkApp(mkConst f,args_as_rels)),res_type)::fun_ctxt
+    (var_decl_of_name (Name res_id) (lift 1 res_type))::
+    (def_decl_of_name (Name fv_id) (mkApp(mkConst f,args_as_rels)) res_type)::fun_ctxt
   in
   (*i and we can return the solution depending on which lemma type we are defining i*)
   if g_to_f
-  then (Anonymous,None,graph_applied)::pre_ctxt,(lift 1 res_eq_f_of_args)
-  else (Anonymous,None,res_eq_f_of_args)::pre_ctxt,(lift 1 graph_applied)
+  then (var_decl_of_name Anonymous graph_applied)::pre_ctxt,(lift 1 res_eq_f_of_args)
+  else (var_decl_of_name Anonymous res_eq_f_of_args)::pre_ctxt,(lift 1 graph_applied)
 
 
 (*
@@ -442,7 +443,7 @@ let prove_fun_correct functional_induction funs_constr graphs_constr schemes lem
 	     | hres::res::(x,_,t)::ctxt ->
 		 Termops.it_mkLambda_or_LetIn
 		   (Termops.it_mkProd_or_LetIn concl [hres;res])
-		   ((x,None,t)::ctxt)
+		   ((var_decl_of_name x t)::ctxt)
 	)
 	lemmas_types_infos
     in
@@ -568,8 +569,8 @@ let prove_fun_correct functional_induction funs_constr graphs_constr schemes lem
 	     if Idset.mem id this_branche_ids
 	     then
 	       match b with
-		 | None -> (id::pre_args,pre_tac)
-		 | Some b ->
+		 | Variable _ -> (id::pre_args,pre_tac)
+		 | Definition (_, b) ->
 		     (pre_args,
 		      tclTHEN (h_reduce (Glob_term.Unfold([Glob_term.all_occurrences_expr,EvalVarRef id])) allHyps) pre_tac
 		     )
@@ -724,7 +725,7 @@ let prove_fun_correct functional_induction funs_constr graphs_constr schemes lem
 let generalize_dependent_of x hyp g =
   tclMAP
     (function
-       | (id,None,t) when not (id = hyp) &&
+       | (id,Variable _,t) when not (id = hyp) &&
 	   (Termops.occur_var (pf_env g) x t) -> tclTHEN (h_generalize [mkVar id]) (thin [id])
        | _ -> tclIDTAC
     )

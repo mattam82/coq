@@ -27,18 +27,20 @@ val e_cumul : ?ts:transparent_state -> env -> evar_map ref -> constr -> constr -
 (* For debugging *)
 val evar_conv_x : transparent_state ->
   env -> evar_map -> conv_pb -> constr -> constr -> evar_map * bool
+val evar_conv_ann_x : transparent_state ->
+  env -> evar_map -> conv_pb -> relevance -> constr -> relevance -> constr -> evar_map * bool
 val evar_eqappr_x : transparent_state ->
   env -> evar_map ->
-    conv_pb -> constr * constr list -> constr * constr list ->
+    conv_pb -> constr * constr args_list -> constr * constr args_list ->
       evar_map * bool
 (**/**)
 
 val consider_remaining_unif_problems : ?ts:transparent_state -> env -> evar_map -> evar_map
 
-val check_conv_record : constr * types list -> constr * types list ->
-  constr * constr list * (constr list * constr list) *
-    (constr list * types list) *
-    (constr list * types list) * constr *
+val check_conv_record : constr * types args_list -> constr * types args_list ->
+  constr * constr args_list * (constr args_list * constr args_list) *
+    (constr args_list * types args_list) *
+    (constr args_list * types args_list) * (annot * constr) *
     (int * constr)
 
 val set_solve_evars : (env -> evar_map -> constr -> evar_map * constr) -> unit

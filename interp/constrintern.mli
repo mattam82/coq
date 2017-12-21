@@ -144,14 +144,14 @@ val interp_reference : ltac_sign -> reference -> glob_constr
 
 (** Interpret binders *)
 
-val interp_binder  : evar_map -> env -> name -> constr_expr -> types
+val interp_binder  : evar_map -> env -> name -> constr_expr -> types * relevance
 
-val interp_binder_evars : evar_map ref -> env -> name -> constr_expr -> types
+val interp_binder_evars : evar_map ref -> env -> name -> constr_expr -> types * relevance
 
 (** Interpret contexts: returns extended env and context *)
 
-val interp_context_gen : (env -> glob_constr -> types) ->
-  (env -> glob_constr -> unsafe_judgment) ->
+val interp_context_gen : (env -> glob_constr -> types * relevance) ->
+  (env -> glob_constr -> unsafe_judgment * relevance) ->
   ?global_level:bool -> ?impl_env:internalization_env ->
   evar_map -> env -> local_binder list -> internalization_env * ((env * rel_context) * Impargs.manual_implicits)
   

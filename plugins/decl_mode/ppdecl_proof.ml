@@ -64,7 +64,7 @@ let rec print_hyps pconstr gtyp env sep _be _have hyps =
 	    let nenv =
 	      match st.st_label with
 		  Anonymous -> env
-		| Name id -> Environ.push_named (id,None,gtyp st.st_it) env in
+		| Name id -> Environ.push_named (id,Term.variable_body,gtyp st.st_it) env in
 	      spc() ++ pr_sep ++ pr_statement pconstr env st ++
 		print_hyps pconstr gtyp nenv true _be _have rest
 	  end
@@ -77,7 +77,7 @@ and print_vars pconstr gtyp env sep _be _have vars =
 	let nenv =
 	  match st.st_label with
 	      Anonymous -> anomaly "anonymous variable"
-	    | Name id -> Environ.push_named (id,None,st.st_it) env in
+	    | Name id -> Environ.push_named (id,Term.variable_body,st.st_it) env in
 	let pr_sep = if sep then pr_comma () else mt () in
 		spc() ++ pr_sep ++
 		   pr_statement pr_constr env st ++

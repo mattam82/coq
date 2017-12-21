@@ -67,6 +67,9 @@ let lookup_rel n env =
       | _, []        -> raise Not_found in
   lookup_rel n env.env_rel_context
 
+let lookup_rel_body n env =
+  constr_of_body (pi2 (lookup_rel n env))
+
 let push_rel d env =
     { env with
       env_rel_context = d :: env.env_rel_context }
@@ -91,6 +94,9 @@ let lookup_named id env =
     | _ :: sign -> lookup_named id sign
     | [] -> raise Not_found in
   lookup_named id env.env_named_context
+
+let lookup_named_body n env =
+  constr_of_body (pi2 (lookup_named n env))
 
 (* A local const is evaluable if it is defined  *)
 

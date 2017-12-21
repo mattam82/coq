@@ -119,7 +119,7 @@ let mk_open_instance id gl m t=
   let rec aux n avoid=
     if n=0 then [] else
       let nid=(fresh_id avoid var_id gl) in
-	(Name nid,None,dummy_constr)::(aux (n-1) (nid::avoid)) in
+	(var_decl_of (binder_annot_of (Name nid)) dummy_constr)::(aux (n-1) (nid::avoid)) in
   let nt=it_mkLambda_or_LetIn revt (aux m []) in
   let rawt=Detyping.detype false [] [] nt in
   let rec raux n t=

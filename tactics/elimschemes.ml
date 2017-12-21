@@ -23,7 +23,7 @@ open Ind_tables
 (* Induction/recursion schemes *)
 
 let optimize_non_type_induction_scheme kind dep sort ind =
-  if check_scheme kind ind then
+  if check_scheme kind ind && sort <> InProp then
     (* in case the inductive has a type elimination, generates only one
        induction scheme, the other ones share the same code with the
        apropriate type *)

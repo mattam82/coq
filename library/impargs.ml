@@ -159,8 +159,7 @@ let is_flexible_reference env bound depth f =
     | Const kn ->
         let cb = Environ.lookup_constant kn env in
 	(match cb.const_body with Def _ -> true | _ -> false)
-    | Var id ->
-        let (_,value,_) = Environ.lookup_named id env in value <> None
+    | Var id ->	named_value id env <> None
     | Ind _ | Construct _ -> false
     |  _ -> true
 
@@ -221,7 +220,7 @@ let compute_implicits_gen strict strongly_strict revpat contextual all env t =
       | Prod (na,a,b) ->
 	  let na',avoid' = find_displayed_name_in all avoid na (names,b) in
 	  add_free_rels_until strict strongly_strict revpat n env a (Hyp (n+1))
-            (aux (push_rel (na',None,a) env) avoid' (n+1) (na'::names) b)
+            (aux (push_rel (var_decl_of_name na' a) env) avoid' (n+1) (na'::names) b)
       | _ ->
 	  rigid := is_rigid_head t;
 	  let names = List.rev names in
@@ -233,7 +232,7 @@ let compute_implicits_gen strict strongly_strict revpat contextual all env t =
   match kind_of_term (whd_betadeltaiota env t) with
     | Prod (na,a,b) ->
 	let na',avoid = find_displayed_name_in all [] na ([],b) in
-	let v = aux (push_rel (na',None,a) env) avoid 1 [na'] b in
+	let v = aux (push_rel (var_decl_of_name na' a) env) avoid 1 [na'] b in
 	!rigid, Array.to_list v
     | _ -> true, []
 
@@ -397,7 +396,7 @@ let compute_mib_implicits flags manual kn =
     Array.to_list
       (Array.map  (* No need to lift, arities contain no de Bruijn *)
         (fun mip ->
-	  (Name mip.mind_typename, None, type_of_inductive env (mib,mip)))
+	  (var_decl_of_name (Name mip.mind_typename) (type_of_inductive env (mib,mip))))
         mib.mind_packets) in
   let env_ar = push_rel_context ar env in
   let imps_one_inductive i mip =
@@ -486,7 +485,7 @@ let subst_implicits (subst,(req,l)) =
 
 let impls_of_context ctx =
   List.rev_map (fun (id,impl,_,_) -> if impl = Lib.Implicit then Some (id, Manual, (true,true)) else None)
-    (List.filter (fun (_,_,b,_) -> b = None) ctx)
+    (List.filter (fun (_,_,b,_) -> is_variable_body b) ctx)
 
 let section_segment_of_reference = function
   | ConstRef con -> section_segment_of_constant con

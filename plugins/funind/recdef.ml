@@ -201,7 +201,7 @@ let (value_f:constr list -> global_reference -> constr) =
       )
     in
     let context = List.map
-      (fun (x, c) -> Name x, None, c) (List.combine rev_x_id_l (List.rev al))
+      (fun (x, c) -> var_decl_of (binder_annot_of (Name x)) c) (List.combine rev_x_id_l (List.rev al))
     in
     let env = Environ.push_rel_context context (Global.env ()) in
     let glob_body =
@@ -1472,7 +1472,7 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
     generate_induction_principle using_lemmas : unit =
   let previous_label = Lib.current_command_label () in
   let function_type = interp_constr Evd.empty (Global.env()) type_of_f in
-  let env = push_named (function_name,None,function_type) (Global.env()) in
+  let env = push_named (var_decl_of_name function_name function_type) (Global.env()) in
   (* Pp.msgnl (str "function type := " ++ Printer.pr_lconstr function_type);  *)
   let equation_lemma_type = 
     nf_betaiotazeta
@@ -1480,7 +1480,7 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
   in
  (* Pp.msgnl (str "lemma type := " ++ Printer.pr_lconstr equation_lemma_type ++ fnl ()); *)
   let res_vars,eq' = decompose_prod equation_lemma_type in
-  let env_eq' = Environ.push_rel_context (List.map (fun (x,y) -> (x,None,y)) res_vars) env in
+  let env_eq' = Environ.push_rel_context (List.map (fun (x,y) -> (x,variable_body,y)) res_vars) env in
   let eq' = nf_zeta env_eq' eq'  in
   let res =
 (*     Pp.msgnl (str "res_var :=" ++ Printer.pr_lconstr_env (push_rel_context (List.map (function (x,t) -> (x,None,t)) res_vars) env) eq'); *)
@@ -1498,7 +1498,7 @@ let recursive_definition is_mes function_name rec_impls type_of_f r rec_arg_num 
   let functional_id =  add_suffix function_name "_F" in
   let term_id = add_suffix function_name "_terminate" in
   let functional_ref = declare_fun functional_id (IsDefinition Decl_kinds.Definition) res in
-  let env_with_pre_rec_args = push_rel_context(List.map (function (x,t) -> (x,None,t)) pre_rec_args) env in  
+  let env_with_pre_rec_args = push_rel_context(List.map (function (x,t) -> (x,variable_body,t)) pre_rec_args) env in  
   let relation =
     interp_constr
       Evd.empty

@@ -19,8 +19,8 @@ open Cooking
 (* Discharging mutual inductive *)
 
 let detype_param = function
-  | (Name id,None,p) -> id, Entries.LocalAssum p
-  | (Name id,Some p,_) -> id, Entries.LocalDef p
+  | (Name id,Variable _,p) -> id, Entries.LocalAssum p
+  | (Name id,Definition (_, p),_) -> id, Entries.LocalDef p
   | (Anonymous,_,_) -> anomaly"Unnamed inductive local variable"
 
 (* Replace
@@ -88,7 +88,7 @@ let process_inductive sechyps modlist mib =
       mib.mind_packets in
   let sechyps' = map_named_context (expmod_constr modlist) sechyps in
   let (params',inds') = abstract_inductive sechyps' nparams inds in
-  { mind_entry_record = mib.mind_record;
+  { mind_entry_record = mib.mind_record <> None;
     mind_entry_finite = mib.mind_finite;
     mind_entry_params = params';
     mind_entry_inds = inds' }

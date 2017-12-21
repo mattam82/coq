@@ -18,6 +18,8 @@ open Coqlib
 open Reductionops
 open Glob_term
 
+open Constr
+
 (* Absurd *)
 
 let absurd c gls =
@@ -25,15 +27,16 @@ let absurd c gls =
   let _,j = Coercion.inh_coerce_to_sort dummy_loc env
     (Evd.create_goal_evar_defs sigma) (Retyping.get_judgment_of env sigma c) in
   let c = j.Environ.utj_val in
+  let rel = relevance_of_sort j.Environ.utj_type in
   (tclTHENS
      (tclTHEN (elim_type (build_coq_False ())) (cut c))
      ([(tclTHENS
-          (cut (applist(build_coq_not (),[c])))
+          (cut (Term.applist(build_coq_not (),[c])))
 	  ([(tclTHEN intros
 	       ((fun gl ->
 		   let ida = pf_nth_hyp_id gl 1
                    and idna = pf_nth_hyp_id gl 2 in
-                   exact_no_check (applist(mkVar idna,[mkVar ida])) gl)));
+                   exact_no_check (applist(mkVar idna,[rel],[mkVar ida])) gl)));
             tclIDTAC]));
        tclIDTAC])) gls
 
@@ -42,7 +45,7 @@ let absurd c gls =
 let filter_hyp f tac gl =
   let rec seek = function
     | [] -> raise Not_found
-    | (id,_,t)::rest when f t -> tac id gl
+    | (id,b,t)::rest when f t -> tac id b gl
     | _::rest -> seek rest in
   seek (pf_hyps gl)
 
@@ -59,7 +62,7 @@ let contradiction_context gl =
 	  | Prod (na,t,u) when is_empty_type u ->
 	      (try
 		filter_hyp (fun typ -> pf_conv_x_leq gl typ t)
-		  (fun id' -> simplest_elim (mkApp (mkVar id,[|mkVar id'|])))
+		  (fun id' b -> simplest_elim (mkApp (mkVar id,[|annot_of_body b|],[|mkVar id'|])))
 		  gl
 	      with Not_found -> seek_neg rest gl)
 	  | _ -> seek_neg rest gl in
@@ -81,7 +84,7 @@ let contradiction_term (c,lbind as cl) gl =
     try
       if lbind = NoBindings then
 	filter_hyp (is_negation_of env sigma typ)
-	  (fun id -> simplest_elim (mkApp (mkVar id,[|c|]))) gl
+	  (fun id v -> simplest_elim (mkApp (mkVar id,[|annot_of_body v|],[|c|]))) gl
       else
 	raise Not_found
     with Not_found -> error "Not a contradiction."

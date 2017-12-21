@@ -255,7 +255,7 @@ let add_new_coercion_core coef stre source target isid =
       raise (CoercionError (NoSource source))
   in
   check_source (Some cls);
-  if not (uniform_cond (llp-ind) lvs) then
+  if not (uniform_cond (llp-ind) (Constr.args_of lvs)) then
     warning (Pp.string_of_ppcmds (explain_coercion_error coef NotUniform));
   let clt =
     try
@@ -267,7 +267,7 @@ let add_new_coercion_core coef stre source target isid =
   check_arity cls;
   check_arity clt;
   let stre' = get_strength stre coef cls clt in
-  declare_coercion coef stre' ~isid ~src:cls ~target:clt ~params:(List.length lvs)
+  declare_coercion coef stre' ~isid ~src:cls ~target:clt ~params:(Constr.argsl_length lvs)
 
 let try_add_new_coercion_core ref b c d e =
   try add_new_coercion_core ref b c d e

@@ -1022,7 +1022,17 @@ let array_fold_left3 f a v1 v2 v3 =
     if n >= lv1 then a else fold (f a v1.(n) v2.(n) v3.(n)) (succ n)
   in
   if Array.length v2 <> lv1 || Array.length v3 <> lv1 then
-    invalid_arg "array_fold_left2";
+    invalid_arg "array_fold_left3";
+  fold a 0
+
+let array_fold_left4 f a v1 v2 v3 v4 =
+  let lv1 = Array.length v1 in
+  let rec fold a n =
+    if n >= lv1 then a else fold (f a v1.(n) v2.(n) v3.(n) v4.(n)) (succ n)
+  in
+  if Array.length v2 <> lv1 || Array.length v3 <> lv1
+    || Array.length v4 <> lv1 then
+    invalid_arg "array_fold_left4";
   fold a 0
 
 let array_fold_left_from n f a v =
@@ -1052,6 +1062,10 @@ let array_chop n v =
   let vlen = Array.length v in
   if n > vlen then failwith "array_chop";
   (Array.sub v 0 n, Array.sub v n (vlen-n))
+
+let array_decompose_last v =
+  let len = Array.length v - 1 in
+  (Array.sub v 0 len, v.(len))
 
 exception Local of int
 

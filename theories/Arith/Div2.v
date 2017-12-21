@@ -172,7 +172,7 @@ Proof.
   simpl; auto.
   simpl.
   replace (n+S(n+0)) with (S (2*n)).
-  f_equal; auto.
+  f_equal. auto.
   simpl; auto with arith.
 Qed.
 
@@ -182,6 +182,6 @@ Proof.
   simpl; auto.
   simpl.
   replace (n+S(n+0)) with (S (2*n)).
-  f_equal; auto.
+  apply f_equal; auto.
   simpl; auto with arith.
 Qed.

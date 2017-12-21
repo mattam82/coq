@@ -28,7 +28,7 @@
 
 #install_printer  (* pattern *) pppattern;;
 #install_printer  (* glob_constr *) ppglob_constr;;
-
+#install_printer  (* clos_infos *) ppclosinfos;;
 #install_printer  (* constr *) ppconstr;;
 #install_printer  (* constr_substituted *) ppsconstr;; 
 #install_printer  (* universe *)  ppuni;;

@@ -41,10 +41,10 @@ val allow_anonymous_refs : bool ref
     these evars. Work as [understand_gen] for the rest. *)
 
 val understand_tcc : ?resolve_classes:bool ->
-  evar_map -> env -> ?expected_type:types -> glob_constr -> open_constr
+  evar_map -> env -> ?expected_type:types -> glob_constr -> open_constr  * relevance
 
 val understand_tcc_evars : ?fail_evar:bool -> ?resolve_classes:bool ->
-  evar_map ref -> env -> typing_constraint -> glob_constr -> constr
+  evar_map ref -> env -> typing_constraint -> glob_constr -> constr * relevance
 
 (** More general entry point with evars from ltac *)
 
@@ -70,33 +70,35 @@ val understand : evar_map -> env -> ?expected_type:Term.types ->
 
 (** Idem but the glob_constr is intended to be a type *)
 
-val understand_type : evar_map -> env -> glob_constr -> constr
+val understand_type : evar_map -> env -> glob_constr -> constr * relevance
 
 (** A generalization of the two previous case *)
 
 val understand_gen : typing_constraint -> evar_map -> env ->
-  glob_constr -> constr
+  glob_constr -> constr * relevance
 
 (** Idem but returns the judgment of the understood term *)
 
-val understand_judgment : evar_map -> env -> glob_constr -> unsafe_judgment
+val understand_judgment : evar_map -> env -> glob_constr -> 
+  unsafe_judgment * relevance
 
 (** Idem but do not fail on unresolved evars *)
-val understand_judgment_tcc : evar_map ref -> env -> glob_constr -> unsafe_judgment
+val understand_judgment_tcc : evar_map ref -> env -> glob_constr -> 
+  unsafe_judgment * relevance
 
 (**/**)
 (** Internal of Pretyping... *)
 val pretype :
   type_constraint -> env -> evar_map ref ->
-  ltac_var_map -> glob_constr -> unsafe_judgment
+  ltac_var_map -> glob_constr -> unsafe_judgment * relevance
 
 val pretype_type :
   val_constraint -> env -> evar_map ref ->
-  ltac_var_map -> glob_constr -> unsafe_type_judgment
+  ltac_var_map -> glob_constr -> unsafe_type_judgment * relevance
 
 val pretype_gen :
   bool -> bool -> bool -> evar_map ref -> env ->
-  ltac_var_map -> typing_constraint -> glob_constr -> constr
+  ltac_var_map -> typing_constraint -> glob_constr -> constr * relevance
 
 (**/**)
 

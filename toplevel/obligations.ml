@@ -97,12 +97,12 @@ let subst_evar_constr evs n idf t =
 	let args =
 	  let rec aux hyps args acc =
 	     match hyps, args with
-		 ((_, None, _) :: tlh), (c :: tla) ->
-		   aux tlh tla ((substrec (depth, fixrels) c) :: acc)
-	       | ((_, Some _, _) :: tlh), (_ :: tla) ->
-		   aux tlh tla acc
-	       | [], [] -> acc
-	       | _, _ -> acc (*failwith "subst_evars: invalid argument"*)
+	     | ((_, Variable _, _) :: tlh), (c :: tla) ->
+	       aux tlh tla ((substrec (depth, fixrels) c) :: acc)
+	     | ((_, Definition _, _) :: tlh), (_ :: tla) ->
+	       aux tlh tla acc
+	     | [], [] -> acc
+	     | _, _ -> acc (*failwith "subst_evars: invalid argument"*)
 	  in aux hyps args []
 	in
 	  if List.exists (fun x -> match kind_of_term x with Rel n -> List.mem n fixrels | _ -> false) args then
@@ -139,14 +139,14 @@ let etype_of_evar evs hyps concl =
 	let s' = Intset.union s s' in
 	let trans' = Idset.union trans trans' in
 	  (match copt with
-	      Some c -> 
+	      Definition (ann, c) -> 
 		let c', s'', trans'' = subst_evar_constr evs n mkVar c in
 		let c' = subst_vars acc 0 c' in
-		  mkNamedProd_or_LetIn (id, Some c', t'') rest,
+		  mkNamedProd_or_LetIn (id, Definition (ann, c'), t'') rest,
 		Intset.union s'' s',
 		Idset.union trans'' trans'
-	    | None ->
-		mkNamedProd_or_LetIn (id, None, t'') rest, s', trans')
+	    | Variable _ ->
+		mkNamedProd_or_LetIn (id, copt, t'') rest, s', trans')
     | [] ->
 	let t', s, trans = subst_evar_constr evs n mkVar concl in
 	  subst_vars acc 0 t', s, trans
@@ -575,7 +575,7 @@ let declare_mutual_definition l =
 (*   let fixdefs = List.map reduce_fix fixdefs in *)
   let fixkind = Option.get first.prg_fixkind in
   let arrrec, recvec = Array.of_list fixtypes, Array.of_list fixdefs in
-  let fixdecls = (Array.of_list (List.map (fun x -> Name x.prg_name) l), arrrec, recvec) in
+  let fixdecls = (Array.of_list (List.map (fun x -> Name x.prg_name, Expl) l), arrrec, recvec) in
   let (local,kind) = first.prg_kind in
   let fixnames = first.prg_deps in
   let kind = if fixkind <> IsCoFixpoint then Fixpoint else CoFixpoint in
@@ -915,7 +915,7 @@ let show_term n =
 	     Printer.pr_constr_env (Global.env ()) prg.prg_type ++ spc () ++ str ":=" ++ fnl ()
 	    ++ Printer.pr_constr_env (Global.env ()) prg.prg_body)
 
-let add_definition n ?term t ?(implicits=[]) ?(kind=Global,Definition) ?tactic
+let add_definition n ?term t ?(implicits=[]) ?(kind=Global,Decl_kinds.Definition) ?tactic
     ?(reduce=reduce) ?(hook=fun _ _ -> ()) obls =
   Flags.if_verbose pp (str (string_of_id n) ++ str " has type-checked");
   let prg = init_prog_info n term t [] None [] obls implicits kind reduce hook in
@@ -933,7 +933,7 @@ let add_definition n ?term t ?(implicits=[]) ?(kind=Global,Definition) ?tactic
 	| Remain rem -> Flags.if_verbose (fun () -> show_obligations ~msg:false (Some n)) (); res
 	| _ -> res)
 
-let add_mutual_definitions l ?tactic ?(kind=Global,Definition) ?(reduce=reduce)
+let add_mutual_definitions l ?tactic ?(kind=Global,Decl_kinds.Definition) ?(reduce=reduce)
     ?(hook=fun _ _ -> ()) notations fixkind =
   let deps = List.map (fun (n, b, t, imps, obls) -> n) l in
     List.iter

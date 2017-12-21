@@ -957,7 +957,7 @@ let strip_prod_binders_glob_constr n (ty,_) =
   let rec strip_ty acc n ty =
     if n=0 then (List.rev acc, (ty,None)) else
       match ty with
-          Glob_term.GProd(loc,na,Explicit,a,b) ->
+          Glob_term.GProd(loc,na,(Explicit,_),a,b) ->
             strip_ty (([dummy_loc,na],(a,None))::acc) (n-1) b
         | _ -> error "Cannot translate fix tactic: not enough products" in
   strip_ty [] n ty

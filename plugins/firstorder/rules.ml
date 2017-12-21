@@ -59,16 +59,16 @@ let axiom_tac t seq=
   try exact_no_check (constr_of_global (find_left t seq))
   with Not_found->tclFAIL 0 (Pp.str "No axiom link")
 
-let ll_atom_tac a backtrack id continue seq=
+let ll_atom_tac a backtrack id continue seq gl =
   tclIFTHENELSE
     (try
       tclTHENLIST
-	[generalize [mkApp(constr_of_global id,
-			   [|constr_of_global (find_left a seq)|])];
+	[generalize [Constr.app_args(constr_of_global id,
+			   (pf_apply Retyping.to_args gl [|constr_of_global (find_left a seq)|]))];
 	 clear_global id;
 	 intro]
     with Not_found->tclFAIL 0 (Pp.str "No link"))
-    (wrap 1 false continue seq) backtrack
+    (wrap 1 false continue seq) backtrack gl
 
 (* right connectives rules *)
 
@@ -115,6 +115,11 @@ let left_false_tac id=
 (* left arrow connective rules *)
 
 (* We use this function for false, and, or, exists *)
+
+let mkAppIrr c args = 
+  Constr.mkApp (c, Array.make (Array.length args) Irr, args)
+
+let mk_impl a b = Constr.mkProd ((Anonymous, (Irr, false)), a, b)
 
 let ll_ind_tac ind largs backtrack id continue seq gl=
      let rcs=ind_hyps 0 ind largs gl in

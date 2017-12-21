@@ -96,7 +96,17 @@ Definition binary_rect (P:N -> Type) (f0 : P 0)
  end.
 
 Definition binary_rec (P:N -> Set) := binary_rect P.
-Definition binary_ind (P:N -> Prop) := binary_rect P.
+
+Definition binary_ind (P:N -> Prop) (f0 : P 0)
+  (f2 : forall n, P n -> P (double n))
+  (fS2 : forall n, P n -> P (succ_double n)) (n : N) : P n :=
+ let P' p := P (Npos p) in
+ let f2' p := f2 (Npos p) in
+ let fS2' p := fS2 (Npos p) in
+ match n with
+ | 0 => f0
+ | Npos p => positive_ind P' fS2' f2' (fS2 0 f0) p
+ end.
 
 (** Peano induction on binary natural numbers *)
 
@@ -123,7 +133,15 @@ trivial.
 now rewrite Pos.peano_rect_succ.
 Qed.
 
-Definition peano_ind (P : N -> Prop) := peano_rect P.
+Definition peano_ind
+  (P : N -> Prop) (f0 : P 0)
+    (f : forall n : N, P n -> P (succ n)) (n : N) : P n :=
+let P' p := P (Npos p) in
+let f' p := f (Npos p) in
+match n with
+| 0 => f0
+| Npos p => Pos.peano_ind P' (f 0 f0) f' p
+end.
 
 Definition peano_rec (P : N -> Set) := peano_rect P.
 
@@ -864,7 +882,7 @@ Theorem bi_induction :
   forall A : N -> Prop, Proper (Logic.eq==>iff) A ->
     A N0 -> (forall n, A n <-> A (succ n)) -> forall n : N, A n.
 Proof.
-intros A A_wd A0 AS. apply peano_rect. assumption. intros; now apply -> AS.
+intros A A_wd A0 AS. apply peano_ind. assumption. intros; now apply -> AS.
 Qed.
 
 Definition recursion {A} : A -> (N -> A -> A) -> N -> A :=

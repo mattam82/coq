@@ -57,7 +57,7 @@ Program Instance equiv_transitive `(sa : Equivalence A) : Transitive equiv.
 
   Next Obligation.
   Proof.
-    transitivity y ; auto.
+    transitivity y; auto.
   Qed.
 
 (** Use the [substitute] command which substitutes an equivalence in every hypothesis. *)

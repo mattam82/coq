@@ -152,8 +152,16 @@ Section Efficient_Rec.
       (forall x:Z, (forall y:Z, 0 <= y < x -> P y) -> 0 <= x -> P x) ->
       forall x:Z, 0 <= x -> P x.
   Proof.
-    exact Zlt_0_rec.
-  Qed.
+   intros P Hrec.
+   induction x as [x IH] using (well_founded_ind R_wf).
+   destruct x; intros Hx.
+   - apply Hrec; trivial. intros y (Hy,Hy').
+     assert (0 < 0) by now apply Z.le_lt_trans with y.
+     discriminate.
+   - apply Hrec; trivial. intros y (Hy,Hy').
+     apply IH; trivial. now split.
+   - now destruct Hx.
+  Defined.
 
   (** Obsolete version of [Zlt] induction principle on non-negative numbers *)
 
@@ -170,7 +178,7 @@ Section Efficient_Rec.
       (forall x:Z, (forall y:Z, 0 <= y < x -> P y) -> P x) ->
       forall x:Z, 0 <= x -> P x.
   Proof.
-    exact Z_lt_rec.
+    intros P Hrec; apply Zlt_0_ind; auto.
   Qed.
 
   (** An even more general induction principle using [Zlt]. *)
@@ -196,7 +204,15 @@ Section Efficient_Rec.
       (forall x:Z, (forall y:Z, z <= y < x -> P y) -> z <= x -> P x) ->
       forall x:Z, z <= x -> P x.
   Proof.
-    exact Zlt_lower_bound_rec.
+    intros P z Hrec x Hx.
+    rewrite <- (Z.sub_simpl_r x z). apply Z.le_0_sub in Hx.
+    pattern (x - z); apply Zlt_0_ind; trivial.
+    clear x Hx. intros x IH Hx.
+    apply Hrec. intros y (Hy,Hy').
+    rewrite <- (Z.sub_simpl_r y z). apply IH; split.
+    now rewrite Z.le_0_sub.
+    now apply Z.lt_sub_lt_add_r.
+    now rewrite <- (Z.add_le_mono_r 0 x z).
   Qed.
 
 End Efficient_Rec.

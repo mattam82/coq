@@ -29,6 +29,9 @@ val get_sort_of :
 val get_sort_family_of :
   ?polyprop:bool -> env -> evar_map -> types -> sorts_family
 
+val get_relevance_of :
+  ?polyprop:bool -> env -> evar_map -> types -> relevance
+
 (** Makes an assumption from a constr *)
 val get_assumption_of : env -> evar_map -> constr -> types
 
@@ -40,3 +43,7 @@ val type_of_global_reference_knowing_parameters : env -> evar_map -> constr ->
 
 val type_of_global_reference_knowing_conclusion :
   env -> evar_map -> constr -> types -> types
+
+val to_args : env -> evar_map -> constr array -> constr args
+val to_argsl : env -> evar_map -> constr list -> constr args_list
+

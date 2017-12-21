@@ -90,10 +90,10 @@ let hdchar env c =
 	     | (Anonymous,_,t) -> hdrec 0 (lift (n-k) t)
 	   with Not_found -> "y")
     | Fix ((_,i),(lna,_,_)) ->
-	let id = match lna.(i) with Name id -> id | _ -> assert false in
+	let id = match letname_of lna.(i) with Name id -> id | _ -> assert false in
 	lowercase_first_char id
     | CoFix (i,(lna,_,_)) ->
-	let id = match lna.(i) with Name id -> id | _ -> assert false in
+	let id = match letname_of lna.(i) with Name id -> id | _ -> assert false in
 	lowercase_first_char id
     | Meta _|Evar _|Case (_, _, _, _) -> "y"
   in
@@ -110,6 +110,11 @@ let named_hd env a = function
 let mkProd_name   env (n,a,b) = mkProd (named_hd env a n, a, b)
 let mkLambda_name env (n,a,b) = mkLambda (named_hd env a n, a, b)
 
+let mkProd_name_annot   env (n,a,b) = 
+  Constr.mkProd (map_binder (named_hd env a) n, a, b)
+let mkLambda_name_annot env (n,a,b) = 
+  Constr.mkLambda (map_binder (named_hd env a) n, a, b)
+
 let lambda_name = mkLambda_name
 let prod_name = mkProd_name
 
@@ -118,8 +123,8 @@ let lambda_create env (a,b) =  mkLambda (named_hd env a Anonymous, a, b)
 
 let name_assumption env (na,c,t) =
   match c with
-    | None      -> (named_hd env t na, None, t)
-    | Some body -> (named_hd env body na, c, t)
+    | Variable ann      -> (named_hd env t na, c, t)
+    | Definition (_, body) -> (named_hd env body na, c, t)
 
 let name_context env hyps =
   snd
@@ -312,19 +317,19 @@ let compute_displayed_let_name_in flags avoid na c =
   let fresh_id = next_name_for_display flags na avoid in
   (Name fresh_id, fresh_id::avoid)
 
-let rec rename_bound_vars_as_displayed avoid env c =
+open Constr
+
+let rename_bound_vars_as_displayed avoid env c =
   let rec rename avoid env c =
     match kind_of_term c with
-    | Prod (na,c1,c2)  ->
-	let na',avoid' =
-          compute_displayed_name_in
-            (RenamingElsewhereFor (env,c2)) avoid na c2 in
-	mkProd (na', c1, rename avoid' (add_name na' env) c2)
-    | LetIn (na,c1,t,c2) ->
-	let na',avoid' =
-          compute_displayed_let_name_in
-            (RenamingElsewhereFor (env,c2)) avoid na c2 in
-	mkLetIn (na',c1,t, rename avoid' (add_name na' env) c2)
+    | Prod ((na,ann),c1,c2)  ->
+	let na',avoid' = compute_displayed_name_in 
+	  (RenamingElsewhereFor (env,c2)) avoid na c2 in
+	mkProd ((na',ann), c1, rename avoid' (add_name na' env) c2)
+    | LetIn ((na,ann),c1,t,c2) ->
+	let na',avoid' = compute_displayed_let_name_in
+	  (RenamingElsewhereFor (env,c2)) avoid na c2 in
+	mkLetIn ((na',ann),c1,t, rename avoid' (add_name na' env) c2)
     | Cast (c,k,t) -> mkCast (rename avoid env c, k,t)
     | _ -> c
   in

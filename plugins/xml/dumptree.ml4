@@ -65,7 +65,7 @@ let pr_rule_xml pr = function
 
 let pr_var_decl_xml env (id,c,typ) =
   let ptyp = print_constr_env env typ in
-  match c with
+  match Term.constr_of_body c with
   | None ->
       (str "<hyp id=\"" ++ xmlstream (pr_id id) ++ str "\" type=\"" ++ xmlstream ptyp ++ str "\"/>")
   | Some c ->
@@ -76,7 +76,7 @@ let pr_var_decl_xml env (id,c,typ) =
 ;;
 
 let pr_rel_decl_xml env (na,c,typ) =
-  let pbody = match c with
+  let pbody = match Term.constr_of_body c with
     | None -> mt ()
     | Some c ->
 	(* Force evaluation *)

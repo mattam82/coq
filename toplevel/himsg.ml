@@ -148,7 +148,7 @@ let explain_ill_formed_branch env sigma c ci actty expty =
 let explain_generalization env (name,var) j =
   let pe = pr_ne_context_of (str "In environment") env in
   let pv = pr_ltype_env env var in
-  let (pc,pt) = pr_ljudge_env (push_rel_assum (name,var) env) j in
+  let (pc,pt) = pr_ljudge_env (push_rel_assum (binder_annot_of name,var) env) j in
   pe ++ str "Cannot generalize" ++ brk(1,1) ++ pv ++ spc () ++
   str "over" ++ brk(1,1) ++ pc ++ str "," ++ spc () ++
   str "it has type" ++ spc () ++ pt ++
@@ -231,7 +231,7 @@ let explain_not_product env sigma c =
 (* (co)fixpoints *)
 let explain_ill_formed_rec_body env err names i fixenv vdefj =
   let prt_name i =
-    match names.(i) with
+    match letname_of names.(i) with
         Name id -> str "Recursive definition of " ++ pr_id id
       | Anonymous -> str "The " ++ pr_nth i ++ str " definition" in
 
@@ -246,7 +246,7 @@ let explain_ill_formed_rec_body env err names i fixenv vdefj =
   | RecursionOnIllegalTerm(j,(arg_env, arg),le,lt) ->
       let arg_env = make_all_name_different arg_env in
       let called =
-        match names.(j) with
+        match letname_of names.(j) with
             Name id -> pr_id id
           | Anonymous -> str "the " ++ pr_nth i ++ str " definition" in
       let pr_db x = quote (pr_db env x) in
@@ -266,7 +266,7 @@ let explain_ill_formed_rec_body env err names i fixenv vdefj =
 
   | NotEnoughArgumentsForFixCall j ->
       let called =
-        match names.(j) with
+        match letname_of names.(j) with
             Name id -> pr_id id
           | Anonymous -> str "the " ++ pr_nth i ++ str " definition" in
      str "Recursive call to " ++ called ++ str " has not enough arguments"
@@ -468,6 +468,15 @@ let explain_non_linear_unification env m t =
   strbrk " which would require to abstract twice on " ++
   pr_lconstr_env env t ++ str "."
 
+let pr_relevance = function
+  | Expl -> mt()
+  | Irr -> str"ir"
+
+let explain_relevance_mismatch env t r r' =
+  strbrk "Relevance mismatch between infered " ++ pr_relevance r ++ str"relevance of " ++
+    pr_lconstr_env env t ++ str " and expected " ++ pr_relevance r' ++ str"relevance."
+
+
 let explain_type_error env sigma err =
   let env = make_all_name_different env in
   match err with
@@ -503,6 +512,8 @@ let explain_type_error env sigma err =
      explain_ill_typed_rec_body env sigma i lna vdefj vargs
   | WrongCaseInfo (ind,ci) ->
       explain_wrong_case_info env ind ci
+  | RelevanceMismatch (c, rel, rel') ->
+      explain_relevance_mismatch env c rel rel'
 
 let explain_pretype_error env sigma err =
   let env = env_nf_betaiotaevar sigma env in

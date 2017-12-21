@@ -416,7 +416,7 @@ let create_meta () = mkMeta(Evarutil.new_meta());;
 
 let my_cut c gl=
      let concl = pf_concl gl in
-       apply_type (mkProd(Anonymous,c,concl)) [create_meta()] gl
+       apply_type (mkProd(Anonymous,c,concl)) ([Expl],[create_meta()]) gl
 ;;
 
 let exact = exact_check;;

@@ -990,11 +990,11 @@ let rec glob_of_pat env = function
       GApp (loc,GPatVar (loc,(true,n)),
         List.map (glob_of_pat env) args)
   | PProd (na,t,c) ->
-      GProd (loc,na,Explicit,glob_of_pat env t,glob_of_pat (na::env) c)
+      GProd (loc,na,explicit_bk,glob_of_pat env t,glob_of_pat (na::env) c)
   | PLetIn (na,t,c) ->
       GLetIn (loc,na,glob_of_pat env t, glob_of_pat (na::env) c)
   | PLambda (na,t,c) ->
-      GLambda (loc,na,Explicit,glob_of_pat env t, glob_of_pat (na::env) c)
+      GLambda (loc,na,explicit_bk,glob_of_pat env t, glob_of_pat (na::env) c)
   | PIf (c,b1,b2) ->
       GIf (loc, glob_of_pat env c, (Anonymous,None),
            glob_of_pat env b1, glob_of_pat env b2)

@@ -62,10 +62,12 @@ Section Well_founded.
   forall P:A -> Prop,
     (forall x:A, (forall y:A, R y x -> P y) -> P x) -> forall a:A, P a.
  Proof.
-  exact (fun P:A -> Prop => well_founded_induction_type P).
+   intros; apply Acc_ind; auto.
  Defined.
 
 (** Well-founded fixpoints *)
+
+ Scheme Acc_inv_dep := Induction for Acc Sort Prop.
 
  Section FixPoint.
 
@@ -75,13 +77,11 @@ Section Well_founded.
   Fixpoint Fix_F (x:A) (a:Acc x) : P x :=
     F (fun (y:A) (h:R y x) => Fix_F (Acc_inv a h)).
 
-  Scheme Acc_inv_dep := Induction for Acc Sort Prop.
-
   Lemma Fix_F_eq :
    forall (x:A) (r:Acc x),
      F (fun (y:A) (p:R y x) => Fix_F (x:=y) (Acc_inv r p)) = Fix_F (x:=x) r.
   Proof.
-   destruct r using Acc_inv_dep; auto.
+   destruct r using Acc_inv_dep; simpl in *; auto.
   Qed.
 
   Definition Fix (x:A) := Fix_F (Rwf x).

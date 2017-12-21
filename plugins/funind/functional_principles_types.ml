@@ -81,7 +81,7 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
   in
 (*   observe (str "starting princ_type := " ++ pr_lconstr_env env princ_type); *)
 (*   observe (str "princ_infos : " ++ pr_elim_scheme princ_type_info); *)
-  let change_predicate_sort i (x,_,t) =
+  let change_predicate_sort i (x,b,t) =
     let new_sort = sorts.(i) in
     let args,_ = decompose_prod t in
     let real_args =
@@ -89,7 +89,7 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
       then List.tl args
       else args
     in
-    Nameops.out_name x,None,compose_prod real_args (mkSort new_sort)
+      Nameops.out_name x,b,compose_prod real_args (mkSort new_sort)
   in
   let new_predicates =
     list_map_i
@@ -151,27 +151,27 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
   in
   let rec compute_new_princ_type remove env pre_princ : types*(constr list) =
     let (new_princ_type,_) as res =
-      match kind_of_term pre_princ with
-	| Rel n ->
+      match Constr.kind_of_term pre_princ with
+	| Constr.Rel n ->
 	    begin
 	      try match Environ.lookup_rel n env with
 		| _,_,t when is_dom t -> raise Toberemoved
 		| _ -> pre_princ,[] with Not_found -> assert false
 	    end
-	| Prod(x,t,b) ->
-	    compute_new_princ_type_for_binder remove mkProd env x t b
-	| Lambda(x,t,b) ->
-	    compute_new_princ_type_for_binder  remove mkLambda env x t b
-	| Ind _ | Construct _ when is_dom pre_princ -> raise Toberemoved
-	| App(f,args) when is_dom f ->
+	| Constr.Prod(x,t,b) ->
+	    compute_new_princ_type_for_binder remove mkProd env (fst x) (snd x) t b
+	| Constr.Lambda(x,t,b) ->
+	  compute_new_princ_type_for_binder  remove mkLambda env (fst x) (snd x) t b
+	| Constr.Ind _ | Constr.Construct _ when is_dom pre_princ -> raise Toberemoved
+	| Constr.App(f,_,args) when is_dom f ->
 	    let var_to_be_removed = destRel (array_last args) in
 	    let num = get_fun_num f in
 	    raise (Toberemoved_with_rel (var_to_be_removed,mk_replacement pre_princ num args))
-	| App(f,args) ->
-	    let args =
+	| Constr.App(f,an,args) ->
+	    let an, args =
 	      if is_pte f && remove
-	      then array_get_start args
-	      else args
+	      then array_get_start an, array_get_start args
+	      else an, args
 	    in
 	    let new_args,binders_to_remove =
 	      Array.fold_right (compute_new_princ_type_with_acc remove env)
@@ -179,10 +179,10 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
 		([],[])
 	    in
 	    let new_f,binders_to_remove_from_f = compute_new_princ_type remove env f in
-	    applist(new_f, new_args),
+	    Constr.applist(new_f, Array.to_list an, new_args),
 	    list_union_eq eq_constr binders_to_remove_from_f binders_to_remove
-	| LetIn(x,v,t,b) ->
-	    compute_new_princ_type_for_letin remove env x v t b
+	| Constr.LetIn(x,v,t,b) ->
+	    compute_new_princ_type_for_letin remove env (fst x) (snd x) v t b
 	| _ -> pre_princ,[]
     in
 (*     let _ = match kind_of_term pre_princ with *)
@@ -194,12 +194,12 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
 (* 	| _ -> () in *)
     res
 
-  and compute_new_princ_type_for_binder remove bind_fun env x t b =
+  and compute_new_princ_type_for_binder remove bind_fun env x an t b =
     begin
       try
 	let new_t,binders_to_remove_from_t = compute_new_princ_type remove env t in
 	let new_x : name = get_name (Termops.ids_of_context env) x in
-	let new_env = Environ.push_rel (x,None,t) env in
+	let new_env = Environ.push_rel (var_decl_of (x,an) t) env in
 	let new_b,binders_to_remove_from_b = compute_new_princ_type remove new_env b in
 	 if List.exists (eq_constr (mkRel 1)) binders_to_remove_from_b
 	 then (Termops.pop new_b), filter_map (eq_constr (mkRel 1)) Termops.pop binders_to_remove_from_b
@@ -222,13 +222,13 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
 	    let new_b,binders_to_remove_from_b = compute_new_princ_type remove env (substnl [c] n b)  in
 	    new_b, list_add_set_eq eq_constr (mkRel n) (List.map Termops.pop binders_to_remove_from_b)
     end
-  and compute_new_princ_type_for_letin remove env x v t b =
+  and compute_new_princ_type_for_letin remove env x an v t b =
     begin
       try
 	let new_t,binders_to_remove_from_t = compute_new_princ_type remove env t in
 	let new_v,binders_to_remove_from_v = compute_new_princ_type remove env v in
 	let new_x : name = get_name (Termops.ids_of_context env) x in
-	let new_env = Environ.push_rel (x,Some v,t) env in
+	let new_env = Environ.push_rel (def_decl_of (x,an) v t) env in
 	let new_b,binders_to_remove_from_b = compute_new_princ_type remove new_env b in
 	if List.exists (eq_constr (mkRel 1)) binders_to_remove_from_b
 	then (Termops.pop new_b),filter_map (eq_constr (mkRel 1)) Termops.pop binders_to_remove_from_b
@@ -277,7 +277,7 @@ let compute_new_princ_type_from_rel rel_to_fun sorts princ_type =
 let change_property_sort toSort princ princName =
   let princ_info = compute_elim_sig princ in
   let change_sort_in_predicate (x,v,t) =
-    (x,None,
+    (x,v,
      let args,_ = decompose_prod t in
      compose_prod args (mkSort toSort)
     )
@@ -354,17 +354,18 @@ let generate_functional_principle
     interactive_proof
     old_princ_type sorts new_princ_name funs i proof_tac
     =
+  let of_family fam princ_name princ_type =
   try
 
   let f = funs.(i) in
-  let type_sort = Termops.new_sort_in_family InType in
+  let type_sort = Termops.new_sort_in_family fam in
   let new_sorts =
     match sorts with
       | None -> Array.make (Array.length funs) (type_sort)
       | Some a -> a
   in
   let base_new_princ_name,new_princ_name =
-    match new_princ_name with
+    match princ_name with
       | Some (id) -> id,id
       | None ->
 	  let id_of_f = id_of_label (con_label f) in
@@ -372,7 +373,7 @@ let generate_functional_principle
   in
   let names = ref [new_princ_name] in
   let hook new_principle_type _ _  =
-    if sorts = None
+    if fam = InType
     then
       (*     let id_of_f = id_of_label (con_label f) in *)
       let register_with_sort fam_sort =
@@ -398,11 +399,10 @@ let generate_functional_principle
 	  name;
 	names := name :: !names
       in
-      register_with_sort InProp;
       register_with_sort InSet
   in
   let (id,(entry,g_kind,hook)) =
-    build_functional_principle interactive_proof old_princ_type new_sorts funs i proof_tac hook
+    build_functional_principle interactive_proof princ_type new_sorts funs i proof_tac hook
   in
   (* Pr  1278 :
      Don't forget to close the goal if an error is raised !!!!
@@ -425,7 +425,8 @@ let generate_functional_principle
       raise (Defining_principle e)
     end
 (*   defined  () *)
-
+  in of_family InType new_princ_name old_princ_type;
+    of_family InProp None old_princ_type
 
 exception Not_Rec
 
@@ -434,7 +435,7 @@ let get_funs_constant mp dp =
     match kind_of_term ((strip_lam e)) with
       | Fix((_,(na,_,_))) ->
 	  Array.mapi
-	    (fun i na ->
+	    (fun i (na,rel) ->
 	       match na with
 		 | Name id ->
 		     let const = make_con mp dp (label_of_id id) in

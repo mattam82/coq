@@ -360,7 +360,6 @@ Proof.
   reduce.
   unfold respectful, relation_equivalence, predicate_equivalence in * ; simpl in *.
   split ; intros.
-
     rewrite <- H0.
     apply H1.
     rewrite H.
@@ -527,9 +526,7 @@ Qed.
 
 Lemma proper_normalizes_proper `(Normalizes A R0 R1, Proper A R1 m) : Proper R0 m.
 Proof.
-  red in H, H0.
-  setoid_rewrite H.
-  assumption.
+  red in H, H0. now setoid_rewrite H.
 Qed.
 
 Ltac proper_normalization :=
@@ -623,7 +620,7 @@ intros x y z (Hxy,Hxy') (Hyz,Hyz'). split.
 apply PreOrder_Transitive with y; assumption.
 intro Hxz.
 apply Hxy'.
-apply partial_order_antisym; auto.
+apply(partial_order_antisym); eauto.
 rewrite Hxz; auto.
 Qed.
 

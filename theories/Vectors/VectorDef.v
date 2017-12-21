@@ -76,6 +76,51 @@ match v1 as v1' in t _ n1
     end t1
 end.
 
+Definition ID_prop := forall A : Prop, A -> A.
+
+Definition indS {A} (P:forall {n}, t A (S n) -> Prop)
+ (bas: forall a: A, P (a :: []))
+ (rect: forall a {n} (v: t A (S n)), P v -> P (a :: v)) :=
+ fix indS_fix {n} (v: t A (S n)) : P v :=
+match v in t _ n' return match n', v return Prop with 0, _ => True | S n, v' => P v' end with
+ |nil => I
+ |cons a 0 v =>
+    match v as vnn in t _ nn
+       return
+       match nn,vnn return Prop with
+         |0,vm =>  P (a :: vm)
+         |S _,_ => True
+       end
+    with
+      |nil => bas a
+      |_ :: _ => I
+    end
+ |cons a (S nn') v => rect a v (indS_fix v)
+ end.
+
+(** An induction scheme for 2 vectors of same length *)
+Definition ind2 {A B} (P:forall {n}, t A n -> t B n -> Prop)
+  (bas : P [] []) (rect : forall {n v1 v2}, P v1 v2 ->
+    forall a b, P (a :: v1) (b :: v2)) :=
+fix rect2_fix {n} (v1:t A n):
+  forall v2 : t B n, P v1 v2 :=
+match v1 as v1' in t _ n1
+  return forall v2 : t B n1, P v1' v2 with
+  |[] => fun v2 =>
+     match v2 in t _ n' return match n', v2 return Prop with | 0, v => P [] v | S n, _ => True end  with
+       |[] => bas
+       |_ :: _ => I
+     end
+  |h1 :: t1 => fun v2 =>
+    match v2 in t _ n' return 
+       match n', v2 return Prop with | 0, _ => True | S n, v2 => forall t1', P (h1 :: t1') v2 end 
+    with
+      |[] => I
+      |h2 :: t2 => fun t1' =>
+        rect (rect2_fix t1' t2) h1 h2
+    end t1
+end.
+
 (** A vector of length [0] is [nil] *)
 Definition case0 {A} (P:t A 0 -> Type) (H:P (nil A)) v:P v :=
 match v with
@@ -85,10 +130,19 @@ end.
 (** A vector of length [S _] is [cons] *)
 Definition caseS {A} (P : forall {n}, t A (S n) -> Type)
   (H : forall h {n} t, @P n (h :: t)) {n} (v: t A (S n)) : P v :=
-match v as v' in t _ m return match m, v' with |0, _ => False -> True |S _, v0 => P v' end with
+match v as v' in t _ m return match m, v' with |0, _ => False -> unit |S _, v0 => P v' end with
   |[] => fun devil => False_rect _ devil (* subterm !!! *)
   |h :: t => H h t
 end.
+
+(** A vector of length [S _] is [cons] *)
+Definition caseSP {A} (P : forall {n}, t A (S n) -> Prop)
+  (H : forall h {n} t, @P n (h :: t)) {n} (v: t A (S n)) : P v :=
+match v as v' in t _ m return match m, v' return Prop with |0, _ => False -> True |S _, v0 => P v' end with
+  |[] => fun devil => False_ind _ devil (* subterm !!! *)
+  |h :: t => H h t
+end.
+
 End SCHEMES.
 
 Section BASES.

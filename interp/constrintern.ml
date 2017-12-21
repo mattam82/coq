@@ -327,10 +327,10 @@ let rec it_mkGLambda loc2 env body =
 (**********************************************************************)
 (* Utilities for binders                                              *)
 let build_impls = function
-  |Implicit -> (function
+  |(Lib.Implicit,_) -> (function
 		  |Name id ->  Some (id, Impargs.Manual, (true,true))
 		  |Anonymous -> anomaly "Anonymous implicit argument")
-  |Explicit -> fun _ -> None
+  |(Lib.Explicit,_) -> fun _ -> None
 
 let impls_type_list ?(args = []) =
   let rec aux acc = function
@@ -396,8 +396,8 @@ let push_name_env ?(global_level=false) lvar implargs env =
 let intern_generalized_binder ?(global_level=false) intern_type lvar
     env (loc, na) b b' t ty =
   let ids = (match na with Anonymous -> fun x -> x | Name na -> Idset.add na) env.ids in
-  let ty, ids' =
-    if t then ty, ids else
+  let ty, ids', kinds =
+    if t then ty, ids, [] else
       Implicit_quantifiers.implicit_application ids
 	Implicit_quantifiers.combine_params_freevar ty
   in
@@ -406,7 +406,11 @@ let intern_generalized_binder ?(global_level=false) intern_type lvar
   let env' = List.fold_left
     (fun env (x, l) -> push_name_env ~global_level lvar (Variable,[],[],[])(*?*) env (l, Name x))
     env fvs in
-  let bl = List.map (fun (id, loc) -> (loc, (Name id, b, None, GHole (loc, Evd.BinderType (Name id))))) fvs in
+  let bl = List.map (fun (id, loc) -> 
+		     let bk = 
+		       try let bk = List.assoc id kinds in (fst b, bk)
+		       with Not_found -> b
+		     in (loc, (Name id, bk, None, GHole (loc, Evd.BinderType (Name id))))) fvs in
   let na = match na with
     | Anonymous ->
 	if global_level then na
@@ -444,7 +448,7 @@ let intern_local_binder_aux ?(global_level=false) intern lvar (env,bl) = functio
   | LocalRawDef((loc,na as locna),def) ->
       let indef = intern env def in
       (push_name_env lvar (impls_term_list indef) env locna,
-      (loc,(na,Explicit,Some(indef),GHole(loc,Evd.BinderType na)))::bl)
+      (loc,(na,explicit_bk,Some(indef),GHole(loc,Evd.BinderType na)))::bl)
 
 let intern_generalization intern env lvar loc bk ak c =
   let c = intern {env with unb = true} c in
@@ -608,6 +612,17 @@ let string_of_ty = function
   | Method -> "meth"
   | Variable -> "var"
 
+let impl_of_binder (na, (_, impl)) =
+  if impl then Some (out_name na, Manual, (true, true))
+  else None
+
+let rec implicits_of_constr c = 
+  match Term.Constr.kind_of_term c with
+  | Term.Constr.Prod (na, t, b) | Term.Constr.Lambda (na, t, b) ->
+    impl_of_binder na :: implicits_of_constr b
+  | Term.Constr.LetIn (na, t, c, b) -> implicits_of_constr b
+  | _ -> []
+
 let intern_var genv (ltacvars,ntnvars) namedctx loc id =
   let (ltacvars,unbndltacvars) = ltacvars in
   (* Is [id] an inductive type potentially with implicit *)
@@ -641,7 +656,7 @@ let intern_var genv (ltacvars,ntnvars) namedctx loc id =
       | Some id0 -> Pretype_errors.error_var_not_found_loc loc id0
   with Not_found ->
     (* Is [id] a goal or section variable *)
-    let _ = Sign.lookup_named id namedctx in
+    let typ = Sign.named_type id namedctx in
       try
 	(* [id] a section variable *)
 	(* Redundant: could be done in intern_qualid *)
@@ -652,7 +667,8 @@ let intern_var genv (ltacvars,ntnvars) namedctx loc id =
 	GRef (loc, ref), impls, scopes, []
       with _ ->
 	(* [id] a goal variable *)
-	GVar (loc,id), [], [], []
+      let impls = implicits_of_constr typ in
+	GVar (loc,id), make_implicits_list impls, [], []
 
 let find_appl_head_data = function
   | GRef (_,ref) as x -> x,implicits_of_global ref,find_arguments_scope ref,[]
@@ -1580,7 +1596,7 @@ let internalize sigma globalenv env allow_patvar lvar c =
 	      |loc,(Name y as x) -> (y,PatVar(loc,x)) :: l in
 	    match case_rel_ctxt,arg_pats with
 	      (* LetIn in the rel_context *)
-	      |(_,Some _,_)::t, l when not with_letin ->
+	      |(_,Term.Definition _,_)::t, l when not with_letin ->
 		canonize_args t l forbidden_names match_acc ((dummy_loc,Anonymous)::var_acc)
 	      |[],[] ->
 		(add_name match_acc na, var_acc)
@@ -1704,7 +1720,7 @@ let interp_gen kind sigma env
                ?(impls=empty_internalization_env) ?(allow_patvar=false) ?(ltacvars=([],[]))
                c =
   let c = intern_gen (kind=IsType) ~impls ~allow_patvar ~ltacvars sigma env c in
-    understand_gen kind sigma env c
+    fst (understand_gen kind sigma env c)
 
 let interp_constr sigma env c =
   interp_gen (OfType None) sigma env c
@@ -1716,7 +1732,7 @@ let interp_casted_constr sigma env ?(impls=empty_internalization_env) c typ =
   interp_gen (OfType (Some typ)) sigma env ~impls c
 
 let interp_open_constr sigma env c =
-  understand_tcc sigma env (intern_constr sigma env c)
+  fst (understand_tcc sigma env (intern_constr sigma env c))
 
 let interp_open_constr_patvar sigma env c =
   let raw = intern_gen false sigma env c ~allow_patvar:true in
@@ -1734,10 +1750,10 @@ let interp_open_constr_patvar sigma env c =
 	)
     | _ -> map_glob_constr patvar_to_evar r in
   let raw = patvar_to_evar raw in
-    understand_tcc !sigma env raw
+    fst (understand_tcc !sigma env raw)
 
 let interp_constr_judgment sigma env c =
-  understand_judgment sigma env (intern_constr sigma env c)
+  fst (understand_judgment sigma env (intern_constr sigma env c))
 
 let interp_constr_evars_gen_impls ?evdref ?(fail_evar=true)
     env ?(impls=empty_internalization_env) kind c =
@@ -1749,7 +1765,7 @@ let interp_constr_evars_gen_impls ?evdref ?(fail_evar=true)
   let istype = kind = IsType in
   let c = intern_gen istype ~impls !evdref env c in
   let imps = Implicit_quantifiers.implicits_of_glob_constr ~with_products:istype c in
-    understand_tcc_evars ~fail_evar evdref env kind c, imps
+    fst (understand_tcc_evars ~fail_evar evdref env kind c), imps
 
 let interp_casted_constr_evars_impls ?evdref ?(fail_evar=true)
     env ?(impls=empty_internalization_env) c typ =
@@ -1763,7 +1779,7 @@ let interp_constr_evars_impls ?evdref ?(fail_evar=true) env ?(impls=empty_intern
 
 let interp_constr_evars_gen evdref env ?(impls=empty_internalization_env) kind c =
   let c = intern_gen (kind=IsType) ~impls !evdref env c in
-    understand_tcc_evars evdref env kind c
+    fst (understand_tcc_evars evdref env kind c)
 
 let interp_casted_constr_evars evdref env ?(impls=empty_internalization_env) c typ =
   interp_constr_evars_gen evdref env ~impls (OfType (Some typ)) c
@@ -1824,6 +1840,11 @@ let intern_context global_level sigma env impl_env params =
   with InternalizationError (loc,e) ->
     user_err_loc (loc,"internalize", explain_internalization_error e)
 
+let merge_impl i j =
+  match i, j with
+  | Irr, _ | _, Irr -> Irr
+  | _ -> Expl
+
 let interp_rawcontext_gen understand_type understand_judgment env bl =
   let (env, par, _, impls) =
     List.fold_left
@@ -1831,18 +1852,19 @@ let interp_rawcontext_gen understand_type understand_judgment env bl =
 	match b with
 	    None ->
 	      let t' = locate_if_isevar (loc_of_glob_constr t) na t in
-	      let t = understand_type env t' in
-	      let d = (na,None,t) in
+	      let t, rel = understand_type env t' in
+	      let d = var_decl_of (na, (merge_impl rel (snd k), fst k = Lib.Implicit)) t in
 	      let impls =
-		if k = Implicit then
+		if fst k = Lib.Implicit then
 		  let na = match na with Name n -> Some n | Anonymous -> None in
 		    (ExplByPos (n, na), (true, true, true)) :: impls
 		else impls
 	      in
 		(push_rel d env, d::params, succ n, impls)
 	  | Some b ->
-	      let c = understand_judgment env b in
-	      let d = (na, Some c.uj_val, c.uj_type) in
+	      let c, rel = understand_judgment env b in
+	      let binder = (na, rel) in
+	      let d = def_decl_of binder c.uj_val c.uj_type in
 		(push_rel d env, d::params, succ n, impls))
       (env,[],1,[]) (List.rev bl)
   in (env, par), impls

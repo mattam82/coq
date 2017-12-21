@@ -59,6 +59,10 @@ Variable F : Bool.
 (** The powerset operator *)
 Definition pow (P:Prop) := P -> Bool.
 
+Inductive propeq (A : Prop) (x : A) : A -> Prop :=
+| propeq_refl : propeq x x.
+
+Infix "=p" := propeq (at level 90).
 
 (** A piece of theory about retracts *)
 Section Retracts.
@@ -66,14 +70,13 @@ Section Retracts.
 Variables A B : Prop.
 
 Record retract : Prop :=
-  {i : A -> B; j : B -> A; inv : forall a:A, j (i a) = a}.
+  {i : A -> B; j : B -> A; inv : forall a:A, j (i a) =p a}.
 
 Record retract_cond : Prop :=
-  {i2 : A -> B; j2 : B -> A; inv2 : retract -> forall a:A, j2 (i2 a) = a}.
-
+  {i2 : A -> B; j2 : B -> A; inv2 : retract -> forall a:A, j2 (i2 a) =p a}.
 
 (** The dependent elimination above implies the axiom of choice: *)
-Lemma AC : forall r:retract_cond, retract -> forall a:A, j2 r (i2 r a) = a.
+Lemma AC : forall r:retract_cond, retract -> forall a:A, j2 r (i2 r a) =p a.
 Proof.
 intros r.
 case r; simpl in |- *.
@@ -116,33 +119,33 @@ intro a.
 unfold f, g in |- *; simpl in |- *.
 apply AC.
 exists (fun x:pow U => x) (fun x:pow U => x).
-trivial.
+apply propeq_refl.
 Qed.
 
 (** Encoding of Russel's paradox *)
 
 (** The boolean negation. *)
-Definition Not_b (b:Bool) := IFProp (b = T) F T.
+Definition Not_b (b:Bool) := IFProp (b =p T) F T.
 
 (** the set of elements not belonging to itself *)
 Definition R : U := g (fun u:U => Not_b (u U u)).
 
 
-Lemma not_has_fixpoint : R R = Not_b (R R).
+Lemma not_has_fixpoint : R R =p Not_b (R R).
 Proof.
 unfold R at 1 in |- *.
 unfold g in |- *.
-rewrite AC with (r := L1 U U) (a := fun u:U => Not_b (u U u)).
-trivial.
-exists (fun x:pow U => x) (fun x:pow U => x); trivial.
+(* rewrite AC with (r := L1 U U) (a := fun u:U => Not_b (u U u)). *)
+apply propeq_refl.
+(* exists (fun x:pow U => x) (fun x:pow U => x); apply propeq_refl. *)
 Qed.
 
-
-Theorem classical_proof_irrelevence : T = F.
+Theorem classical_proof_irrelevence : T =p F.
 Proof.
 generalize not_has_fixpoint.
 unfold Not_b in |- *.
-apply AC_IF.
+refine (AC_IF _ _ (fun p => (R R) =p p ->
+   T =p F) _ _).
 intros is_true is_false.
 elim is_true; elim is_false; trivial.
 

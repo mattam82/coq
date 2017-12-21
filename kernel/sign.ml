@@ -34,6 +34,22 @@ let rec lookup_named id = function
   | _ :: sign -> lookup_named id sign
   | [] -> raise Not_found
 
+let named_type id sign =
+  let (_,_,t) = lookup_named id sign in t
+
+let named_body id sign =
+  let (_,b,_) = lookup_named id sign in b
+
+let evaluable_named id sign =
+  match named_body id sign with
+  | Definition _      -> true
+  | _                 -> false
+
+let named_value id sign = 
+  match named_body id sign with
+  | Definition (_, c) -> Some c
+  | Variable _ -> None
+
 let named_context_length = List.length
 let named_context_equal = list_equal eq_named_declaration
 
@@ -41,10 +57,19 @@ let vars_of_named_context = List.map (fun (id,_,_) -> id)
 
 let instance_from_named_context sign =
   let rec inst_rec = function
-    | (id,None,_) :: sign -> mkVar id :: inst_rec sign
+    | (id,Variable _,_) :: sign -> mkVar id :: inst_rec sign
     | _ :: sign -> inst_rec sign
     | [] -> [] in
   Array.of_list (inst_rec sign)
+
+let instance_args_from_named_context sign =
+  let rec inst_rec = function
+    | (id,Variable (an,_),_) :: sign -> 
+	let ans, args = inst_rec sign in
+	  an :: ans, mkVar id :: args
+    | _ :: sign -> inst_rec sign
+    | [] -> [], [] in
+  inst_rec sign
 
 let fold_named_context f l ~init = List.fold_right f l init
 let fold_named_context_reverse f ~init l = List.fold_left f init l
@@ -57,7 +82,7 @@ let fold_rel_context_reverse f ~init:x l = List.fold_left f x l
 
 let map_context f l =
   let map_decl (n, body_o, typ as decl) =
-    let body_o' = Option.smartmap f body_o in
+    let body_o' = smartmap_body f body_o in
     let typ' = f typ in
       if body_o' == body_o && typ' == typ then decl else
 	(n, body_o', typ')
@@ -67,8 +92,8 @@ let map_context f l =
 let map_rel_context = map_context
 let map_named_context = map_context
 
-let iter_rel_context f = List.iter (fun (_,b,t) -> f t; Option.iter f b)
-let iter_named_context f = List.iter (fun (_,b,t) -> f t; Option.iter f b)
+let iter_rel_context f = List.iter (fun (_,b,t) -> f t; iter_body f b)
+let iter_named_context f = List.iter (fun (_,b,t) -> f t; iter_body f b)
 
 (* Push named declarations on top of a rel context *)
 (* Bizarre. Should be avoided. *)
@@ -76,7 +101,7 @@ let push_named_to_rel_context hyps ctxt =
   let rec push = function
     | (id,b,t) :: l ->
 	let s, hyps = push l in
-	let d = (Name id, Option.map (subst_vars s) b, subst_vars s t) in
+	let d = map_rel_declaration (subst_vars s) (Name id, b, t) in
 	id::s, d::hyps
     | [] -> [],[] in
   let s, hyps = push hyps in

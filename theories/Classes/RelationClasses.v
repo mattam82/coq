@@ -98,7 +98,7 @@ Hint Extern 3 (Transitive (flip _)) => class_apply flip_Transitive : typeclass_i
 
 Definition Reflexive_complement_Irreflexive `(Reflexive A (R : relation A))
    : Irreflexive (complement R).
-Proof. firstorder. Qed.
+Proof. intro. unfold complement. intros. apply H0. apply H. Qed. 
 
 Definition complement_Symmetric `(Symmetric A (R : relation A)) : Symmetric (complement R).
 Proof. firstorder. Qed.
@@ -383,7 +383,7 @@ Class PartialOrder {A} eqA `{equ : Equivalence A eqA} R `{preo : PreOrder A R} :
    for equivalence (see Morphisms).
    It is also sufficient to show that [R] is antisymmetric w.r.t. [eqA] *)
 
-Instance partial_order_antisym `(PartialOrder A eqA R) : ! Antisymmetric A eqA R.
+Instance partial_order_antisym `{PartialOrder A eqA R} : ! Antisymmetric A eqA R.
 Proof with auto.
   reduce_goal.
   pose proof partial_order_equivalence as poe. do 3 red in poe.
@@ -446,6 +446,6 @@ Hint Extern 3 (StrictOrder (inverse _)) => class_apply StrictOrder_inverse : typ
 Hint Extern 3 (PreOrder (inverse _)) => class_apply PreOrder_inverse : typeclass_instances.
 
 Lemma PartialOrder_inverse `(PartialOrder A eqA R) : PartialOrder eqA (inverse R).
-Proof. firstorder. Qed.
-
+Proof. red. unfold flip. red in H. firstorder. Qed.
+  
 Hint Extern 3 (PartialOrder (inverse _)) => class_apply PartialOrder_inverse : typeclass_instances.

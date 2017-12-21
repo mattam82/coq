@@ -120,7 +120,7 @@ type stack_member =
 and stack = stack_member list
 
 val append_stack : fconstr array -> stack -> stack
-val eta_expand_stack : stack -> stack
+val eta_expand_stack : relevance * stack -> stack
 
 (* To lazy reduce a constr, create a [clos_infos] with
    [create_clos_infos], inject the term to reduce with [inject]; then use
@@ -131,7 +131,7 @@ val inject : constr -> fconstr
 val fterm_of : fconstr -> fterm
 val term_of_fconstr : fconstr -> constr
 val destFLambda :
-  (fconstr subs -> constr -> fconstr) -> fconstr -> name * fconstr * fconstr
+  (fconstr subs -> constr -> fconstr) -> fconstr -> name binder_annot * fconstr * fconstr
 
 (* Global and local constant cache *)
 type clos_infos

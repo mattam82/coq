@@ -185,19 +185,16 @@ let build_beq_scheme kn =
 	match kind_of_term c with
         | Rel x -> mkRel (x-nlist+ndx)
         | Var x -> mkVar (id_of_string ("eq_"^(string_of_id x)))
-        | Cast (x,_,_) -> aux (applist (x,a))
+        | Cast (x,_,_) -> aux (Constr.app_argsl (x,a))
         | App _ -> assert false
         | Ind (kn',i as ind') -> if eq_mind kn kn' then mkRel(eqA-nlist-i+nb_ind-1)
                         else ( try
-			  let a = Array.of_list a in
                           let eq = mkConst (find_scheme (!beq_scheme_kind_aux()) (kn',i))
-                          and eqa = Array.map aux a
+                          and eqa = Constr.map_argsl aux a
 			  in
-                            let args = Array.append
-                                (Array.map (fun x->lift lifti x) a) eqa
-                            in if args = [||] then eq
-                               else mkApp (eq,Array.append
-                                      (Array.map (fun x->lift lifti x) a) eqa)
+                            let args = Constr.concat_argsl
+                                (Constr.map_argsl (fun x->lift lifti x) a) eqa
+                            in Constr.app_argsl (eq,args)
                          with Not_found -> raise(EqNotFound (ind',ind))
                         )
         | Sort _  -> raise InductiveWithSort
@@ -207,7 +204,7 @@ let build_beq_scheme kn =
         | Const kn ->
 	    (match Environ.constant_opt_value env kn with
 	      | None -> raise (ParameterWithoutEquality kn)
-	      | Some c -> aux (applist (c,a)))
+	      | Some c -> aux (Constr.app_argsl (c,a)))
         | Construct _ -> raise (EqUnknown "Construct")
         | Case _ -> raise (EqUnknown "Case")
         | CoFix _ -> raise (EqUnknown "CoFix")
@@ -230,7 +227,7 @@ let build_beq_scheme kn =
                Cn => match Y with ... end |]  part *)
     let ci = make_case_info env ind MatchStyle in
     let constrs n = get_constructors env (make_ind_family (ind,
-      extended_rel_list (n+nb_ind-1) mib.mind_params_ctxt)) in
+      extended_rel_applist (n+nb_ind-1) mib.mind_params_ctxt)) in
     let constrsi = constrs (3+nparrec) in
     let n = Array.length constrsi in
     let ar = Array.create n ff in
@@ -278,11 +275,11 @@ let build_beq_scheme kn =
           mkNamedLambda (id_of_string "Y") (mkFullInd ind (nb_ind-1+2))  (
  	    mkCase (ci, do_predicate rel_list 0,mkVar (id_of_string "X"),ar)))
     in (* build_beq_scheme *)
-    let names = Array.make nb_ind Anonymous and
+    let names = Array.make nb_ind (letbinder_annot_of Anonymous) and
         types = Array.make nb_ind mkSet and
         cores = Array.make nb_ind mkSet in
     for i=0 to (nb_ind-1) do
-        names.(i) <- Name (id_of_string (rec_name i));
+        names.(i) <- (letbinder_annot_of (Name (id_of_string (rec_name i))));
 	types.(i) <- mkArrow (mkFullInd (kn,i) 0)
                      (mkArrow (mkFullInd (kn,i) 1) bb);
         cores.(i) <- make_one_eq i

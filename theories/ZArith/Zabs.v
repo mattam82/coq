@@ -49,7 +49,7 @@ Proof.
  intros x y Hx; now subst.
 Qed.
 
-Theorem Zabs_intro : forall P (n:Z), P (- n) -> P n -> P (Z.abs n).
+Theorem Zabs_intro : forall (P : Z -> Prop) (n:Z), P (- n) -> P n -> P (Z.abs n).
 Proof.
  now destruct n.
 Qed.

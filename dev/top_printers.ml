@@ -193,13 +193,13 @@ let constr_display csr =
       "Fix(([|"^(Array.fold_right (fun x i -> (string_of_int x)^(if not(i="")
         then (";"^i) else "")) t "")^"|],"^(string_of_int i)^"),"
       ^(array_display tl)^",[|"
-      ^(Array.fold_right (fun x i -> (name_display x)^(if not(i="")
+      ^(Array.fold_right (fun (x,rel) i -> (name_display x)^(if not(i="")
         then (";"^i) else "")) lna "")^"|],"
       ^(array_display bl)^")"
   | CoFix(i,(lna,tl,bl)) ->
       "CoFix("^(string_of_int i)^"),"
       ^(array_display tl)^","
-      ^(Array.fold_right (fun x i -> (name_display x)^(if not(i="")
+      ^(Array.fold_right (fun (x,rel) i -> (name_display x)^(if not(i="")
         then (";"^i) else "")) lna "")^","
       ^(array_display bl)^")"
 
@@ -222,6 +222,96 @@ let constr_display csr =
 
   in
     msg (str (term_display csr) ++fnl ())
+
+module Full = struct
+  open Constr
+
+  let constr_display csr =
+  let rec term_display c = match kind_of_term c with
+  | Rel n -> "Rel("^(string_of_int n)^")"
+  | Meta n -> "Meta("^(string_of_int n)^")"
+  | Var id -> "Var("^(string_of_id id)^")"
+  | Sort s -> "Sort("^(sort_display s)^")"
+  | Cast (c,k, t) ->
+      "Cast("^(term_display c)^","^(cast_kind_display k)^","^(term_display t)^")"
+  | Prod (na,t,c) ->
+      "Prod("^(binder_display na)^","^(term_display t)^","^(term_display c)^")\n"
+  | Lambda (na,t,c) ->
+      "Lambda("^(binder_display na)^","^(term_display t)^","^(term_display c)^")\n"
+  | LetIn (na,b,t,c) ->
+      "LetIn("^(letbinder_display na)^","^(term_display b)^","
+      ^(term_display t)^","^(term_display c)^")"
+  | App (c,al,l) -> "App("^(term_display c)^","^(ann_array_display al)^","^(array_display l)^")\n"
+  | Evar (e,l) -> "Evar("^(string_of_int e)^","^(array_display l)^")"
+  | Const c -> "Const("^(string_of_con c)^")"
+  | Ind (sp,i) ->
+      "MutInd("^(string_of_mind sp)^","^(string_of_int i)^")"
+  | Construct ((sp,i),j) ->
+      "MutConstruct(("^(string_of_mind sp)^","^(string_of_int i)^"),"
+      ^(string_of_int j)^")"
+  | Case (ci,p,c,bl) ->
+      "MutCase(<abs>,"^(term_display (case_pred p))^","^(term_display c)^","
+      ^(array_display bl)^")"
+  | Fix ((t,i),(lna,tl,bl)) ->
+      "Fix(([|"^(Array.fold_right (fun x i -> (string_of_int x)^(if not(i="")
+        then (";"^i) else "")) t "")^"|],"^(string_of_int i)^"),"
+      ^(array_display tl)^",[|"
+      ^(Array.fold_right (fun x i -> (letbinder_display x)^(if not(i="")
+        then (";"^i) else "")) lna "")^"|],"
+      ^(array_display bl)^")"
+  | CoFix(i,(lna,tl,bl)) ->
+      "CoFix("^(string_of_int i)^"),"
+      ^(array_display tl)^","
+      ^(Array.fold_right (fun (x,rel) i -> (name_display x)^(if not(i="")
+        then (";"^i) else "")) lna "")^","
+      ^(array_display bl)^")"
+
+  and ann_display = function
+    | Expl -> ""
+    | Irr -> "ε"
+
+  and ann_array_display v =
+    "[|"^
+    (Array.fold_right
+       (fun x i -> (ann_display x)^(if not(i="") then (";"^i) else ""))
+       v "")^"|]"
+
+  and array_display v =
+    "[|"^
+    (Array.fold_right
+       (fun x i -> (term_display x)^(if not(i="") then (";"^i) else ""))
+       v "")^"|]"
+
+  and sort_display = function
+    | Prop(Pos) -> "Prop(Pos)"
+    | Prop(Null) -> "Prop(Null)"
+    | Type u ->
+	incr cnt; pp (str "with " ++ int !cnt ++ pr_uni u ++ fnl ());
+	"Type("^(string_of_int !cnt)^")"
+
+  and name_display = function
+    | Name id -> "Name("^(string_of_id id)^")"
+    | Anonymous -> "Anonymous"
+
+  and binder_display (na, (irr, impl)) =
+    (name_display na) ^ "[" ^ (ann_display irr) ^ "]"
+
+  and letbinder_display (na, irr) =
+    (name_display na) ^ "[" ^ (ann_display irr) ^ "]"
+
+  in
+    str (term_display csr)
+end
+
+let full_constr_display = Full.constr_display
+
+let ppfullconstr x = msg (full_constr_display x ++fnl ())
+let ppfulljudgment j = 
+  msg (full_constr_display j.uj_val ++ str " : " ++
+	 full_constr_display j.uj_type)
+    
+let ppclosinfos infos = 
+  msg (print_env (Closure.clos_infos_env infos))
 
 open Format;;
 
@@ -291,7 +381,7 @@ let print_pure_constr csr =
       let rec print_fix () =
         for k = 0 to (Array.length tl) - 1 do
 	  open_vbox 0;
-	  name_display lna.(k); print_string "/";
+	  name_display (fst lna.(k)); print_string "/";
 	  print_int t.(k); print_cut(); print_string ":";
 	  box_display tl.(k) ; print_cut(); print_string ":=";
 	  box_display bl.(k); close_box ();
@@ -305,7 +395,7 @@ let print_pure_constr csr =
       let rec print_fix () =
         for k = 0 to (Array.length tl) - 1 do
           open_vbox 1;
-	  name_display lna.(k);  print_cut(); print_string ":";
+	  name_display (fst lna.(k));  print_cut(); print_string ":";
 	  box_display tl.(k) ; print_cut(); print_string ":=";
 	  box_display bl.(k); close_box ();
 	  print_cut();
