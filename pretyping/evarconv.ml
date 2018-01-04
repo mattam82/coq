@@ -545,8 +545,10 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) ts env evd pbty
                 UnifFailure (evd, NotSameHead)
               else
                 begin
-                  let evd' = check_leq_inductives evd cumi u u' in
-                  Success (check_leq_inductives evd' cumi u' u)
+                  try Success (check_leq_inductives evd cumi u u')
+                  with Univ.UniverseInconsistency _ ->
+                    try Success (check_leq_inductives evd cumi u' u)
+                    with Univ.UniverseInconsistency e -> UnifFailure (evd, UnifUnivInconsistency e)
                 end
             end
         in
