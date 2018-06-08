@@ -64,7 +64,7 @@ Section Well_founded.
   forall P:A -> Prop,
     (forall x:A, (forall y:A, R y x -> P y) -> P x) -> forall a:A, P a.
  Proof.
-  exact (fun P:A -> Prop => well_founded_induction_type P).
+  intros; apply Acc_ind; auto.
  Defined.
 
 (** Well-founded fixpoints *)

@@ -168,3 +168,7 @@ let get_dump_bytecode () = !dump_bytecode
 let dump_lambda = ref false
 let set_dump_lambda = (:=) dump_lambda
 let get_dump_lambda () = !dump_lambda
+
+(* Do we have (implicit) Prop-Type cumulativity ? *)
+
+let prop_cumul = ref true

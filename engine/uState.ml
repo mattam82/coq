@@ -214,6 +214,12 @@ let process_universe_constraints ctx cstrs =
               | Some l, Some r ->
                 Univ.Constraint.add (l, Univ.Le, r) local
               | _ -> local
+            else if Univ.is_type0m_univ l && not !Flags.prop_cumul then
+              begin match Univ.Universe.level r with
+              | Some r' when is_local r' -> instantiate_variable r' l vars; local
+              | _ ->
+                 raise (Univ.UniverseInconsistency (Univ.Le, l, r, None))
+              end
             else
               begin match Univ.Universe.level r with
               | None -> user_err Pp.(str "Algebraic universe on the right")

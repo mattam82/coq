@@ -343,6 +343,7 @@ let different_class_params i =
     if (snd ci).cl_param > 0 then true
     else 
       match fst ci with
+      | CL_SORT -> true (* to allow a Prop->Type coercion *)
       | CL_IND i -> Global.is_polymorphic (IndRef i)
       | CL_CONST c -> Global.is_polymorphic (ConstRef c)
       | _ -> false

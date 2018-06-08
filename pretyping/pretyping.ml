@@ -177,6 +177,15 @@ let _ =
 	    optread  = Universes.is_set_minimization;
 	    optwrite = (:=) Universes.set_minimization })
 
+let _ =
+  Goptions.(declare_bool_option
+              { optdepr  = false;
+                optname  = "implicit prop-type cumulativity";
+                optkey   = ["PropType";"Cumulativity"];
+                optread  = (fun () -> !Flags.prop_cumul);
+                optwrite = (:=) Flags.prop_cumul })
+
+
 (** Miscellaneous interpretation functions *)
 
 let interp_known_universe_level evd r =

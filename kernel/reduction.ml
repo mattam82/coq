@@ -649,12 +649,9 @@ let check_leq univs u u' =
 let check_sort_cmp_universes env pb s0 s1 univs =
   let open Sorts in
   match (s0,s1) with
-    | (Prop c1, Prop c2) when is_cumul pb ->
-      begin match c1, c2 with
-      | Null, _ | _, Pos -> () (* Prop <= Set *)
-      | _ -> raise NotConvertible
-      end
-    | (Prop c1, Prop c2) -> if c1 != c2 then raise NotConvertible
+    | (Prop c1, Prop c2) when c1 == c2 -> ()
+    | (Prop Null, Prop Pos) when is_cumul pb && !Flags.prop_cumul -> ()
+    | (Prop _, Prop _) -> raise NotConvertible
     | (Prop c1, Type u) ->
 	if not (type_in_type env) then
 	let u0 = univ_of_sort s0 in
@@ -700,12 +697,9 @@ let infer_leq (univs, cstrs as cuniv) u u' =
 let infer_cmp_universes env pb s0 s1 univs =
   let open Sorts in
   match (s0,s1) with
-    | (Prop c1, Prop c2) when is_cumul pb ->
-      begin match c1, c2 with
-      | Null, _ | _, Pos -> univs (* Prop <= Set *)
-      | _ -> raise NotConvertible
-      end
-    | (Prop c1, Prop c2) -> if c1 == c2 then univs else raise NotConvertible
+    | (Prop c1, Prop c2) when c1 == c2 -> univs
+    | (Prop Null, Prop Pos) when is_cumul pb && !Flags.prop_cumul -> univs
+    | (Prop _, Prop _) -> raise NotConvertible
     | (Prop c1, Type u) ->
       let u0 = univ_of_sort s0 in
 	(match pb with

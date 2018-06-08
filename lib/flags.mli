@@ -139,3 +139,6 @@ val get_dump_bytecode : unit -> bool
 val dump_lambda : bool ref
 val set_dump_lambda : bool -> unit
 val get_dump_lambda : unit -> bool
+
+(* Do we have (implicit) Prop-Type cumulativity ? *)
+val prop_cumul : bool ref

@@ -315,11 +315,8 @@ struct
     let hash = ExprHash.hash
 
     let leq (u,n) (v,n') =
-      let cmp = Level.compare u v in
-	if Int.equal cmp 0 then n <= n'
-	else if n <= n' then 
-	  (Level.is_prop u && Level.is_small v)
-	else false
+      if Level.equal u v then n <= n'
+      else !Flags.prop_cumul && Level.is_prop u && Level.is_small v && n <= n'
 
     let successor (u,n) =
       if Level.is_prop u then type1
@@ -698,9 +695,11 @@ let constraint_add_leq v u c =
 	Constraint.add (x,Le,y) c
       else (* j >= 1 *) (* m = n + k, u <= v+k *)
 	if Level.equal x y then c (* u <= u+k, trivial *)
-	else if Level.is_small x then c (* Prop,Set <= u+S k, trivial *)
-	else anomaly (Pp.str"Unable to handle arbitrary u <= v+k constraints.")
-	  
+        else if Level.is_set x then c (* Set <= u+S k, trivial *)
+        else if Level.is_prop x then
+          Constraint.add (x,Le,y) c (* Prop <= u+S k, now explicit *)
+        else anomaly (Pp.str"Unable to handle arbitrary u <= v+k constraints.")
+
 let check_univ_leq_one u v = Universe.exists (Expr.leq u) v
 
 let check_univ_leq u v = 

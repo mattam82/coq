@@ -634,7 +634,7 @@ let check_smaller g strict u v =
   if strict then
     search_path true arcu arcv g
   else
-    is_prop_arc arcu 
+    (!Flags.prop_cumul && is_prop_arc arcu)
     || (is_set_arc arcu && not (is_prop_arc arcv))
     || search_path false arcu arcv g
 
@@ -659,7 +659,7 @@ let real_check_leq g u v =
     
 let check_leq g u v =
   Universe.equal u v ||
-    is_type0m_univ u ||
+    (!Flags.prop_cumul && is_type0m_univ u) ||
     real_check_leq g u v
 
 let check_eq_univs g l1 l2 =
@@ -717,7 +717,7 @@ let empty_universes =
   } in
   let entries = UMap.add Level.set set_arc (UMap.singleton Level.prop prop_arc) in
   let empty = { entries; index = (-2); n_nodes = 2; n_edges = 0 } in
-  enforce_univ_lt Level.prop Level.set empty
+  (*enforce_univ_lt Level.prop Level.set*) empty
 
 (* Prop = Set is forbidden here. *)
 let initial_universes = empty_universes

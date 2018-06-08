@@ -14,6 +14,16 @@ Require Export Notations.
 
 Notation "A -> B" := (forall (_ : A), B) : type_scope.
 
+(** * Explicit lifting of propositions in Type *)
+
+Local Set Primitive Projections.
+
+Record lift (A:Prop) : Set := up { down : A }.
+
+Coercion lift : Sortclass >-> Sortclass.
+
+Global Unset PropType Cumulativity.
+
 (** * Propositional connectives *)
 
 (** [True] is the always true proposition *)
@@ -247,13 +257,19 @@ Notation "'IF' c1 'then' c2 'else' c3" := (IF_then_else c1 c2 c3)
     is provided too.
 *)
 
-Inductive ex (A:Type) (P:A -> Prop) : Prop :=
+Universes ex ex2 all.
+
+Inductive ex (A:Type@{ex}) (P:A -> Prop) : Prop :=
   ex_intro : forall x:A, P x -> ex (A:=A) P.
 
-Inductive ex2 (A:Type) (P Q:A -> Prop) : Prop :=
+Inductive ex2 (A:Type@{ex2}) (P Q:A -> Prop) : Prop :=
   ex_intro2 : forall x:A, P x -> Q x -> ex2 (A:=A) P Q.
 
-Definition all (A:Type) (P:A -> Prop) := forall x:A, P x.
+Definition all (A:Type@{all}) (P:A -> Prop) := forall x:A, P x.
+
+Constraint Prop <= ex.
+Constraint Prop <= ex2.
+Constraint Prop <= all.
 
 (* Rule order is important to give printing priority to fully typed exists *)
 
@@ -306,10 +322,14 @@ End universal_quantification.
     as it expresses that [x] and [y] are equal iff every property on
     [A] which is true of [x] is also true of [y] *)
 
-Inductive eq (A:Type) (x:A) : A -> Prop :=
+Universe eq.
+
+Inductive eq (A:Type@{eq}) (x:A) : A -> Prop :=
     eq_refl : x = x :>A
 
 where "x = y :> A" := (@eq A x y) : type_scope.
+
+Constraint Prop <= eq.
 
 Notation "x = y" := (x = y :>_) : type_scope.
 Notation "x <> y  :> T" := (~ x = y :>T) : type_scope.
@@ -335,7 +355,7 @@ Section Logic_lemmas.
   Qed.
 
   Section equality.
-    Variables A B : Type.
+    Variables A B : Type@{eq}. (* TODO FIXME *)
     Variable f : A -> B.
     Variables x y z : A.
 
@@ -393,6 +413,23 @@ Module EqNotations.
   Notation "'rew' -> H 'in' H'" := (eq_rect _ _ H' _ H)
     (at level 10, H' at level 10, only parsing).
   Notation "'rew' -> [ P ] H 'in' H'" := (eq_rect _ P H' _ H)
+    (at level 10, H' at level 10, only parsing).
+
+  Notation "'rewP' H 'in' H'" := (eq_ind _ _ H' _ H)
+    (at level 10, H' at level 10,
+     format "'[' 'rewP'  H  in  '/' H' ']'").
+  Notation "'rewP' [ P ] H 'in' H'" := (eq_ind _ P H' _ H)
+    (at level 10, H' at level 10,
+     format "'[' 'rewP'  [ P ]  '/    ' H  in  '/' H' ']'").
+  Notation "'rewP' <- H 'in' H'" := (eq_ind_r _ H' H)
+    (at level 10, H' at level 10,
+     format "'[' 'rewP'  <-  H  in  '/' H' ']'").
+  Notation "'rewP' <- [ P ] H 'in' H'" := (eq_ind_r P H' H)
+    (at level 10, H' at level 10,
+     format "'[' 'rewP'  <-  [ P ]  '/    ' H  in  '/' H' ']'").
+  Notation "'rewP' -> H 'in' H'" := (eq_ind _ _ H' _ H)
+    (at level 10, H' at level 10, only parsing).
+  Notation "'rewP' -> [ P ] H 'in' H'" := (eq_ind _ P H' _ H)
     (at level 10, H' at level 10, only parsing).
 
 End EqNotations.
@@ -509,8 +546,10 @@ Proof.
   destruct (eq_id_comm_l f Hfsymf a).
   unfold Hfsymf.
   destruct (Hf a). simpl.
+(* TODO: pourquoi ça ne marche pas ?
   rewrite eq_trans_refl_l.
-  reflexivity.
+  reflexivity. *)
+  apply eq_trans_refl_l.
 Defined.
 
 Lemma eq_refl_map_distr : forall A B x (f:A->B), f_equal f (eq_refl x) = eq_refl (f x).
@@ -544,6 +583,12 @@ Qed.
 
 Lemma rew_const : forall A P (x y:A) (e:x=y) (k:P),
     rew [fun _ => P] e in k = k.
+Proof.
+  destruct e; reflexivity.
+Qed.
+
+Lemma rewP_const : forall A (P:Prop) (x y:A) (e:x=y) (k:P),
+    rewP [fun _ => P] e in k = k.
 Proof.
   destruct e; reflexivity.
 Qed.
@@ -670,7 +715,7 @@ Local Notation "'rew' 'dependent' H 'in' H'"
 Section ex.
   Local Unset Implicit Arguments.
   Definition eq_ex_uncurried {A : Type} (P : A -> Prop) {u1 v1 : A} {u2 : P u1} {v2 : P v1}
-             (pq : exists p : u1 = v1, rew p in u2 = v2)
+             (pq : exists p : u1 = v1, rewP p in u2 = v2)
   : ex_intro P u1 u2 = ex_intro P v1 v2.
   Proof.
     destruct pq as [p q].
@@ -679,7 +724,7 @@ Section ex.
   Qed.
 
   Definition eq_ex {A : Type} {P : A -> Prop} (u1 v1 : A) (u2 : P u1) (v2 : P v1)
-             (p : u1 = v1) (q : rew p in u2 = v2)
+             (p : u1 = v1) (q : rewP p in u2 = v2)
   : ex_intro P u1 u2 = ex_intro P v1 v2
     := eq_ex_uncurried P (ex_intro _ p q).
 
@@ -690,7 +735,7 @@ Section ex.
     := eq_ex u1 v1 u2 v2 p (P_hprop _ _ _).
 
   Lemma rew_ex {A x} {P : A -> Type} (Q : forall a, P a -> Prop) (u : exists p, Q x p) {y} (H : x = y)
-  : rew [fun a => exists p, Q a p] H in u
+  : rewP [fun a => exists p, Q a p] H in u
     = match u with
         | ex_intro _ u1 u2
           => ex_intro
@@ -710,7 +755,7 @@ Section ex2.
   Definition eq_ex2_uncurried {A : Type} (P Q : A -> Prop) {u1 v1 : A}
              {u2 : P u1} {v2 : P v1}
              {u3 : Q u1} {v3 : Q v1}
-             (pq : exists2 p : u1 = v1, rew p in u2 = v2 & rew p in u3 = v3)
+             (pq : exists2 p : u1 = v1, rewP p in u2 = v2 & rewP p in u3 = v3)
   : ex_intro2 P Q u1 u2 u3 = ex_intro2 P Q v1 v2 v3.
   Proof.
     destruct pq as [p q r].
@@ -722,7 +767,7 @@ Section ex2.
              (u1 v1 : A)
              (u2 : P u1) (v2 : P v1)
              (u3 : Q u1) (v3 : Q v1)
-             (p : u1 = v1) (q : rew p in u2 = v2) (r : rew p in u3 = v3)
+             (p : u1 = v1) (q : rewP p in u2 = v2) (r : rewP p in u3 = v3)
   : ex_intro2 P Q u1 u2 u3 = ex_intro2 P Q v1 v2 v3
     := eq_ex2_uncurried P Q (ex_intro2 _ _ p q r).
 
@@ -738,7 +783,7 @@ Section ex2.
         (Q : forall a, P a -> Prop)
         (R : forall a, P a -> Prop)
         (u : exists2 p, Q x p & R x p) {y} (H : x = y)
-  : rew [fun a => exists2 p, Q a p & R a p] H in u
+  : rewP [fun a => exists2 p, Q a p & R a p] H in u
     = match u with
         | ex_intro2 _ _ u1 u2 u3
           => ex_intro2
@@ -752,3 +797,16 @@ Section ex2.
     destruct H, u; reflexivity.
   Qed.
 End ex2.
+
+(* The [down] and [up] conversions between [A:Prop] and [lift A : Type]
+    can cancel out *)
+
+Lemma down_up (A:Prop)(a:A) : down (up a) = a.
+Proof.
+ reflexivity.
+Defined.
+
+Lemma up_down (A:Prop)(a:lift A) : up (down a) = a.
+Proof.
+ reflexivity. (* surjective pairing *)
+Defined.
