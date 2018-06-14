@@ -24,6 +24,8 @@ Coercion lift : Sortclass >-> Sortclass.
 
 Global Unset PropType Cumulativity.
 
+Definition lift1 {A} := fun (P:A->Prop)(a:A) => lift (P a).
+
 (** * Propositional connectives *)
 
 (** [True] is the always true proposition *)
@@ -382,17 +384,18 @@ Section Logic_lemmas.
   End equality.
 
   Definition eq_ind_r :
-    forall (A:Type) (x:A) (P:A -> Prop), P x -> forall y:A, y = x -> P y.
+    forall (A:Type@{eq}) (x:A) (P:A -> Prop), P x -> forall y:A, y = x -> P y.
+  Proof.
     intros A x P H y H0. elim eq_sym with (1 := H0); assumption.
   Defined.
 
   Definition eq_rec_r :
-    forall (A:Type) (x:A) (P:A -> Set), P x -> forall y:A, y = x -> P y.
+    forall (A:Type@{eq}) (x:A) (P:A -> Set), P x -> forall y:A, y = x -> P y.
     intros A x P H y H0; elim eq_sym with (1 := H0); assumption.
   Defined.
 
   Definition eq_rect_r :
-    forall (A:Type) (x:A) (P:A -> Type), P x -> forall y:A, y = x -> P y.
+    forall (A:Type@{eq}) (x:A) (P:A -> Type), P x -> forall y:A, y = x -> P y.
     intros A x P H y H0; elim eq_sym with (1 := H0); assumption.
   Defined.
 End Logic_lemmas.
@@ -546,10 +549,8 @@ Proof.
   destruct (eq_id_comm_l f Hfsymf a).
   unfold Hfsymf.
   destruct (Hf a). simpl.
-(* TODO: pourquoi ça ne marche pas ?
   rewrite eq_trans_refl_l.
-  reflexivity. *)
-  apply eq_trans_refl_l.
+  reflexivity.
 Defined.
 
 Lemma eq_refl_map_distr : forall A B x (f:A->B), f_equal f (eq_refl x) = eq_refl (f x).
@@ -809,4 +810,16 @@ Defined.
 Lemma up_down (A:Prop)(a:lift A) : up (down a) = a.
 Proof.
  reflexivity. (* surjective pairing *)
+Defined.
+
+Lemma up_inj (A:Prop)(a b:A) : up a = up b -> a = b.
+Proof.
+ intros H. change (down (up a) = down (up b)).
+ destruct H. reflexivity.
+Defined.
+
+Lemma down_inj (A:Prop)(a b:lift A) : down a = down b -> a = b.
+Proof.
+ intros H. change (up (down a) = up (down b)).
+ rewrite H. reflexivity.
 Defined.

@@ -168,14 +168,16 @@ Section Fix_rects.
     Fix_F_sub A R P f x a =
     Fix_F_sub A R P f x a'.
   Proof.
+    apply down.
     revert a'.
     pattern x, (Fix_F_sub A R P f x a).
     apply Fix_F_sub_rect.
     intros.
     rewrite F_unfold.
+    apply up.
     apply equiv_lowers.
     intros.
-    apply H.
+    apply X.
     assumption.
   Qed.
 

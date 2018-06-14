@@ -120,7 +120,7 @@ Lemma eq_dep_strictly_stronger_JMeq :
  exists U P p q x y, JMeq x y /\ ~ eq_dep U P p x q y.
 Proof.
 exists bool. exists (fun _ => True). exists true. exists false.
-exists I. exists I.
+exists (up I). exists (up I).
 split.
 trivial.
 intro H.

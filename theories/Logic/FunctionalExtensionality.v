@@ -29,7 +29,12 @@ Qed.
 
 (** Statements of functional extensionality for simple and dependent functions. *)
 
-Axiom functional_extensionality_dep : forall {A} {B : A -> Type},
+Universe funextA funextB.
+Constraint Prop <= funextA.
+Constraint Prop <= funextB.
+
+Axiom functional_extensionality_dep :
+forall {A:Type@{funextA}} {B : A -> Type@{funextB}},
   forall (f g : forall x : A, B x),
   (forall x, f x = g x) -> f = g.
 
@@ -38,6 +43,22 @@ Lemma functional_extensionality {A B} (f g : A -> B) :
 Proof.
   intros ; eauto using @functional_extensionality_dep.
 Qed.
+
+(* TODO: extensionality over Prop isn't for free anymore without above univ tricks
+Lemma functional_extensionalityP {A} {B : Prop} (f g : A -> B) :
+  (forall x, f x = g x) -> f = g.
+Proof.
+  intros.
+  assert ((fun x => up (f x)) = (fun x => up (g x))).
+  { apply functional_extensionality.
+    intros. f_equal. apply H. }
+  ??
+Qed.
+Other approach : separate axiom for Prop, actually 3 more axioms
+{A:Prop}{B:A->Type}
+{A:Type}{B:A->Prop}
+{A:Prop}{B:A->Prop}
+*)
 
 (** Extensionality of [forall]s follows from functional extensionality. *)
 Lemma forall_extensionality {A} {B C : A -> Type} (H : forall x : A, B x = C x)
@@ -61,7 +82,7 @@ Defined.
 (** A version of [functional_extensionality_dep] which is provably
     equal to [eq_refl] on [fun _ => eq_refl] *)
 Definition functional_extensionality_dep_good
-           {A} {B : A -> Type}
+           {A:Type@{funextA}} {B : A -> Type@{funextB}}
            (f g : forall x : A, B x)
            (H : forall x, f x = g x)
   : f = g
@@ -118,8 +139,10 @@ Definition f_equal__functional_extensionality_dep_good
            {A B f g} H a
   : f_equal (fun h => h a) (@functional_extensionality_dep_good A B f g H) = H a.
 Proof.
-  apply forall_eq_rect with (H := H); clear H g.
+  apply down.
+  apply forall_eq_rect with (H:=H); clear H g.
   change (eq_refl (f a)) with (f_equal (fun h => h a) (eq_refl f)).
+  apply up.
   apply f_equal, functional_extensionality_dep_good_refl.
 Defined.
 
@@ -127,7 +150,8 @@ Definition f_equal__functional_extensionality_dep_good__fun
            {A B f g} H
   : (fun a => f_equal (fun h => h a) (@functional_extensionality_dep_good A B f g H)) = H.
 Proof.
-  apply functional_extensionality_dep_good; intro a; apply f_equal__functional_extensionality_dep_good.
+  apply functional_extensionality_dep_good.
+  intro a; apply f_equal__functional_extensionality_dep_good.
 Defined.
 
 (** Apply [functional_extensionality], introducing variable x. *)

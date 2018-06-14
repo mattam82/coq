@@ -72,8 +72,8 @@ Local Notation PropositionalFunctionalExtensionality :=
 Lemma PredExt_imp_PropExt : PredicateExtensionality -> PropositionalExtensionality.
 Proof.
   intros Ext A B Equiv. 
-  change A with ((fun _ => A) I).
-  now rewrite Ext with (P := fun _ : True =>A) (Q := fun _ => B).
+  change A with ((fun _ => A) tt).
+  now rewrite Ext with (P := fun _ : unit =>A) (Q := fun _ => B).
 Qed.
 
 Lemma PredExt_imp_PropFunExt : PredicateExtensionality -> PropositionalFunctionalExtensionality.

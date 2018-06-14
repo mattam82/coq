@@ -46,17 +46,17 @@ Module ProofIrrelevanceTheory (M:ProofIrrelevance).
       x = y -> exist P x p = exist P y q.
   Proof.
     intros.
-    rewrite M.proof_irrelevance with (p1:=q) (p2:=eq_rect x P p y H).
+    rewrite M.proof_irrelevance with (p1:=q) (p2:=eq_ind x P p y H).
     elim H using eq_indd.
     reflexivity.
   Qed.
 
   Lemma subsetT_eq_compat :
     forall (U:Type) (P:U->Prop) (x y:U) (p:P x) (q:P y),
-      x = y -> existT P x p = existT P y q.
+      x = y -> existT P x (up p) = existT P y (up q).
   Proof.
     intros.
-    rewrite M.proof_irrelevance with (p1:=q) (p2:=eq_rect x P p y H).
+    rewrite M.proof_irrelevance with (p1:=q) (p2:=eq_ind x P p y H).
     elim H using eq_indd.
     reflexivity.
   Qed.

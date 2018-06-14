@@ -145,7 +145,7 @@ Notation equiv_eqex_eqdep := eq_sigT_iff_eq_dep (only parsing). (* Compat *)
 
 Lemma eq_sig_eq_dep :
   forall (U:Type) (P:U -> Prop) (p q:U) (x:P p) (y:P q),
-    exist P p x = exist P q y -> eq_dep p x q y.
+    exist P p x = exist P q y -> @eq_dep U (lift1 P) p (up x) q (up y).
 Proof.
   intros.
   dependent rewrite H.
@@ -154,14 +154,17 @@ Qed.
 
 Lemma eq_dep_eq_sig :
   forall (U:Type) (P:U -> Prop) (p q:U) (x:P p) (y:P q),
-    eq_dep p x q y -> exist P p x = exist P q y.
+    @eq_dep U (lift1 P) p (up x) q (up y) -> exist P p x = exist P q y.
 Proof.
-  destruct 1; reflexivity.
+  intros.
+  change x with (down (up x)).
+  change y with (down (up y)).
+  destruct H; reflexivity.
 Qed.
 
 Lemma eq_sig_iff_eq_dep :
   forall (U:Type) (P:U -> Prop) (p q:U) (x:P p) (y:P q),
-    exist P p x = exist P q y <-> eq_dep p x q y.
+    exist P p x = exist P q y <-> @eq_dep U (lift1 P) p (up x) q (up y).
 Proof.
   split; auto using eq_sig_eq_dep, eq_dep_eq_sig.
 Qed.
@@ -170,6 +173,7 @@ Qed.
 
 Set Implicit Arguments.
 
+(* Beurk
 Lemma eq_sigT_sig_eq : forall X P (x1 x2:X) H1 H2, existT P x1 H1 = existT P x2 H2 <->
                                                    {H:x1=x2 | rew H in H1 = H2}.
 Proof.
@@ -182,6 +186,7 @@ Proof.
   - destruct H as (->,<-).
     reflexivity.
 Defined.
+*)
 
 Lemma eq_sigT_fst :
   forall X P (x1 x2:X) H1 H2 (H:existT P x1 H1 = existT P x2 H2), x1 = x2.
@@ -213,10 +218,10 @@ Proof.
 Defined.
 
 Lemma eq_sig_snd :
-  forall X P (x1 x2:X) H1 H2 (H:exist P x1 H1 = exist P x2 H2), rew (eq_sig_fst H) in H1 = H2.
+  forall X P (x1 x2:X) H1 H2 (H:exist P x1 H1 = exist P x2 H2), rewP (eq_sig_fst H) in H1 = H2.
 Proof.
   intros.
-  unfold eq_sig_fst, eq_ind.
+  unfold eq_sig_fst.
   change x2 with (proj1_sig (exist P x2 H2)).
   change H2 with (proj2_sig (exist P x2 H2)) at 3.
   destruct H.
@@ -297,11 +302,12 @@ Section Equivalences.
   (** Injectivity of Dependent Equality *)
 
   Lemma eq_dep_eq_on__UIP_on (x y : U) (p1 : x = y) :
-    Eq_dep_eq_on (fun y => x = y) x eq_refl -> UIP_on_ x y p1.
+    Eq_dep_eq_on (fun y => x = y) x (up eq_refl) -> UIP_on_ x y p1.
   Proof.
     intro eq_dep_eq; red.
     elim p1 using eq_indd.
-    intros; apply eq_dep_eq.
+    intros. apply up_inj.
+    apply eq_dep_eq.
     elim p2 using eq_indd.
     apply eq_dep_intro.
   Qed.
@@ -326,7 +332,8 @@ Section Equivalences.
   Lemma UIP_refl_on__Streicher_K_on (x : U) (P : x = x -> Prop) :
     UIP_refl_on_ x -> Streicher_K_on_ x P.
   Proof.
-    intro UIP_refl; red; intros; rewrite UIP_refl; assumption.
+    intro UIP_refl; red; intros. red in UIP_refl.
+    rewrite (UIP_refl p); assumption.
   Qed.
   Lemma UIP_refl__Streicher_K : UIP_refl_ -> Streicher_K_.
   Proof (fun UIP_refl x P =>
@@ -365,8 +372,9 @@ End Equivalences.
     proof of inclusion of h-level n into h-level n+1; see hlevelntosn
     in https://github.com/vladimirias/Foundations.git). *)
 
+(* TODO
 Theorem UIP_shift_on (X : Type) (x : X) :
-  UIP_refl_on_ X x -> forall y : x = x, UIP_refl_on_ (x = x) y.
+  UIP_refl_on_ X x -> forall y : x = x, UIP_refl_on_ (x = x) (up y).
 Proof.
   intros UIP_refl y.
   rewrite (UIP_refl y).
@@ -387,6 +395,7 @@ Qed.
 Theorem UIP_shift : forall U, UIP_refl_ U -> forall x:U, UIP_refl_ (x = x).
 Proof (fun U UIP_refl x =>
          @UIP_shift_on U x (UIP_refl x)).
+*)
 
 Section Corollaries.
 
