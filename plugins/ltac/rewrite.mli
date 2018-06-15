@@ -59,7 +59,7 @@ type rewrite_result_info = {
   rew_to : constr;
   rew_prf : rewrite_proof;
   rew_evars : evars;
-  rew_decls : Context.Named.t
+  rew_decls : EConstr.named_context
 }
 
 type rewrite_result =
@@ -70,7 +70,7 @@ type rewrite_result =
 type strategy
 
 val strategy_of_ast : interp_sign ->
-                      (glob_constr_and_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast -> strategy
+                      (glob_constr_and_expr Tactypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast -> strategy
 
 val map_strategy : ('a -> 'b) -> ('c -> 'd) ->
   ('a, 'c) strategy_ast -> ('b, 'd) strategy_ast

@@ -87,8 +87,8 @@ ARGUMENT EXTEND debug_flag TYPED AS bool PRINTED BY pr_debug_flag
 END
 
 
-type raw_strategy = (constr_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
-type glob_strategy = (Tacexpr.glob_constr_and_expr Misctypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
+type raw_strategy = (constr_expr Tactypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
+type glob_strategy = (Tacexpr.glob_constr_and_expr Tactypes.with_bindings, Tacexpr.raw_red_expr) strategy_ast
 
 let interp_strategy ist gl s = 
   let sigma = project gl in

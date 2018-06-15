@@ -1,8 +1,9 @@
 Require Import RelationClasses Setoid. 
-
+Require Import List Program.Basics.
+Require ZArith.
 (** Patterns *)
 Module Patterns.
-Require Import ZArith.
+Import ZArith.
 
 Local Open Scope Z.
 Lemma addrC (x y : Z) : x + y = y + x.
@@ -55,7 +56,7 @@ Proof.
 Qed.
 
 
-Require Import List Program.Basics.
+Import List Program.Basics.
 Lemma map_comp {A B C} (f : A -> B) (g : B -> C) (l : list A) : map (compose g f) l = map g (map f l).
 Proof. Admitted.
 
@@ -84,7 +85,6 @@ Local Open Scope nat.
 
 Lemma addnA n m p : n + (m + p) = n + m + p.
 Admitted.
-Require Import Arith.
 
 Lemma example3 n m : n + 2 * m = m + (m + n).
 Proof.
@@ -246,6 +246,7 @@ Undo 2.
 Undo 2.
   Time rewrite_strat (topdown (choice lem2 (choice lem1 (choice lem0 lem3)))).
   reflexivity.
+  Show Proof.
 Qed.
 
 Goal forall x, h 10 x = f x.

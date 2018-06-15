@@ -56,19 +56,11 @@ let init_setoid () =
   if is_dirpath_prefix_of classes_dirpath (Lib.cwd ()) then ()
   else Coqlib.check_required_library ["Coq";"Setoids";"Setoid"]
 
+let find_reference dir s = Coqlib.coq_reference "generalized rewriting" dir s
+
 let lazy_find_reference dir s =
-  let gr = lazy (Coqlib.coq_reference "generalized rewriting" dir s) in
+  let gr = lazy (find_reference dir s) in
   fun () -> Lazy.force gr
-
-let try_find_global_reference dir s =
-  let sp = Libnames.make_path (make_dir ("Coq"::dir)) (Id.of_string s) in
-    try Nametab.global_of_path sp
-    with Not_found -> 
-      anomaly (str "Global reference " ++ str s ++ str " not found in generalized rewriting")
-
-let find_reference dir s =
-  let gr = lazy (try_find_global_reference dir s) in
-    fun () -> Lazy.force gr
 
 type evars = evar_map * Evar.Set.t (* goal evars, constraint evars *)
 
@@ -173,8 +165,8 @@ end) = struct
 
   let rewrite_relation_class = find_global relation_classes "RewriteRelation"
 
-  let proper_class = lazy (class_info (try_find_global_reference morphisms "Proper"))
-  let proper_proxy_class = lazy (class_info (try_find_global_reference morphisms "ProperProxy"))
+  let proper_class = lazy (class_info (find_reference morphisms "Proper"))
+  let proper_proxy_class = lazy (class_info (find_reference morphisms "ProperProxy"))
 
   let proper_proj = lazy (mkConst (Option.get (pi3 (List.hd (Lazy.force proper_class).cl_projs))))
 
@@ -674,7 +666,7 @@ type rewrite_result_info = {
   (** A proof of rew_from == rew_to *)
   rew_evars : evars;
   (** The updated map of evars *)
-  rew_decls : Context.Named.t
+  rew_decls : EConstr.named_context
   (** A new set of declarations (for [set]) *)
 }
 
@@ -718,28 +710,27 @@ let symmetry env sort rew =
   { rew with rew_from = rew.rew_to; rew_to = rew.rew_from; rew_prf; rew_evars; }
 
 let eq_abs_id = Id.of_string "__abs__"
-let is_eq_abs t =
-  match kind_of_term t with
+let is_eq_abs (evars, _) t =
+  match kind evars t with
   | Var id -> Id.equal eq_abs_id id
   | _ -> false
 
-	 
-let keyed_unify env evd kop = 
+let keyed_unify env sigma kop =
   match kop with 
   | None -> fun _ -> true
   | Some kop ->
      fun cl ->
-       let kc = Keys.constr_key cl in
+       let kc = Keys.constr_key (EConstr.kind sigma) cl in
        match kc with
        | None -> false
        | Some kc -> Keys.equiv_keys kop kc
 
 let unify flags env sigma l r =
-  let kop = Keys.constr_key l in
+  let kop = Keys.constr_key (EConstr.kind sigma) l in
   if Unification.is_keyed_unification () then
     if keyed_unify env sigma kop r then
-      let f1, l1 = decompose_app_vect l in
-      let f2, l2 = decompose_app_vect r in
+      let f1, l1 = decompose_app_vect sigma l in
+      let f2, l2 = decompose_app_vect sigma r in
       let f1, l1, f2, l2 = adjust_app_array_size f1 l1 f2 l2 in
       let sigma = Unification.w_unify ~flags env sigma CONV f1 f2 in
       Array.fold_left2 (fun sigma -> Unification.w_unify ~flags env sigma CONV) sigma l1 l2
@@ -768,8 +759,8 @@ let unify_eqn (car, rel, prf, c1, c2, holes, sort) l2r flags env (sigma, cstrs) 
     let () = if not (convertible env evd ty2 ty1) then raise Reduction.NotConvertible in
     let rew_evars = evd, cstrs in
     let rew_prf =
-      let hd, args = decompose_app rel in
-      if is_global (Lazy.force Coqlib.coq_eq_ref) hd then
+      let hd, args = decompose_app sigma rel in
+      if is_global sigma (Lazy.force Coqlib.coq_eq_ref) hd then
         RewEq (mkVar eq_abs_id, rew_car, c1, c2, prf, hd, List.hd args)
       else RewPrf (rel, prf) in
     let rew = { rew_evars; rew_prf; rew_car; rew_from = c1; rew_to = c2; rew_decls = []} in
@@ -822,7 +813,7 @@ let get_rew_prf evars r = match r.rew_prf with
     evars, (rel, mkCast (mkApp (eq_refl, [| r.rew_car; r.rew_from |]),
 		         c, mkApp (rel, [| r.rew_from; r.rew_to |])))
   | RewEq (p, pty, t1, t2, c, rel, car) ->
-     if is_eq_abs p then evars, (mkApp (rel, [| car |]), c)
+     if is_eq_abs evars p then evars, (mkApp (rel, [| car |]), c)
      else
        let pred = mkNamedLambda eq_abs_id car (lift 1 p) in
        let evars, eq_congr = make_eq_congr evars in
@@ -909,11 +900,13 @@ let resolve_morphism env avoid oldt m ?(fnewt=fun x -> x) args args' (b,cstr) ev
 	[ a, Some r ] -> evars, proof, substl subst a, substl subst r, oldt, fnewt newt
       | _ -> assert(false)
 
+
 let coerce env avoid cstr res =
   match snd cstr with
   | None -> res
   | Some r ->
-     let rel, prf = get_rew_prf res in
+     let evars, (rel, prf) = get_rew_prf res.rew_evars res in
+     let res = { res with rew_evars = evars } in
      resolve_subrelation env avoid res.rew_car rel (fst cstr) prf r res
 
 let apply_rule unify loccs : int pure_strategy =
@@ -938,7 +931,7 @@ let apply_rule unify loccs : int pure_strategy =
               (occ, res)
     }
 
-let set_rule unify n loccs : int pure_strategy =
+let _set_rule unify n loccs : int pure_strategy =
   let (nowhere_except_in,occs) = convert_occs loccs in
   let is_occ occ =
     if nowhere_except_in
@@ -948,7 +941,7 @@ let set_rule unify n loccs : int pure_strategy =
   { strategy = fun { state = occ; env ; unfresh ;
 		     term1 = t ; ty1 = ty ; cstr ; evars } ->
       let unif =
-	if isEvar t then None else unify env evars t in
+        if isEvar (fst evars) t then None else unify env evars t in
 	match unif with
 	| None -> (occ, Fail)
         | Some rew ->
@@ -980,7 +973,8 @@ let make_leibniz_proof env c ty r =
 	in RewPrf (rel, prf)
     | RewCast k -> r.rew_prf
     | RewEq _ ->
-       let rel, prf = get_rew_prf r in
+       let sigma, (rel, prf) = get_rew_prf !evars r in
+       evars := sigma;
        RewPrf (rel, prf)
   in
     { rew_car = ty; rew_evars = !evars;
@@ -1041,9 +1035,6 @@ let unfold_match env sigma sk app =
 	Reductionops.whd_beta sigma (mkApp (v, args))
   | _ -> app
 
-let is_rew_prf = function RewPrf _ -> true | _ -> false
-let is_rew_eq = function RewEq _ -> true | _ -> false
-
 let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
   let rec aux { state ; env ; unfresh ;
 		term1 = t ; ty1 = ty ; cstr = (prop, cstr) ; evars } =
@@ -1080,23 +1071,23 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 	      | Some false -> Identity
 	      | Some true ->
 		 let args' = Array.of_list (List.rev args') in
-		 let rewrite_prf =
+                 let evars', rewrite_prf =
 		   Array.fold_left
-		   (fun acc r ->
+                   (fun (evars, acc) r ->
 		    match acc with
-		    | Some (RewPrf _) -> acc
-		    | None | Some (RewCast _) -> (match r with None -> acc | Some r -> Some r.rew_prf)
+                    | Some (RewPrf _) -> evars, acc
+                    | None | Some (RewCast _) -> (match r with None -> evars, acc | Some r -> evars, Some r.rew_prf)
 		    | Some (RewEq (_, _, _, _, c, _, _)) ->
 		       (match r with
-			| None -> acc
+                        | None -> evars, acc
 			| Some res ->
 			   (match res.rew_prf with
-			    | RewPrf _ as x -> Some x
-			    | RewCast _ -> acc
+                            | RewPrf _ as x -> evars, Some x
+                            | RewCast _ -> evars, acc
 			    | RewEq (_, _, _, _, c', _, _) ->
-			       if eq_constr c c' then acc
-			       else let c, rel = get_rew_prf res in Some (RewPrf (c, rel)))))
-		   None args'
+                               if eq_constr (fst evars) c c' then evars, acc
+                               else let evars, (c, rel) = get_rew_prf evars res in evars, Some (RewPrf (c, rel)))))
+                   (evars', None) args'
 		 in
 		 (match rewrite_prf with
 		  | None -> Identity
@@ -1259,11 +1250,11 @@ let subterm all flags (s : 'a pure_strategy) : 'a pure_strategy =
 	     let r = match r.rew_prf with
 	     | RewPrf _
 	     | RewEq _ ->
-		let (rel, prf) = get_rew_prf r in
+                let evars, (rel, prf) = get_rew_prf r.rew_evars r in
 		let point = if prop then PropGlobal.pointwise_or_dep_relation else
 		    TypeGlobal.pointwise_or_dep_relation
 		in
-		let evars, rel = point env r.rew_evars n' t r.rew_car rel in
+                let evars, rel = point env evars n' t r.rew_car rel in
 		let prf = mkLambda (n', t, prf) in
 		  { r with rew_prf = RewPrf (rel, prf); rew_evars = evars }
 	      | x -> r
@@ -1361,13 +1352,14 @@ let transitivity state env unfresh prop (res : rewrite_result_info) (next : 'a p
 	| _ ->
 	   match res.rew_prf, res'.rew_prf with
 	   | RewEq (p, pty, t1, t2, c, rel, car),
-	     RewEq (p', pty', t1', t2', c', rel', car') when eq_constr c c' ->
+             RewEq (p', pty', t1', t2', c', rel', car') when eq_constr (fst res'.rew_evars) c c' ->
 	      let prf' = RewEq (p, pty, t1, t2, c, rel, car) in
-	      let res' = { res with rew_to = res'.rew_to; rew_prf = prf' } in
+              let res' = { res with rew_evars = res'.rew_evars;
+                                    rew_to = res'.rew_to; rew_prf = prf' } in
 	      Success res'
 	   | _ ->
-	      let rew_rel, rew_prf = get_rew_prf res in
-	      let (res'_rel, res'_prf) = get_rew_prf res' in
+              let evars, (rew_rel, rew_prf) = get_rew_prf res'.rew_evars res in
+              let evars, (res'_rel, res'_prf) = get_rew_prf evars res' in
 	      let trans =
 		if prop then PropGlobal.transitive_type
 		else TypeGlobal.transitive_type
@@ -1541,10 +1533,9 @@ module Strategies =
     let pattern_of_constr_pattern pat hd : 'a pure_strategy =
       { strategy =
 	fun { state; env; term1 = t; ty1 = ty; evars } ->
-        let sigma = fst evars in
-        let () = Printf.printf "pattern matching: %s and %s\n"
-	    		     (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat))
-	    		     (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) in
+        (* let () = Printf.printf "pattern matching: %s and %s\n"
+         *     		     (Pp.string_of_ppcmds (Printer.pr_constr_pattern_env env sigma pat))
+         *     		     (Pp.string_of_ppcmds (Printer.pr_constr_env env sigma t)) in *)
 	try let _map = Constr_matching.matches env (fst evars) pat t in
 	    state, Identity
 	with Constr_matching.PatternMatchingFailure ->
@@ -1552,23 +1543,23 @@ module Strategies =
             match hd with
             | None -> state, Fail
             | Some gr ->
-               let cspat, _, _ = Recordops.cs_pattern_of_constr t in
+               let cspat, _, _ = Recordops.cs_pattern_of_constr env (EConstr.Unsafe.to_constr t) in
                let _ = Recordops.lookup_canonical_conversion (gr, cspat) in
                state, Identity
           with Not_found -> state, Fail }
 
     let pattern_of_constr env sigma c : 'a pure_strategy =
-      let pat = Patternops.pattern_of_constr env sigma c in
+      let pat = Patternops.pattern_of_constr env sigma (EConstr.Unsafe.to_constr c) in
       let globhead =
         try
-          let gr = global_of_constr (fst (destApp c)) in
+          let gr, _u = global_of_constr sigma (fst (destApp sigma c)) in
           let _ = Recordops.find_projection gr in
           Some gr
         with Not_found -> None
       in pattern_of_constr_pattern pat globhead
 
     let pattern p : 'a pure_strategy =
-      let sigma, env = Lemmas.get_current_context () in
+      let sigma, env = Pfedit.get_current_context () in
       let sigma, c = Pretyping.understand_tcc env sigma p in
       pattern_of_constr env sigma c
 end
@@ -1985,7 +1976,7 @@ let rec pr_strategy prc prr = function
 | StratEval r -> str "eval" ++ spc () ++ prr r
 | StratFold c -> str "fold" ++ spc () ++ prc c
 | StratPattern p -> str "pattern" ++ spc () ++ prc p
-| StratSet (id, c) -> str "set" ++ spc () ++ pr_id id ++ prc c
+| StratSet (id, c) -> str "set" ++ spc () ++ Names.Id.print id ++ prc c
 
 let rec strategy_of_ast is = function
   | StratId -> Strategies.id
@@ -2377,7 +2368,7 @@ let general_s_rewrite cl l2r occs (c,l) ~new_goals =
     | e -> Proofview.tclZERO ~info e)
   end
 
-let general_s_rewrite_clause x =
+let _general_s_rewrite_clause x =
   match x with
     | None -> general_s_rewrite None
     | Some id -> general_s_rewrite (Some id)
