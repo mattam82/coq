@@ -127,7 +127,7 @@ Section Defs.
       fun x y H => symmetry (R:=R) H.
     
     Program Definition flip_Asymmetric `(Asymmetric R) : Asymmetric (flip R) :=
-      fun x y H H' => asymmetry (R:=R) H H'.
+      fun x y H => up (fun H' => down (asymmetry (R:=R) H) H').
     
     Program Definition flip_Transitive `(Transitive R) : Transitive (flip R) :=
       fun x y z H H' => transitivity (R:=R) H' H.
