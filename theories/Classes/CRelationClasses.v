@@ -180,9 +180,9 @@ Section Defs.
 
   (** Leibniz equality. *)
   Section Leibniz.
-    Global Instance eq_Reflexive : Reflexive (@eq A) := @eq_refl A.
-    Global Instance eq_Symmetric : Symmetric (@eq A) := @eq_sym A.
-    Global Instance eq_Transitive : Transitive (@eq A) := @eq_trans A.
+    Global Instance eq_Reflexive : Reflexive (@eq A) := fun x => up (@eq_refl A x).
+    Global Instance eq_Symmetric : Symmetric (@eq A) := fun x y p => up (@eq_sym A x y (down p)).
+    Global Instance eq_Transitive : Transitive (@eq A) := fun x y z p q => up (@eq_trans A x y z (down p) (down q)).
     
     (** Leibinz equality [eq] is an equivalence crelation.
         The instance has low priority as it is always applicable
@@ -266,9 +266,9 @@ Program Instance impl_Transitive : Transitive impl.
 
 (** Logical equivalence. *)
 
-Instance iff_Reflexive : Reflexive iff := iff_refl.
-Instance iff_Symmetric : Symmetric iff := iff_sym.
-Instance iff_Transitive : Transitive iff := iff_trans.
+Instance iff_Reflexive : Reflexive iff := fun x => up (iff_refl x).
+Instance iff_Symmetric : Symmetric iff := fun x y p => up (@iff_sym x y (down p)).
+Instance iff_Transitive : Transitive iff := fun x y z p q => up (@iff_trans x y z (down p) (down q)).
 
 (** Logical equivalence [iff] is an equivalence crelation. *)
 

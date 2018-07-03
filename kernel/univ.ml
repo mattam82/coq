@@ -877,7 +877,7 @@ struct
     else Array.append x y
 
   let of_array a =
-    (*assert(Array.for_all (fun x -> not (Level.is_prop x)) a);*)
+    assert(Array.for_all (fun x -> not (Level.is_prop x)) a);
     a
 
   let to_array a = a

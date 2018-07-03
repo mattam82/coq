@@ -216,7 +216,8 @@ let process_universe_constraints ctx cstrs =
               | _ -> local
             else if Univ.is_type0m_univ l && not !Flags.prop_cumul then
               begin match Univ.Universe.level r with
-              | Some r' when is_local r' -> instantiate_variable r' l vars; local
+              | Some r' when is_local r' && Univ.LSet.mem r' ctx.uctx_univ_algebraic ->
+                 instantiate_variable r' l vars; local
               | _ ->
                  raise (Univ.UniverseInconsistency (Univ.Le, l, r, None))
               end
