@@ -490,7 +490,8 @@ let build_combined_scheme env schemes =
       (List.rev_map (fun (x, y) -> LocalAssum (x, y)) ctx) in
   let typ = List.fold_left (fun d c -> Term.mkProd_wo_LetIn c d) concl_typ ctx in
   let body = it_mkLambda_or_LetIn concl_bod ctx in
-  (!evdref, body, typ)
+  let evd, _ = Typing.type_of env !evdref (EConstr.of_constr body) in
+  (evd, body, typ)
 
 let do_combined_scheme name schemes =
   let open CAst in

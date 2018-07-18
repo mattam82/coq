@@ -340,8 +340,8 @@ let coq_I      = lazy_init_reference ["Logic"] "I"
 
 (* Connectives *)
 let coq_not = lazy_init_reference ["Logic"] "not"
-let coq_and = lazy_init_reference ["Logic"] "and"
-let coq_conj = lazy_init_reference ["Logic"] "conj"
+let coq_and = lazy_init_reference ["Logic"] "prod"
+let coq_conj = lazy_init_reference ["Logic"] "pair"
 let coq_or = lazy_init_reference ["Logic"] "or"
 let coq_ex = lazy_init_reference ["Logic"] "ex"
 let coq_iff = lazy_init_reference ["Logic"] "iff"
