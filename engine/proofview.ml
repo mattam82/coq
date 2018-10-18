@@ -738,12 +738,15 @@ let guard_no_unifiable =
       tclUNIT (Some l)
 
 (** [unshelve l p] adds all the goals in [l] at the end of the focused
-    goals of p *)
+    goals of p, removing them from the shelf. *)
 let unshelve l p =
   let l = List.map with_empty_state l in
   (* advance the goals in case of clear *)
   let l = undefined p.solution l in
-  { p with comb = p.comb@l }
+  (* Remove the unshelved goals from the shelf *)
+  let unshelved g = List.exists (fun g' -> Evar.equal g (drop_state g')) l in
+  let shelf = List.filter (fun g -> not (unshelved g)) p.shelf in
+  { p with comb = p.comb@l; shelf }
 
 let mark_in_evm ~goal evd content =
   let info = Evd.find evd content in

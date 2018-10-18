@@ -334,7 +334,7 @@ val shelve_unifiable_informative : Evar.t list tactic
 val guard_no_unifiable : Names.Name.t list option tactic
 
 (** [unshelve l p] adds all the goals in [l] at the end of the focused
-    goals of p *)
+    goals of p, removing them from the shelf. *)
 val unshelve : Evar.t list -> proofview -> proofview
 
 (** [depends_on g1 g2 sigma] checks if g1 occurs in the type/ctx of g2 *)
