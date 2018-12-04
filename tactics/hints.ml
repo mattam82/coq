@@ -506,7 +506,8 @@ val map_existential : evar_map -> secvars:Id.Pred.t ->
 val map_eauto : evar_map -> secvars:Id.Pred.t ->
                 (GlobRef.t * constr array) -> constr -> t -> full_hint list
 val map_auto : evar_map -> secvars:Id.Pred.t ->
-               (GlobRef.t * constr array) -> constr -> t -> full_hint list
+  (GlobRef.t * constr array) -> constr -> t -> full_hint list
+val solvable : evar_map -> (GlobRef.t * constr array) -> t -> bool
 val add_one : env -> evar_map -> hint_entry -> t -> t
 val add_list : env -> evar_map -> hint_entry list -> t -> t
 val remove_one : GlobRef.t -> t -> t
@@ -613,6 +614,10 @@ struct
       if matches_modes sigma args se.sentry_mode then
         merge_entry secvars db se.sentry_nopat se.sentry_pat
       else merge_entry secvars db [] []
+
+  let solvable sigma (k, args) db =
+    let se = find k db in
+    matches_modes sigma args se.sentry_mode
 
   (* [c] contains an existential *)
   let map_eauto sigma ~secvars (k,args) concl db =

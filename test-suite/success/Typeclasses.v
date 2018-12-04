@@ -257,3 +257,21 @@ Module AxiomsAreInstances.
   Definition testdef2 : TestClass2 := _.
 
 End AxiomsAreInstances.
+
+Class A X := { opA: X -> X }.
+Hint Mode A ! : typeclass_instances.
+
+Class B X {aX: A X} Y := { opB: X -> Y -> Y }.
+Hint Mode B - - ! : typeclass_instances.
+
+Section Section.
+
+Context X {aX: A X} Y {bY: B X Y}.
+
+Set Typeclasses Debug.
+
+Let ok := fun x (y: Y) => @opB _ _ _ bY (opA x) y.
+
+Let ko := fun x (y: Y) => opB (opA x) y.
+
+End Section.

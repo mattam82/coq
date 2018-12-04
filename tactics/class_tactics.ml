@@ -843,18 +843,25 @@ module Search = struct
     let info = make_autogoal ?st only_classes dep (cut_of_hints hints) i gl in
     search_tac hints depth 1 info
 
+  let resolvable sigma concl hints =
+    let f, args = Termops.decompose_app_vect sigma concl in
+    Hint_db.solvable sigma (global_of_constr (EConstr.Unsafe.to_constr f), args) hints
+
   let search_tac ?(st=TransparentState.full) only_classes dep hints depth =
     let open Proofview in
     let tac sigma gls i =
       Goal.enter
         begin fun gl ->
-          search_tac_gl ~st only_classes dep hints depth (succ i) sigma gls gl end
+          if only_classes && not (resolvable (Goal.sigma gl) (Goal.concl gl) (List.hd hints)) then
+            Proofview.shelve
+          else
+            search_tac_gl ~st only_classes dep hints depth (succ i) sigma gls gl end
     in
-      Proofview.Unsafe.tclGETGOALS >>= fun gls ->
-      let gls = CList.map Proofview.drop_state gls in
-      Proofview.tclEVARMAP >>= fun sigma ->
-      let j = List.length gls in
-      (tclDISPATCH (List.init j (fun i -> tac sigma gls i)))
+    Proofview.Unsafe.tclGETGOALS >>= fun gls ->
+    let gls = CList.map Proofview.drop_state gls in
+    Proofview.tclEVARMAP >>= fun sigma ->
+    let j = List.length gls in
+    (tclDISPATCH (List.init j (fun i -> tac sigma gls i)))
 
   let fix_iterative t =
     let rec aux depth =

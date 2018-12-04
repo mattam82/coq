@@ -142,6 +142,8 @@ module Hint_db :
 	arguments and using the discrimination net. *)
     val map_eauto : evar_map -> secvars:Id.Pred.t -> (GlobRef.t * constr array) -> constr -> t -> full_hint list
 
+    val solvable : evar_map -> (GlobRef.t * constr array) -> t -> bool
+
     (** All hints associated to the reference, respecting modes if evars appear in the 
 	arguments. *)
     val map_auto : evar_map -> secvars:Id.Pred.t ->
