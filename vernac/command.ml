@@ -783,7 +783,7 @@ let rec fold_left3 f x y z acc =
   | _ -> raise (Invalid_argument "fold_left3")
            
 let make_name f id = f (Safe_typing.current_modpath (Global.safe_env ())) 
-                       (Global.current_dirpath ()) (Label.of_id id)
+    DirPath.empty (Label.of_id id)
     
 let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   check_all_names_different indl;
@@ -882,9 +882,6 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   List.iter (fun (_,ctyps,_) ->
     List.iter (fun c -> check_evars env_ar_fix_params Evd.empty evd (EConstr.of_constr c)) ctyps)
     constructors;
-  let indnames = List.map (fun ind -> ind.ind_name) indl in
-  let indname = List.hd indnames in
-  let _kn = make_name make_mind indname in
 
   let fixdecls = 
     List.fold_right2

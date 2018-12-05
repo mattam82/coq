@@ -548,14 +548,16 @@ let add_mind dir l mie fixl senv =
   let mib =
     match mib.mind_hyps with [] -> Declareops.hcons_mind mib | _ -> mib
   in
-     kn, add_field (l,SFBmind mib) (I kn) 
-                   (List.fold_left
-                      (fun senv (kn, fixl) ->
-                        add_field (Constant.label kn, SFBconst fixl)
-                                  (C kn)
-                                  senv)
-                      senv cbs)
-
+  let senv = add_field (l,SFBmind mib) (I kn) senv in
+  let senv =
+    List.fold_left
+      (fun senv (kn, fixl) ->
+         add_field (Constant.label kn, SFBconst fixl)
+           (C kn)
+           senv)
+      senv cbs
+  in
+  kn, senv
 
 (** Insertion of module types *)
 

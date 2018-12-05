@@ -354,14 +354,15 @@ let dummy_one_inductive_entry mie = {
 }
 
 (* Hack to reduce the size of .vo: we keep only what load/open needs *)
-let dummy_inductive_entry (_,m,_) = ([],{
+let dummy_inductive_entry (_,m,l) = ([],{
   mind_entry_params = [];
   mind_entry_record = None;
   mind_entry_finite = Decl_kinds.BiFinite;
   mind_entry_inds = List.map dummy_one_inductive_entry m.mind_entry_inds;
   mind_entry_polymorphic = false;
   mind_entry_universes = Univ.UContext.empty;
-  mind_entry_private = None },[])
+  mind_entry_private = None },
+  List.map (fun (c, _) -> (c, ParameterEntry (None,false,(mkProp,Univ.UContext.empty),None))) l)
 
 type inductive_obj = Dischargedhypsmap.discharged_hyps * mutual_inductive_entry *
   (Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list

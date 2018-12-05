@@ -105,6 +105,8 @@ End WithRel.
 Scheme con_elim := Induction for Con Sort Type
 with ty_elim := Induction for Ty Sort Type.
 
+End TyElim.
+
 Require Import ZArith.
 
 Module FirstCircle.
@@ -399,7 +401,7 @@ with F0 (a : A) (b : B a) {struct b} : P0 a _ b :=
   end
     for F0.
 
-Module TyElim.
+Module TyElim2.
   
 Inductive Con : Set :=
 | empty : Con
@@ -453,7 +455,7 @@ with Ty : Con -> Set :=
             for F0.
   End elim.
 
-End TyElim.
+End TyElim2.
   
 Module DTT.
 
@@ -498,7 +500,8 @@ with ConMap_elim := Induction for ConMap Sort Type
 with Term_elim := Induction for Term Sort Type
 with TyEq_elim := Induction for TyEq Sort Type
 with TermEq_elim := Induction for TermEq Sort Type.
-                                            
+
+End DTT.
 
 (* Fixpoint El Γ (T : Ty Γ) (val : forall n, Γ -> Type) : Set := *)
 (*   match T with *)

@@ -1,9 +1,10 @@
+Set Printing All.
 Module Impls.
   Set Implicit Arguments.
 
 Inductive bete :  Type :=
 | Cbete  : forall mtt (e : mtt = tt), rec e  -> bete  
-                                            fix rec (mtt :unit) (e: mtt = tt ) :Type  := unit.
+fix rec (mtt :unit) (e: mtt = tt ) :Type  := unit.
 
 End Impls.
 
@@ -66,6 +67,8 @@ End SetUniv.
 
 
 Module typeUniv.
+
+  Definition foo := 0.
 Inductive U : Type :=
 | cunit : U
 | cset : Set -> U
@@ -99,6 +102,8 @@ Definition uinhabprod : U :=
   csigma cunit (fun x => cunit).
 
 End typeUniv.
+
+About Top.typeUniv.U.
 
 Module MLUniv.
 Inductive U : Type :=
