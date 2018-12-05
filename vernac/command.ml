@@ -920,7 +920,7 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
   in
   let fixl =
     if List.is_empty fixl then [], [] else
-      let state = Summary.freeze_summaries ~marshallable:`No in
+      let state = States.freeze ~marshallable:`No in
       let ((env,rec_sign,evd), (fixnames,fixdefs,fixtypes'), fixmeta) = 
         let (_,kn), _ = Declare.declare_mind (mentry,fixdecls) in
         let mind = Global.mind_of_delta_kn kn in
@@ -960,7 +960,7 @@ let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
       let ctx = Universes.restrict_universe_context ctx vars in
       (*let fixdecls = List.map Term_typing.mk_pure_proof fixdecls in *)
       let ctx = Univ.ContextSet.to_context ctx in
-        Summary.unfreeze_summaries state;
+        States.unfreeze state;
         (* Declare the recursive definitions *)
         fixpoint_message (Some indexes) fixnames;
         let fixl =
