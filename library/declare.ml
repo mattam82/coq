@@ -205,12 +205,12 @@ let (inConstant, outConstant : (constant_obj -> obj) * (obj -> constant_obj)) =
 let declare_scheme = ref (fun _ _ -> assert false)
 let set_declare_scheme f = declare_scheme := f
 
+let update_tables c =
+  declare_constant_implicits c;
+  Heads.declare_head (EvalConstRef c);
+  Notation.declare_ref_arguments_scope (ConstRef c)
+
 let declare_constant_common id cst =
-  let update_tables c =
-(*  Printf.eprintf "tables: %s\n%!" (Names.Constant.to_string c); *)
-    declare_constant_implicits c;
-    Heads.declare_head (EvalConstRef c);
-    Notation.declare_ref_arguments_scope (ConstRef c) in
   let o = inConstant cst in
   let _, kn as oname = add_leaf id o in
   List.iter (fun (c,ce,role) ->
@@ -401,6 +401,7 @@ let declare_mind (mie, fixl) =
   declare_mib_implicits mind;
   declare_inductive_argument_scopes mind mie;
   if_xml (Hook.get f_xml_declare_inductive) (isrecord,oname);
+  List.iter (fun (c, _) -> update_tables c) fixl;
   oname, isprim
 
 (* Declaration messages *)

@@ -782,10 +782,21 @@ let rec fold_left3 f x y z acc =
   | x::xs, y::ys, z::zs -> fold_left3 f xs ys zs (f x y z acc)
   | _ -> raise (Invalid_argument "fold_left3")
            
-let make_name f id = f (Safe_typing.current_modpath (Global.safe_env ())) 
-    DirPath.empty (Label.of_id id)
+let make_name f id =
+  let () = Global.join_safe_environment () in
+  let mp = Safe_typing.current_modpath (Global.safe_env ()) in
+  let dp = Global.current_dirpath () in
+  Printf.printf "%s\n%!"
+    (Pp.string_of_ppcmds (str"Forging name with modpath " ++ str (ModPath.debug_to_string mp) ++
+                          str " and dirpath " ++ str (string_of_dirpath dp) ++ str " and label " ++
+                          str (Id.to_string id) ++ str " env is initial ?" ++
+                          (if Global.env_is_initial () then str"true" else str"false") ++
+                          str "Library mp: " ++ str (ModPath.debug_to_string (Lib.current_mp ())) ++
+                          str "Library dp: " ++ str (string_of_dirpath (Lib.library_dp ()))));
+  f mp DirPath.empty (Label.of_id id)
     
 let interp_mutual_inductive (paramsl,indl) fixl notations poly prv finite =
+  Printf.printf "interp_mutual_inductive\n%!";
   check_all_names_different indl;
   List.iter check_param paramsl;
   let env0 = Global.env() in
