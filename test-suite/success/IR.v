@@ -1,11 +1,33 @@
+Set Printing All.
 Module Impls.
   Set Implicit Arguments.
 
 Inductive bete :  Type :=
 | Cbete  : forall mtt (e : mtt = tt), rec e  -> bete  
-                                            fix rec (mtt :unit) (e: mtt = tt ) :Type  := unit.
+
+fix rec (mtt :unit) (e: mtt = tt ) :Type  := unit.
 
 End Impls.
+Module SetUniv.
+
+Inductive U : Set :=
+| cunit : U
+| cnat : U
+| ceq u : El u -> El u -> U
+| cprod (u : U) (f : El u -> U) : U
+| csigma (u : U) : (El u -> U) -> U
+
+fix El (u : U) : Set :=
+  match u with
+  | cunit => unit
+  | cnat => nat
+  | ceq U u v => u = v
+  | cprod u f => forall x : El u, El (f x)
+  | csigma u f => { u' : El u & El (f u') }
+  end.
+End SetUniv.
+
+Check SetUniv.El.
 
 (* Inductive Pack A (R : A -> Type) := pack { *)
 (*   TX : A; *)
@@ -45,27 +67,11 @@ End Impls.
 (* | TelS p 0 T A => fun _ => Pack (@eval p (π T)) (fun x => A x) *)
 (* | TelS p n T A => fun H => _ *)
 (* end eq_refl. *)
-Module SetUniv.
-
-Inductive U : Set :=
-| cunit : U
-| cnat : U
-| ceq u : El u -> El u -> U
-| cprod (u : U) (f : El u -> U) : U
-| csigma (u : U) : (El u -> U) -> U
-
-fix El (u : U) : Set :=
-  match u with
-  | cunit => unit
-  | cnat => nat
-  | ceq U u v => u = v
-  | cprod u f => forall x : El u, El (f x)
-  | csigma u f => { u' : El u & El (f u') }
-  end.
-End SetUniv.
 
 
 Module typeUniv.
+
+  Definition foo := 0.
 Inductive U : Type :=
 | cunit : U
 | cset : Set -> U
@@ -93,12 +99,13 @@ Fixpoint fstU {u : U} : El u -> unit :=
 
 Definition uinhab : U :=
   cprod (cset nat) (fun x => ceq _ x x).
-Eval compute in El uinhab.
 
 Definition uinhabprod : U :=
   csigma cunit (fun x => cunit).
 
 End typeUniv.
+
+About Top.typeUniv.U.
 
 Module MLUniv.
 Inductive U : Type :=
@@ -121,11 +128,12 @@ fix El (u : U) : Type :=
 
 Definition uinhab : U :=
   cprod (cset nat) (fun x => ceq _ x x).
-Eval compute in El uinhab.
+(* Eval compute in El uinhab. *)
 
 Definition polyu : U :=
   cprod (ctype Set) (fun x => ceq _ x x).
-Eval compute in El polyu.
+(* Eval compute in El polyu. *)
+End MLUniv.
 
 Inductive funnylist : Set :=
 | nil
@@ -184,9 +192,6 @@ Section blaind.
     apply foo0.
   Admitted.
     
-
-Definition uinhabprod : U :=
-  csigma cunit (fun x => cunit).
 
 End blaind.
 (** Ill formed, not positive *)

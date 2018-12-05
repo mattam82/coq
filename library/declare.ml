@@ -98,7 +98,7 @@ let declare_variable id obj =
 (** Declaration of constants and parameters *)
 
 type constant_obj = {
-  cst_decl : global_declaration;
+  cst_decl : global_declaration option;
   cst_hyps : Dischargedhypsmap.discharged_hyps;
   cst_kind : logical_kind;
   cst_locl : bool;
@@ -113,7 +113,7 @@ type constant_declaration = Safe_typing.private_constants constant_entry * logic
 (* At load-time, the segment starting from the module name to the discharge *)
 (* section (if Remark or Fact) is needed to access a construction *)
 let load_constant i ((sp,kn), obj) =
-  if Nametab.exists_cci sp then
+  if not (Option.is_empty obj.cst_decl) && Nametab.exists_cci sp then
     alreadydeclared (pr_id (basename sp) ++ str " already exists");
   let con = Global.constant_of_delta_kn kn in
   Nametab.push (Nametab.Until i) sp (ConstRef con);
@@ -151,10 +151,13 @@ let cache_constant ((sp,kn), obj) =
       then constant_of_kn kn
       else CErrors.anomaly Pp.(str"Ex seff not found: " ++ Id.print(basename sp))
     end else
-      let () = check_exists sp in
-      let kn', exported = Global.add_constant dir id obj.cst_decl in
-      obj.cst_exported <- exported;
-      kn' in
+      match obj.cst_decl with
+      | Some d ->
+        let () = check_exists sp in
+        let kn', exported = Global.add_constant dir id d in
+        obj.cst_exported <- exported; kn'
+      | None -> constant_of_kn kn
+  in
   assert (eq_constant kn' (constant_of_kn kn));
   Nametab.push (Nametab.Until 1) sp (ConstRef (constant_of_kn kn));
   let cst = Global.lookup_constant kn' in
@@ -175,7 +178,7 @@ let discharge_constant ((sp, kn), obj) =
   let new_hyps = (discharged_hyps kn hyps) @ obj.cst_hyps in
   let abstract = (named_of_variable_context hyps, subst, uctx) in
   let new_decl = GlobalRecipe{ from; info = { Opaqueproof.modlist; abstract}} in
-  Some { obj with cst_hyps = new_hyps; cst_decl = new_decl; }
+  Some { obj with cst_hyps = new_hyps; cst_decl = Some new_decl; }
 
 (* Hack to reduce the size of .vo: we keep only what load/open needs *)
 let dummy_constant_entry = 
@@ -183,7 +186,7 @@ let dummy_constant_entry =
     (false, ParameterEntry (None,false,(mkProp,Univ.UContext.empty),None))
 
 let dummy_constant cst = {
-  cst_decl = dummy_constant_entry;
+  cst_decl = None;
   cst_hyps = [];
   cst_kind = cst.cst_kind;
   cst_locl = cst.cst_locl;
@@ -205,18 +208,18 @@ let (inConstant, outConstant : (constant_obj -> obj) * (obj -> constant_obj)) =
 let declare_scheme = ref (fun _ _ -> assert false)
 let set_declare_scheme f = declare_scheme := f
 
-let declare_constant_common id cst =
-  let update_tables c =
-(*  Printf.eprintf "tables: %s\n%!" (Names.Constant.to_string c); *)
-    declare_constant_implicits c;
-    Heads.declare_head (EvalConstRef c);
-    Notation.declare_ref_arguments_scope (ConstRef c) in
+let update_tables c =
+  declare_constant_implicits c;
+  Heads.declare_head (EvalConstRef c);
+  Notation.declare_ref_arguments_scope (ConstRef c)
+
+let declare_constant_common fake id cst =
   let o = inConstant cst in
   let _, kn as oname = add_leaf id o in
   List.iter (fun (c,ce,role) ->
       (* handling of private_constants just exported *)
       let o = inConstant {
-        cst_decl = ConstantEntry (false, ce);
+        cst_decl = Some (ConstantEntry (false, ce));
         cst_hyps = [] ;
         cst_kind = IsProof Theorem;
         cst_locl = false;
@@ -246,7 +249,7 @@ let definition_entry ?fix_exn ?(opaque=false) ?(inline=false) ?types
     const_entry_feedback = None;
     const_entry_inline_code = inline}
 
-let declare_constant ?(internal = UserIndividualRequest) ?(local = false) id ?(export_seff=false) (cd, kind) =
+let declare_constant ?(fake=false) ?(internal = UserIndividualRequest) ?(local = false) id ?(export_seff=false) (cd, kind) =
   let export = (* We deal with side effects *)
     match cd with
     | DefinitionEntry de when
@@ -259,14 +262,14 @@ let declare_constant ?(internal = UserIndividualRequest) ?(local = false) id ?(e
     | _ -> false
   in
   let cst = {
-    cst_decl = ConstantEntry (export,cd);
+    cst_decl = if fake then None else Some (ConstantEntry (export,cd));
     cst_hyps = [] ;
     cst_kind = kind;
     cst_locl = local;
     cst_exported = [];
     cst_was_seff = false;
   } in
-  let kn = declare_constant_common id cst in
+  let kn = declare_constant_common fake id cst in
   let () = if_xml (Hook.get f_xml_declare_constant) (internal, kn) in
   kn
 
@@ -308,12 +311,13 @@ let inductive_names sp kn mie fixl =
 	   ((sp, IndRef ind_p) :: names, n+1))
       ([], 0) mie.mind_entry_inds
   in
-  let names =
-    List.fold_left
-      (fun names (c, _) ->
-        let sp = Libnames.make_path dp (Label.to_id (Constant.label c)) in
-        (sp, ConstRef c) :: names) names fixl
-  in names
+  names
+  (* let names =
+   *   List.fold_left
+   *     (fun names (c, _) ->
+   *       let sp = Libnames.make_path dp (Label.to_id (Constant.label c)) in
+   *       (sp, ConstRef c) :: names) names fixl
+   * in names *)
 
 let load_inductive i ((sp,kn),(_,mie,fixl)) =
   let names = inductive_names sp kn mie fixl in
@@ -354,14 +358,15 @@ let dummy_one_inductive_entry mie = {
 }
 
 (* Hack to reduce the size of .vo: we keep only what load/open needs *)
-let dummy_inductive_entry (_,m,_) = ([],{
+let dummy_inductive_entry (_,m,l) = ([],{
   mind_entry_params = [];
   mind_entry_record = None;
   mind_entry_finite = Decl_kinds.BiFinite;
   mind_entry_inds = List.map dummy_one_inductive_entry m.mind_entry_inds;
   mind_entry_polymorphic = false;
   mind_entry_universes = Univ.UContext.empty;
-  mind_entry_private = None },[])
+  mind_entry_private = None },
+  List.map (fun (c, _) -> (c, ParameterEntry (None,false,(mkProp,Univ.UContext.empty),None))) l)
 
 type inductive_obj = Dischargedhypsmap.discharged_hyps * mutual_inductive_entry *
   (Names.Constant.t * Safe_typing.private_constants Entries.constant_entry) list
@@ -397,6 +402,9 @@ let declare_mind (mie, fixl) =
   let (sp,kn as oname) = add_leaf id (inInductive ([],mie,fixl)) in
   let mind = Global.mind_of_delta_kn kn in
   let isrecord,isprim = declare_projections mind in
+  let () = List.iter (fun (c, cb) ->
+      ignore(declare_constant ~fake:true (Label.to_id (Constant.label c)) (cb, Decl_kinds.(IsDefinition Fixpoint))))
+      fixl in
   declare_mib_implicits mind;
   declare_inductive_argument_scopes mind mie;
   if_xml (Hook.get f_xml_declare_inductive) (isrecord,oname);

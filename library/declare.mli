@@ -51,7 +51,7 @@ val definition_entry : ?fix_exn:Future.fix_exn ->
 
   internal specify if the constant has been created by the kernel or by the
   user, and in the former case, if its errors should be silent *)
-val declare_constant :
+val declare_constant : ?fake:bool ->
  ?internal:internal_flag -> ?local:bool -> Id.t -> ?export_seff:bool -> constant_declaration -> constant
 
 val declare_definition : 
