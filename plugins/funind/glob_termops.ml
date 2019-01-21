@@ -580,7 +580,7 @@ If someone knows how to prevent solved existantial removal in  understand, pleas
            rt
          with Found evi -> (* we found the evar corresponding to this hole *)
            match evi.evar_body with
-           | Evar_defined c ->
+           | Evar_defined c | Evar_abstract (c,_) ->
              (* we just have to lift the solution in glob_term *)
               Detyping.detype Detyping.Now false Id.Set.empty env ctx (f c)
            | Evar_empty -> rt (* the hole was not solved : we do nothing *)
@@ -602,7 +602,7 @@ If someone knows how to prevent solved existantial removal in  understand, pleas
              rt
            with Found evi -> (* we found the evar corresponding to this hole *)
                 match evi.evar_body with
-                | Evar_defined c ->
+                | Evar_defined c | Evar_abstract (c,_) ->
                    (* we just have to lift the solution in glob_term *)
                    Detyping.detype Detyping.Now false Id.Set.empty env ctx (f c)
                 | Evar_empty -> rt (* the hole was not solved : we d when falseo nothing *)

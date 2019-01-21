@@ -170,12 +170,12 @@ let cache_term_by_tactic_then ~opaque ?(goal_type=None) id gk tac tacK =
   Proofview.tclTHEN (Proofview.Unsafe.tclEVARS evd) tac
   end
 
-let abstract_subproof ~opaque id gk tac =
+let _abstract_subproof ~opaque id gk tac =
   cache_term_by_tactic_then ~opaque id gk tac (fun lem args -> Tactics.exact_no_check (applist (lem, args)))
 
 let anon_id = Id.of_string "anonymous"
 
-let name_op_to_name name_op object_kind suffix =
+let _name_op_to_name name_op object_kind suffix =
   let open Proof_global in
   let default_gk = (Global, false, object_kind) in
   let name, gk = match Proof_global.V82.get_current_initial_conclusions () with
@@ -188,8 +188,20 @@ let name_op_to_name name_op object_kind suffix =
     let name = Option.default anon_id name in
     Nameops.add_suffix name suffix, gk
 
+let make_abstract opaque =
+  let abstract = if opaque then Evd.Opaque else Evd.Transparent in
+  Proofview.Goal.enter begin fun gl ->
+    let env = Proofview.Goal.env gl in
+    Refine.refine ~typecheck:false ~abstract (fun sigma ->
+      let sigma, evar = Evarutil.new_evar env sigma (Proofview.Goal.concl gl) in
+      sigma, evar)
+  end
+
 let tclABSTRACT ?(opaque=true) name_op tac =
-  let s, gk = if opaque
-    then name_op_to_name name_op (Proof Theorem) "_subproof"
-    else name_op_to_name name_op (DefinitionBody Definition) "_subterm" in
-  abstract_subproof ~opaque s gk tac
+  Proofview.tclTHEN (make_abstract opaque) tac
+
+
+  (* let s, gk = if opaque
+   *   then name_op_to_name name_op (Proof Theorem) "_subproof"
+   *   else name_op_to_name name_op (DefinitionBody Definition) "_subterm" in
+   * abstract_subproof ~opaque s gk tac *)

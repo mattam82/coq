@@ -164,6 +164,7 @@ let pr_evar_info env sigma evi =
     match evi.evar_body with
       | Evar_empty -> mt ()
       | Evar_defined c -> spc() ++ str"=> "  ++ print_constr env sigma c
+      | Evar_abstract (c, _) -> spc() ++ str"=!> "  ++ print_constr env sigma c
   in
   let candidates =
     match evi.evar_body, evi.evar_candidates with
@@ -191,7 +192,7 @@ let compute_evar_dependency_graph sigma =
     in
     match evar_body evi with
     | Evar_empty -> acc
-    | Evar_defined c -> Evar.Set.fold fold_ev (evars_of_term (EConstr.Unsafe.to_constr c)) acc
+    | Evar_defined c | Evar_abstract (c, _) -> Evar.Set.fold fold_ev (evars_of_term (EConstr.Unsafe.to_constr c)) acc
   in
   Evd.fold fold sigma EvMap.empty
 
@@ -324,12 +325,12 @@ let to_list d =
   (* Workaround for change in Map.fold behavior in ocaml 3.08.4 *)
   let l = ref [] in
   let fold_def evk evi () = match evi.evar_body with
-    | Evar_defined _ -> l := (evk, evi) :: !l
+    | Evar_defined _ | Evar_abstract _ -> l := (evk, evi) :: !l
     | Evar_empty -> ()
   in
   let fold_undef evk evi () = match evi.evar_body with
     | Evar_empty -> l := (evk, evi) :: !l
-    | Evar_defined _ -> ()
+    | Evar_defined _ | Evar_abstract _ -> ()
   in
   Evd.fold fold_def d ();
   Evd.fold fold_undef d ();
@@ -351,7 +352,7 @@ let pr_evar_by_filter filter env sigma =
   let elts = Evd.fold (fun evk evi accu -> (evk, evi) :: accu) sigma [] in
   let elts = List.rev elts in
   let is_def (_, evi) = match evi.evar_body with
-  | Evar_defined _ -> true
+  | Evar_defined _ | Evar_abstract _ -> true
   | Evar_empty -> false
   in
   let (defined, undefined) = List.partition is_def elts in

@@ -134,9 +134,12 @@ module Store = Store.Make ()
 
 let string_of_existential evk = "?X" ^ string_of_int (Evar.repr evk)
 
+type opacity = Opaque | Transparent
+
 type evar_body =
   | Evar_empty
   | Evar_defined of constr
+  | Evar_abstract of constr * opacity
 
 type evar_info = {
   evar_concl : constr;
@@ -203,6 +206,7 @@ let evar_filtered_env evi = match Filter.repr (evar_filter evi) with
 let map_evar_body f = function
   | Evar_empty -> Evar_empty
   | Evar_defined d -> Evar_defined (f d)
+  | Evar_abstract (d, b) -> Evar_abstract (f d, b)
 
 let map_evar_info f evi =
   {evi with
@@ -463,7 +467,7 @@ let add_with_name ?name ?(typeclass_candidate = true) d e i = match i.evar_body 
     else d.evar_flags
   in
   { d with undf_evars = EvMap.add e i d.undf_evars; evar_names; evar_flags }
-| Evar_defined _ ->
+| Evar_defined _ | Evar_abstract _ ->
   let evar_names = EvNames.remove_name_defined e d.evar_names in
   { d with defn_evars = EvMap.add e i d.defn_evars; evar_names }
 
@@ -607,6 +611,8 @@ let existential_opt_value d (n, args) =
   | Some info ->
     match evar_body info with
     | Evar_defined c -> Some (instantiate_evar_array info c args)
+    | Evar_abstract (c, Transparent) -> Some (instantiate_evar_array info c args)
+    | Evar_abstract (c, Opaque) -> None
     | Evar_empty -> None (* impossible but w/e *)
 
 let existential_value d ev = match existential_opt_value d ev with
@@ -709,7 +715,7 @@ let evar_source evk d = (find d evk).evar_source
 let evar_ident evk evd = EvNames.ident evk evd.evar_names
 let evar_key id evd = EvNames.key id evd.evar_names
 
-let define_aux def undef evk body =
+let define_aux ?abstract def undef evk body =
   let oldinfo =
     try EvMap.find evk undef
     with Not_found ->
@@ -719,12 +725,16 @@ let define_aux def undef evk body =
         anomaly ~label:"Evd.define" (Pp.str "cannot define undeclared evar.")
   in
   let () = assert (oldinfo.evar_body == Evar_empty) in
-  let newinfo = { oldinfo with evar_body = Evar_defined body } in
+  let evar_body = match abstract with
+  | None -> Evar_defined body
+  | Some fl -> Evar_abstract (body, fl)
+  in
+  let newinfo = { oldinfo with evar_body } in
   EvMap.add evk newinfo def, EvMap.remove evk undef
 
 (* define the existential of section path sp as the constr body *)
-let define_gen evk body evd evar_flags =
-  let (defn_evars, undf_evars) = define_aux evd.defn_evars evd.undf_evars evk body in
+let define_gen ?abstract evk body evd evar_flags =
+  let (defn_evars, undf_evars) = define_aux ?abstract evd.defn_evars evd.undf_evars evk body in
   let last_mods = match evd.conv_pbs with
   | [] ->  evd.last_mods
   | _ -> Evar.Set.add evk evd.last_mods
@@ -733,15 +743,15 @@ let define_gen evk body evd evar_flags =
   { evd with defn_evars; undf_evars; last_mods; evar_names; evar_flags }
 
 (** By default, the obligation and evar tag of the evar is removed *)
-let define evk body evd =
+let define ?abstract evk body evd =
   let evar_flags = remove_evar_flags evk evd.evar_flags in
-  define_gen evk body evd evar_flags
+  define_gen ?abstract evk body evd evar_flags
 
 (** In case of an evar-evar solution, the flags are inherited *)
-let define_with_evar evk body evd =
+let define_with_evar ?abstract evk body evd =
   let evk' = fst (destEvar body) in
   let evar_flags = inherit_evar_flags evd.evar_flags evk evk' in
-  define_gen evk body evd evar_flags
+  define_gen ?abstract evk body evd evar_flags
 
 let is_restricted_evar evd evk =
   try Some (Evar.Map.find evk evd.evar_flags.restricted_evars)
@@ -831,8 +841,9 @@ let evars_of_filtered_evar_info evi =
   Evar.Set.union (evars_of_term evi.evar_concl)
     (Evar.Set.union
 	(match evi.evar_body with
-	| Evar_empty -> Evar.Set.empty
-	| Evar_defined b -> evars_of_term b)
+         | Evar_empty -> Evar.Set.empty
+         | Evar_abstract (b, _) -> evars_of_term b
+         | Evar_defined b -> evars_of_term b)
 	(evars_of_named_context (evar_filtered_context evi)))
 
 (**********************************************************)

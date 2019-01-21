@@ -1980,7 +1980,7 @@ end = struct (* {{{ *)
         let Proof.{sigma} = Proof.data (Proof_global.give_me_the_proof ()) in
         match Evd.(evar_body (find sigma r_goal)) with
         | Evd.Evar_empty -> RespNoProgress
-        | Evd.Evar_defined t ->
+        | Evd.Evar_defined t | Evd.Evar_abstract (t,_) ->
             let t = Evarutil.nf_evar sigma t in
             if Evarutil.is_ground_term sigma t then
               let t = EConstr.Unsafe.to_constr t in

@@ -83,7 +83,7 @@ let occur_meta_or_undefined_evar evd c =
     | Meta _ -> raise Occur
     | Evar (ev,args) ->
         (match evar_body (Evd.find evd ev) with
-        | Evar_defined c ->
+        | Evar_defined c | Evar_abstract (c,_) ->
             occrec (EConstr.Unsafe.to_constr c); Array.iter occrec args
         | Evar_empty -> raise Occur)
     | _ -> Constr.iter occrec c

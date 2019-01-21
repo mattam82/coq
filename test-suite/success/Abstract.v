@@ -1,5 +1,10 @@
 (* Cf BZ#546 *)
 
+Lemma foo : nat.
+  abstract exact 0.
+Defined.
+
+
 Require Import Omega.
 
 Section S.

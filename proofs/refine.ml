@@ -55,7 +55,7 @@ let add_if_undefined env eff =
 let add_side_effects env eff =
   List.fold_left add_if_undefined env eff
 
-let generic_refine ~typecheck f gl =
+let generic_refine ~typecheck ?abstract f gl =
   let sigma = Proofview.Goal.sigma gl in
   let env = Proofview.Goal.env gl in
   let concl = Proofview.Goal.concl gl in
@@ -96,10 +96,10 @@ let generic_refine ~typecheck f gl =
     sigma
   | Some self ->
     match evkmain with
-    | None -> Evd.define self c sigma
+    | None -> Evd.define ?abstract self c sigma
     | Some evk ->
         let id = Evd.evar_ident self sigma in
-        let sigma = Evd.define self c sigma in
+        let sigma = Evd.define ?abstract self c sigma in
         match id with
         | None -> sigma
         | Some id -> Evd.rename evk id sigma
@@ -126,16 +126,16 @@ let lift c =
   Proofview.tclUNIT c
   end
 
-let make_refine_enter ~typecheck f gl = generic_refine ~typecheck (lift f) gl
+let make_refine_enter ~typecheck ?abstract f gl = generic_refine ~typecheck ?abstract (lift f) gl
 
-let refine_one ~typecheck f =
-  Proofview.Goal.enter_one (make_refine_enter ~typecheck f)
+let refine_one ~typecheck ?abstract f =
+  Proofview.Goal.enter_one (make_refine_enter ~typecheck ?abstract f)
 
-let refine ~typecheck f =
+let refine ~typecheck ?(abstract:Evd.opacity option) f =
   let f evd =
     let (evd,c) = f evd in (evd,((), c))
   in
-  Proofview.Goal.enter (make_refine_enter ~typecheck f)
+  Proofview.Goal.enter (make_refine_enter ~typecheck ?abstract f)
 
 (** Useful definitions *)
 

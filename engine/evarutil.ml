@@ -684,7 +684,7 @@ let process_dependent_evar q acc evm is_dependent e =
   match evi.evar_body with
   | Evar_empty ->
       if is_dependent then Evar.Map.add e None acc else acc
-  | Evar_defined b ->
+  | Evar_defined b | Evar_abstract (b,_) ->
       let subevars = evars_of_term (EConstr.Unsafe.to_constr b) in
       (* evars appearing in the definition of an evar [e] are marked
          as dependent when [e] is dependent itself: if [e] is a
@@ -726,7 +726,7 @@ let rec advance sigma evk =
   let evi = Evd.find sigma evk in
   match evi.evar_body with
   | Evar_empty -> Some evk
-  | Evar_defined v ->
+  | Evar_defined v | Evar_abstract (v, _) ->
       match is_restricted_evar sigma evk with
       | Some evk -> advance sigma evk
       | None -> None
@@ -755,11 +755,11 @@ let undefined_evars_of_named_context evd nc =
 let undefined_evars_of_evar_info evd evi =
   Evar.Set.union (undefined_evars_of_term evd evi.evar_concl)
     (Evar.Set.union
-       (match evi.evar_body with
-	 | Evar_empty -> Evar.Set.empty
-         | Evar_defined b -> undefined_evars_of_term evd b)
-       (undefined_evars_of_named_context evd
-	  (named_context_of_val evi.evar_hyps)))
+     (match evi.evar_body with
+      | Evar_empty -> Evar.Set.empty
+      | Evar_abstract (b,_) | Evar_defined b -> undefined_evars_of_term evd b)
+     (undefined_evars_of_named_context evd
+      (named_context_of_val evi.evar_hyps)))
 
 type undefined_evars_cache = {
   mutable cache : (EConstr.named_declaration * Evar.Set.t) ref Id.Map.t;
@@ -805,7 +805,7 @@ let filtered_undefined_evars_of_evar_info ?cache sigma evi =
   in
   let accu = match evi.evar_body with
   | Evar_empty -> Evar.Set.empty
-  | Evar_defined b -> evars_of_term (EConstr.Unsafe.to_constr b)
+  | Evar_defined b | Evar_abstract (b,_) -> evars_of_term (EConstr.Unsafe.to_constr b)
   in
   let accu = Evar.Set.union (undefined_evars_of_term sigma evi.evar_concl) accu in
   let ctxt = EConstr.Unsafe.to_named_context (evar_filtered_context evi) in

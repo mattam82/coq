@@ -504,7 +504,7 @@ module New = struct
       let evi = Evd.find sigma evk in
       match Evd.evar_body evi with
       | Evd.Evar_empty -> Some (evk,evi)
-      | Evd.Evar_defined c -> match Constr.kind (EConstr.Unsafe.to_constr c) with
+      | Evd.Evar_defined c | Evd.Evar_abstract (c,_) -> match Constr.kind (EConstr.Unsafe.to_constr c) with
         | Evar (evk,l) -> is_undefined_up_to_restriction sigma evk
         | _ -> 
           (* We make the assumption that there is no way to refine an
