@@ -236,16 +236,35 @@ let allowed_sorts {ind_squashed;ind_univ;ind_min_univ=_;ind_has_relevant_arg=_} 
   if not ind_squashed then InType
   else Sorts.family (Sorts.sort_of_univ ind_univ)
 
+(* For a level to be template polymorphic, it must be introduced
+   by the definition (so have no constraint except lbound <= l)
+   and not to be constrained from below, so any universe l' <= l
+   can be used as an instance of l. All bounds from above, i.e.
+   l <=/< r will be valid for any l' <= l. *)
+let unbounded_from_below u cstrs =
+  Univ.Constraint.for_all (fun (l, d, r) ->
+      match d with
+      | Eq -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
+      | Lt | Le -> not (Univ.Level.equal r u))
+    cstrs
+
 (* Returns the list [x_1, ..., x_n] of levels contributing to template
    polymorphism. The elements x_k is None if the k-th parameter (starting
    from the most recent and ignoring let-definitions) is not contributing
    or is Some u_k if its level is u_k and is contributing. *)
-let param_ccls paramsctxt =
+let param_ccls uctx paramsctxt =
   let fold acc = function
     | (LocalAssum (_, p)) ->
       (let c = Term.strip_prod_assum p in
       match kind c with
-        | Sort (Type u) -> Univ.Universe.level u
+        | Sort (Type u) ->
+          (match Univ.Universe.level u with
+          | Some l ->
+            if Univ.LSet.mem l (Univ.ContextSet.levels uctx) &&
+               unbounded_from_below l (Univ.ContextSet.constraints uctx) then
+              Some l
+            else None
+          | None -> None)
         | _ -> None) :: acc
     | LocalDef _ -> acc
   in
@@ -266,12 +285,12 @@ let abstract_packets univs usubst params ((arity,lc),(indices,splayed_lc),univ_i
   let arity = match univ_info.ind_min_univ with
     | None -> RegularArity {mind_user_arity=arity;mind_sort=Sorts.sort_of_univ ind_univ}
     | Some min_univ ->
-      ((match univs with
-          | Monomorphic _ -> ()
+      let ctx = match univs with
+          | Monomorphic ctx -> ctx
           | Polymorphic _ ->
             CErrors.anomaly ~label:"polymorphic_template_ind"
-              Pp.(strbrk "Template polymorphism and full polymorphism are incompatible."));
-       TemplateArity {template_param_levels=param_ccls params; template_level=min_univ})
+              Pp.(strbrk "Template polymorphism and full polymorphism are incompatible.") in
+       TemplateArity {template_param_levels=param_ccls ctx params; template_level=min_univ}
   in
 
   let kelim = allowed_sorts univ_info in
