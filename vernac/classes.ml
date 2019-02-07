@@ -276,8 +276,8 @@ let do_instance env env' sigma ?hook ~refine ~tac ~global ~poly ~program_mode ct
   else CErrors.user_err Pp.(str "Unsolved obligations remaining.");
   id
 
-let interp_instance_context env ctx ?(generalize=false) pl bk cl =
-  let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env pl in
+let interp_instance_context env ctx ~polymorphic ?(generalize=false) pl bk cl =
+  let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env ~polymorphic pl in
   let tclass, ids =
     match bk with
     | Decl_kinds.Implicit ->
@@ -324,7 +324,7 @@ let new_instance ?(global=false) ?(refine= !refine_instance) ~program_mode
   let env = Global.env() in
   let ({CAst.loc;v=instid}, pl) = instid in
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    interp_instance_context env ~generalize ctx pl bk cl
+    interp_instance_context env ~generalize ctx ~polymorphic:poly pl bk cl
   in
   let id =
     match instid with
@@ -341,7 +341,7 @@ let declare_new_instance ?(global=false) poly ctx (instid, bk, cl) pri =
   let env = Global.env() in
   let ({CAst.loc;v=instid}, pl) = instid in
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    interp_instance_context env ctx pl bk cl
+    interp_instance_context env ctx ~polymorphic:poly pl bk cl
   in
   do_declare_instance env sigma ~global ~poly k u ctx ctx' pri decl imps subst instid
 

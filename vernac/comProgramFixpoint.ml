@@ -90,7 +90,7 @@ let build_wellfounded (recname,pl,n,bl,arityc,body) poly r measure notation =
   let lift_rel_context n l = Termops.map_rel_context_with_binders (liftn n) l in
   Coqlib.check_required_library ["Coq";"Program";"Wf"];
   let env = Global.env() in
-  let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env pl in
+  let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env ~polymorphic:poly pl in
   let sigma, (_, ((env', binders_rel), impls)) = interp_context_evars env sigma bl in
   let len = List.length binders_rel in
   let top_env = push_rel_context binders_rel env in
@@ -251,7 +251,7 @@ let collect_evars_of_term evd c ty =
 let do_program_recursive local poly fixkind fixl ntns =
   let cofix = fixkind = Obligations.IsCoFixpoint in
   let (env, rec_sign, pl, evd), fix, info =
-    interp_recursive ~cofix ~program_mode:true fixl ntns
+    interp_recursive ~cofix ~program_mode:true ~polymorphic:poly fixl ntns
   in
     (* Program-specific code *)
     (* Get the interesting evars, those that were not instantiated *)

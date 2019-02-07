@@ -624,10 +624,11 @@ let interp_univ_constraints env evd cstrs =
   in
   List.fold_left interp (evd,Univ.Constraint.empty) cstrs
 
-let interp_univ_decl env decl =
+let interp_univ_decl env ~polymorphic decl =
   let open UState in
   let pl : lident list = decl.univdecl_instance in
-  let evd = Evd.from_ctx (UState.make_with_initial_binders ~lbound:(Environ.universes_lbound env)
+  let lbound = if polymorphic then Univ.Level.set else Environ.universes_lbound env in
+  let evd = Evd.from_ctx (UState.make_with_initial_binders ~lbound
                             (Environ.universes env) pl) in
   let evd, cstrs = interp_univ_constraints env evd decl.univdecl_constraints in
   let decl = { univdecl_instance = pl;
@@ -636,7 +637,10 @@ let interp_univ_decl env decl =
     univdecl_extensible_constraints = decl.univdecl_extensible_constraints }
   in evd, decl
 
-let interp_univ_decl_opt env l =
+let interp_univ_decl_opt env ~polymorphic l =
   match l with
-  | None -> Evd.from_env env, UState.default_univ_decl
-  | Some decl -> interp_univ_decl env decl
+  | None ->
+    let lbound = if polymorphic then Univ.Level.set else Environ.universes_lbound env in
+    let evd = Evd.from_ctx (UState.make_with_initial_binders ~lbound (Environ.universes env) []) in
+    evd, UState.default_univ_decl
+  | Some decl -> interp_univ_decl env ~polymorphic decl

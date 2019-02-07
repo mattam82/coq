@@ -163,7 +163,7 @@ type recursive_preentry =
 let fix_proto sigma =
   Evarutil.new_global sigma (Coqlib.lib_ref "program.tactic.fix_proto")
 
-let interp_recursive ~program_mode ~cofix fixl notations =
+let interp_recursive ~program_mode ~cofix ~polymorphic fixl notations =
   let open Context.Named.Declaration in
   let open EConstr in
   let env = Global.env() in
@@ -181,7 +181,7 @@ let interp_recursive ~program_mode ~cofix fixl notations =
            if not (CList.for_all2eq (fun x y -> Id.equal x.CAst.v y.CAst.v) lsu usu) then
              user_err Pp.(str "(co)-recursive definitions should all have the same universe binders");
            Some us) fixl None in
-  let sigma, decl = interp_univ_decl_opt env all_universes in
+  let sigma, decl = interp_univ_decl_opt env ~polymorphic all_universes in
   let sigma, (fixctxs, fiximppairs, fixannots) =
     on_snd List.split3 @@
       List.fold_left_map (fun sigma -> interp_fix_context env sigma ~cofix) sigma fixl in
@@ -244,8 +244,8 @@ let ground_fixpoint env evd (fixnames,fixdefs,fixtypes) =
   let fixtypes = List.map EConstr.(to_constr evd) fixtypes in
   Evd.evar_universe_context evd, (fixnames,fixdefs,fixtypes)
 
-let interp_fixpoint ~cofix l ntns =
-  let (env,_,pl,evd),fix,info = interp_recursive ~program_mode:false ~cofix l ntns in
+let interp_fixpoint ~cofix ~polymorphic l ntns =
+  let (env,_,pl,evd),fix,info = interp_recursive ~program_mode:false ~cofix ~polymorphic l ntns in
   check_recursive true env evd fix;
   let uctx,fix = ground_fixpoint env evd fix in
   (fix,pl,uctx,info)
@@ -345,7 +345,7 @@ let check_safe () =
 
 let do_fixpoint local poly l =
   let fixl, ntns = extract_fixpoint_components true l in
-  let (_, _, _, info as fix) = interp_fixpoint ~cofix:false fixl ntns in
+  let (_, _, _, info as fix) = interp_fixpoint ~cofix:false ~polymorphic:poly fixl ntns in
   let possible_indexes =
     List.map compute_possible_guardness_evidences info in
   declare_fixpoint local poly fix possible_indexes ntns;
@@ -353,6 +353,6 @@ let do_fixpoint local poly l =
 
 let do_cofixpoint local poly l =
   let fixl,ntns = extract_cofixpoint_components l in
-  let cofix = interp_fixpoint ~cofix:true fixl ntns in
+  let cofix = interp_fixpoint ~cofix:true ~polymorphic:poly fixl ntns in
   declare_cofixpoint local poly cofix ntns;
   if not (check_safe ()) then Feedback.feedback Feedback.AddedAxiom else ()

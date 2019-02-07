@@ -349,7 +349,7 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   List.iter check_param paramsl;
   if not (List.is_empty uparamsl) && not (List.is_empty notations)
   then user_err (str "Inductives with uniform parameters may not have attached notations.");
-  let sigma, udecl = interp_univ_decl_opt env0 udecl in
+  let sigma, udecl = interp_univ_decl_opt env0 ~polymorphic:poly udecl in
   let sigma, (uimpls, ((env_uparams, ctx_uparams), useruimpls)) =
     interp_context_evars env0 sigma uparamsl in
   let sigma, (impls, ((env_params, ctx_params), userimpls)) =

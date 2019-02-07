@@ -44,7 +44,7 @@ type structured_fixpoint_expr = {
 (** Exported for Program *)
 val interp_recursive :
   (* Misc arguments *)
-  program_mode:bool -> cofix:bool ->
+  program_mode:bool -> cofix:bool -> polymorphic:bool ->
   (* Notations of the fixpoint / should that be folded in the previous argument? *)
   structured_fixpoint_expr list -> decl_notation list ->
 
@@ -72,7 +72,7 @@ type recursive_preentry =
   Id.t list * constr option list * types list
 
 val interp_fixpoint :
-  cofix:bool ->
+  cofix:bool -> polymorphic:bool ->
   structured_fixpoint_expr list -> decl_notation list ->
   recursive_preentry * UState.universe_decl * UState.t *
   (EConstr.rel_context * Impargs.manual_implicits * int option) list

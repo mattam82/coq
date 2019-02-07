@@ -54,6 +54,9 @@ val ugraph : t -> UGraph.t
 val initial_graph : t -> UGraph.t
 (** The initial graph with just the declarations of new universes. *)
 
+val universes_lbound : t -> Univ.Level.t
+(** The lower bound on universes in this graph *)
+
 val algebraics : t -> Univ.LSet.t
 (** The subset of unification variables that can be instantiated with algebraic
     universes as they appear in inferred types only. *)

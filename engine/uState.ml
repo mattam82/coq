@@ -131,6 +131,8 @@ let ugraph ctx = ctx.uctx_universes
 
 let initial_graph ctx = ctx.uctx_initial_universes
 
+let universes_lbound ctx = ctx.uctx_universes_lbound
+
 let algebraics ctx = ctx.uctx_univ_algebraic
 
 let add_uctx_names ?loc s l (names, names_rev) =
