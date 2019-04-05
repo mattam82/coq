@@ -418,10 +418,7 @@ let interp_instance ?loc evd l =
          (evd, l :: univs)) (evd, [])
       l
   in
-  let lbound = Global.universes_lbound () in
-  if List.exists (fun l -> Univ.Level.is_prop l &&
-                           Evd.check_leq evd (Univ.Universe.super (Univ.Universe.make l))
-                             (Univ.Universe.make lbound)) l' then
+  if List.exists (fun l -> Univ.Level.is_prop l) l' then
     user_err ?loc ~hdr:"pretype"
       (str "Universe instances cannot contain Prop, polymorphic" ++
        str " universe instances must be greater or equal to Set.");
