@@ -295,10 +295,14 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   mind_check_names mie;
   assert (List.is_empty (Environ.rel_context env));
 
+  let has_template_poly = List.exists (fun oie -> oie.mind_entry_template) mie.mind_entry_inds in
+
   (* universes *)
   let env_univs =
     match mie.mind_entry_universes with
-    | Monomorphic_entry ctx -> push_context_set ctx env (* set_lbound env prop when arity is template *)
+    | Monomorphic_entry ctx ->
+      let env = if has_template_poly then set_universes_lbound env Univ.Level.prop else env in
+      push_context_set ctx env
     | Polymorphic_entry (_, ctx) -> push_context ctx env
   in
 
