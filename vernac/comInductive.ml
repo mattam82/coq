@@ -140,14 +140,17 @@ let make_conclusion_flexible sigma = function
         | None -> sigma)
      | _ -> sigma)
 
-let interp_ind_arity env sigma ind =
+let intern_ind_arity env sigma ind =
   let c = intern_gen IsType env sigma ind.ind_arity in
   let impls = Implicit_quantifiers.implicits_of_glob_constr ~with_products:true c in
-  let sigma,t = understand_tcc env sigma ~expected_type:IsType c in
   let pseudo_poly = check_anonymous_type c in
+  (constr_loc ind.ind_arity, c, impls, pseudo_poly)
+
+let pretype_ind_arity env sigma (loc, c, impls, pseudo_poly) =
+  let sigma,t = understand_tcc env sigma ~expected_type:IsType c in
   match Reductionops.sort_of_arity env sigma t with
   | exception Invalid_argument _ ->
-    user_err ?loc:(constr_loc ind.ind_arity) (str "Not an arity")
+    user_err ?loc (str "Not an arity")
   | s ->
     let concl = if pseudo_poly then Some s else None in
     sigma, (t, Retyping.relevance_of_sort s,  concl, impls)
@@ -349,25 +352,46 @@ let restrict_inductive_universes sigma ctx_params arities constructors =
   let uvars = List.fold_right (fun (_,ctypes,_) -> List.fold_right merge_universes_of_constr ctypes) constructors uvars in
   Evd.restrict_universe_context sigma uvars
 
+let interp_params env udecl uparamsl paramsl =
+  let sigma, udecl = interp_univ_decl_opt env udecl in
+  let sigma, (uimpls, ((env_uparams, ctx_uparams), useruimpls)) =
+    interp_context_evars ~program_mode:false env sigma uparamsl in
+  let sigma, (impls, ((env_params, ctx_params), userimpls)) =
+    interp_context_evars ~program_mode:false ~impl_env:uimpls env_uparams sigma paramsl
+  in
+
+  (* Names of parameters as arguments of the inductive type (defs removed) *)
+  let assums = List.filter is_local_assum ctx_params in
+  sigma, env_params, (ctx_params, env_uparams, ctx_uparams,
+  List.map (RelDecl.get_name %> Name.get_id) assums, userimpls, useruimpls, impls, udecl)
+
 let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) notations cum poly prv finite =
   check_all_names_different indl;
   List.iter check_param paramsl;
   if not (List.is_empty uparamsl) && not (List.is_empty notations)
   then user_err (str "Inductives with uniform parameters may not have attached notations.");
-  let sigma, udecl = interp_univ_decl_opt env0 udecl in
-  let sigma, (uimpls, ((env_uparams, ctx_uparams), useruimpls)) =
-    interp_context_evars ~program_mode:false env0 sigma uparamsl in
-  let sigma, (impls, ((env_params, ctx_params), userimpls)) =
-    interp_context_evars ~program_mode:false ~impl_env:uimpls env_uparams sigma paramsl
-  in
-  let indnames = List.map (fun ind -> ind.ind_name) indl in
 
-  (* Names of parameters as arguments of the inductive type (defs removed) *)
-  let assums = List.filter is_local_assum ctx_params in
-  let params = List.map (RelDecl.get_name %> Name.get_id) assums in
+  let indnames = List.map (fun ind -> ind.ind_name) indl in
+  let sigma, env_params, infos =
+    interp_params env0 udecl uparamsl paramsl
+  in
 
   (* Interpret the arities *)
-  let sigma, arities = List.fold_left_map (fun sigma -> interp_ind_arity env_params sigma) sigma indl in
+  let arities = List.map (intern_ind_arity env_params sigma) indl in
+
+  let sigma, env_params, (ctx_params, env_uparams, ctx_uparams, params, userimpls, useruimpls, impls, udecl), arities =
+    if List.exists (fun (_,_,_,pseudo_poly) -> pseudo_poly) arities then
+      (* In case of template polymorphism, we need to compute more constraints *)
+      let env0 = Environ.set_universes_lbound env0 Univ.Level.prop in
+      let sigma, env_params, infos =
+        interp_params env0 udecl uparamsl paramsl
+      in
+      let arities = List.map (intern_ind_arity env_params sigma) indl in
+      sigma, env_params, infos, arities
+    else sigma, env_params, infos, arities
+  in
+
+  let sigma, arities = List.fold_left_map (pretype_ind_arity env_params) sigma arities in
   let arities, relevances, arityconcl, indimpls = List.split4 arities in
 
   let fullarities = List.map (fun c -> EConstr.it_mkProd_or_LetIn c ctx_params) arities in
