@@ -48,7 +48,7 @@ let empty =
     uctx_univ_variables = LMap.empty;
     uctx_univ_algebraic = LSet.empty;
     uctx_universes = initial_sprop_cumulative;
-    uctx_universes_lbound = Univ.Level.prop;
+    uctx_universes_lbound = Univ.Level.set;
     uctx_initial_universes = initial_sprop_cumulative;
     uctx_weak_constraints = UPairSet.empty; }
 
