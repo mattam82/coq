@@ -87,6 +87,7 @@ val empty_env : env
 
 val universes     : env -> UGraph.t
 val universes_lbound : env -> Univ.Level.t
+val set_universes_lbound : env -> Univ.Level.t -> env
 val rel_context   : env -> Constr.rel_context
 val named_context : env -> Constr.named_context
 val named_context_val : env -> named_context_val

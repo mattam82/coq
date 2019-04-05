@@ -289,7 +289,7 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   (* universes *)
   let env_univs =
     match mie.mind_entry_universes with
-    | Monomorphic_entry ctx -> push_context_set ctx env
+    | Monomorphic_entry ctx -> push_context_set ctx env (* set_lbound env prop when arity is template *)
     | Polymorphic_entry (_, ctx) -> push_context ctx env
   in
 
