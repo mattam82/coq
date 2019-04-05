@@ -260,6 +260,11 @@ let indices_matter env = env.env_typing_flags.indices_matter
 
 let universes env = env.env_stratification.env_universes
 let universes_lbound env = env.env_stratification.env_universes_lbound
+
+let set_universes_lbound env lbound =
+  let env_stratification = { env.env_stratification with env_universes_lbound = lbound } in
+  { env with env_stratification }
+
 let named_context env = env.env_named_context.env_named_ctx
 let named_context_val env = env.env_named_context
 let rel_context env = env.env_rel_context.env_rel_ctx
