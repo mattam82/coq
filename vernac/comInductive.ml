@@ -258,7 +258,7 @@ let solve_constraints_system levels level_bounds =
   done;
   v
 
-let inductive_levels env evd arities inds =
+let inductive_levels env evd arities inds is_template =
   let destarities = List.map (fun x -> x, Reduction.dest_arity env x) arities in
   let levels = List.map (fun (x,(ctx,a)) ->
     if Sorts.is_prop a || Sorts.is_sprop a then None
@@ -320,7 +320,7 @@ let inductive_levels env evd arities inds =
         let duu = Sorts.univ_of_sort du in
         let evd =
           if not (Univ.is_small_univ duu) && Univ.Universe.equal cu duu then
-            if is_flexible_sort evd duu && not (Evd.check_leq evd Univ.type0_univ duu) then
+            if not is_template && is_flexible_sort evd duu && not (Evd.check_leq evd Univ.type0_univ duu) then
               Evd.set_eq_sort env evd Sorts.prop du
             else evd
           else Evd.set_eq_sort env evd (sort_of_univ cu) du
@@ -379,16 +379,17 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   (* Interpret the arities *)
   let arities = List.map (intern_ind_arity env_params sigma) indl in
 
-  let sigma, env_params, (ctx_params, env_uparams, ctx_uparams, params, userimpls, useruimpls, impls, udecl), arities =
-    if List.exists (fun (_,_,_,pseudo_poly) -> pseudo_poly) arities then
+  let sigma, env_params, (ctx_params, env_uparams, ctx_uparams, params, userimpls, useruimpls, impls, udecl), arities, is_template =
+    let is_template = List.exists (fun (_,_,_,pseudo_poly) -> pseudo_poly) arities in
+    if is_template then
       (* In case of template polymorphism, we need to compute more constraints *)
       let env0 = Environ.set_universes_lbound env0 Univ.Level.prop in
       let sigma, env_params, infos =
         interp_params env0 udecl uparamsl paramsl
       in
       let arities = List.map (intern_ind_arity env_params sigma) indl in
-      sigma, env_params, infos, arities
-    else sigma, env_params, infos, arities
+      sigma, env_params, infos, arities, is_template
+    else sigma, env_params, infos, arities, is_template
   in
 
   let sigma, arities = List.fold_left_map (pretype_ind_arity env_params) sigma arities in
@@ -440,7 +441,7 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   let constructors = List.map (fun (idl,cl,impsl) -> (idl,List.map nf cl,impsl)) constructors in
   let arities = List.map EConstr.(to_constr sigma) arities in
   let sigma = List.fold_left make_conclusion_flexible sigma arityconcl in
-  let sigma, arities = inductive_levels env_ar_params sigma arities constructors in
+  let sigma, arities = inductive_levels env_ar_params sigma arities constructors is_template in
   let sigma = Evd.minimize_universes sigma in
   let nf = Evarutil.nf_evars_universes sigma in
   let arities = List.map nf arities in
