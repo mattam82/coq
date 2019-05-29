@@ -379,7 +379,7 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
 
   let sigma, env_params, (ctx_params, env_uparams, ctx_uparams, params, userimpls, useruimpls, impls, udecl), arities, is_template =
     let is_template = List.exists (fun (_,_,_,pseudo_poly) -> pseudo_poly) arities in
-    if is_template then
+    if not poly && is_template then
       (* In case of template polymorphism, we need to compute more constraints *)
       let env0 = Environ.set_universes_lbound env0 Univ.Level.prop in
       let sigma, env_params, infos =

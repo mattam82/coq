@@ -101,8 +101,19 @@ let binder_of_decl = function
 
 let binders_of_decls = List.map binder_of_decl
 
+let check_anonymous_type ind =
+  match ind with
+  | { CAst.v = CSort (Glob_term.GType []) } -> true
+  | _ -> false
+
 let typecheck_params_and_fields finite def poly pl ps records =
   let env0 = Global.env () in
+  (* Special case elaboration for template-polymorphic inductives,
+     lower bound on introduced universes is Prop so that we do not miss
+     any Set <= i constraint for universes that might actually be instantiated with Prop. *)
+  let is_template =
+    List.exists (fun (_, arity, _, _) -> Option.cata check_anonymous_type true arity) records in
+  let env0 = if not poly && is_template then Environ.set_universes_lbound env0 Univ.Level.prop else env0 in
   let sigma, decl = Constrexpr_ops.interp_univ_decl_opt env0 pl in
   let () =
     let error bk {CAst.loc; v=name} =
