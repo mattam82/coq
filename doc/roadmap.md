@@ -85,3 +85,6 @@ all. A checker should be able to do that.
 ** coqdoc
 ** coq_makefile, making plugins
 ** IDEs: coqide, proof-general, ...
+
+Requirements:
+- Good linking/crossref support with coqdoc and other generated files
