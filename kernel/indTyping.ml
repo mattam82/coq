@@ -158,15 +158,23 @@ let check_indices_matter env_params info indices =
   else check_context_univs ~ctor:false env_params info indices
 
 (* env_ar contains the inductives before the current ones in the block, and no parameters *)
-let check_arity env_params env_ar ind =
+let check_arity ?template env_params env_ar ind =
   let {utj_val=arity;utj_type=_} = Typeops.infer_type env_params ind.mind_entry_arity in
   let indices, ind_sort = Reduction.dest_arity env_params arity in
-  let ind_min_univ = if ind.mind_entry_template then Some Universe.type0m else None in
+  let ind_min_univ, arity, sort =
+    match template with
+    | Some (_levels, (lsubst, _invlsubst)) ->
+      (** Make the parameterized sort *)
+      let sort = Univ.subst_univs_level_universe lsubst (Sorts.univ_of_sort ind_sort) in
+      let arity = it_mkProd_or_LetIn (mkSort (Sorts.sort_of_univ sort)) indices in
+      Some Universe.type0m, arity, sort
+    | None -> None, arity, Sorts.univ_of_sort ind_sort
+  in
   let univ_info = {
     ind_squashed=false;
     ind_has_relevant_arg=false;
     ind_min_univ;
-    ind_univ=Sorts.univ_of_sort ind_sort;
+    ind_univ=sort;
   }
   in
   let univ_info = check_indices_matter env_params univ_info indices in
@@ -236,41 +244,56 @@ let allowed_sorts {ind_squashed;ind_univ;ind_min_univ=_;ind_has_relevant_arg=_} 
   if not ind_squashed then InType
   else Sorts.family (Sorts.sort_of_univ ind_univ)
 
-(* For a level to be template polymorphic, it must be introduced
-   by the definition (so have no constraint except lbound <= l)
-   and not to be constrained from below, so any universe l' <= l
-   can be used as an instance of l. All bounds from above, i.e.
-   l <=/< r will be valid for any l' <= l. *)
-let unbounded_from_below u cstrs =
-  Univ.Constraint.for_all (fun (l, d, r) ->
-      match d with
-      | Eq -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
-      | Lt | Le -> not (Univ.Level.equal r u))
-    cstrs
+(* [lower_ctx params] Returns the list [x_1, ..., x_n] of levels
+   contributing to template polymorphism. The elements x_k is None if
+   the k-th parameter (starting from the most oldest and ignoring
+   let-definitions) is not contributing or is Some u_k if its level is
+   u_k and is contributing.
 
-(* Returns the list [x_1, ..., x_n] of levels contributing to template
-   polymorphism. The elements x_k is None if the k-th parameter (starting
-   from the most recent and ignoring let-definitions) is not contributing
-   or is Some u_k if its level is u_k and is contributing. *)
-let param_ccls uctx paramsctxt =
-  let fold acc = function
+   For a level to be template polymorphic, it must be a level variable
+   [l] appearing as the conclusion of a parameter type.  It must not be
+   constrained from below, so any universe [l' <= l] can be used as an
+   instance of [l]. All bounds from above, i.e.  [l <=/< r] will be
+   valid for any [l' <= l]. We check this by typechecking a generalized
+   version of the inductive declaration for fresh l', represented as
+   [Var i] universe levels.
+
+   [lower_ctx] hence also returns a substitution [x_i -> Level.Var i]
+   and extension of the universe context for [Prop <= Var i]
+   universes. A template-polymorphic inductive must be typable for *any*
+   instantiation of its universes, so we check typability of the
+   constructors under this substitution for the parameters and arities. *)
+let lower_ctx paramsctxt =
+  let fold decl ((lsubst, invlsubst) as subst, levels, params', uctx) =
+    match decl with
     | (LocalAssum (_, p)) ->
-      (let c = Term.strip_prod_assum p in
-      match kind c with
+      (let ctx, ty = Term.decompose_prod_assum p in
+      match kind ty with
         | Sort (Type u) ->
           (match Univ.Universe.level u with
           | Some l ->
-            if Univ.LSet.mem l (Univ.ContextSet.levels uctx) &&
-               unbounded_from_below l (Univ.ContextSet.constraints uctx) then
-              Some l
-            else None
-          | None -> None)
-        | _ -> None) :: acc
-    | LocalDef _ -> acc
+            let subst, uctx, ty =
+              try
+                let l' = Univ.LMap.find l lsubst in
+                (subst, uctx, it_mkProd_or_LetIn (mkType (Univ.Universe.make l')) ctx)
+              with Not_found ->
+                let l' = Univ.Level.var (Univ.LMap.cardinal lsubst) in
+                let lsubst = Univ.LMap.add l l' lsubst in
+                let invlsubst = Univ.LMap.add l' l invlsubst in
+                let uctx = Univ.ContextSet.add_universe l' uctx in
+                let cstr = Univ.enforce_leq_level l' l Univ.Constraint.empty in
+                let uctx = Univ.ContextSet.add_constraints cstr uctx in
+                ((lsubst, invlsubst), uctx, it_mkProd_or_LetIn (mkType (Univ.Universe.make l')) ctx)
+            in (subst, Some l :: levels, Context.Rel.Declaration.set_type ty decl :: params', uctx)
+          | None -> (subst, None :: levels, decl :: params', uctx))
+        | _ -> (subst, None :: levels, decl :: params', uctx))
+    | LocalDef _ -> (subst, levels, decl :: params', uctx)
   in
-  List.fold_left fold [] paramsctxt
+  let subst, levels, params', uctx =
+    List.fold_right fold paramsctxt ((Univ.LMap.empty, Univ.LMap.empty), [], [], Univ.ContextSet.empty) in
+  (subst, List.rev levels, params', uctx)
 
-let abstract_packets univs usubst params ((arity,lc),(indices,splayed_lc),univ_info) =
+let abstract_packets ?template_info usubst ((arity,lc),(indices,splayed_lc),univ_info) =
   let arity = Vars.subst_univs_level_constr usubst arity in
   let lc = Array.map (Vars.subst_univs_level_constr usubst) lc in
   let indices = Vars.subst_univs_level_context usubst indices in
@@ -282,15 +305,15 @@ let abstract_packets univs usubst params ((arity,lc),(indices,splayed_lc),univ_i
   in
   let ind_univ = Univ.subst_univs_level_universe usubst univ_info.ind_univ in
 
-  let arity = match univ_info.ind_min_univ with
+  let arity =
+    match template_info with
+    | Some levels ->
+      (* Invariant: always there for template polymorphic inductives *)
+      let min_univ = Option.get univ_info.ind_min_univ in
+      (* Go back to the fixed universes *)
+      let min_univ = Univ.subst_univs_level_universe usubst min_univ in
+      TemplateArity {template_param_levels=levels; template_level=min_univ}
     | None -> RegularArity {mind_user_arity=arity;mind_sort=Sorts.sort_of_univ ind_univ}
-    | Some min_univ ->
-      let ctx = match univs with
-          | Monomorphic ctx -> ctx
-          | Polymorphic _ ->
-            CErrors.anomaly ~label:"polymorphic_template_ind"
-              Pp.(strbrk "Template polymorphism and full polymorphism are incompatible.") in
-       TemplateArity {template_param_levels=param_ccls ctx params; template_level=min_univ}
   in
 
   let kelim = allowed_sorts univ_info in
@@ -308,19 +331,50 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   let has_template_poly = List.exists (fun oie -> oie.mind_entry_template) mie.mind_entry_inds in
 
   (* universes *)
-  let env_univs =
+  let env_univs, template_info =
     match mie.mind_entry_universes with
     | Monomorphic_entry ctx ->
-      let env = if has_template_poly then set_universes_lbound env Univ.Level.prop else env in
-      push_context_set ctx env
-    | Polymorphic_entry (_, ctx) -> push_context ctx env
+      if has_template_poly then
+        let env = set_universes_lbound env Univ.Level.prop in
+        push_context_set ctx env, Some ctx
+      else push_context_set ctx env, None
+    | Polymorphic_entry (_, ctx) ->
+      if has_template_poly then
+        CErrors.anomaly ~label:"polymorphic_template_ind"
+          Pp.(strbrk "Template polymorphism and full polymorphism are incompatible.");
+      push_context ctx env, None
   in
 
   (* Params *)
   let env_params, params = Typeops.check_context env_univs mie.mind_entry_params in
 
   (* Arities *)
-  let env_ar, data = List.fold_left_map (check_arity env_params) env_univs mie.mind_entry_inds in
+  let params, env_ar, template_info, data =
+    match template_info with
+    | Some ctx ->
+      (** Check that using unconstrained universes for the template polymorphic ones
+          allow to typecheck the declaration. *)
+      let subst, levels, params, ctx' = lower_ctx params in
+      (** We push a relaxed universe context where each template-polymorphic universe [l]
+          has a corresponding relaxed one Prop <= (Var i) <= l.
+          Typechecking only does checking of universes, so it ensures that [Var i = l]
+          is a valid instantiation (otherwise said, typechecking will fail if it encounters
+          [Var i < l]). *)
+      let env_univs = push_context_set ctx' env_univs in
+      (** Check that the relaxed context typechecks *)
+      let env_params, params = Typeops.check_context env_univs params in
+      (** Check that the relaxed arity typechecks (substituting _only_ in the conclusion of the arity) *)
+      let env_ar, data = List.fold_left_map (check_arity env_params ~template:(levels, subst))
+          env_univs mie.mind_entry_inds in
+      (** Note that we do _not_ substitute the relaxed variables in constructors below. This
+          ensures that each constructor application can indeed live in any instantiation of
+          the relaxed variables. *)
+      params, env_ar, Some (ctx, levels, subst), data
+    | None ->
+      let env_ar, data = List.fold_left_map (check_arity env_params) env_univs mie.mind_entry_inds in
+      params, env_ar, None, data
+  in
+
   let env_ar_par = push_rel_context params env_ar in
 
   (* Constructors *)
@@ -356,9 +410,18 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   in
 
   (* Abstract universes *)
-  let usubst, univs = Declareops.abstract_universes mie.mind_entry_universes in
+  let template_info, (usubst, univs) =
+    (* Maybe refactor this *)
+    match template_info with
+    | Some (ctx, levels, (_lsubst, invlsubst)) ->
+      (** We go back from the relaxed context to the original one,
+          effectively performing [Var i = l] for each template-polymorphic universe [l]. *)
+      Some levels, (invlsubst, Monomorphic ctx)
+    | None ->
+      None, Declareops.abstract_universes mie.mind_entry_universes
+  in
   let params = Vars.subst_univs_level_context usubst params in
-  let data = List.map (abstract_packets univs usubst params) data in
+  let data = List.map (abstract_packets ?template_info usubst) data in
 
   let env_ar_par =
     let ctx = Environ.rel_context env_ar_par in
