@@ -140,13 +140,19 @@ let check_univ_leq ?(is_real_arg=false) env u info =
     else raise (InductiveError BadUnivs)
   else raise (InductiveError BadUnivs)
 
-let check_context_univs ~ctor env info ctx =
+let check_context_univs ~ctor ?template env info ctx =
   let check_one d (info,env) =
     let info = match d with
       | LocalAssum (_,t) ->
         (* could be retyping if it becomes available in the kernel *)
         let tj = Typeops.infer_type env t in
-        check_univ_leq ~is_real_arg:ctor env (Sorts.univ_of_sort tj.utj_type) info
+        let uj = Sorts.univ_of_sort tj.utj_type in
+        let uj =
+          match template with
+          | Some (_ctx, _levels, (lsubst, _invlsubst)) -> Univ.subst_univs_level_universe lsubst uj
+          | None -> uj
+        in
+        check_univ_leq ~is_real_arg:ctor env uj info
       | LocalDef _ -> info
     in
     info, push_rel d env
@@ -187,12 +193,20 @@ let check_arity ?template env_params env_ar ind =
   push_rel (LocalAssum (x, arity)) env_ar,
   (arity, indices, univ_info)
 
-let check_constructor_univs env_ar_par info (args,_) =
+let check_constructor_univs ?template env_ar_par info (args,_) =
   (* We ignore the output, positivity will check that it's the expected inductive type *)
-  check_context_univs ~ctor:true env_ar_par info args
+  check_context_univs ~ctor:true ?template env_ar_par info args
 
-let check_constructors env_ar_par isrecord params lc (arity,indices,univ_info) =
-  let lc = Array.map_of_list (fun c -> (Typeops.infer_type env_ar_par c).utj_val) lc in
+let check_constructors ?template env_ar_par isrecord params lc (arity,indices,univ_info) =
+  let lc = Array.map_of_list (fun c ->
+      let c =
+        match template with
+        | Some (_ctx, _levels, (lsubst, _invlsubst)) ->
+          Vars.subst_univs_level_constr lsubst c
+        | None -> c
+      in
+      (Typeops.infer_type env_ar_par c).utj_val) lc
+  in
   let splayed_lc = Array.map (Reduction.dest_prod_assum env_ar_par) lc in
   let univ_info = match Array.length lc with
     (* Empty type: all OK *)
@@ -207,7 +221,7 @@ let check_constructors env_ar_par isrecord params lc (arity,indices,univ_info) =
     (* More than 1 constructor: must squash if Prop/SProp *)
     | _ -> check_univ_leq env_ar_par Univ.Universe.type0 univ_info
   in
-  let univ_info = Array.fold_left (check_constructor_univs env_ar_par) univ_info splayed_lc in
+  let univ_info = Array.fold_left (check_constructor_univs ?template env_ar_par) univ_info splayed_lc in
   (* generalize the constructors over the parameters *)
   let lc = Array.map (fun c -> Term.it_mkProd_or_LetIn c params) lc in
   (arity, lc), (indices, splayed_lc), univ_info
@@ -349,7 +363,7 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   let env_params, params = Typeops.check_context env_univs mie.mind_entry_params in
 
   (* Arities *)
-  let params, env_ar, template_info, data =
+  let params, env_ar, template, data =
     match template_info with
     | Some ctx ->
       (** Check that using unconstrained universes for the template polymorphic ones
@@ -366,9 +380,6 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
       (** Check that the relaxed arity typechecks (substituting _only_ in the conclusion of the arity) *)
       let env_ar, data = List.fold_left_map (check_arity env_params ~template:(levels, subst))
           env_univs mie.mind_entry_inds in
-      (** Note that we do _not_ substitute the relaxed variables in constructors below. This
-          ensures that each constructor application can indeed live in any instantiation of
-          the relaxed variables. *)
       params, env_ar, Some (ctx, levels, subst), data
     | None ->
       let env_ar, data = List.fold_left_map (check_arity env_params) env_univs mie.mind_entry_inds in
@@ -383,7 +394,7 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
     | Some None | None -> false
   in
   let data = List.map2 (fun ind data ->
-      check_constructors env_ar_par isrecord params ind.mind_entry_lc data)
+      check_constructors ?template env_ar_par isrecord params ind.mind_entry_lc data)
       mie.mind_entry_inds data
   in
 
@@ -412,7 +423,7 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   (* Abstract universes *)
   let template_info, (usubst, univs) =
     (* Maybe refactor this *)
-    match template_info with
+    match template with
     | Some (ctx, levels, (_lsubst, invlsubst)) ->
       (** We go back from the relaxed context to the original one,
           effectively performing [Var i = l] for each template-polymorphic universe [l]. *)
