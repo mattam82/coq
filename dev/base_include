@@ -142,7 +142,6 @@ open Ind_tables
 open Auto_ind_decl
 open Coqinit
 open Coqtop
-open Discharge
 open Himsg
 open Metasyntax
 open Mltop
