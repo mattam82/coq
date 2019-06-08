@@ -102,22 +102,22 @@ Module Export ContextFreeGrammar.
     | Terminal (_ : CharType)
     | NonTerminal (_ : string).
 
-      Definition production := list item.
-      Definition productions := list production.
-
-      Record grammar :=
-        {
-          Start_symbol :> string;
-          Lookup :> string -> productions;
-          Start_productions :> productions := Lookup Start_symbol;
-          Valid_nonterminals : list string;
-          Valid_productions : list productions := map Lookup Valid_nonterminals
-        }.
     End definitions.
-
   End cfg.
 
+  Polymorphic Definition production (CharType : Type) := list (item CharType).
+  Polymorphic Definition productions (CharType : Type) := list (production CharType).
+
+  Record grammar (CharType : Type) :=
+        {
+          Start_symbol :> string;
+          Lookup :> string -> productions CharType;
+          Start_productions :> productions CharType := Lookup Start_symbol;
+          Valid_nonterminals : list string;
+          Valid_productions : list (productions CharType) := map Lookup Valid_nonterminals
+        }.
 End ContextFreeGrammar.
+
 Module Export BaseTypes.
   Import Coq.Strings.String.
 
