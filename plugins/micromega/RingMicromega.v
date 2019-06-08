@@ -292,8 +292,8 @@ Qed.
 #[universes(template)]
 Inductive Psatz : Type :=
 | PsatzIn : nat -> Psatz
-| PsatzSquare : PolC -> Psatz
-| PsatzMulC : PolC -> Psatz -> Psatz
+| PsatzSquare : Pol C -> Psatz
+| PsatzMulC : Pol C -> Psatz -> Psatz
 | PsatzMulE : Psatz -> Psatz -> Psatz
 | PsatzAdd  : Psatz -> Psatz -> Psatz
 | PsatzC    : C -> Psatz
