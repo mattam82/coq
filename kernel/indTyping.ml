@@ -140,18 +140,13 @@ let check_univ_leq ?(is_real_arg=false) env u info =
     else raise (InductiveError BadUnivs)
   else raise (InductiveError BadUnivs)
 
-let check_context_univs ~ctor ?template env info ctx =
+let check_context_univs ~ctor env info ctx =
   let check_one d (info,env) =
     let info = match d with
       | LocalAssum (_,t) ->
         (* could be retyping if it becomes available in the kernel *)
         let tj = Typeops.infer_type env t in
         let uj = Sorts.univ_of_sort tj.utj_type in
-        let uj =
-          match template with
-          | Some (_ctx, _levels, (lsubst, _invlsubst)) -> Univ.subst_univs_level_universe lsubst uj
-          | None -> uj
-        in
         check_univ_leq ~is_real_arg:ctor env uj info
       | LocalDef _ -> info
     in
@@ -193,9 +188,9 @@ let check_arity ?template env_params env_ar ind =
   push_rel (LocalAssum (x, arity)) env_ar,
   (arity, indices, univ_info)
 
-let check_constructor_univs ?template env_ar_par info (args,_) =
+let check_constructor_univs env_ar_par info (args,_) =
   (* We ignore the output, positivity will check that it's the expected inductive type *)
-  check_context_univs ~ctor:true ?template env_ar_par info args
+  check_context_univs ~ctor:true env_ar_par info args
 
 let check_constructors ?template env_ar_par isrecord params lc (arity,indices,univ_info) =
   let lc = Array.map_of_list (fun c ->
@@ -221,7 +216,7 @@ let check_constructors ?template env_ar_par isrecord params lc (arity,indices,un
     (* More than 1 constructor: must squash if Prop/SProp *)
     | _ -> check_univ_leq env_ar_par Univ.Universe.type0 univ_info
   in
-  let univ_info = Array.fold_left (check_constructor_univs ?template env_ar_par) univ_info splayed_lc in
+  let univ_info = Array.fold_left (check_constructor_univs env_ar_par) univ_info splayed_lc in
   (* generalize the constructors over the parameters *)
   let lc = Array.map (fun c -> Term.it_mkProd_or_LetIn c params) lc in
   (arity, lc), (indices, splayed_lc), univ_info
@@ -258,6 +253,17 @@ let allowed_sorts {ind_squashed;ind_univ;ind_min_univ=_;ind_has_relevant_arg=_} 
   if not ind_squashed then InType
   else Sorts.family (Sorts.sort_of_univ ind_univ)
 
+(* For a level to be template polymorphic, it must
+   not be constrained from below, so any universe l' <= l
+   can be used as an instance of l. We filter out the universes
+   explicitely bounded from below from polymorphism. *)
+let unbounded_from_below u cstrs =
+  Univ.Constraint.for_all (fun (l, d, r) ->
+      match d with
+      | Eq -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
+      | Lt | Le -> not (Univ.Level.equal r u))
+    cstrs
+
 (* [lower_ctx params] Returns the list [x_1, ..., x_n] of levels
    contributing to template polymorphism. The elements x_k is None if
    the k-th parameter (starting from the most oldest and ignoring
@@ -277,7 +283,8 @@ let allowed_sorts {ind_squashed;ind_univ;ind_min_univ=_;ind_has_relevant_arg=_} 
    universes. A template-polymorphic inductive must be typable for *any*
    instantiation of its universes, so we check typability of the
    constructors under this substitution for the parameters and arities. *)
-let lower_ctx paramsctxt =
+
+let lower_ctx uctx0 paramsctxt =
   let fold decl ((lsubst, invlsubst) as subst, levels, params', uctx) =
     match decl with
     | (LocalAssum (_, p)) ->
@@ -285,7 +292,7 @@ let lower_ctx paramsctxt =
       match kind ty with
         | Sort (Type u) ->
           (match Univ.Universe.level u with
-          | Some l ->
+          | Some l when unbounded_from_below l (Univ.ContextSet.constraints uctx0) ->
             let subst, uctx, ty =
               try
                 let l' = Univ.LMap.find l lsubst in
@@ -299,7 +306,7 @@ let lower_ctx paramsctxt =
                 let uctx = Univ.ContextSet.add_constraints cstr uctx in
                 ((lsubst, invlsubst), uctx, it_mkProd_or_LetIn (mkType (Univ.Universe.make l')) ctx)
             in (subst, Some l :: levels, Context.Rel.Declaration.set_type ty decl :: params', uctx)
-          | None -> (subst, None :: levels, decl :: params', uctx))
+          | _ -> (subst, None :: levels, decl :: params', uctx))
         | _ -> (subst, None :: levels, decl :: params', uctx))
     | LocalDef _ -> (subst, levels, decl :: params', uctx)
   in
@@ -368,7 +375,7 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
     | Some ctx ->
       (** Check that using unconstrained universes for the template polymorphic ones
           allow to typecheck the declaration. *)
-      let subst, levels, params, ctx' = lower_ctx params in
+      let subst, levels, params, ctx' = lower_ctx ctx params in
       (** We push a relaxed universe context where each template-polymorphic universe [l]
           has a corresponding relaxed one Prop <= (Var i) <= l.
           Typechecking only does checking of universes, so it ensures that [Var i = l]
