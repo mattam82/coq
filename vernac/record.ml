@@ -103,7 +103,7 @@ let binders_of_decls = List.map binder_of_decl
 
 let check_anonymous_type ind =
   match ind with
-  | { CAst.v = CSort (Glob_term.GType []) } -> true
+  | { CAst.v = CSort (Glob_term.UAnonymous {rigid=true}) } -> true
   | _ -> false
 
 let typecheck_params_and_fields finite def poly pl ps records =

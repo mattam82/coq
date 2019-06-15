@@ -11,6 +11,7 @@
 open Environ
 open Entries
 open Declarations
+open Univ
 
 (** Type checking for some inductive entry.
     Returns:
@@ -33,3 +34,10 @@ val typecheck_inductive : env -> mutual_inductive_entry ->
      (Constr.rel_context * (Constr.rel_context * Constr.types) array) *
      Sorts.family)
     array
+
+type univ_info = { ind_squashed : bool; ind_has_relevant_arg : bool;
+                   ind_min_univ : Universe.t option; (* Some for template *)
+                   ind_univ : Universe.t }
+
+val check_univ_leq :  ?is_real_arg:bool ->
+           Environ.env -> Univ.Universe.t -> univ_info -> univ_info
