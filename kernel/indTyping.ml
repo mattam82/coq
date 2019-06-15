@@ -308,7 +308,9 @@ let lower_ctx uctx0 paramsctxt =
             in (subst, Some l :: levels, Context.Rel.Declaration.set_type ty decl :: params', uctx)
           | _ -> (subst, None :: levels, decl :: params', uctx))
         | _ -> (subst, None :: levels, decl :: params', uctx))
-    | LocalDef _ -> (subst, levels, decl :: params', uctx)
+    | LocalDef _ ->
+      let decl' = Context.Rel.Declaration.map_constr (Vars.subst_univs_level_constr lsubst) decl in
+      (subst, levels, decl' :: params', uctx)
   in
   let subst, levels, params', uctx =
     List.fold_right fold paramsctxt ((Univ.LMap.empty, Univ.LMap.empty), [], [], Univ.ContextSet.empty) in
