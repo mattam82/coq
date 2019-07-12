@@ -252,25 +252,27 @@ let unbounded_from_below u cstrs =
    polymorphism. The elements x_k is None if the k-th parameter (starting
    from the most recent and ignoring let-definitions) is not contributing
    or is Some u_k if its level is u_k and is contributing. *)
-let param_ccls uctx paramsctxt =
+let param_ccls ~template_check uctx paramsctxt =
   let fold acc = function
     | (LocalAssum (_, p)) ->
       (let c = Term.strip_prod_assum p in
       match kind c with
         | Sort (Type u) ->
-          (match Univ.Universe.level u with
-          | Some l ->
-            if Univ.LSet.mem l (Univ.ContextSet.levels uctx) &&
-               unbounded_from_below l (Univ.ContextSet.constraints uctx) then
-              Some l
-            else None
-          | None -> None)
+          if template_check then
+            (match Univ.Universe.level u with
+             | Some l ->
+               if Univ.LSet.mem l (Univ.ContextSet.levels uctx) &&
+                  unbounded_from_below l (Univ.ContextSet.constraints uctx) then
+                 Some l
+               else None
+             | None -> None)
+          else Univ.Universe.level u
         | _ -> None) :: acc
     | LocalDef _ -> acc
   in
   List.fold_left fold [] paramsctxt
 
-let abstract_packets univs usubst params ((arity,lc),(indices,splayed_lc),univ_info) =
+let abstract_packets ~template_check univs usubst params ((arity,lc),(indices,splayed_lc),univ_info) =
   let arity = Vars.subst_univs_level_constr usubst arity in
   let lc = Array.map (Vars.subst_univs_level_constr usubst) lc in
   let indices = Vars.subst_univs_level_context usubst indices in
@@ -290,7 +292,7 @@ let abstract_packets univs usubst params ((arity,lc),(indices,splayed_lc),univ_i
           | Polymorphic _ ->
             CErrors.anomaly ~label:"polymorphic_template_ind"
               Pp.(strbrk "Template polymorphism and full polymorphism are incompatible.") in
-       TemplateArity {template_param_levels=param_ccls ctx params; template_level=min_univ}
+       TemplateArity {template_param_levels=param_ccls ~template_check ctx params; template_level=min_univ}
   in
 
   let kelim = allowed_sorts univ_info in
@@ -358,7 +360,8 @@ let typecheck_inductive env (mie:mutual_inductive_entry) =
   (* Abstract universes *)
   let usubst, univs = Declareops.abstract_universes mie.mind_entry_universes in
   let params = Vars.subst_univs_level_context usubst params in
-  let data = List.map (abstract_packets univs usubst params) data in
+  let template_check = Environ.check_template env in
+  let data = List.map (abstract_packets ~template_check univs usubst params) data in
 
   let env_ar_par =
     let ctx = Environ.rel_context env_ar_par in
