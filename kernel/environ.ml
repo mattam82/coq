@@ -260,6 +260,7 @@ let type_in_type env = not (typing_flags env).check_universes
 let deactivated_guard env = not (typing_flags env).check_guarded
 
 let indices_matter env = env.env_typing_flags.indices_matter
+let check_template env = env.env_typing_flags.check_template
 
 let universes env = env.env_stratification.env_universes
 let universes_lbound env = env.env_stratification.env_universes_lbound
@@ -432,6 +433,7 @@ let same_flags {
      share_reduction;
      enable_VM;
      enable_native_compiler;
+     check_template;
   } alt =
   check_guarded == alt.check_guarded &&
   check_universes == alt.check_universes &&
@@ -439,7 +441,8 @@ let same_flags {
   indices_matter == alt.indices_matter &&
   share_reduction == alt.share_reduction &&
   enable_VM == alt.enable_VM &&
-  enable_native_compiler == alt.enable_native_compiler
+  enable_native_compiler == alt.enable_native_compiler &&
+  check_template == alt.check_template
 [@warning "+9"]
 
 let set_typing_flags c env = (* Unsafe *)
@@ -570,6 +573,9 @@ let polymorphic_pind (ind,u) env =
 
 let type_in_type_ind (mind,_i) env =
   not (lookup_mind mind env).mind_typing_flags.check_universes
+
+let template_checked_ind (mind,_i) env =
+  not (lookup_mind mind env).mind_typing_flags.check_template
 
 let template_polymorphic_ind (mind,i) env =
   match (lookup_mind mind env).mind_packets.(i).mind_arity with 
@@ -764,6 +770,14 @@ let is_template_polymorphic env r =
   | ConstRef _c -> false
   | IndRef ind -> template_polymorphic_ind ind env
   | ConstructRef cstr -> template_polymorphic_ind (inductive_of_constructor cstr) env
+
+let is_template_checked env r =
+  let open Names.GlobRef in
+  match r with
+  | VarRef _id -> false
+  | ConstRef _c -> false
+  | IndRef ind -> template_checked_ind ind env
+  | ConstructRef cstr -> template_checked_ind (inductive_of_constructor cstr) env
 
 let is_type_in_type env r =
   let open Names.GlobRef in

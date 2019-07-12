@@ -102,6 +102,7 @@ val is_impredicative_set : env -> bool
 val type_in_type : env -> bool
 val deactivated_guard : env -> bool
 val indices_matter : env -> bool
+val check_template : env -> bool
 
 val is_impredicative_sort : env -> Sorts.t -> bool
 val is_impredicative_univ : env -> Univ.Universe.t -> bool
@@ -257,6 +258,7 @@ val type_in_type_ind : inductive -> env -> bool
 (** Old-style polymorphism *)
 val template_polymorphic_ind : inductive -> env -> bool
 val template_polymorphic_pind : pinductive -> env -> bool
+val template_checked_ind : inductive -> env -> bool
 
 (** {5 Modules } *)
 
@@ -348,6 +350,7 @@ val remove_hyps : Id.Set.t -> (Constr.named_declaration -> Constr.named_declarat
 
 val is_polymorphic : env -> Names.GlobRef.t -> bool
 val is_template_polymorphic : env -> GlobRef.t -> bool
+val is_template_checked : env -> GlobRef.t -> bool
 val is_type_in_type : env -> GlobRef.t -> bool
 
 (** Native compiler *)
