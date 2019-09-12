@@ -44,7 +44,7 @@ let typecheck_evar ev env sigma =
   let sigma, _ = Typing.sort_of env sigma (Evd.evar_concl info) in
   sigma
 
-let generic_refine ~typecheck f gl =
+let generic_refine ~with_classes ~typecheck f gl =
   let sigma = Proofview.Goal.sigma gl in
   let env = Proofview.Goal.env gl in
   let concl = Proofview.Goal.concl gl in
@@ -94,6 +94,11 @@ let generic_refine ~typecheck f gl =
   in
   (* Mark goals *)
   let sigma = Proofview.Unsafe.mark_as_goals sigma comb in
+  let sigma =
+    if not with_classes then
+      Proofview.Unsafe.mark_unresolvables sigma shelf
+    else sigma
+  in
   let comb = CList.map (fun x -> Proofview.goal_with_state x state) comb in
   let trace env sigma = Pp.(hov 2 (str"simple refine"++spc()++
                                    Termops.Internal.print_constr_env env sigma c)) in
@@ -114,13 +119,13 @@ let lift c =
   Proofview.tclUNIT c
   end
 
-let make_refine_enter ~typecheck f gl = generic_refine ~typecheck (lift f) gl
+let make_refine_enter ?(with_classes=true) ~typecheck f gl = generic_refine ~with_classes ~typecheck (lift f) gl
 
-let refine ~typecheck f =
+let refine ?(with_classes=true) ~typecheck f =
   let f evd =
     let (evd,c) = f evd in (evd,((), c))
   in
-  Proofview.Goal.enter (make_refine_enter ~typecheck f)
+  Proofview.Goal.enter (make_refine_enter ~with_classes ~typecheck f)
 
 (** {7 solve_constraints}
 
