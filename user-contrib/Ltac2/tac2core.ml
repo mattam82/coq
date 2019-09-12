@@ -806,7 +806,7 @@ end
 let () = define1 "refine" closure begin fun c ->
   let c = thaw c >>= fun c -> Proofview.tclUNIT ((), Value.to_constr c) in
   Proofview.Goal.enter begin fun gl ->
-    Refine.generic_refine ~typecheck:true c gl
+    Refine.generic_refine ~with_classes:true ~typecheck:true c gl
   end >>= fun () -> return v_unit
 end
 
