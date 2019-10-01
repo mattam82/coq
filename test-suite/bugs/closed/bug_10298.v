@@ -31,7 +31,5 @@ Proof.
   notypeclasses refine (EID _ _ _ _).
   eapply (ID _).
   Unshelve.
-  + exact unit.
-  + typeclasses eauto.
   + apply FORM_intro.
 Qed.
