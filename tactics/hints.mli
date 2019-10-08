@@ -52,7 +52,7 @@ type 'a hints_path_atom_gen =
 
 type hints_path_atom = GlobRef.t hints_path_atom_gen
 type hint_db_name = string
-
+exception ModeMatchFailure
 type 'a with_metadata = private
   { pri     : int
   (** A number lower is higher priority *)

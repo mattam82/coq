@@ -501,6 +501,10 @@ let rec subst_hints_path subst hp =
 
 type hint_db_name = string
 
+(* Exception raised when the goal does not match any declared mode for the
+   head *)
+exception ModeMatchFailure
+
 module Hint_db :
 sig
 type t
@@ -530,7 +534,6 @@ val add_modes : hint_mode array list GlobRef.Map.t -> t -> t
 val modes : t -> hint_mode array list GlobRef.Map.t
 val fold : (GlobRef.t option -> hint_mode array list -> full_hint list -> 'a -> 'a) ->
   t -> 'a -> 'a
-
 end =
 struct
 
@@ -595,7 +598,9 @@ struct
       
   let matches_modes sigma args modes =
     if List.is_empty modes then true
-    else List.exists (matches_mode sigma args) modes
+    else
+      List.exists (matches_mode sigma args) modes ||
+      raise ModeMatchFailure
 
   let merge_entry secvars db nopat pat =
     let h = List.sort pri_order_int (List.map snd db.hintdb_nopat) in
