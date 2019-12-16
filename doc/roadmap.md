@@ -32,59 +32,59 @@ into debates of alternative solutions here.
 Ideal overall structure:
 
 * Core calculus. PCuIC
--- No use of elaboration here! Actually should avoid using Gallina at
-all. A checker should be able to do that.
-** Summary/highlights
-** Terms
-*** Correspondance to actual Coq syntax (for uses)
-*** Correspondence to actual ML encoding (for devs)
-** Typing
-** Universe Polymorphism
-** SProp
-** CoInductives
-** Native Integers
-** VM and native compute
-** Module system
-** Libraries (dev view)
-** Extraction
+  -- No use of elaboration here! Actually should avoid using Gallina at
+  all. A checker should be able to do that.
+  - Summary/highlights
+  - Terms
+    - Correspondance to actual Coq syntax (for uses)
+    - Correspondence to actual ML encoding (for devs)
+  - Typing
+  - Universe Polymorphism
+  - SProp
+  - CoInductives
+  - Native Integers
+  - VM and native compute
+  - Module system
+  - Libraries (dev view)
+  - Extraction
 
 * Gallina and elaboration, related vernacular commands
-** Summary/highlights
-** Syntax
-** Terms with holes
-** Unification (*new*)
-** Extended pattern-matching
-** Notations
-** Implicit Arguments
-** Coercions
-** Type Classes
-** Canonical Structures
-** Module System
-** Library managment (user view: scoping of defs etc...)
-** Other commands
+  * Summary/highlights
+  * Syntax
+  * Terms with holes
+  * Unification (*new*)
+  * Extended pattern-matching
+  * Notations
+  * Implicit Arguments
+  * Coercions
+  * Type Classes
+  * Canonical Structures
+  * Module System
+  * Library managment (user view: scoping of defs etc...)
+  * Other commands
 
 * Proof Languages
-** Summary/highlights
-** Interactive model, proof handling
-*** Parallel proof processing
-** Tactics
-** Ltac/Ltac2
-*** Examples should be integrated there
-** ssr
-** Other proof languages? At least mention Mtac2!
-** Decision procedures
-*** Omega/Micromega
-*** Ring
-*** Nsatz
-*** Generalized rewriting
+  * Summary/highlights
+  * Interactive model, proof handling
+    * Parallel proof processing
+  * Tactics
+  * Ltac/Ltac2
+    * Examples should be integrated there
+  * SSR
+  * Other proof languages? At least mention Mtac2!
+  * Decision procedures
+    * Omega/Micromega
+    * Ring
+    * Nsatz
+    * Generalized rewriting
 
 * Developing
-** Structuring projects
-*** Library managment (user view: examples)
-** Coq commands
-** coqdoc
-** coq_makefile, making plugins
-** IDEs: coqide, proof-general, ...
+  * Structuring projects
+    * Library managment (user view: examples)
+  * Coq commands
+  * coqdoc
+  * coq_makefile, making plugins
+  * IDEs: coqide, proof-general, ...
 
 Requirements:
 - Good linking/crossref support with coqdoc and other generated files
