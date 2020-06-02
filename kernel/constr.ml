@@ -513,10 +513,10 @@ let iter_with_binders g f n c = match kind c with
   | Case (_,p,c,bl) -> f n p; f n c; Array.Fun1.iter f n bl
   | Proj (_p,c) -> f n c
   | Fix (_,(_,tl,bl)) ->
-      Array.Fun1.iter (fun i -> f (iterate g i n)) tl;
+      Array.iteri (fun i -> f (iterate g i n)) tl;
       Array.Fun1.iter f (iterate g (Array.length tl) n) bl
   | CoFix (_,(_,tl,bl)) ->
-      Array.Fun1.iter (fun i -> f (iterate g i n)) tl;
+      Array.iteri (fun i -> f (iterate g i n)) tl;
       Array.Fun1.iter f (iterate g (Array.length tl) n) bl
 
 (* [fold_constr_with_binders g f n acc c] folds [f n] on the immediate
@@ -793,13 +793,13 @@ let map_with_binders g f l c0 = match kind c0 with
     if p' == p && c' == c && bl' == bl then c0
     else mkCase (ci, p', c', bl')
   | Fix (ln, (lna, tl, bl)) ->
-    let tl' = Array.Fun1.Smart.map_i (fun i -> f (iterate g i l)) tl in
+    let tl' = Array.Fun1.Smart.map_i (fun i l -> f (iterate g i l)) l tl in
     let l' = iterate g (Array.length tl) l in
     let bl' = Array.Fun1.Smart.map f l' bl in
     if tl' == tl && bl' == bl then c0
     else mkFix (ln,(lna,tl',bl'))
   | CoFix(ln,(lna,tl,bl)) ->
-    let tl' = Array.Fun1.Smart.map_i (fun i -> f (iterate g i l)) tl in
+    let tl' = Array.Fun1.Smart.map_i (fun i l -> f (iterate g i l)) l tl in
     let l' = iterate g (Array.length tl) l in
     let bl' = Array.Fun1.Smart.map f l' bl in
     mkCoFix (ln,(lna,tl',bl'))
@@ -838,14 +838,13 @@ let fold_with_full_binders g f n acc c =
   | Evar (_,l) -> List.fold_left (f n) acc l
   | Case (_,p,c,bl) -> Array.fold_left (f n) (f n (f n acc p) c) bl
   | Fix (_,(lna,tl,bl)) ->
-      let n' = CArray.fold_left2_i (fun i c n t -> g (LocalAssum (n,lift i t)) c) n lna tl in
-      let fd = Array.map2 (fun t b -> (t,b)) tl bl in
-      Array.fold_left (fun acc (t,b) -> f n' (f n acc t) b) acc fd
+      let (n', acc) = CArray.fold_left2 (fun (n, acc) na t ->
+       (g (LocalAssum (na,t)) n, f n acc t)) (n,acc) lna tl
+      in Array.fold_left (fun acc b -> f n' acc b) acc bl
   | CoFix (_,(lna,tl,bl)) ->
-      let n' = CArray.fold_left2_i (fun i c n t -> g (LocalAssum (n,lift i t)) c) n lna tl in
-      let fd = Array.map2 (fun t b -> (t,b)) tl bl in
-      Array.fold_left (fun acc (t,b) -> f n' (f n acc t) b) acc fd
-
+      let (n', acc) = CArray.fold_left2 (fun (n, acc) na t ->
+       (g (LocalAssum (na,t)) n, f n acc t)) (n,acc) lna tl
+      in Array.fold_left (fun acc b -> f n' acc b) acc bl
 
 type 'univs instance_compare_fn = GlobRef.t -> int ->
   'univs -> 'univs -> bool

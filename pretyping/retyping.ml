@@ -145,7 +145,7 @@ let retype ?(polyprop=true) sigma =
        substl subst tys.(i)
     | CoFix (i,(_,tys,_ as recdef)) -> 
       let subst = List.init i (fun k -> mkCoFix ((pred i - k), recdef)) in
-      tys.(i)
+      substl subst tys.(i)
     | App(f,args) when Termops.is_template_polymorphic_ind env sigma f ->
         let t = type_of_global_reference_knowing_parameters env f args in
         strip_outer_cast sigma (subst_type env sigma t (Array.to_list args))

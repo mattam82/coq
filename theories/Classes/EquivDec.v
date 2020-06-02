@@ -130,7 +130,8 @@ Program Instance bool_function_eqdec `(EqDec A eq) : EqDec (bool -> A) eq :=
 
 Require Import List.
 
-Program Instance list_eqdec `(eqa : EqDec A eq) : EqDec (list A) eq :=
+#[refine]
+Instance list_eqdec `(eqa : EqDec A eq) : EqDec (list A) eq :=
   { equiv_dec :=
     fix aux (x y : list A) :=
     match x, y with

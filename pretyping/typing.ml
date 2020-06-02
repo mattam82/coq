@@ -196,7 +196,7 @@ let check_type_fixpoint ?loc env sigma lna lar vdefj =
   let sigma, _ = 
     Array.fold_left2_i (fun i (sigma, env) defj ar ->
       match Evarconv.unify_leq_delay env sigma defj.uj_type (lift (lt - i) ar) with
-      | sigma -> (sigma, push_rel (LocalAssum (lna.(i), lar.(i))))
+      | sigma -> (sigma, push_rel (LocalAssum (lna.(i), lar.(i))) env)
       | exception Evarconv.UnableToUnify _ ->
         error_ill_typed_rec_body ?loc env sigma
           i lna vdefj lar)
@@ -332,13 +332,14 @@ let judge_of_float env v =
   Environ.on_judgment EConstr.of_constr (judge_of_float env v)
 
 (* TODO move *)
-let push_rec_defs indices (names, lar, vdef as recdef) =
+let push_rec_defs indices (names, lar, vdef as recdef) env =
   let len = Array.length names in
-  match indices with
+  let ctx = match indices with
   | Some vn -> 
-    List.map2_i (fun i na ty -> LocalDef (na, mkFix ((vn, len - i), recdef), ty)) names lar
+    Array.map2_i (fun i na ty -> LocalDef (na, mkFix ((vn, len - i), recdef), ty)) names lar
   | None ->
-    List.map2_i (fun i na ty -> LocalDef (na, mkCoFix (len - i, recdef), ty)) names lar
+    Array.map2_i (fun i na ty -> LocalDef (na, mkCoFix (len - i, recdef), ty)) names lar
+  in push_rel_context (Array.to_list ctx) env
   
 (* cstr must be in n.f. w.r.t. evars and execute returns a judgement
    where both the term and type are in n.f. *)
@@ -455,17 +456,17 @@ let rec execute env sigma cstr =
         sigma, judge_of_float env f
 
 and execute_recdef env sigma indices (names,lar,vdef) =
-  let (sigma, fixenv), lara =
+  let (fixenv, sigma), lara =
     Array.fold_left2_map (fun (env, sigma) na t ->
       let sigma, tj = execute env sigma t in
       let sigma, ar = assumption_of_judgment env sigma tj in
       (push_rel (LocalAssum (na, ar)) env, sigma), ar)
-    (sigma, env) names lar
+    (env, sigma) names lar
   in
   let envdefs = push_rec_defs indices (names, lara, vdef) env in
   let sigma, vdefj = execute_array envdefs sigma vdef in
   let vdefv = Array.map j_val vdefj in
-  let sigma = check_type_fixpoint env1 sigma names lara vdefj in
+  let sigma = check_type_fixpoint env sigma names lara vdefj in
   sigma, (names,lara,vdefv)
 
 and execute_array env = Array.fold_left_map (execute env)

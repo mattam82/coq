@@ -60,6 +60,16 @@ let mind_check_names mie =
   name, but only by the name of the inductive packet and an index. *)
 
 
+let map_rel_context_with_binders f sign =
+  let rec aux k = function
+    | d::sign -> Context.Rel.Declaration.map_constr (f k) d :: aux (k-1) sign
+    | [] -> []
+  in
+  aux (Context.Rel.length sign) sign
+
+let substl_rel_context l =
+  map_rel_context_with_binders (fun k -> Vars.substnl l (k-1))
+
 (************************************************************************)
 (************************** Type checking *******************************)
 (************************************************************************)
@@ -127,17 +137,8 @@ let check_constructor_univs env_ar_par info (args,_) =
   (* We ignore the output, positivity will check that it's the expected inductive type *)
   check_context_univs ~ctor:true env_ar_par info args
 
-let check_constructors (env_ar_par_cstrs, cstrsubst) isrecord params names lc (arity,indices,univ_info) =
-  let env_ar_par_cstrs', lc =
-    List.fold_left2_map (fun (env, lc) n t ->
-        let j = Typing.infer_type env t in
-        let decl = LocalAssum (Name n, j.utj_val) in
-        (Environ.push_rel decl env, j.utj_val))
-      env_ar_par_cstrs names lc
-  in
-  let lc = Array.of_list lc in
-  let splayed_lc = Array.map (Reduction.dest_prod_assum env_ar_par_cstrs) lc in
-  let univ_info = match Array.length lc with
+let check_constructors kn i u (env_ar_par_cstrs, cstrsubst) isrecord params names lc (arity,indices,univ_info) =
+  let univ_info = match List.length lc with
     (* Empty type: all OK *)
     | 0 -> univ_info
 
@@ -145,23 +146,38 @@ let check_constructors (env_ar_par_cstrs, cstrsubst) isrecord params names lc (a
     | 1 when isrecord -> univ_info
 
     (* Unit and identity types must squash if SProp *)
-    | 1 -> check_univ_leq env_ar_par Univ.Universe.type0m univ_info
+    | 1 -> check_univ_leq env_ar_par_cstrs Univ.Universe.type0m univ_info
 
     (* More than 1 constructor: must squash if Prop/SProp *)
-    | _ -> check_univ_leq env_ar_par Univ.Universe.type0 univ_info
+    | _ -> check_univ_leq env_ar_par_cstrs Univ.Universe.type0 univ_info
   in
-  let univ_info = Array.fold_left (check_constructor_univs env_ar_par_cstrs) univ_info splayed_lc in
   let paraminst = Context.Rel.to_extended_vect mkRel 0 params in
-  let (_, cstrsubst), lc =
-    Array.fold_left_map (fun (j,crs) t ->
+  let (env_ar_par_cstrs', univ_info, _ncstrs, cstrsubst), lc =
+    List.fold_left2_map (fun (env, univ_info, k, cstrsubst) n t ->
+      (* First infer the type of the constructor *)
+      let j = Typeops.infer_type env t in
+      (* Prepare a new context including the constructor, for the following constructors *)
+      let annot = Context.make_annot (Name n) (Sorts.relevance_of_sort j.utj_type) in
+      let decl = LocalAssum (annot, j.utj_val) in
+      (* Split the arguments from the conclusion *)
+      let (ctx, concl as splayed) = Reduction.dest_prod_assum env j.utj_val in
+      (* Check the arguments sorts *)
+      let univ_info = check_constructor_univs env univ_info splayed in
       (* Substitute the references to previous constructors. *)
-      let crs' = mkApp (mkConstructUi (((kn,i),u),j), paraminst) :: crs in
-      let t' = substl crs t in
-      (* Generalize the constructors over the parameters *)  
-      let t' = it_mkProd_or_LetIn t' params in
-      ((succ j, crs'), t')) (1, cstrsubst) lc 
+      let cty = Vars.substl cstrsubst j.utj_val in
+      let splayed =
+        substl_rel_context cstrsubst ctx, Vars.substnl cstrsubst (Context.Rel.length ctx) concl
+      in
+      (* Add the constructor's global reference to the substitution *)
+      let cstrsubst = mkApp (mkConstructUi (((kn,i),u),k), paraminst) :: cstrsubst in
+      (* Generalize the constructor type over the parameters *)
+      let cty = it_mkProd_or_LetIn cty params in
+      (Environ.push_rel decl env, univ_info, succ k, cstrsubst), (cty, splayed))
+      (env_ar_par_cstrs, univ_info, 1, cstrsubst) names lc
   in
-  (env_ar_par_cstrs', cstrsubst), (arity, lc), (indices, splayed_lc), univ_info
+  let lc, splayed_lc = List.split lc in
+  let lc = Array.of_list lc and splayed_lc = Array.of_list splayed_lc in
+  (env_ar_par_cstrs', cstrsubst), ((arity, lc), (indices, splayed_lc), univ_info)
 
 let check_record data =
   List.for_all (fun (_,(_,splayed_lc),info) ->
@@ -301,7 +317,7 @@ let abstract_packets kn uinst usubst arsubst ((arity,lc),(indices,splayed_lc),un
   then raise (InductiveError (MissingConstraints (univ_info.missing,univ_info.ind_univ)));
   let arity = Vars.subst_univs_level_constr usubst (Vars.substl arsubst arity) in
   let lc = Array.map (Vars.subst_univs_level_constr usubst) lc in
-  let indices = Vars.subst_univs_level_context usubst (subst_context arsubst 0 indices) in
+  let indices = Vars.subst_univs_level_context usubst (substl_rel_context arsubst indices) in
   let splayed_lc = Array.map (fun (args,out) ->
       let args = Vars.subst_univs_level_context usubst args in
       let out = Vars.subst_univs_level_constr usubst out in
@@ -318,7 +334,7 @@ let abstract_packets kn uinst usubst arsubst ((arity,lc),(indices,splayed_lc),un
 
   let kelim = allowed_sorts univ_info in
   let arsubst' = mkIndU ((kn,List.length arsubst),uinst) :: arsubst in
-  (arity,lc), (indices,splayed_lc), kelim
+  arsubst', ((arity,lc), (indices,splayed_lc), kelim)
 
 let typecheck_inductive kn env ~sec_univs (mie:mutual_inductive_entry) =
   let () = match mie.mind_entry_inds with
@@ -358,9 +374,11 @@ let typecheck_inductive kn env ~sec_univs (mie:mutual_inductive_entry) =
     | Some (Some _) -> true
     | Some None | None -> false
   in
-  let (env_ar_par_cstrs, cstrsubst), data =
-    List.fold_left2_map (fun (env_ar_par_cstrs, cstrsubst) ind data ->
-      check_constructors (env_ar_par_cstrs, cstrsubst) isrecord params ind.mind_entry_lc data)
+
+  let (_env_ar_par_cstrs, _cstrsubst), data =
+    List.fold_left2_map_i (fun i (env_ar_par_cstrs, cstrsubst) ind data ->
+      check_constructors kn i uinst (env_ar_par_cstrs, cstrsubst) isrecord params
+        ind.mind_entry_consnames ind.mind_entry_lc data)
       (env_ar_par, []) mie.mind_entry_inds data
   in
 

@@ -571,9 +571,9 @@ let rec to_constr lfts v =
         mkFix fx
       else
         let n = Array.length bds in
-        let subs_ty i = comp_subs (el_liftn i lfts) (subst_liftn i e) in
+        let subs_ty i = comp_subs (el_liftn i lfts) (subs_liftn i e) in
         let subs_bd = subs_ty n in
-        let tys = Array.map_i (fun i -> subst_constr (subs_ty i)) tys in
+        let tys = Array.mapi (fun i -> subst_constr (subs_ty i)) tys in
         let bds = Array.Fun1.map subst_constr subs_bd bds in
         mkFix (op, (lna, tys, bds))
     | FCoFix ((op,(lna,tys,bds)) as cfx, e) ->
@@ -581,9 +581,9 @@ let rec to_constr lfts v =
         mkCoFix cfx
       else
         let n = Array.length bds in
-        let subs_ty i = comp_subs (el_liftn i lfts) (subst_liftn i e) in
+        let subs_ty i = comp_subs (el_liftn i lfts) (subs_liftn i e) in
         let subs_bd = subs_ty n in
-        let tys = Array.map_i (fun i -> subst_constr (subs_ty i)) tys in
+        let tys = Array.mapi (fun i -> subst_constr (subs_ty i)) tys in
         let bds = Array.Fun1.map subst_constr subs_bd bds in
         mkCoFix (op, (lna, tys, bds))
     | FApp (f,ve) ->
@@ -1398,12 +1398,12 @@ and norm_head info tab m =
       | FProd(na,dom,rng,e) ->
           mkProd(na, kl info tab dom, kl info tab (mk_clos (subs_lift e) rng))
       | FCoFix((n,(na,tys,bds)),e) ->
-          let ftys = Array.map_i (fun i -> mk_clos (subs_liftn i e)) tys in
+          let ftys = Array.mapi (fun i -> mk_clos (subs_liftn i e)) tys in
           let fbds =
             Array.Fun1.map mk_clos (subs_liftn (Array.length na) e) bds in
           mkCoFix(n,(na, CArray.map (kl info tab) ftys, CArray.map (kl info tab) fbds))
       | FFix((n,(na,tys,bds)),e) ->
-          let ftys = Array.map_i (fun i -> mk_clos (subs_liftn i e)) tys in
+          let ftys = Array.mapi (fun i -> mk_clos (subs_liftn i e)) tys in
           let fbds =
             Array.Fun1.map mk_clos (subs_liftn (Array.length na) e) bds in
           mkFix(n,(na, CArray.map (kl info tab) ftys, CArray.map (kl info tab) fbds))

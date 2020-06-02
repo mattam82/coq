@@ -89,8 +89,10 @@ val template_polymorphism_candidate
    monomorphic universe context that can be made parametric in its
    conclusion sort, if one is given. *)
 
-val maybe_unify_params_in : Environ.env -> Evd.evar_map -> ninds:int -> nparams:int
+val maybe_unify_params_in : Environ.env -> Evd.evar_map -> ninds:int -> nparams:int -> ncstrs:int
   -> EConstr.t -> Evd.evar_map
 (** [nparams] is the number of parameters which aren't treated as
     uniform, ie the length of params (including letins) where the env
-    is [uniform params, inductives, params]. *)
+    is [uniform params, inductives, params, cstrs] and ncstrs is the
+    length of the context of previous constructor types
+    (for inductive-inductive types).  *)

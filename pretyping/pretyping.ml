@@ -641,20 +641,6 @@ let pretype_instance self ~program_mode ~poly resolve_tc env sigma loc hyps evk 
   check_instance loc subst inst;
   sigma, List.map snd subst
 
-
-let nf_evar_context sigma ctx =
-  Context.Rel.map (Evarutil.nf_evar sigma) ctx
-
-let reset_with_named_context nctx env sigma =
-  let env = reset_with_named_context nctx env.ExtraEnv.env in
-  { env; extra = lazy (get_extra env sigma) }
-
-let nf_evar_env sigma env =
-  let ctx = EConstr.rel_context env.ExtraEnv.env in
-  let nctx = Environ.named_context_val env.ExtraEnv.env in
-  let ctx' = nf_evar_context sigma ctx in
-  push_rel_context sigma ctx' (reset_with_named_context nctx env sigma)
-
 module Default =
 struct
 
@@ -739,17 +725,20 @@ struct
         let sigma, bd' = pretype (mk_tycon ty'.utj_val) env sigma bd in
         let dcl = LocalDef (make_annot na rty', bd'.uj_val, ty'.utj_val) in
         let dcl', env = push_rel ~hypnaming sigma dcl env in
-        type_bl dcl' sigma (Context.Rel.add dcl' ctxt) bl in
+        type_bl env sigma (Context.Rel.add dcl' ctxt) bl
+    in
     let sigma, ctxtv = Array.fold_left_map (fun sigma -> type_bl env sigma Context.Rel.empty) sigma bl in
     let (sigma, decls, env_ar), ftydecls =
       Array.fold_left3_map
         (fun (sigma, decls, env_ar) na e ar ->
-          let arty = pretype_type empty_valcon (snd (push_rel_context ~hypnaming sigma e env_ar)) sigma ar in
+          let sigma, arty = pretype_type empty_valcon (snd (push_rel_context ~hypnaming sigma e env_ar)) sigma ar in
+          let rar = Sorts.relevance_of_sort arty.utj_type in
           let ar = it_mkProd_or_LetIn arty.utj_val e in
-          let na = make_annot (Name na) (Retyping.relevance_of_type env_ar sigma ar) in
+          let ann = make_annot (Name na) rar in
           let decl = LocalAssum (ann, ar) in
-          (sigma, decl :: decls,  push_rel ~hypsnaming sigma decl env), (na, decls, e, ar))
-        (sigma, [], !!env) names ctxtv lar 
+          let decl', env = push_rel ~hypnaming sigma decl env_ar in
+          (sigma, decl' :: decls, env), (ann, decls, e, ar))
+        (sigma, [], env) names ctxtv lar
     in
     let nbfix = Array.length lar in
     let names = Array.map (fun (na, _, _, _) -> na) ftydecls in
@@ -762,7 +751,8 @@ struct
           | GCoFix i -> i
         in
         let (na, decls, _, fty) = ftydecls.(fixi) in
-        begin match Evarconv.unify_delay (push_rel_context ~hypsnaming sigma decls !!env) fty (lift nbfix t) with
+        let env = EConstr.push_rel_context decls !!env in
+        begin match Evarconv.unify_delay env sigma fty (lift (Context.Rel.length decls) t) with
           | exception Evarconv.UnableToUnify _ -> sigma
           | sigma -> sigma
         end
@@ -777,7 +767,7 @@ struct
         match fixkind with
         | GFix (vn,i) -> 
           Some (Array.mapi
-            (fun i (n,_) ->
+            (fun i n ->
                 match n with
                 | Some n -> n
                 | None -> Context.Rel.length ctxtv.(i) - 1) vn)
@@ -798,11 +788,11 @@ struct
                   (Array.map2_i (fun i na fix -> LocalDef (na, fix, ftys.(i)))
                                 names fixes)
       in
-      sigma, Array.map (fun x -> destEvar !evdref x) bodies, ctx
+      sigma, Array.map (fun x -> destEvar sigma x) bodies, ctx
     in
     (* env_ar has "partial" fixpoints defininitions for all the 
       mutual fixpoints. *)
-    let env_ar = push_rel_context !evdref fixdecls env in
+    let fixdecls, env_ar = push_rel_context ~hypnaming sigma fixdecls env in
     let sigma, vdefj =
       CArray.fold_left2_map_i (fun i sigma (na, decls, ctxt, ar) def ->
         (* we lift nbfix times the type in tycon, because of
@@ -810,28 +800,26 @@ struct
         let (ctxt,ty) = decompose_prod_n_assum sigma (Context.Rel.length ctxt)
             (lift (nbfix - i) ar) in
         (* ctxt, ty is in env_ar = env, f_i : F_i (for all i) *)
-        let env_ar = nf_evar_env !evdref env_ar in
-        let nenv = push_rel_context !evdref ctxt env_ar in
+        let ctxt, nenv = push_rel_context ~hypnaming sigma ctxt env_ar in
         (* env, f_i : F_i, ctxt |- ty *)
-        let j = pretype (mk_tycon ty) nenv evdref def in
+        let sigma, j = pretype (mk_tycon ty) nenv sigma def in
         (* env, f_i : F_i, ctxt |- j = def : ty *)
         let uj_val = it_mkLambda_or_LetIn j.uj_val ctxt in
         let uj_type = it_mkProd_or_LetIn j.uj_type ctxt in
         (* env, f_i : F_i |- uj_val, uj_type *)
-        let _, inst, _, _, _ =
-          push_rel_context_to_named_context env_ar.ExtraEnv.env sigma uj_val in
-        let sigma = Evd.define (fst bodies.(i)) (EConstr.Unsafe.to_constr inst) sigma in
-        let () = match Evarsolve.reconsider_conv_pbs
-                          (Evarconv.evar_conv_x full_transparent_state) sigma with
+        let _, inst, _, _ = push_rel_context_to_named_context ~hypnaming !!env_ar sigma uj_val in
+        let sigma = Evd.define (fst bodies.(i)) inst sigma in
+        let sigma = match Evarsolve.reconsider_unif_constraints
+                          Evarconv.evar_unify Evarconv.(default_flags_of TransparentState.full) sigma with
           | Evarsolve.Success sigma -> sigma
           | _ -> sigma
         in
-        { uj_val; uj_type })
+        sigma, { uj_val; uj_type })
       sigma ftydecls vdef 
     in
-    let ftys = Array.map (nf_evar !evdref) ftys in
-    let vdefj = Array.map (fun x -> j_nf_evar !evdref x) vdefj in
-    Typing.check_type_fixpoint loc env.ExtraEnv.env evdref names ftys vdefj;
+    let ftys = Array.map (nf_evar sigma) ftys in
+    let vdefj = Array.map (fun x -> j_nf_evar sigma x) vdefj in
+    let sigma = Typing.check_type_fixpoint ?loc !!env sigma names ftys vdefj in
     let fdefs = Array.map j_val vdefj in
     let fixj = match fixkind with
       | GFix (vn,i) ->
@@ -857,13 +845,12 @@ struct
 	        make_judge (make_one i) ty
 	    | GCoFix i ->
         let fixdecls = (names,ftys,fdefs) in
-        let cofix = (i, fixdecls) in
         let make_one n = mkCoFix (n,fixdecls) in
         let ty =
           let substi = List.init i (fun k -> make_one (pred i - k)) in
           substl substi ftys.(i)
         in
-        make_judge (mkCoFix (i,fixdecls)) ty
+        make_judge (make_one i) ty
       in
       discard_trace @@ inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma fixj tycon
 

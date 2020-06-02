@@ -55,16 +55,16 @@ sig
   val map3_i :
     (int -> 'a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
   val map_left : ('a -> 'b) -> 'a array -> 'b array
+  val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
   val iter2_i : (int -> 'a -> 'b -> unit) -> 'a array -> 'b array -> unit
   val fold_left_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
-  val fold_left_map_i :  (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
   val fold_right_map : ('a -> 'c -> 'b * 'c) -> 'a array -> 'c -> 'b array * 'c
+  val fold_left_map_i :  (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b array -> 'a * 'c array
   val fold_left2_map : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b array -> 'c array -> 'a * 'd array
   val fold_left2_map_i : (int -> 'a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b array -> 'c array -> 'a * 'd array
   val fold_right2_map : ('a -> 'b -> 'c -> 'd * 'c) -> 'a array -> 'b array -> 'c -> 'd array * 'c
   val fold_left3_map : ('a -> 'b -> 'c -> 'd -> 'a * 'e) -> 'a -> 'b array -> 'c array -> 'd array ->
     'a * 'e array
-  val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
   val distinct : 'a array -> bool
   val rev_of_list : 'a list -> 'a array
   val rev_to_list : 'a array -> 'a list
@@ -75,7 +75,7 @@ sig
     val map_i : (int -> 'a -> 'a) -> 'a array -> 'a array
     val map2 : ('a -> 'b -> 'b) -> 'a array -> 'b array -> 'b array
     val fold_left_map : ('a -> 'b -> 'a * 'b) -> 'a -> 'b array -> 'a * 'b array
-    val fold_left2_map : ('a -> 'b -> 'c -> 'a * 'c) -> 'a -> 'b array -> 'c array -> 'a * 'c array
+    val fold_left2_map2_i : (int -> 'a -> 'b -> 'c -> 'a * 'b * 'c) -> 'a -> 'b array -> 'c array -> 'a * 'b array * 'c array
   end
   module Fun1 :
   sig
@@ -612,44 +612,7 @@ struct
       !r, ans
     end else !r, ar
 
-  (** Same as [Smart.map2] but threads a state meanwhile *)
-  let fold_left2_map f accu aux_ar ar =
-    let len = Array.length ar in
-    let aux_len = Array.length aux_ar in
-    let () = if not (Int.equal len aux_len) then invalid_arg "Array.Smart.fold_left2_map" in
-    let i = ref 0 in
-    let break = ref true in
-    let r = ref accu in
-    (* This variable is never accessed unset *)
-    let temp = ref None in
-    while !break && (!i < len) do
-      let v = Array.unsafe_get ar !i in
-      let w = Array.unsafe_get aux_ar !i in
-      let (accu, v') = f !r w v in
-      r := accu;
-      if v == v' then incr i
-      else begin
-        break := false;
-        temp := Some v';
-      end
-    done;
-    if !i < len then begin
-      let ans : 'a array = Array.copy ar in
-      let v = match !temp with None -> assert false | Some x -> x in
-      Array.unsafe_set ans !i v;
-      incr i;
-      while !i < len do
-        let v = Array.unsafe_get ar !i in
-        let w = Array.unsafe_get aux_ar !i in
-        let (accu, v') = f !r w v in
-        r := accu;
-        if v != v' then Array.unsafe_set ans !i v';
-        incr i
-      done;
-      !r, ans
-    end else !r, ar
-
-  let fold_left2_map2_i f accu aux_ar ar =
+  let fold_left2_map2_i f accu ar aux_ar =
     let len = Array.length ar in
     let aux_len = Array.length aux_ar in
     let () = if not (Int.equal len aux_len) then invalid_arg "Array.Smart.fold_left2_map2_i" in
@@ -661,32 +624,32 @@ struct
     while !break && (!i < len) do
       let v = Array.unsafe_get ar !i in
       let w = Array.unsafe_get aux_ar !i in
-      let (accu, w', v') = f !i !r w v in
+      let (accu, v', w') = f !i !r v w in
       r := accu;
       if v == v' && w == w' then incr i
       else begin
         break := false;
-        temp := Some (w', v');
+        temp := Some (v', w');
       end
     done;
     if !i < len then begin
-      let aux_ans : 'a array = Array.copy aux_ar in
-      let ans : 'a array = Array.copy ar in
-      let (w, v) = match !temp with None -> assert false | Some x -> x in
+      let aux_ans : 'c array = Array.copy aux_ar in
+      let ans : 'b array = Array.copy ar in
+      let (v, w) = match !temp with None -> assert false | Some x -> x in
       Array.unsafe_set ans !i v;
       Array.unsafe_set aux_ans !i w;
       incr i;
       while !i < len do
         let v = Array.unsafe_get ar !i in
         let w = Array.unsafe_get aux_ar !i in
-        let (accu, w', v') = f !i !r w v in
+        let (accu, v', w') = f !i !r v w in
         r := accu;
         if v != v' then Array.unsafe_set ans !i v';
         if w != w' then Array.unsafe_set aux_ans !i w';
         incr i
       done;
-      !r, aux_ans, ans 
-    end else !r, aux_ar, ar
+      !r, ans, aux_ans
+    end else !r, ar, aux_ar
 
 end
 

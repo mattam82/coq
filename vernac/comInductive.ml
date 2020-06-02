@@ -143,16 +143,18 @@ let model_conclusion env sigma ind_rel params n nc arity_indices =
 
 let interp_cstrs (sigma, cenv, ind_rel, ncstrs) impls params ind arity =
   let cnames,ctyps = List.split ind.ind_lc in
-  let arity_indices, cstr_sort = Reductionops.splay_arity env sigma arity in
+  let arity_indices, cstr_sort = Reductionops.splay_arity cenv sigma arity in
   (* Interpret the constructor types *)
-  let interp_cstr (sigma, env, ncstrs) (cname, ctyp) =
+  let interp_cstr (sigma, env, ncstrs) cname ctyp =
     let flags =
       Pretyping.{ all_no_fail_flags with
                   use_typeclasses = UseTCForConv;
                   solve_unification_constraints = false }
     in
     let sigma, (ctyp, cimpl) = interp_type_evars_impls ~flags env sigma ~impls ctyp in
-    let decl = LocalAssum (Name cname, EConstr.Unsafe.to_constr ctyp) in
+    let rty = Retyping.relevance_of_type env sigma ctyp in
+    let annot = make_annot (Name cname) rty in
+    let decl = LocalAssum (annot, ctyp) in
     let ctx, concl = Reductionops.splay_prod_assum env sigma ctyp in
     let concl_env = EConstr.push_rel_context ctx env in
     let sigma_with_model_evars, model =
@@ -165,13 +167,13 @@ let interp_cstrs (sigma, cenv, ind_rel, ncstrs) impls params ind arity =
         user_err (Himsg.explain_pretype_error concl_env sigma
                     (Pretype_errors.CannotUnify (concl, model, (Some e))))
     in
-    (sigma, Environ.push_rel decl env, succ ncstrs), (ctyp, cimpl)
+    (sigma, EConstr.push_rel decl env, succ ncstrs), ((annot, ctyp), cimpl)
   in
   let (sigma, cenv, ncstrs), (ctyps, cimpls) =
     on_snd List.split @@
     List.fold_left2_map interp_cstr (sigma, cenv, ncstrs) cnames ctyps
   in
-  (sigma, cenv, pred ind_rel, ncstrs), (ctyps, cimpls)
+  (sigma, cenv, pred ind_rel, ncstrs), (cnames, ctyps, cimpls)
 
 let sign_level env evd sign =
   fst (List.fold_right
@@ -187,10 +189,13 @@ let sign_level env evd sign =
 let sup_list min = List.fold_left Univ.sup min
 
 let extract_level env evd min tys =
-  let sorts = List.map (fun ty ->
+  let env, sorts = List.fold_left_map (fun env ty ->
     let ctx, concl = Reduction.dest_prod_assum env ty in
-      sign_level env evd (LocalAssum (make_annot Anonymous Sorts.Relevant, concl) :: ctx)) tys
-  in sup_list min sorts
+    let rty = Retyping.relevance_of_type env evd (EConstr.of_constr ty) in
+    let decl = LocalAssum (make_annot Anonymous rty, ty) in
+    (push_rel decl env, sign_level env evd (LocalAssum (make_annot Anonymous Sorts.Relevant, concl) :: ctx)))
+    env tys
+  in env, sup_list min sorts
 
 let is_flexible_sort evd u =
   match Univ.Universe.level u with
@@ -270,8 +275,8 @@ let inductive_levels env evd arities inds =
     else Some (univ_of_sort a)) destarities
   in
   let cstrs_levels, min_levels, sizes =
-    CList.split3
-      (List.map2 (fun (_,tys) (arity,(ctx,du)) ->
+    CList.split3 @@ snd @@
+      (List.fold_left2_map (fun env (_,tys) (arity,(ctx,du)) ->
         let len = List.length tys in
         let minlev = Sorts.univ_of_sort du in
         let minlev =
@@ -286,8 +291,8 @@ let inductive_levels env evd arities inds =
               Univ.sup ilev minlev)
           else minlev
         in
-        let clev = extract_level env evd minlev tys in
-          (clev, minlev, len)) inds destarities)
+        let env, clev = extract_level env evd minlev tys in
+          env, (clev, minlev, len)) env inds destarities)
   in
   (* Take the transitive closure of the system of constructors *)
   (* level constraints and remove the recursive dependencies *)
@@ -372,6 +377,7 @@ let interp_mutual_inductive_constr ~sigma ~template ~udecl ~ctx_params ~indnames
   let constructors = List.map (on_snd (List.map nf)) constructors in
   let arities = List.map EConstr.(to_constr sigma) arities in
   let sigma = List.fold_left make_anonymous_conclusion_flexible sigma arityconcl in
+
   let sigma, arities = inductive_levels env_ar_params sigma arities constructors in
   let sigma = Evd.minimize_universes sigma in
   let nf = Evarutil.nf_evars_universes sigma in
@@ -448,18 +454,18 @@ let interp_params env udecl uparamsl paramsl =
    do the unification.
    [env_ar_par] is [uparams; inds; params]
  *)
-let maybe_unify_params_in env_ar_par sigma ~ninds ~nparams c =
+let maybe_unify_params_in env_ar_par sigma ~ninds ~nparams ~ncstrs c =
   let is_ind sigma k c = match EConstr.kind sigma c with
     | Constr.Rel n ->
-      (* env is [uparams; inds; params; k other things] *)
-      n > k + nparams && n <= k + nparams + ninds
+      (* env is [uparams; inds; params; ncstrs; k other things] *)
+      n > k + ncstrs + nparams && n <= k + ncstrs + nparams + ninds
     | _ -> false
   in
   let rec aux (env,k as envk) sigma c = match EConstr.kind sigma c with
     | Constr.App (h,args) when is_ind sigma k h ->
       Array.fold_left_i (fun i sigma arg ->
           if i >= nparams || not (EConstr.isEvar sigma arg) then sigma
-          else Evarconv.unify_delay env sigma arg (EConstr.mkRel (k+nparams-i)))
+          else Evarconv.unify_delay env sigma arg (EConstr.mkRel (k+ncstrs+nparams-i)))
         sigma args
     | _ -> Termops.fold_constr_with_full_binders
              sigma
@@ -469,26 +475,33 @@ let maybe_unify_params_in env_ar_par sigma ~ninds ~nparams c =
   aux (env_ar_par,0) sigma c
 
 let interp_arities sigma env_params ctx_params indl = 
-  let interp_arity (sigma, (env, subst, i, decls, arities)) ind =
-    let arity = intern_ind_arity env ind in
+  let nparams = Context.Rel.length ctx_params in
+  let interp_arity (sigma, (env, subst, i, decls)) ind =
+    let arity = intern_ind_arity env sigma ind in
     let sigma, (t, relevance, poly, impls) = pretype_ind_arity env sigma arity in
-    let signlev =
-      let ctx, s = Reduction.dest_arity env t in
+    (* let signlev =
+      let ctx, s = EConstr.dest_arity env t in
       if Indtypes.is_indices_matter () && List.length ctx > 0 then
 	        Some (sign_level env !evdref ctx)
       else None
-    in
-    let t = substl subst t in
-    let full = Term.it_mkProd_or_LetIn t ctx_params in
-    let decl = LocalAssum(Name ind.ind_name, full) in
-    (sigma, (push_rel decl env, mkRel (nparams + 1) :: List.map (lift 1) subst,
-     succ i, full :: decls, (t, relevance, poly, impls)) :: arities)
+    in *)
+    let t = EConstr.Vars.substl subst t in
+    let full = EConstr.it_mkProd_or_LetIn t ctx_params in
+    let decl = LocalAssum (make_annot (Name ind.ind_name) relevance, full) in
+    (sigma, (EConstr.push_rel decl env, EConstr.mkRel (nparams + 1) :: List.map (EConstr.Vars.lift 1) subst,
+     succ i, full :: decls)), (t, relevance, poly, impls)
   in
-  let (sigma, (aritiesenv, _, _, fullarities, arities)) =
-    List.fold_left interp_arity (sigma, (env_params, [], 0, [], [])) indl in
+  let (sigma, (aritiesenv, _, _, fullarities)), arities =
+    List.fold_left_map interp_arity (sigma, (env_params, [], 0, [])) indl in
   let fullarities = List.rev fullarities in
-  let arities = List.rev arities in
   sigma, fullarities, arities
+
+let lift_context n ctx =
+  let (_, ctx') = List.fold_right
+    (fun decl (k, ctx') ->
+      (succ k, map_constr (EConstr.Vars.liftn n k) decl :: ctx'))
+    ctx (1, [])
+  in ctx'
 
 let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) notations ~cumulative ~poly ~private_ind finite =
   check_all_names_different indl;
@@ -512,7 +525,11 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   let ninds = List.length indl in
 
   (* We lift over the arities to account for dependencies between uniform parameters and regular ones *)
-  let ctx_params_lifted = lift_context ninds n in
+  let ctx_params_lifted, fullarities = CList.fold_left_map
+      (fun ctx_params c -> lift_context 1 ctx_params, EConstr.it_mkProd_or_LetIn c ctx_params)
+      ctx_params
+      arities
+  in
 
   let env_ar = push_types env_uparams indnames relevances fullarities in
   let env_ar_params = EConstr.push_rel_context ctx_params_lifted env_ar in
@@ -521,24 +538,24 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   let indimpls = List.map (fun impls -> userimpls @ impls) indimpls in
   let impls = compute_internalization_env env_uparams sigma ~impls Inductive indnames fullarities indimpls in
   let ntn_impls = compute_internalization_env env_uparams sigma Inductive indnames fullarities indimpls in
-  
-  let (sigma, _), constructors =
+
+  let (sigma, _env_ar_params_cstrs, _ind_rel, _nconstrs), constructors =
     Metasyntax.with_syntax_protection (fun () ->
         (* Temporary declaration of notations and scopes *)
         List.iter (Metasyntax.set_notation_for_interpretation env_params ntn_impls) notations;
         (* Interpret the constructor types *)
         List.fold_left2_map (fun acc -> interp_cstrs acc impls ctx_params)
-          (sigma, env_ar_params, ninds, 0) arities indl)
+          (sigma, env_ar_params, ninds, 0) indl arities)
       ()
   in
-
   let nparams = Context.Rel.length ctx_params in
-  let sigma =
-    List.fold_left (fun sigma (_,ctyps,_) ->
-        List.fold_left (fun sigma ctyp ->
-            maybe_unify_params_in env_ar_params sigma ~ninds ~nparams ctyp)
-          sigma ctyps)
-      sigma constructors
+  let _, _, sigma =
+    List.fold_left (fun (ncstrs, env, sigma) (_,ctyps,_) ->
+        List.fold_left (fun (ncstrs, env, sigma) (ann, ctyp) ->
+            let sigma = maybe_unify_params_in env sigma ~ninds ~nparams ~ncstrs ctyp in
+            (ncstrs + 1, EConstr.push_rel (LocalAssum (ann, ctyp)) env, sigma))
+          (ncstrs, env, sigma) ctyps)
+      (0, env_ar_params, sigma) constructors
   in
 
   (* generalize over the uniform parameters *)
@@ -547,11 +564,15 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   let uparam_subst =
     List.init (List.length indl) EConstr.(fun i -> mkApp (mkRel (i + 1 + nuparams), uargs))
     @ List.init nuparams EConstr.(fun i -> mkRel (i + 1)) in
-  let generalize_constructor c = EConstr.Unsafe.to_constr (EConstr.Vars.substnl uparam_subst nparams c) in
+  let generalize_constructor ncstrs (ann, c) =
+    let c' = EConstr.Unsafe.to_constr (EConstr.Vars.substnl uparam_subst (ncstrs + nparams) c) in
+    succ ncstrs, c'
+  in
   let cimpls = List.map pi3 constructors in
-  let constructors = List.map (fun (cnames,ctypes,cimpls) ->
-      (cnames,List.map generalize_constructor ctypes))
-      constructors
+  let _ncstrs, constructors = List.fold_left_map (fun ncstrs (cnames,ctypes,cimpls) ->
+      let ncstrs, ctypes' = List.fold_left_map generalize_constructor ncstrs ctypes in
+        ncstrs, (cnames, ctypes'))
+      0 constructors
   in
   let ctx_params = ctx_params @ ctx_uparams in
   let userimpls = useruimpls @ userimpls in
@@ -560,6 +581,7 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   let env_ar = push_types env0 indnames relevances fullarities in
   let env_ar_params = EConstr.push_rel_context ctx_params env_ar in
   (* Try further to solve evars, and instantiate them *)
+
   let sigma = solve_remaining_evars all_and_fail_flags env_params sigma in
   let impls =
     List.map2 (fun indimpls cimpls ->

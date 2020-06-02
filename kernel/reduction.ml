@@ -591,8 +591,8 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
         if Int.equal i1 i2 && Array.equal Int.equal op1 op2
         then
           let n = Array.length cl1 in
-          let fty1 = Array.map_i (fun i -> mk_clos (subs_liftn i e1)) tys1 in
-          let fty2 = Array.map_i (fun i -> mk_clos (subs_liftn i e2)) tys2 in
+          let fty1 = Array.mapi (fun i -> mk_clos (subs_liftn i e1)) tys1 in
+          let fty2 = Array.mapi (fun i -> mk_clos (subs_liftn i e2)) tys2 in
           let fcl1 = Array.map (mk_clos (subs_liftn n e1)) cl1 in
           let fcl2 = Array.map (mk_clos (subs_liftn n e2)) cl2 in
           let el1 = el_stack lft1 v1 in
@@ -610,8 +610,8 @@ and eqappr cv_pb l2r infos (lft1,st1) (lft2,st2) cuniv =
         if Int.equal op1 op2
         then
           let n = Array.length cl1 in
-          let fty1 = Array.map_i (fun i -> mk_clos (subs_liftn i e1)) tys1 in
-          let fty2 = Array.map_i (fun i -> mk_clos (subs_liftn i e2)) tys2 in
+          let fty1 = Array.mapi (fun i -> mk_clos (subs_liftn i e1)) tys1 in
+          let fty2 = Array.mapi (fun i -> mk_clos (subs_liftn i e2)) tys2 in
           let fcl1 = Array.map (mk_clos (subs_liftn n e1)) cl1 in
           let fcl2 = Array.map (mk_clos (subs_liftn n e2)) cl2 in
           let el1 = el_stack lft1 v1 in
@@ -717,7 +717,7 @@ and convert_vect_i l2r infos lft1 lft2 v1 v2 cuniv =
     let rec fold n cuniv =
       if n >= lv1 then cuniv
       else
-        let cuniv = ccnv CONV l2r infos (el_lift n lft1) (el_lift n lft2) v1.(n) v2.(n) cuniv in
+        let cuniv = ccnv CONV l2r infos (el_liftn n lft1) (el_liftn n lft2) v1.(n) v2.(n) cuniv in
         fold (n+1) cuniv in
     fold 0 cuniv
   else raise NotConvertible

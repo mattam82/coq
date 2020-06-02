@@ -292,7 +292,7 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
               let c' = hnf_prod_applist env' c auxrecparams' in
               (* skip non-recursive parameters *)
               let (ienv',c') = ienv_decompose_prod ienv' auxnnonrecpar c' in
-                check_constructors ienv' false nmr c')
+                check_constructor ienv' false nmr c')
             auxlcvect
         in
         let irecargs = Array.map snd irecargs_nmr
@@ -300,7 +300,7 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
         in
           (nmr',(Rtree.mk_rec [|mk_paths (Imbr mi) irecargs|]).(0))
 
-  (** [check_constructors ienv check_head nmr c] checks the positivity
+  (** [check_constructor ienv check_head nmr c] checks the positivity
       condition in the type [c] of a constructor (i.e. that recursive
       calls to the inductives of the mutually inductive definition
       appear strictly positively in each of the arguments of the
@@ -308,7 +308,7 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
       then the type of the fully applied constructor (the "head" of
       the type [c]) is checked to be the right (properly applied)
       inductive type. *)
-  and check_constructors ienv check_head nmr c =
+  and check_constructor ienv check_head nmr c =
     let rec check_constr_rec (env,n,ntypes,_ra_env as ienv) nmr lrec c =
       let x,largs = decompose_app (whd_all env c) in
         match kind x with
@@ -336,19 +336,15 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
             (nmr, List.rev lrec)
     in check_constr_rec ienv nmr [] c
   in
-  let ienv', irecargs_nmr =
-    Array.fold_left2_map
-      (fun ienv id c ->
+  let irecargs_nmr =
+    Array.map2
+      (fun id c ->
         let _,rawc = mind_extract_params nparamsctxt c in
-        let res =
-          try
-	          check_constructors ienv true nmr rawc
-          with IllFormedInd err ->
-	          explain_ind_err id (ntypes-i) env nparamsctxt c err
-        in
-        let ienv = ienv_push_var ienv (Name id, c, mk_norec) in
-        (res, ienv))
-      ienv, (Array.of_list lcnames) indlc
+        try
+         check_constructor ienv true nmr rawc
+        with IllFormedInd err ->
+         explain_ind_err id (ntypes-i) env nparamsctxt c err)
+      (Array.of_list lcnames) indlc
   in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
@@ -367,13 +363,12 @@ let check_positivity ~chkpos kn names env_ar_par paramsctxt finite inds =
   let ra_env_ar = Array.rev_to_list rc in
   let nparamsctxt = Context.Rel.length paramsctxt in
   let nmr = Context.Rel.nhyps paramsctxt in
-  let check_one i nconstr (_,lcnames) (nindices,lc) =
-    let ra_env_ar_par =
-      List.init (nparamsctxt + nconstr) (fun _ -> (Norec,mk_norec)) @ ra_env_ar in
-    let ienv = (env_ar_par, 1+nparamsctxt+nconstr, ntypes, ra_env_ar_par) in
-    (nconstr + Array.length lc, check_positivity_one ~chkpos recursive ienv paramsctxt (kn,i) snindices lcnames lc)
+  let ra_env_ar_par = List.init nparamsctxt (fun _ -> (Norec,mk_norec)) @ ra_env_ar in
+  let ienv = (env_ar_par, 1+nparamsctxt, ntypes, ra_env_ar_par) in
+  let check_one i (_,lcnames) (nindices,lc) =
+    check_positivity_one ~chkpos recursive ienv paramsctxt (kn,i) nindices lcnames lc
   in
-  let nconstr, irecargs_nmr = Array.fold_left2_map_i check_one ([], 0) names inds in
+  let irecargs_nmr = Array.map2_i check_one names inds in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
   in (nmr',Rtree.mk_rec irecargs)
@@ -469,13 +464,6 @@ let compute_projections (kn, i as ind) mib =
   Array.of_list (List.rev labs),
   Array.of_list (List.rev rs),
   Array.of_list (List.rev pbs)
-
-let subst_rel_context k subst ctx = 
-  let (_, ctx') = List.fold_right 
-    (fun decl (k, ctx') ->
-      (succ k, map_constr (substnl subst k) decl :: ctx'))
-    ctx (k, [])
-  in ctx'
 
 let build_inductive env ~sec_univs names prv univs template variance
     paramsctxt kn isrecord isfinite inds nmr recargs =

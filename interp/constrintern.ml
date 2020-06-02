@@ -1929,7 +1929,7 @@ let internalize globalenv env pattern_mode (_, ntnvars as lvar) c =
         (* We add the recursive function types to the environment *)
         let env_rec, idl_temp = Array.fold_left_map
             (fun env_rec (id,recarg,bl,ty,_) ->
-               let recarg = Option.map (function { CAst.v = v } -> match v with
+               let recarg = Option.map (fun { CAst.v = v } -> match v with
                  | CStructRec i -> i
                  | _ -> anomaly Pp.(str "Non-structural recursive argument in non-program fixpoint")) recarg
                in
@@ -1943,10 +1943,10 @@ let internalize globalenv env pattern_mode (_, ntnvars as lvar) c =
                let bl = List.rev (List.map glob_local_binder_of_extended rbl) in
                let bl_impls = remember_binders_impargs env' bl in
                let tyi = intern_type env' ty in
-               let binder_index,fix_args = impls_binder_list 1 bli in
+               let binder_index,fix_args = impls_binder_list 1 bl in
                let tyimpls = impls_type_list ~args:fix_args binder_index tyi in
-               let env_rec = push_name_env ntnvars tyimpls env (CAst.make @@ Name id) in
-               env_rec, (n, bl, tyi, bl_impls)) dl
+               let env_rec = push_name_env ntnvars tyimpls env (CAst.make @@ Name id.CAst.v) in
+               env_rec, (n, bl, tyi, bl_impls)) env dl
         in
         let idl = Array.map2 (fun (_,_,_,_,bd) (n,bl,ty,before_impls) ->
           (* We add the binders common to body and type to the environment *)

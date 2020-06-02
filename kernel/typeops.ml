@@ -611,21 +611,21 @@ and execute_recdef ?vn env (names,lar,vdef as recdef) i =
   let open Context.Rel.Declaration in
   let mkfix na i =
     match vn with
-    | None -> LocalDef (na, mkCoFix (i, fixdecl), lar.(i))
-    | Some indexes -> LocalDef (na, mkFix ((indexes, i), fixdecl), lar.(i))
+    | None -> LocalDef (na, mkCoFix (i, recdef), lar.(i))
+    | Some indexes -> LocalDef (na, mkFix ((indexes, i), recdef), lar.(i))
   in
-  let (envass, envdefs), names', lar' =
-    CArray.Smart.fold_left2_map2_i (fun i na ar (envass, envdefs) ->
+  let (_envass, envdefs), names', lar' =
+    CArray.Smart.fold_left2_map2_i (fun i (envass, envdefs) na ar ->
         let ar', art = execute envass ar in
         let na' = check_assumption env na ar' art in
         let envass' = push_rel (LocalAssum (na', ar')) envass in
         let envdefs' = push_rel (mkfix na i) envdefs in
-        (envass', envdefs'), na', ar') names lar env in
+        (envass', envdefs'), na', ar') (env, env) names lar in
   let vdef', vdeft = execute_array envdefs vdef in
   let recdef = if names == names' && lar == lar' && vdef == vdef' then recdef else (names',lar',vdef') in
   (* TODO: We should update envdefs here in case some marks have changed *)
   let () = check_fixpoint envdefs names' lar' vdef' vdeft in
-  (lara.(i),recdef)
+  (lar'.(i),recdef)
 
 and execute_array env cs =
   let tys = Array.make (Array.length cs) mkProp in
