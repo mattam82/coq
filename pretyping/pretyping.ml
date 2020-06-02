@@ -68,6 +68,38 @@ let clear_bidirectionality_hint gr =
 open Inductive
 open Inductiveops
 
+(*
+let push_rel sigma d env = {
+  env = push_rel d env.env;
+  extra = lazy (push_rel_decl_to_named_context sigma d (Lazy.force env.extra));
+}
+
+let pop_rel_context n env sigma = make_env (pop_rel_context n env.env) sigma
+
+let push_rel_context sigma ctx env = {
+  env = push_rel_context ctx env.env;
+  extra = lazy (List.fold_right (fun d acc -> push_rel_decl_to_named_context sigma d acc) ctx (Lazy.force env.extra));
+}
+
+let lookup_named id env = lookup_named id env.env
+
+let e_new_evar env evdref ?src ?naming typ =
+  let subst2 subst vsubst c = csubst_subst subst (replace_vars vsubst c) in
+  let open Context.Named.Declaration in
+  let inst_vars = List.map (get_id %> mkVar) (named_context env.env) in
+  let inst_rels = List.rev (rel_list 0 (nb_rel env.env)) in
+  let (subst, vsubst, _, nc) = Lazy.force env.extra in
+  let typ' = subst2 subst vsubst typ in
+  let instance = inst_rels @ inst_vars in
+  let sign = val_of_named_context nc in
+  let sigma = Sigma.Unsafe.of_evar_map !evdref in
+  let Sigma (e, sigma, _) = new_evar_instance sign sigma typ' ?src ?naming instance in
+  evdref := Sigma.to_evar_map sigma;
+  e
+
+end *)
+
+
 (************************************************************************)
 
 (* An auxiliary function for searching for fixpoint guard indexes *)
@@ -609,10 +641,25 @@ let pretype_instance self ~program_mode ~poly resolve_tc env sigma loc hyps evk 
   check_instance loc subst inst;
   sigma, List.map snd subst
 
+
+let nf_evar_context sigma ctx =
+  Context.Rel.map (Evarutil.nf_evar sigma) ctx
+
+let reset_with_named_context nctx env sigma =
+  let env = reset_with_named_context nctx env.ExtraEnv.env in
+  { env; extra = lazy (get_extra env sigma) }
+
+let nf_evar_env sigma env =
+  let ctx = EConstr.rel_context env.ExtraEnv.env in
+  let nctx = Environ.named_context_val env.ExtraEnv.env in
+  let ctx' = nf_evar_context sigma ctx in
+  push_rel_context sigma ctx' (reset_with_named_context nctx env sigma)
+
 module Default =
 struct
 
   let discard_trace (sigma,t,otrace) = sigma, t
+
 
   let pretype_ref self (ref, u) =
     fun ?loc ~program_mode ~poly resolve_tc tycon env sigma ->
@@ -692,17 +739,21 @@ struct
         let sigma, bd' = pretype (mk_tycon ty'.utj_val) env sigma bd in
         let dcl = LocalDef (make_annot na rty', bd'.uj_val, ty'.utj_val) in
         let dcl', env = push_rel ~hypnaming sigma dcl env in
-        type_bl env sigma (Context.Rel.add dcl' ctxt) bl in
+        type_bl dcl' sigma (Context.Rel.add dcl' ctxt) bl in
     let sigma, ctxtv = Array.fold_left_map (fun sigma -> type_bl env sigma Context.Rel.empty) sigma bl in
-    let sigma, larj =
-      Array.fold_left2_map
-        (fun sigma e ar ->
-          pretype_type empty_valcon (snd (push_rel_context ~hypnaming sigma e env)) sigma ar)
-        sigma ctxtv lar in
-    let lara = Array.map (fun a -> a.utj_val) larj in
-    let ftys = Array.map2 (fun e a -> it_mkProd_or_LetIn a e) ctxtv lara in
+    let (sigma, decls, env_ar), ftydecls =
+      Array.fold_left3_map
+        (fun (sigma, decls, env_ar) na e ar ->
+          let arty = pretype_type empty_valcon (snd (push_rel_context ~hypnaming sigma e env_ar)) sigma ar in
+          let ar = it_mkProd_or_LetIn arty.utj_val e in
+          let na = make_annot (Name na) (Retyping.relevance_of_type env_ar sigma ar) in
+          let decl = LocalAssum (ann, ar) in
+          (sigma, decl :: decls,  push_rel ~hypsnaming sigma decl env), (na, decls, e, ar))
+        (sigma, [], !!env) names ctxtv lar 
+    in
     let nbfix = Array.length lar in
-    let names = Array.map (fun id -> Name id) names in
+    let names = Array.map (fun (na, _, _, _) -> na) ftydecls in
+    let ftys = Array.map (fun (_, _, _, fty) -> fty) ftydecls in
     let sigma =
       match tycon with
       | Some t ->
@@ -710,62 +761,109 @@ struct
           | GFix (vn,i) -> i
           | GCoFix i -> i
         in
-        begin match Evarconv.unify_delay !!env sigma ftys.(fixi) t with
+        let (na, decls, _, fty) = ftydecls.(fixi) in
+        begin match Evarconv.unify_delay (push_rel_context ~hypsnaming sigma decls !!env) fty (lift nbfix t) with
           | exception Evarconv.UnableToUnify _ -> sigma
           | sigma -> sigma
         end
       | None -> sigma
     in
-    let names = Array.map2 (fun na t ->
-        make_annot na (Retyping.relevance_of_type !!(env) sigma t))
-        names ftys
-    in
-      (* Note: bodies are not used by push_rec_types, so [||] is safe *)
     let names,newenv = push_rec_types ~hypnaming sigma (names,ftys) env in
+    (* We define partial bodies for all the fixpoints, where the body of a given
+      fixpoint is an existential variables. These will be gradually refined by
+      typechecking.  *)
+    let sigma, bodies, fixdecls =
+      let indexes =
+        match fixkind with
+        | GFix (vn,i) -> 
+          Some (Array.mapi
+            (fun i (n,_) ->
+                match n with
+                | Some n -> n
+                | None -> Context.Rel.length ctxtv.(i) - 1) vn)
+        | GCoFix _ -> None
+      in
+      let sigma, bodies =
+        Array.fold_left_map_i (fun i sigma (na, decls, e, ar) ->
+          let ty = lift (nbfix - i) ar in
+          new_evar env_ar sigma ty) sigma ftydecls
+      in
+      let mkfix i =
+        match indexes with
+        | Some indexes -> lift i (mkFix ((indexes, i), (names, ftys, bodies)))
+        | None -> lift i (mkCoFix (i, (names, ftys, bodies))) 
+      in
+      let fixes = Array.init nbfix mkfix in
+      let ctx = Array.rev_to_list
+                  (Array.map2_i (fun i na fix -> LocalDef (na, fix, ftys.(i)))
+                                names fixes)
+      in
+      sigma, Array.map (fun x -> destEvar !evdref x) bodies, ctx
+    in
+    (* env_ar has "partial" fixpoints defininitions for all the 
+      mutual fixpoints. *)
+    let env_ar = push_rel_context !evdref fixdecls env in
     let sigma, vdefj =
-      Array.fold_left2_map_i
-        (fun i sigma ctxt def ->
-           (* we lift nbfix times the type in tycon, because of
-            * the nbfix variables pushed to newenv *)
-           let (ctxt,ty) =
-             decompose_prod_n_assum sigma (Context.Rel.length ctxt)
-               (lift nbfix ftys.(i)) in
-           let ctxt,nenv = push_rel_context ~hypnaming sigma ctxt newenv in
-           let sigma, j = pretype (mk_tycon ty) nenv sigma def in
-           sigma, { uj_val = it_mkLambda_or_LetIn j.uj_val ctxt;
-                    uj_type = it_mkProd_or_LetIn j.uj_type ctxt })
-        sigma ctxtv vdef in
-      let sigma = Typing.check_type_fixpoint ?loc !!env sigma names ftys vdefj in
-      let nf c = nf_evar sigma c in
-      let ftys = Array.map nf ftys in (* FIXME *)
-      let fdefs = Array.map (fun x -> nf (j_val x)) vdefj in
-      let fixj = match fixkind with
-        | GFix (vn,i) ->
-              (* First, let's find the guard indexes. *)
-              (* If recursive argument was not given by user, we try all args.
-                 An earlier approach was to look only for inductive arguments,
-                 but doing it properly involves delta-reduction, and it finally
-                 doesn't seem worth the effort (except for huge mutual
-                 fixpoints ?) *)
-          let possible_indexes =
-            Array.to_list (Array.mapi
-                             (fun i annot -> match annot with
-                             | Some n -> [n]
-                             | None -> List.map_i (fun i _ -> i) 0 ctxtv.(i))
-           vn)
-          in
-          let fixdecls = (names,ftys,fdefs) in
-          let indexes = esearch_guard ?loc !!env sigma possible_indexes fixdecls in
-          make_judge (mkFix ((indexes,i),fixdecls)) ftys.(i)
-        | GCoFix i ->
-          let fixdecls = (names,ftys,fdefs) in
-          let cofix = (i, fixdecls) in
-            (try check_cofix !!env (i, nf_fix sigma fixdecls)
-             with reraise ->
-               let (e, info) = Exninfo.capture reraise in
-               let info = Option.cata (Loc.add_loc info) info loc in
-               Exninfo.iraise (e, info));
-            make_judge (mkCoFix cofix) ftys.(i)
+      CArray.fold_left2_map_i (fun i sigma (na, decls, ctxt, ar) def ->
+        (* we lift nbfix times the type in tycon, because of
+	        the (nbfix - i) variables pushed to env_ar *)
+        let (ctxt,ty) = decompose_prod_n_assum sigma (Context.Rel.length ctxt)
+            (lift (nbfix - i) ar) in
+        (* ctxt, ty is in env_ar = env, f_i : F_i (for all i) *)
+        let env_ar = nf_evar_env !evdref env_ar in
+        let nenv = push_rel_context !evdref ctxt env_ar in
+        (* env, f_i : F_i, ctxt |- ty *)
+        let j = pretype (mk_tycon ty) nenv evdref def in
+        (* env, f_i : F_i, ctxt |- j = def : ty *)
+        let uj_val = it_mkLambda_or_LetIn j.uj_val ctxt in
+        let uj_type = it_mkProd_or_LetIn j.uj_type ctxt in
+        (* env, f_i : F_i |- uj_val, uj_type *)
+        let _, inst, _, _, _ =
+          push_rel_context_to_named_context env_ar.ExtraEnv.env sigma uj_val in
+        let sigma = Evd.define (fst bodies.(i)) (EConstr.Unsafe.to_constr inst) sigma in
+        let () = match Evarsolve.reconsider_conv_pbs
+                          (Evarconv.evar_conv_x full_transparent_state) sigma with
+          | Evarsolve.Success sigma -> sigma
+          | _ -> sigma
+        in
+        { uj_val; uj_type })
+      sigma ftydecls vdef 
+    in
+    let ftys = Array.map (nf_evar !evdref) ftys in
+    let vdefj = Array.map (fun x -> j_nf_evar !evdref x) vdefj in
+    Typing.check_type_fixpoint loc env.ExtraEnv.env evdref names ftys vdefj;
+    let fdefs = Array.map j_val vdefj in
+    let fixj = match fixkind with
+      | GFix (vn,i) ->
+        (* First, let's find the guard indexes. *)
+        (* If recursive argument was not given by user, we try all args.
+            An earlier approach was to look only for inductive arguments,
+            but doing it properly involves delta-reduction, and it finally
+            doesn't seem worth the effort (except for huge mutual fixpoints ?) *)
+        let possible_indexes =
+          Array.to_list (Array.mapi
+                            (fun i annot -> match annot with
+                            | Some n -> [n]
+                            | None -> List.map_i (fun i _ -> i) 0 ctxtv.(i))
+          vn)
+        in
+    	  let fixdecls = (names,ftys,fdefs) in
+        let indexes = esearch_guard ?loc !!env sigma possible_indexes fixdecls in
+        let make_one n = mkFix ((indexes,n),fixdecls) in
+        let ty =
+          let substi = List.init i (fun k -> make_one (pred i - k)) in
+          substl substi ftys.(i)
+        in
+	        make_judge (make_one i) ty
+	    | GCoFix i ->
+        let fixdecls = (names,ftys,fdefs) in
+        let cofix = (i, fixdecls) in
+        let make_one n = mkCoFix (n,fixdecls) in
+        let ty =
+          let substi = List.init i (fun k -> make_one (pred i - k)) in
+          substl substi ftys.(i)
+        in
+        make_judge (mkCoFix (i,fixdecls)) ty
       in
       discard_trace @@ inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma fixj tycon
 

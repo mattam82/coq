@@ -956,7 +956,7 @@ let check_one_fix renv recpos trees def =
 
         | Case (ci,p,c_0,lrest) ->
             begin try
-              List.iter (check_rec_call renv []) (c_0::p::l);
+              List.iter (check_rec_call renv []) (c_0::(* p :: DANGER, FIXME ::*) l);
               (* compute the recarg info for the arguments of each branch *)
               let case_spec =
                 branches_specif renv (lazy_subterm_specif renv [] c_0) ci in

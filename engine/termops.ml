@@ -577,11 +577,13 @@ let adjust_app_array_size f1 l1 f2 l2 =
    time being almost those of the ML representation (except for
    (co-)fixpoint) *)
 
-let fold_rec_types g (lna,typarray,_) e =
+let fold_rec_types g (lna,typarray,_) f e =
   let open EConstr in
   let open Vars in
-  let ctxt = Array.map2_i (fun i na t -> RelDecl.LocalAssum (na, lift i t)) lna typarray in
-  Array.fold_left (fun e assum -> g assum e) e ctxt
+  Array.fold_left2_map (fun e na t ->
+    let t' = f e t in
+    let decl = RelDecl.LocalAssum (na, t') in
+    g decl e, t') lna typarray e
 
 let map_left2 f a g b =
   let l = Array.length a in
@@ -647,17 +649,17 @@ let map_constr_with_binders_left_to_right sigma g f l c =
         if b' == b && p' == p && bl' == bl then c
         else mkCase (ci, p', b', bl')
   | Fix (ln,(lna,tl,bl as fx)) ->
-      let l' = fold_rec_types g fx l in
-      let (tl', bl') = map_left2 (f l) tl (f l') bl in
-        if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
+      let tl', l' = fold_rec_types g fx f l in
+      let bl' = Array.map_left (f l') bl in
+	      if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
         then c
-        else mkFix (ln,(lna,tl',bl'))
-  | CoFix(ln,(lna,tl,bl as fx)) ->
-      let l' = fold_rec_types g fx l in
-      let (tl', bl') = map_left2 (f l) tl (f l') bl in
-        if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
+	      else mkFix (ln,(lna,tl',bl'))
+  | CoFix (ln,(lna,tl,bl as fx)) ->
+      let tl', l' = fold_rec_types g fx f l in
+      let bl' = Array.map_left (f l') bl in
+	      if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
         then c
-        else mkCoFix (ln,(lna,tl',bl'))
+	      else mkCoFix (ln,(lna,tl',bl'))
 
 let map_under_context_with_full_binders sigma g f l n d =
   let open EConstr in
@@ -722,15 +724,13 @@ let map_constr_with_full_binders_gen userview sigma g f l cstr =
       if p==p' && c==c' && Array.for_all2 (==) bl bl' then cstr else
         mkCase (ci, p', c', bl')
   | Fix (ln,(lna,tl,bl as fx)) ->
-      let tl' = Array.map (f l) tl in
-      let l' = fold_rec_types g fx l in
+      let tl', l' = fold_rec_types g fx f l in
       let bl' = Array.map (f l') bl in
       if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
       then cstr
       else mkFix (ln,(lna,tl',bl'))
-  | CoFix(ln,(lna,tl,bl as fx)) ->
-      let tl' = Array.map (f l) tl in
-      let l' = fold_rec_types g fx l in
+  | Fix (ln,(lna,tl,bl as fx)) ->
+      let tl', l' = fold_rec_types g fx f l in
       let bl' = Array.map (f l') bl in
       if Array.for_all2 (==) tl tl' && Array.for_all2 (==) bl bl'
       then cstr

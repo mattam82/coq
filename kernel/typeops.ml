@@ -443,7 +443,7 @@ let check_fixpoint env lna lar vdef vdeft =
   let lt = Array.length vdeft in
   assert (Int.equal (Array.length lar) lt);
   try
-    conv_leq_vecti env vdeft (Array.map (fun ty -> lift lt ty) lar)
+    conv_leq_vecti env vdeft (Array.mapi (fun i ty -> lift (lt - i) ty) lar)
   with NotConvertibleVect i ->
     error_ill_typed_rec_body env i lna (make_judgev vdef vdeft) lar
 
@@ -574,20 +574,24 @@ let rec execute env cstr =
         in
         cstr, t
 
-    | Fix ((_vn,i as vni),recdef as fix) ->
-      let (fix_ty,recdef') = execute_recdef env recdef i in
+    | Fix ((vn,i as vni),recdef as fix) ->
+      let (fix_ty,recdef') = execute_recdef ~vn env recdef i in
       let cstr, fix = if recdef == recdef' then cstr, fix else
           let fix = (vni,recdef') in mkFix fix, fix
       in
-      check_fix env fix; cstr, fix_ty
-
+      let () = check_fix env fix in
+      let substi = List.init i (fun k -> mkFix ((vn,pred i - k),recdef')) in
+      cstr, substl substi fix_ty
+	  
     | CoFix (i,recdef as cofix) ->
       let (fix_ty,recdef') = execute_recdef env recdef i in
       let cstr, cofix = if recdef == recdef' then cstr, cofix else
           let cofix = (i,recdef') in mkCoFix cofix, cofix
       in
-      check_cofix env cofix; cstr, fix_ty
-
+      let () = check_cofix env cofix in
+      let substi = List.init i (fun k -> mkCoFix ((pred i - k),recdef')) in
+      cstr, substl substi fix_ty
+	  
     (* Primitive types *)
     | Int _ -> cstr, type_of_int env
     | Float _ -> cstr, type_of_float env
@@ -603,21 +607,30 @@ and execute_is_type env constr =
   let c, t = execute env constr in
     c, check_type env constr t
 
-and execute_recdef env (names,lar,vdef as recdef) i =
-  let lar', lart = execute_array env lar in
-  let names' = Array.Smart.map_i (fun i na -> check_assumption env na lar'.(i) lart.(i)) names in
-  let env1 = push_rec_types (names',lar',vdef) env in (* vdef is ignored *)
-  let vdef', vdeft = execute_array env1 vdef in
-  let () = check_fixpoint env1 names' lar' vdef' vdeft in
+and execute_recdef ?vn env (names,lar,vdef as recdef) i =
+  let open Context.Rel.Declaration in
+  let mkfix na i =
+    match vn with
+    | None -> LocalDef (na, mkCoFix (i, fixdecl), lar.(i))
+    | Some indexes -> LocalDef (na, mkFix ((indexes, i), fixdecl), lar.(i))
+  in
+  let (envass, envdefs), names', lar' =
+    CArray.Smart.fold_left2_map2_i (fun i na ar (envass, envdefs) ->
+        let ar', art = execute envass ar in
+        let na' = check_assumption env na ar' art in
+        let envass' = push_rel (LocalAssum (na', ar')) envass in
+        let envdefs' = push_rel (mkfix na i) envdefs in
+        (envass', envdefs'), na', ar') names lar env in
+  let vdef', vdeft = execute_array envdefs vdef in
   let recdef = if names == names' && lar == lar' && vdef == vdef' then recdef else (names',lar',vdef') in
-    (lar'.(i),recdef)
+  (* TODO: We should update envdefs here in case some marks have changed *)
+  let () = check_fixpoint envdefs names' lar' vdef' vdeft in
+  (lara.(i),recdef)
 
 and execute_array env cs =
   let tys = Array.make (Array.length cs) mkProp in
   let cs = Array.Smart.map_i (fun i c -> let c, ty = execute env c in tys.(i) <- ty; c) cs in
   cs, tys
-
-(* Derived functions *)
 
 let check_wellformed_universes env c =
   let univs = universes_of_constr c in

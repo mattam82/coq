@@ -127,9 +127,16 @@ let check_constructor_univs env_ar_par info (args,_) =
   (* We ignore the output, positivity will check that it's the expected inductive type *)
   check_context_univs ~ctor:true env_ar_par info args
 
-let check_constructors env_ar_par isrecord params lc (arity,indices,univ_info) =
-  let lc = Array.map_of_list (fun c -> (Typeops.infer_type env_ar_par c).utj_val) lc in
-  let splayed_lc = Array.map (Reduction.dest_prod_assum env_ar_par) lc in
+let check_constructors (env_ar_par_cstrs, cstrsubst) isrecord params names lc (arity,indices,univ_info) =
+  let env_ar_par_cstrs', lc =
+    List.fold_left2_map (fun (env, lc) n t ->
+        let j = Typing.infer_type env t in
+        let decl = LocalAssum (Name n, j.utj_val) in
+        (Environ.push_rel decl env, j.utj_val))
+      env_ar_par_cstrs names lc
+  in
+  let lc = Array.of_list lc in
+  let splayed_lc = Array.map (Reduction.dest_prod_assum env_ar_par_cstrs) lc in
   let univ_info = match Array.length lc with
     (* Empty type: all OK *)
     | 0 -> univ_info
@@ -143,10 +150,18 @@ let check_constructors env_ar_par isrecord params lc (arity,indices,univ_info) =
     (* More than 1 constructor: must squash if Prop/SProp *)
     | _ -> check_univ_leq env_ar_par Univ.Universe.type0 univ_info
   in
-  let univ_info = Array.fold_left (check_constructor_univs env_ar_par) univ_info splayed_lc in
-  (* generalize the constructors over the parameters *)
-  let lc = Array.map (fun c -> Term.it_mkProd_or_LetIn c params) lc in
-  (arity, lc), (indices, splayed_lc), univ_info
+  let univ_info = Array.fold_left (check_constructor_univs env_ar_par_cstrs) univ_info splayed_lc in
+  let paraminst = Context.Rel.to_extended_vect mkRel 0 params in
+  let (_, cstrsubst), lc =
+    Array.fold_left_map (fun (j,crs) t ->
+      (* Substitute the references to previous constructors. *)
+      let crs' = mkApp (mkConstructUi (((kn,i),u),j), paraminst) :: crs in
+      let t' = substl crs t in
+      (* Generalize the constructors over the parameters *)  
+      let t' = it_mkProd_or_LetIn t' params in
+      ((succ j, crs'), t')) (1, cstrsubst) lc 
+  in
+  (env_ar_par_cstrs', cstrsubst), (arity, lc), (indices, splayed_lc), univ_info
 
 let check_record data =
   List.for_all (fun (_,(_,splayed_lc),info) ->
@@ -281,12 +296,12 @@ let get_template univs params data =
   in
   { template_param_levels = params; template_context = ctx }
 
-let abstract_packets usubst ((arity,lc),(indices,splayed_lc),univ_info) =
+let abstract_packets kn uinst usubst arsubst ((arity,lc),(indices,splayed_lc),univ_info) =
   if not (Universe.Set.is_empty univ_info.missing)
   then raise (InductiveError (MissingConstraints (univ_info.missing,univ_info.ind_univ)));
-  let arity = Vars.subst_univs_level_constr usubst arity in
+  let arity = Vars.subst_univs_level_constr usubst (Vars.substl arsubst arity) in
   let lc = Array.map (Vars.subst_univs_level_constr usubst) lc in
-  let indices = Vars.subst_univs_level_context usubst indices in
+  let indices = Vars.subst_univs_level_context usubst (subst_context arsubst 0 indices) in
   let splayed_lc = Array.map (fun (args,out) ->
       let args = Vars.subst_univs_level_context usubst args in
       let out = Vars.subst_univs_level_constr usubst out in
@@ -296,14 +311,16 @@ let abstract_packets usubst ((arity,lc),(indices,splayed_lc),univ_info) =
   let ind_univ = Univ.subst_univs_level_universe usubst univ_info.ind_univ in
 
   let arity = match univ_info.ind_min_univ with
-    | None -> RegularArity {mind_user_arity = arity; mind_sort = Sorts.sort_of_univ ind_univ}
+    | None ->
+      RegularArity {mind_user_arity = arity; mind_sort = Sorts.sort_of_univ ind_univ}
     | Some min_univ -> TemplateArity { template_level = min_univ; }
   in
 
   let kelim = allowed_sorts univ_info in
+  let arsubst' = mkIndU ((kn,List.length arsubst),uinst) :: arsubst in
   (arity,lc), (indices,splayed_lc), kelim
 
-let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
+let typecheck_inductive kn env ~sec_univs (mie:mutual_inductive_entry) =
   let () = match mie.mind_entry_inds with
   | [] -> CErrors.anomaly Pp.(str "empty inductive types declaration.")
   | _ -> ()
@@ -315,18 +332,18 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
   let has_template_poly = mie.mind_entry_template in
 
   (* universes *)
-  let env_univs =
+  let uinst, env_univs =
     match mie.mind_entry_universes with
     | Monomorphic_entry ctx ->
       if has_template_poly then
         (* For that particular case, we typecheck the inductive in an environment
            where the universes introduced by the definition are only [>= Prop] *)
         let env = set_universes_lbound env UGraph.Bound.Prop in
-        push_context_set ~strict:false ctx env
+        Univ.Instance.empty, push_context_set ~strict:false ctx env
       else
         (* In the regular case, all universes are [> Set] *)
-        push_context_set ~strict:true ctx env
-    | Polymorphic_entry (_, ctx) -> push_context ctx env
+        Univ.Instance.empty, push_context_set ~strict:true ctx env
+    | Polymorphic_entry (_, ctx) -> Univ.UContext.instance ctx, push_context ctx env
   in
 
   (* Params *)
@@ -341,9 +358,10 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
     | Some (Some _) -> true
     | Some None | None -> false
   in
-  let data = List.map2 (fun ind data ->
-      check_constructors env_ar_par isrecord params ind.mind_entry_lc data)
-      mie.mind_entry_inds data
+  let (env_ar_par_cstrs, cstrsubst), data =
+    List.fold_left2_map (fun (env_ar_par_cstrs, cstrsubst) ind data ->
+      check_constructors (env_ar_par_cstrs, cstrsubst) isrecord params ind.mind_entry_lc data)
+      (env_ar_par, []) mie.mind_entry_inds data
   in
 
   let record = mie.mind_entry_record in
@@ -379,7 +397,7 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
   (* Abstract universes *)
   let usubst, univs = Declareops.abstract_universes mie.mind_entry_universes in
   let params = Vars.subst_univs_level_context usubst params in
-  let data = List.map (abstract_packets usubst) data in
+  let _, data = List.fold_left_map (abstract_packets kn uinst usubst) [] data in
   let template =
     let check ((arity, _), _, _) = match arity with
     | TemplateArity _ -> true

@@ -336,15 +336,19 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
             (nmr, List.rev lrec)
     in check_constr_rec ienv nmr [] c
   in
-  let irecargs_nmr =
-    Array.map2
-      (fun id c ->
+  let ienv', irecargs_nmr =
+    Array.fold_left2_map
+      (fun ienv id c ->
         let _,rawc = mind_extract_params nparamsctxt c in
+        let res =
           try
-            check_constructors ienv true nmr rawc
+	          check_constructors ienv true nmr rawc
           with IllFormedInd err ->
-            explain_ind_err id (ntypes-i) env nparamsctxt c err)
-      (Array.of_list lcnames) indlc
+	          explain_ind_err id (ntypes-i) env nparamsctxt c err
+        in
+        let ienv = ienv_push_var ienv (Name id, c, mk_norec) in
+        (res, ienv))
+      ienv, (Array.of_list lcnames) indlc
   in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
@@ -363,13 +367,13 @@ let check_positivity ~chkpos kn names env_ar_par paramsctxt finite inds =
   let ra_env_ar = Array.rev_to_list rc in
   let nparamsctxt = Context.Rel.length paramsctxt in
   let nmr = Context.Rel.nhyps paramsctxt in
-  let check_one i (_,lcnames) (nindices,lc) =
+  let check_one i nconstr (_,lcnames) (nindices,lc) =
     let ra_env_ar_par =
-      List.init nparamsctxt (fun _ -> (Norec,mk_norec)) @ ra_env_ar in
-    let ienv = (env_ar_par, 1+nparamsctxt, ntypes, ra_env_ar_par) in
-    check_positivity_one ~chkpos recursive ienv paramsctxt (kn,i) nindices lcnames lc
+      List.init (nparamsctxt + nconstr) (fun _ -> (Norec,mk_norec)) @ ra_env_ar in
+    let ienv = (env_ar_par, 1+nparamsctxt+nconstr, ntypes, ra_env_ar_par) in
+    (nconstr + Array.length lc, check_positivity_one ~chkpos recursive ienv paramsctxt (kn,i) snindices lcnames lc)
   in
-  let irecargs_nmr = Array.map2_i check_one names inds in
+  let nconstr, irecargs_nmr = Array.fold_left2_map_i check_one ([], 0) names inds in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
   in (nmr',Rtree.mk_rec irecargs)
@@ -466,6 +470,13 @@ let compute_projections (kn, i as ind) mib =
   Array.of_list (List.rev rs),
   Array.of_list (List.rev pbs)
 
+let subst_rel_context k subst ctx = 
+  let (_, ctx') = List.fold_right 
+    (fun decl (k, ctx') ->
+      (succ k, map_constr (substnl subst k) decl :: ctx'))
+    ctx (k, [])
+  in ctx'
+
 let build_inductive env ~sec_univs names prv univs template variance
     paramsctxt kn isrecord isfinite inds nmr recargs =
   let ntypes = Array.length inds in
@@ -559,12 +570,11 @@ let build_inductive env ~sec_univs names prv univs template variance
   { mib with mind_record = record_info }
 
 (************************************************************************)
-(************************************************************************)
 
 let check_inductive env ~sec_univs kn mie =
   (* First type-check the inductive definition *)
   let (env_ar_par, univs, template, variance, record, paramsctxt, inds) =
-    IndTyping.typecheck_inductive env ~sec_univs mie
+    IndTyping.typecheck_inductive kn env ~sec_univs mie
   in
   (* Then check positivity conditions *)
   let chkpos = (Environ.typing_flags env).check_positive in

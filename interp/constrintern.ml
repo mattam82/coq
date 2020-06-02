@@ -1926,8 +1926,9 @@ let internalize globalenv env pattern_mode (_, ntnvars as lvar) c =
             Exninfo.iraise (InternalizationError (UnboundFixName (false,iddef)),info)
         in
         let env = restart_lambda_binders env in
-        let idl_temp = Array.map
-            (fun (id,recarg,bl,ty,_) ->
+        (* We add the recursive function types to the environment *)
+        let env_rec, idl_temp = Array.fold_left_map
+            (fun env_rec (id,recarg,bl,ty,_) ->
                let recarg = Option.map (function { CAst.v = v } -> match v with
                  | CStructRec i -> i
                  | _ -> anomaly Pp.(str "Non-structural recursive argument in non-program fixpoint")) recarg
@@ -1941,26 +1942,27 @@ let internalize globalenv env pattern_mode (_, ntnvars as lvar) c =
                let (env',rbl) = List.fold_left intern_local_binder (env',rbefore) after in
                let bl = List.rev (List.map glob_local_binder_of_extended rbl) in
                let bl_impls = remember_binders_impargs env' bl in
-               (n, bl, intern_type env' ty, bl_impls)) dl in
-        (* We add the recursive functions to the environment *)
-        let env_rec = List.fold_left_i (fun i en name ->
-           let (_,bli,tyi,_) = idl_temp.(i) in
-           let binder_index,fix_args = impls_binder_list 1 bli in
-           let impls = impls_type_list ~args:fix_args binder_index tyi in
-           push_name_env ntnvars impls en (CAst.make @@ Name name)) 0 env lf in
+               let tyi = intern_type env' ty in
+               let binder_index,fix_args = impls_binder_list 1 bli in
+               let tyimpls = impls_type_list ~args:fix_args binder_index tyi in
+               let env_rec = push_name_env ntnvars tyimpls env (CAst.make @@ Name id) in
+               env_rec, (n, bl, tyi, bl_impls)) dl
+        in
         let idl = Array.map2 (fun (_,_,_,_,bd) (n,bl,ty,before_impls) ->
-            (* We add the binders common to body and type to the environment *)
-            let env_body = restore_binders_impargs env_rec before_impls in
-            (n,bl,ty,intern {env_body with tmp_scope = None} bd)) dl idl_temp in
-        DAst.make ?loc @@
-        GRec (GFix
+          (* We add the binders common to body and type to the environment *)
+          let env_body = restore_binders_impargs env_rec before_impls in
+          (n,bl,ty,intern {env_body with tmp_scope = None} bd)) dl idl_temp in
+          DAst.make ?loc @@
+            GRec (GFix
                 (Array.map (fun (ro,_,_,_) -> ro) idl,n),
-              Array.of_list lf,
-              Array.map (fun (_,bl,_,_) -> bl) idl,
-              Array.map (fun (_,_,ty,_) -> ty) idl,
-              Array.map (fun (_,_,_,bd) -> bd) idl)
+                 Array.of_list lf,
+                 Array.map (fun (_,bl,_,_) -> bl) idl,
+                 Array.map (fun (_,_,ty,_) -> ty) idl,
+                 Array.map (fun (_,_,_,bd) -> bd) idl)
+                 
 
     | CCoFix ({ CAst.loc = locid; v = iddef }, dl) ->
+        (* TODO same as fix: allowing dependencies in types *)
         let lf = List.map (fun ({CAst.v = id},_,_,_) -> id) dl in
         let dl = Array.of_list dl in
         let n =
