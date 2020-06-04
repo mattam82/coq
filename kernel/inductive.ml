@@ -94,6 +94,7 @@ let constructor_subst mind mib u i n =
 let constructor_instantiate (mind, i) n u mib c =
   let sc = constructor_subst mind mib u i n in
   let si = ind_subst mind mib u in
+  (* Feedback.msg_debug Pp.(str"Instanciating " ++ Constr.debug_print c); *)
   substl si (Vars.substl sc (subst_instance_constr u c))
 
 let instantiate_params full t u args sign =

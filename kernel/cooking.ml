@@ -270,7 +270,7 @@ let abstract_rel_ctx (section_decls,subst) ctx =
   assert (Constr.equal t mkProp);
   ctx
 
-let abstract_lc ~ntypes expmod (newparams,subst) c =
+let abstract_lc ~ntypes ~ncstrs expmod (newparams,subst) c =
   let args = Array.rev_of_list (CList.map_filter (fun d ->
       if RelDecl.is_local_def d then None
       else match RelDecl.get_name d with
@@ -279,8 +279,10 @@ let abstract_lc ~ntypes expmod (newparams,subst) c =
       newparams)
   in
   let diff = List.length newparams in
-  let subs = List.init ntypes (fun k ->
-      lift diff (mkApp (mkRel (k+1), args)))
+  (** We lift all the references to inductives and previous constructors in the block
+    above the new parameters. *)
+  let subs = List.init (ntypes + ncstrs) (fun k ->
+      mkApp (mkRel (diff+k+1), args))
   in
   let c = Vars.substl subs c in
   let c = Vars.subst_vars subst (expmod c) in
@@ -294,8 +296,7 @@ let abstract_projection ~params expmod hyps t =
   let _, t = decompose_prod_n_assum (List.length params + 1 + Context.Rel.nhyps (fst hyps)) t in
   t
 
-let cook_one_ind ~ntypes
-    hyps expmod mip =
+let cook_one_ind ~ntypes ~ncstrs hyps expmod mip =
   let mind_arity = match mip.mind_arity with
     | RegularArity {mind_user_arity=arity;mind_sort=sort} ->
       let arity = abstract_as_type (expmod arity) hyps in
@@ -309,12 +310,12 @@ let cook_one_ind ~ntypes
     abstract_rel_ctx hyps ctx
   in
   let mind_user_lc =
-    Array.map (abstract_lc ~ntypes expmod hyps)
+    Array.mapi (fun i -> abstract_lc ~ntypes ~ncstrs:(ncstrs+i) expmod hyps)
       mip.mind_user_lc
   in
-  let mind_nf_lc = Array.map (fun (ctx,t) ->
+  let mind_nf_lc = Array.mapi (fun i (ctx,t) ->
       let lc = it_mkProd_or_LetIn t ctx in
-      let lc = abstract_lc ~ntypes expmod hyps lc in
+      let lc = abstract_lc ~ntypes ~ncstrs:(ncstrs+i) expmod hyps lc in
       decompose_prod_assum lc)
       mip.mind_nf_lc
   in
@@ -350,9 +351,11 @@ let cook_inductive { Opaqueproof.modlist; abstract } mib =
     abstract_rel_ctx hyps ctx
   in
   let ntypes = mib.mind_ntypes in
-  let mind_packets =
-    Array.map (cook_one_ind ~ntypes hyps expmod)
-      mib.mind_packets
+  let _ncstrs, mind_packets =
+    Array.fold_left_map (fun ncstrs oib ->
+      let cind = cook_one_ind ~ntypes ~ncstrs hyps expmod oib in
+      (ncstrs + Array.length oib.mind_consnames, cind))
+      0 mib.mind_packets
   in
   let mind_record = match mib.mind_record with
     | NotRecord -> NotRecord

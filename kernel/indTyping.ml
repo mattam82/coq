@@ -347,7 +347,6 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
 
   (* Arities *)
   let env_ar, data = List.fold_left_map (check_arity ~template:has_template_poly params) env_univs mie.mind_entry_inds in
-  let env_ar_par = push_rel_context params env_ar in
 
   (* Constructors *)
   let isrecord = match mie.mind_entry_record with
@@ -372,7 +371,7 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
         (* if someone tried to declare a record as SProp but it can't
            be primitive we must squash. *)
         let data = List.map (fun (a,b,univs) ->
-            a,b,check_univ_leq env_ar_par Univ.Universe.type0m univs)
+            a,b,check_univ_leq env_ar Univ.Universe.type0m univs)
             data
         in
         data, Some None
@@ -404,11 +403,11 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
     if List.exists check data then Some (get_template univs params data) else None
   in
 
-  let env_ar_par =
-    let ctx = Environ.rel_context env_ar_par in
+  let env_ar =
+    let ctx = Environ.rel_context env_ar in
     let ctx = Vars.subst_univs_level_context usubst ctx in
-    let env = Environ.pop_rel_context (Environ.nb_rel env_ar_par) env_ar_par in
+    let env = Environ.pop_rel_context (Environ.nb_rel env_ar) env_ar in
     Environ.push_rel_context ctx env
   in
 
-  env_ar_par, univs, template, variance, record, params, Array.of_list data
+  env_ar, univs, template, variance, record, params, Array.of_list data

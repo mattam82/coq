@@ -58,8 +58,8 @@ val interp_mutual_inductive_constr
   -> arities:EConstr.t list
   -> arityconcl:(bool * EConstr.ESorts.t) option list
   -> constructors:(Names.Id.t list * Constr.constr list) list
-  -> env_ar_params:Environ.env
-  (** Environment with the inductives and parameters in the rel_context *)
+  -> env_ar:Environ.env
+  (** Environment with the inductives in the rel_context *)
   -> cumulative:bool
   -> poly:bool
   -> private_ind:bool
