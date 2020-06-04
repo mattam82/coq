@@ -62,15 +62,39 @@ let instantiate_inductive_constraints mib u =
 
 (* Build the substitution that replaces Rels by the appropriate *)
 (* inductives *)
-let ind_subst mind mib u =
-  let ntypes = mib.mind_ntypes in
+
+let ind_subst_gen mind ntypes u =
   let make_Ik k = mkIndU ((mind,ntypes-k-1),u) in
   List.init ntypes make_Ik
 
-(* Instantiate inductives in constructor type *)
-let constructor_instantiate mind u mib c =
-  let s = ind_subst mind mib u in
-    substl s (subst_instance_constr u c)
+let ind_subst mind mib u =
+  let ntypes = mib.mind_ntypes in
+  ind_subst_gen mind ntypes u
+
+(* Instantiate inductives in inductive type *)
+let inductive_instantiate mind u i ty =
+  let s = ind_subst_gen mind i u in
+    substl s (subst_instance_constr u ty)
+
+(* Instantiate constructors in constructor type *)
+let constructor_subst mind mib u i n =
+  assert (n > 0);
+  let rec aux acc k =
+    if k < i then
+      let oib = mib.mind_packets.(k) in
+      let len = (Array.length oib.mind_user_lc) in
+      let cstrs = List.init len (fun i -> mkConstructU (((mind,k), (len - i)), u)) in
+      aux (cstrs @ acc) (succ k)
+    else (* We are at inductive i, we just want the previous constructors s*)
+      List.init (pred n) (fun i -> mkConstructU (((mind, k), (pred n - i)), u)) @ acc
+  in aux [] 0
+
+(* Instantiate inductives and constructors in a constructor type, which should
+  already be generalized w.r.t. parameters  *)
+let constructor_instantiate (mind, i) n u mib c =
+  let sc = constructor_subst mind mib u i n in
+  let si = ind_subst mind mib u in
+  substl si (Vars.substl sc (subst_instance_constr u c))
 
 let instantiate_params full t u args sign =
   let fail () =
@@ -95,9 +119,9 @@ let full_inductive_instantiate mib u params sign =
   let t = Term.mkArity (Vars.subst_instance_context u sign,dummy) in
     fst (Term.destArity (instantiate_params true t u params mib.mind_params_ctxt))
 
-let full_constructor_instantiate ((mind,_),u,(mib,_),params) t =
-  let inst_ind = constructor_instantiate mind u mib t in
-   instantiate_params true inst_ind u params mib.mind_params_ctxt
+let full_constructor_instantiate ((mind,i),u,(mib,_),params) n t =
+  let inst_ind = constructor_instantiate (mind,i) n u mib t in
+  instantiate_params true inst_ind u params mib.mind_params_ctxt
 
 (************************************************************************)
 (************************************************************************)
@@ -267,27 +291,36 @@ let type_of_constructor (cstr, u) (mib,mip) =
   let i = index_of_constructor cstr in
   let nconstr = Array.length mip.mind_consnames in
   if i > nconstr then user_err Pp.(str "Not enough constructors in the type.");
-  constructor_instantiate (fst ind) u mib specif.(i-1)
+  constructor_instantiate ind i u mib specif.(i-1)
+
+let arity_of_constructor (cstr, u) (mib,mip) =
+  check_instance mib u;
+  let ind = inductive_of_constructor cstr in
+  let specif = mip.mind_nf_lc in
+  let i = index_of_constructor cstr in
+  let nconstr = Array.length mip.mind_consnames in
+  if i > nconstr then user_err Pp.(str "Not enough constructors in the type.");
+  let (ctx, cty) = specif.(i - 1) in
+  constructor_instantiate ind i u mib (Term.it_mkProd_or_LetIn cty ctx)
 
 let constrained_type_of_constructor (_cstr,u as cstru) (mib,_mip as ind) =
   let ty = type_of_constructor cstru ind in
   let cst = instantiate_inductive_constraints mib u in
     (ty, cst)
 
-let arities_of_specif (kn,u) (mib,mip) =
+let arities_of_specif ((kn,i),u) (mib,mip) =
   let specif = mip.mind_nf_lc in
-  let map (ctx, c) =
+  let map j (ctx, c) =
     let cty = Term.it_mkProd_or_LetIn c ctx in
-    constructor_instantiate kn u mib cty
+    constructor_instantiate (kn,i) (j+1) u mib cty
   in
-  Array.map map specif
+  Array.mapi map specif
 
-let arities_of_constructors ind specif =
-  arities_of_specif (fst (fst ind), snd ind) specif
+let arities_of_constructors = arities_of_specif
 
 let type_of_constructors (ind,u) (mib,mip) =
   let specif = mip.mind_user_lc in
-    Array.map (constructor_instantiate (fst ind) u mib) specif
+    Array.mapi (fun i -> constructor_instantiate ind (i+1) u mib) specif
 
 (************************************************************************)
 
@@ -369,7 +402,7 @@ let is_correct_arity env c pj ind specif params =
 let build_branches_type (ind,u) (_,mip as specif) params p =
   let build_one_branch i (ctx, c) =
     let cty = Term.it_mkProd_or_LetIn c ctx in
-    let typi = full_constructor_instantiate (ind,u,specif,params) cty in
+    let typi = full_constructor_instantiate (ind,u,specif,params) (i+1) cty in
     let (cstrsign,ccl) = Term.decompose_prod_assum typi in
     let nargs = Context.Rel.length cstrsign in
     let (_,allargs) = decompose_app ccl in
@@ -687,7 +720,8 @@ let get_recargs_approx env tree ind args =
     in
     let mk_irecargs j specif =
       (* The nested inductive type with parameters removed *)
-      let auxlcvect = abstract_mind_lc auxntyp auxnpar specif.mind_nf_lc in
+      let auxlcvect = (*  TODO fixme still refers to constructors *)
+        abstract_mind_lc auxntyp auxnpar specif.mind_nf_lc in
       let paths = Array.mapi
         (fun k c ->
          let c' = hnf_prod_applist env' c lpar' in

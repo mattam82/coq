@@ -69,13 +69,15 @@ val constrained_type_of_constructor : pconstructor -> mind_specif -> types const
 val type_of_constructor : pconstructor -> mind_specif -> types
 
 (** Return constructor types in normal form *)
+
+val arity_of_constructor : pconstructor -> mind_specif -> types
 val arities_of_constructors : pinductive -> mind_specif -> types array
 
 (** Return constructor types in user form *)
 val type_of_constructors : pinductive -> mind_specif -> types array
 
 (** Transforms inductive specification into types (in nf) *)
-val arities_of_specif : MutInd.t puniverses -> mind_specif -> types array
+val arities_of_specif : pinductive -> mind_specif -> types array
 
 val inductive_params : mind_specif -> int
 

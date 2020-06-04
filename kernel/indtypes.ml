@@ -183,7 +183,7 @@ let rec ienv_decompose_prod (env,_,_,_ as ienv) n c =
 let array_min nmr a = if Int.equal nmr 0 then 0 else
   Array.fold_left (fun k (nmri,_) -> min k nmri) nmr a
 
-(** [check_positivity_one ienv paramsctxt (mind,i) nnonrecargs lcnames indlc]
+(** [check_positivity_one ienv cstrsubst paramsctxt (mind,i) nnonrecargs lcnames indlc]
     checks the positivity of the [i]-th member of the mutually
     inductive definition [mind]. It returns an [Rtree.t] which
     represents the position of the recursive calls of inductive in [i]
@@ -194,8 +194,9 @@ let array_min nmr a = if Int.equal nmr 0 then 0 else
 
     If [chkpos] is [false] then positivity is assumed, and
     [check_positivity_one] computes the subterms occurrences in a
-    best-effort fashion. *)
-let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (_,i as ind) nnonrecargs lcnames indlc =
+    best-effort fashion.
+    *)
+let check_positivity_one ~chkpos recursive ienv ncstrs paramsctxt (_,i as ind) nnonrecargs lcnames indlc =
   let nparamsctxt = Context.Rel.length paramsctxt in
   let nmr = Context.Rel.nhyps paramsctxt in
   (** Positivity of one argument [c] of a constructor (i.e. the
@@ -336,19 +337,26 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
             (nmr, List.rev lrec)
     in check_constr_rec ienv nmr [] c
   in
-  let irecargs_nmr =
-    Array.map2
-      (fun id c ->
-        let _,rawc = mind_extract_params nparamsctxt c in
+  let ra_env_par = List.init nparamsctxt (fun _ -> (Norec,mk_norec)) in
+  let (ienv', ncstrs), irecargs_nmr =
+    Array.fold_left2_map
+      (fun ((env, n, ntypes, ra_env), ncstrs) id c ->
         try
-         check_constructor ienv true nmr rawc
+         let ienv_par = (Environ.push_rel_context paramsctxt env,
+           n+nparamsctxt, ntypes, ra_env_par @ ra_env) in
+         let nmr = check_constructor ienv_par true nmr c in
+         (* Add the constructor to the environment *)
+         let ienv = ienv_push_var ienv
+          (Context.make_annot (Name id) Sorts.Relevant, c, mk_norec)
+        (* FIXME: these should be ok to recurse on *)
+        in (ienv, succ ncstrs), nmr
         with IllFormedInd err ->
-         explain_ind_err id (ntypes-i) env nparamsctxt c err)
-      (Array.of_list lcnames) indlc
+         explain_ind_err id (ntypes-i) env (nparamsctxt + ncstrs) c err)
+      (ienv, ncstrs) (Array.of_list lcnames) indlc
   in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
-  in (nmr', mk_paths (Mrec ind) irecargs)
+  in (ienv', ncstrs), (nmr', mk_paths (Mrec ind) irecargs)
 
 (** [check_positivity ~chkpos kn env_ar paramsctxt inds] checks that the mutually
     inductive block [inds] is strictly positive.
@@ -356,19 +364,17 @@ let check_positivity_one ~chkpos recursive (env,_,ntypes,_ as ienv) paramsctxt (
     If [chkpos] is [false] then positivity is assumed, and
     [check_positivity_one] computes the subterms occurrences in a
     best-effort fashion. *)
-let check_positivity ~chkpos kn names env_ar_par paramsctxt finite inds =
+let check_positivity ~chkpos kn names env_ar paramsctxt finite inds =
   let ntypes = Array.length inds in
   let recursive = finite != BiFinite in
   let rc = Array.mapi (fun j t -> (Mrec (kn,j),t)) (Rtree.mk_rec_calls ntypes) in
   let ra_env_ar = Array.rev_to_list rc in
-  let nparamsctxt = Context.Rel.length paramsctxt in
   let nmr = Context.Rel.nhyps paramsctxt in
-  let ra_env_ar_par = List.init nparamsctxt (fun _ -> (Norec,mk_norec)) @ ra_env_ar in
-  let ienv = (env_ar_par, 1+nparamsctxt, ntypes, ra_env_ar_par) in
-  let check_one i (_,lcnames) (nindices,lc) =
-    check_positivity_one ~chkpos recursive ienv paramsctxt (kn,i) nindices lcnames lc
+  let ienv = (env_ar, 1, ntypes, ra_env_ar) in
+  let check_one i (ienv, ncstrs) (_,lcnames) (nindices,lc) =
+    check_positivity_one ~chkpos recursive ienv ncstrs paramsctxt (kn,i) nindices lcnames lc
   in
-  let irecargs_nmr = Array.map2_i check_one names inds in
+  let _, irecargs_nmr = Array.fold_left2_map_i check_one (ienv, 0) names inds in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
   in (nmr',Rtree.mk_rec irecargs)
@@ -508,8 +514,8 @@ let build_inductive env ~sec_univs names prv univs template variance
         mind_consnames = Array.of_list cnames;
         mind_consnrealdecls = consnrealdecls;
         mind_consnrealargs = consnrealargs;
-        mind_user_lc = lc;
-        mind_nf_lc = nf_lc;
+        mind_user_lc = lc; (* No parameters *)
+        mind_nf_lc = splayed_lc; (* With parameters *)
         mind_recargs = recarg;
         mind_relevance;
         mind_nb_constant = !nconst;
@@ -562,7 +568,7 @@ let build_inductive env ~sec_univs names prv univs template variance
 let check_inductive env ~sec_univs kn mie =
   (* First type-check the inductive definition *)
   let (env_ar_par, univs, template, variance, record, paramsctxt, inds) =
-    IndTyping.typecheck_inductive kn env ~sec_univs mie
+    IndTyping.typecheck_inductive env ~sec_univs mie
   in
   (* Then check positivity conditions *)
   let chkpos = (Environ.typing_flags env).check_positive in

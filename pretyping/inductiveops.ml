@@ -102,13 +102,7 @@ let mis_is_recursive (ind,mib,mip) =
     mip.mind_recargs
 
 let mis_nf_constructor_type ((ind,u),mib,mip) j =
-  let specif = mip.mind_nf_lc
-  and ntypes = mib.mind_ntypes
-  and nconstr = Array.length mip.mind_consnames in
-  let make_Ik k = mkIndU (((fst ind),ntypes-k-1),u) in
-  if j > nconstr then user_err Pp.(str "Not enough constructors in the type.");
-  let (ctx, cty) = specif.(j - 1) in
-  substl (List.init ntypes make_Ik) (subst_instance_constr u (Term.it_mkProd_or_LetIn cty ctx))
+  Inductive.arity_of_constructor ((ind,j),u) (mib,mip)
 
 (* Number of constructors *)
 
@@ -312,7 +306,7 @@ let instantiate_params t params sign =
   substl subst t
 
 let get_constructor ((ind,u as indu),mib,mip,params) j =
-  assert (j <= Array.length mip.mind_consnames);
+  assert (j > 0 && j <= Array.length mip.mind_consnames);
   let typi = mis_nf_constructor_type (indu,mib,mip) j in
   let ctx = Vars.subst_instance_context u mib.mind_params_ctxt in
   let typi = instantiate_params typi params ctx in
