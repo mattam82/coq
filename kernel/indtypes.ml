@@ -279,32 +279,38 @@ let check_positivity_one ~chkpos recursive ienv paramsctxt (_,i as ind) nnonreca
         failwith_non_pos_list n ntypes auxnonrecargs;
       (* Nested mutual inductive types are not supported *)
       let auxntyp = mib.mind_ntypes in
-        if not (Int.equal auxntyp 1) then raise (IllFormedInd (LocalNonPos n));
-        (* The nested inductive type with parameters removed *)
-        let auxlcvect = abstract_mind_lc auxntyp auxnrecpar mip.mind_nf_lc in
-          (* Extends the environment with a variable corresponding to
-             the inductive def *)
-        let (env',_,_,_,_ as ienv') = ienv_push_inductive ienv ((mi,u),auxrecparams) in
-          (* Parameters expressed in env' *)
-        let auxrecparams' = List.map (lift auxntyp) auxrecparams in
-        let irecargs_nmr =
-          (** Checks that the "nesting" inductive type is covariant in
-              the relevant parameters. In other words, that the
-              (nested) parameters which are instantiated with
-              inductives of the mutually inductive block occur
-              positively in the types of the nested constructors. *)
-          Array.map
-            (function c ->
-              let c' = hnf_prod_applist env' c auxrecparams' in
-              (* skip non-recursive parameters *)
-              let (ienv',c') = ienv_decompose_prod ienv' auxnnonrecpar c' in
-                check_constructor ienv' false nmr c')
-            auxlcvect
-        in
-        let irecargs = Array.map snd irecargs_nmr
-        and nmr' = array_min nmr irecargs_nmr
-        in
-          (nmr',(Rtree.mk_rec [|mk_paths (Imbr mi) irecargs|]).(0))
+      let () = if not (Int.equal auxntyp 1) then raise (IllFormedInd (LocalNonPos n)) in
+      (** FIXME: we remove references to the mutually defined constructors for
+        inductive inductive types. We should rather push their declarations in the env. *)
+      let lc = Array.map (fun (ctx, c) -> Term.it_mkProd_or_LetIn c ctx) mip.mind_nf_lc in
+      let lc = Array.mapi (fun k cty ->
+        let csubst = constructor_subst (fst mi) mib u 0 (k+1) in
+        substl csubst cty) lc in
+      (* The nested inductive type with parameters removed *)
+      let auxlcvect = abstract_mind_lc auxntyp auxnrecpar lc in
+        (* Extends the environment with a variable corresponding to
+            the inductive def *)
+      let (env',_,_,_,_ as ienv') = ienv_push_inductive ienv ((mi,u),auxrecparams) in
+        (* Parameters expressed in env' *)
+      let auxrecparams' = List.map (lift auxntyp) auxrecparams in
+      let irecargs_nmr =
+        (** Checks that the "nesting" inductive type is covariant in
+            the relevant parameters. In other words, that the
+            (nested) parameters which are instantiated with
+            inductives of the mutually inductive block occur
+            positively in the types of the nested constructors. *)
+        Array.map
+          (function c ->
+            let c' = hnf_prod_applist env' c auxrecparams' in
+            (* skip non-recursive parameters *)
+            let (ienv',c') = ienv_decompose_prod ienv' auxnnonrecpar c' in
+              check_constructor ienv' false nmr c')
+          auxlcvect
+      in
+      let irecargs = Array.map snd irecargs_nmr
+      and nmr' = array_min nmr irecargs_nmr
+      in
+        (nmr',(Rtree.mk_rec [|mk_paths (Imbr mi) irecargs|]).(0))
 
   (** [check_constructor ienv check_head nmr c] checks the positivity
       condition in the type [c] of a constructor (i.e. that recursive
@@ -350,9 +356,6 @@ let check_positivity_one ~chkpos recursive ienv paramsctxt (_,i as ind) nnonreca
           let _,rawc = mind_extract_params nparamsctxt c in
           let ienv_par = (Environ.push_rel_context paramsctxt env,
             n+nparamsctxt, ntypes, ncstrs, ra_env_par @ ra_env) in
-          Feedback.msg_debug Pp.(str"Checking " ++ Constr.debug_print rawc ++
-            str"n = " ++ int n ++ str " ntypes = " ++ int ntypes ++ str " ncstrs = " ++
-            int ncstrs);
           let nmr = check_constructor ienv_par true nmr rawc in
           (* Add the constructor to the environment *)
           let ienv = ienv_push_cstr ienv
@@ -385,7 +388,9 @@ let check_positivity ~chkpos kn names env_ar paramsctxt finite inds =
   let _, irecargs_nmr = Array.fold_left2_map_i check_one ienv names inds in
   let irecargs = Array.map snd irecargs_nmr
   and nmr' = array_min nmr irecargs_nmr
-  in (nmr',Rtree.mk_rec irecargs)
+  in
+  let tree = Rtree.mk_rec irecargs in
+  (nmr',tree)
 
 
 (************************************************************************)

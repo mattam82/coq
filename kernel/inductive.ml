@@ -661,7 +661,6 @@ let lambda_implicit_lift n a =
 (* This removes global parameters of the inductive types in lc (for
    nested inductive types only ) *)
 let abstract_mind_lc ntyps npars lc =
-  let lc = Array.map (fun (ctx, c) -> Term.it_mkProd_or_LetIn c ctx) lc in
   if Int.equal npars 0 then
     lc
   else
@@ -720,9 +719,15 @@ let get_recargs_approx env tree ind args =
       else Array.map (fun mip -> dest_subterms mip.mind_recargs) mib.mind_packets
     in
     let mk_irecargs j specif =
-      (* The nested inductive type with parameters removed *)
-      let auxlcvect = (*  TODO fixme still refers to constructors *)
-        abstract_mind_lc auxntyp auxnpar specif.mind_nf_lc in
+      let lc = Array.map (fun (ctx, c) -> Term.it_mkProd_or_LetIn c ctx) specif.mind_nf_lc in
+      (* FIXME inductive-inductive constructors. Here we substitute the references to
+        constructors so that the constructor type is typeable in the context of arities. *)
+      let lc = Array.mapi (fun k cty ->
+          let csubst = constructor_subst mind mib u j (k+1) in
+          substl csubst cty) lc in
+      (* The nested inductive type's constructors with recursively uniform
+         parameters removed at each recursive application of the inductive. *)
+      let auxlcvect = abstract_mind_lc auxntyp auxnpar lc in
       let paths = Array.mapi
         (fun k c ->
          let c' = hnf_prod_applist env' c lpar' in
@@ -908,6 +913,17 @@ let error_illegal_rec_call renv fx (arg_renv,arg) =
 let error_partial_apply renv fx =
   raise (FixGuardError (renv.env,NotEnoughArgumentsForFixCall fx))
 
+let prrecarg r =
+  let open Pp in
+  match r with
+  | Declarations.Norec -> str "Norec"
+  | Declarations.Mrec (mind,i) ->
+     str "Mrec[" ++ MutInd.print mind ++ pr_comma () ++ int i ++ str "]"
+  | Declarations.Imbr (mind,i) ->
+     str "Imbr[" ++ MutInd.print mind ++ pr_comma () ++ int i ++ str "]"
+
+let pr_tree = Rtree.pp_tree prrecarg
+
 let filter_stack_domain env p stack =
   let absctx, ar = dest_lam_assum env p in
   (* Optimization: if the predicate is not dependent, no restriction is needed
@@ -929,6 +945,8 @@ let filter_stack_domain env p stack =
         | Not_subterm | Dead_code -> elt
         | Subterm(s,path) ->
             let recargs = get_recargs_approx env path ind args in
+            Feedback.msg_debug Pp.(str"Intersecting " ++ pr_tree recargs ++ spc () ++ str" and " ++ pr_tree path);
+
             let path = inter_wf_paths path recargs in
             SArg (lazy (Subterm(s,path))))
       | _ -> (SArg (lazy Not_subterm))

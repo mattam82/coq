@@ -35,6 +35,8 @@ val lookup_mind_specif : env -> inductive -> mind_specif
 
 (** {6 Functions to build standard types related to inductive } *)
 val ind_subst : MutInd.t -> mutual_inductive_body -> Instance.t -> constr list
+val constructor_subst : MutInd.t -> mutual_inductive_body -> Instance.t ->
+  int -> int -> constr list
 
 val inductive_paramdecls : mutual_inductive_body puniverses -> Constr.rel_context
 
@@ -146,4 +148,4 @@ val subterm_specif : guard_env -> stack_element list -> constr -> subterm_spec
 
 val lambda_implicit_lift : int -> constr -> constr
 
-val abstract_mind_lc : int -> Int.t -> (rel_context * constr) array -> constr array
+val abstract_mind_lc : int -> Int.t -> constr array -> constr array

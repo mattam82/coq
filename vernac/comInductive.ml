@@ -653,7 +653,6 @@ let do_mutual_inductive ~template udecl indl ~cumulative ~poly ~private_ind ~uni
   in
   let mie,pl,impls = interp_mutual_inductive_gen (Global.env()) ~template udecl indl ntns ~cumulative ~poly ~private_ind finite in
   (* Declare the mutual inductive block with its associated schemes *)
-  Printf.printf "declaring\n%!";
   ignore (DeclareInd.declare_mutual_inductive_with_eliminations mie pl impls);
   (* Declare the possible notations of inductive types *)
   List.iter (Metasyntax.add_notation_interpretation (Global.env ())) ntns;
