@@ -72,7 +72,7 @@ let ind_subst mind mib u =
   ind_subst_gen mind ntypes u
 
 (* Instantiate inductives in inductive type *)
-let inductive_subst mind i u =
+let ind_ind_subst ((mind, i), u) =
   ind_subst_gen mind i u
 
 (* Instantiate constructors in constructor type *)
@@ -114,10 +114,10 @@ let instantiate_params full t u args sign =
   let () = if not (List.is_empty rem_args) then fail () in
   substl subs ty
 
-let full_inductive_instantiate (mib,_mip) ((mind,i),u) params sign =
+let full_inductive_instantiate (mib,_mip) ((mind,i),u as pind) params sign =
   let dummy = Sorts.prop in
   let t = Term.mkArity (Vars.subst_instance_context u sign,dummy) in
-  let t = Vars.substl (inductive_subst mind i u) t in
+  let t = Vars.substl (ind_ind_subst pind) t in
     fst (Term.destArity (instantiate_params true t u params mib.mind_params_ctxt))
 
 let full_constructor_instantiate (mib,_) (i,u) params n t =
@@ -237,7 +237,7 @@ let check_instance mib u =
 
 let type_of_inductive_gen ?(polyprop=true) (mib,mip) ((mind,i),u) paramtyps =
   check_instance mib u;
-  let isubst = inductive_subst mind i u in
+  let isubst = ind_ind_subst ((mind,i), u) in
   match mip.mind_arity with
   | RegularArity a -> Vars.substl isubst (subst_instance_constr u a.mind_user_arity)
   | TemplateArity ar ->

@@ -275,7 +275,7 @@ Definition interp_Tm :
 
 (** Examples *)
 Definition tyUU : Ty emp_ctx := Pi U U.
-Eval compute in interp_Ty _ tyUU.
+Eval compute in interp_Ty _ tyUU tt.
 
 Definition Uctx : Ctx := ctx_ext emp_ctx U.
 
@@ -294,6 +294,7 @@ Definition vs {Γ} {A : Ty Γ} {B} : Tm Γ A -> Tm (ctx_ext Γ B) (subst_ty A wk
 Definition idU := lam vz : Tm emp_ctx (Pi U (subst_ty U wk)).
 Eval compute in interp_Tm _ _ idU tt.
 
+(* Have the substitution calculus equations would be nicer *)
 Axiom subst_ty_U : forall {Γ}, subst_ty U (@wk Γ U) = U.
 
 Definition coetm {Γ A A'} : A = A' -> Tm Γ A -> Tm Γ A'.

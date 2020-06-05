@@ -230,10 +230,10 @@ let inductive_paramdecls env (ind,u) =
 let inductive_paramdecls_env env (ind,u) = inductive_paramdecls env (ind,u)
 [@@ocaml.deprecated "Alias for Inductiveops.inductive_paramsdecls"]
 
-let inductive_alldecls env ind =
-  let spec = Inductive.lookup_mind_specif env (fst ind) in
-  let typ = Inductive.type_of_inductive spec ind in
-  fst (destArity typ)
+let inductive_alldecls env (ind,u) =
+  let (mib,mip) = Inductive.lookup_mind_specif env ind in
+  substl_rel_context (Inductive.ind_ind_subst (ind,u))
+    (Vars.subst_instance_context u mip.mind_arity_ctxt)
 
 let inductive_alldecls_env env (ind,u) = inductive_alldecls env (ind,u)
 [@@ocaml.deprecated "Alias for Inductiveops.inductive_alldecls"]
@@ -385,7 +385,7 @@ let get_arity env ((ind,u),params) =
     end in
   let parsign = Vars.subst_instance_context u parsign in
   let arproperlength = List.length mip.mind_arity_ctxt - List.length parsign in
-  let mind_arity_ctxt = fst (destArity (Inductive.type_of_inductive (mib,mip) (ind,u))) in
+  let mind_arity_ctxt = substl_rel_context (Inductive.ind_ind_subst (ind,u)) mip.mind_arity_ctxt in
   let arsign,_ = List.chop arproperlength mind_arity_ctxt in
   let subst = subst_of_rel_context_instance parsign params in
   let arsign = Vars.subst_instance_context u arsign in

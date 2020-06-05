@@ -34,7 +34,14 @@ type mind_specif = mutual_inductive_body * one_inductive_body
 val lookup_mind_specif : env -> inductive -> mind_specif
 
 (** {6 Functions to build standard types related to inductive } *)
+
+(* Substitution of all inductives in the block *)
 val ind_subst : MutInd.t -> mutual_inductive_body -> Instance.t -> constr list
+
+(** Substitution for inductives up to i (not included).
+  Used to substitute in arities of inductive-inductive types. *)
+val ind_ind_subst : pinductive -> constr list
+
 val constructor_subst : MutInd.t -> mutual_inductive_body -> Instance.t ->
   int -> int -> constr list
 

@@ -8,7 +8,7 @@ Inductive Con : Set :=
 with Ty : Con -> Set :=
 | Uunit Γ :  Ty Γ
 | Upi Γ A (B : Ty (ext Γ A)) : Ty Γ.
-
+Print Ty.
 (** Unification issue, difference between named and rel_context, 
     putting these variables in the rel_context results in unification
     failure *)
@@ -29,11 +29,11 @@ Section elim.
         | ext g t =>
           (* Interresting unification issue here, there should be 
            a single solution *)
-          f1 g (F g) t (F0 g t)
-          (* let x := F g in f1 g x t (F0 g t : TyM g x t) *)
+          (* f1 g (F g) t (F0 g t) *)
+          let x := F g in f1 g x t (F0 g t : TyM g x t)
         end
         with F0 (a : Con) (t : Ty a) {struct t} : TyM a (F a) t :=
-          match t in Ty g return TyM g (F g) t with
+          match t as t0 in Ty g return TyM g (F g) t0 with
           | Uunit g => f2 _ (F g)
           | Upi g a b => f3 g a b (F g) (F0 g a)
                            (F0 (ext g a) b : TyM (ext g a) (F (ext g a)) b)
@@ -105,10 +105,11 @@ End WithRel.
 Scheme con_elim := Induction for Con Sort Type
 with ty_elim := Induction for Ty Sort Type.
 
+Print con_elim.
+Print WithNamed.con_elim.
 End TyElim.
 
-Require Import ZArith.
-
+(*
 Module FirstCircle.
   Inductive circle : Set :=
   | base : circle
@@ -310,7 +311,7 @@ Definition circle_elim :  forall (P : circle -> Set)
       | loop => floop
       end
         for F0.
-
+*)
 (* Definition eqtransport (a b : circle) (P : circle -> Set) (p : P a) (e : eq a b) : P b. *)
 (* Proof. *)
 (*   revert p. revert a b e. *)
@@ -369,7 +370,7 @@ Definition circle_elim :  forall (P : circle -> Set)
 (* Defined. *)
 
 (* Eval compute in circleeq_to_Z base base (eqtrans _ _ _ loop loop). *)
-End FullCircle2.
+(* End FullCircle2. *)
 
 
 
