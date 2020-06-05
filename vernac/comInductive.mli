@@ -55,11 +55,14 @@ val interp_mutual_inductive_constr
   -> udecl:UState.universe_decl
   -> ctx_params:(EConstr.t, EConstr.t) Context.Rel.Declaration.pt list
   -> indnames:Names.Id.t list
+  -> relevances:Sorts.relevance list
   -> arities:EConstr.t list
   -> arityconcl:(bool * EConstr.ESorts.t) option list
   -> constructors:(Names.Id.t list * Constr.constr list) list
+  -> env:Environ.env
+  (** Original environment *)
   -> env_ar:Environ.env
-  (** Environment with the inductives in the rel_context *)
+  (** Environment with the full arities in the rel_context *)
   -> cumulative:bool
   -> poly:bool
   -> private_ind:bool

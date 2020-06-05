@@ -281,15 +281,22 @@ let solve_constraints_system levels level_bounds =
   done;
   v
 
-let inductive_levels env evd params arities inds =
-  let destarities = List.map (fun x -> x, Reduction.dest_arity env x) arities in
-  let levels = List.map (fun (x,(ctx,a)) ->
+let inductive_levels env env_ar evd params names relevances (arities : Constr.types list) inds =
+  let env_par = EConstr.push_rel_context params env in
+  let env_par_ar, destarities =
+    List.fold_left3_map (fun env_par_ar na r ar ->
+      let da = Reduction.dest_arity env_par_ar ar in
+      let env_par_ar' = push_rel (LocalAssum (Context.make_annot (Name na) r, ar)) env_par_ar in
+      env_par_ar', (ar, env_par_ar, da))
+    env_par names relevances arities
+  in
+  let levels = List.map (fun (x,_,(ctx,a)) ->
     if Sorts.is_prop a || Sorts.is_sprop a then None
     else Some (univ_of_sort a)) destarities
   in
   let cstrs_levels, min_levels, sizes =
     CList.split3 @@ snd @@
-      (List.fold_left2_map (fun env (_,tys) (arity,(ctx,du)) ->
+      (List.fold_left2_map (fun env (_,tys) (arity,env_arity,(ctx,du)) ->
         let len = List.length tys in
         let minlev = Sorts.univ_of_sort du in
         let minlev =
@@ -300,12 +307,13 @@ let inductive_levels env evd params arities inds =
         let minlev =
           (* Indices contribute. *)
           if indices_matter env && List.length ctx > 0 then (
-            let ilev = sign_level env evd ctx in
+            let ilev = sign_level env_arity evd ctx in
               Univ.sup ilev minlev)
           else minlev
         in
         let env, clev = extract_level env evd minlev params tys in
-          env, (clev, minlev, len)) env inds destarities)
+          env, (clev, minlev, len))
+        env_ar inds destarities)
   in
   (* Take the transitive closure of the system of constructors *)
   (* level constraints and remove the recursive dependencies *)
@@ -313,7 +321,7 @@ let inductive_levels env evd params arities inds =
     (Array.of_list cstrs_levels)
   in
   let evd, arities =
-    CList.fold_left3 (fun (evd, arities) cu (arity,(ctx,du)) len ->
+    CList.fold_left3 (fun (evd, arities) cu (arity,_,(ctx,du)) len ->
       if is_impredicative_sort env du then
         (* Any product is allowed here. *)
         evd, (false, arity) :: arities
@@ -383,8 +391,8 @@ let restrict_inductive_universes sigma ctx_params arities constructors =
   let uvars = List.fold_right (fun (_,ctypes) -> List.fold_right merge_universes_of_constr ctypes) constructors uvars in
   Evd.restrict_universe_context sigma uvars
 
-let interp_mutual_inductive_constr ~sigma ~template ~udecl ~ctx_params ~indnames ~arities
-  ~arityconcl ~constructors ~env_ar ~cumulative ~poly ~private_ind ~finite =
+let interp_mutual_inductive_constr ~sigma ~template ~udecl ~ctx_params ~indnames ~relevances
+  ~arities ~arityconcl ~constructors ~env ~env_ar ~cumulative ~poly ~private_ind ~finite =
   (* Compute renewed arities *)
   let sigma = Evd.minimize_universes sigma in
   let nf = Evarutil.nf_evars_universes sigma in
@@ -392,7 +400,7 @@ let interp_mutual_inductive_constr ~sigma ~template ~udecl ~ctx_params ~indnames
   let arities = List.map EConstr.(to_constr sigma) arities in
   let sigma = List.fold_left make_anonymous_conclusion_flexible sigma arityconcl in
 
-  let sigma, arities = inductive_levels env_ar sigma ctx_params arities constructors in
+  let sigma, arities = inductive_levels env env_ar sigma ctx_params indnames relevances arities constructors in
   let sigma = Evd.minimize_universes sigma in
   let nf = Evarutil.nf_evars_universes sigma in
   let arities = List.map (on_snd nf) arities in
@@ -588,7 +596,7 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
   let indimpls = List.map (fun iimpl -> useruimpls @ iimpl) indimpls in
   let fullarities = List.map (fun c -> EConstr.it_mkProd_or_LetIn c ctx_uparams) fullarities in
   let env_ar = push_types env0 indnames relevances fullarities in
-  (** Now each constructor is typed in [fullarities; cstrs; ctx_params] *)
+  (* Now each constructor is typed in [fullarities; cstrs; ctx_params] *)
 
   (* Try further to solve evars, and instantiate them *)
 
@@ -599,7 +607,10 @@ let interp_mutual_inductive_gen env0 ~template udecl (uparamsl,paramsl,indl) not
             userimpls @ impls) cimpls)
       indimpls cimpls
   in
-  let mie, pl = interp_mutual_inductive_constr ~template ~sigma ~ctx_params ~udecl ~arities ~arityconcl ~constructors ~env_ar ~poly ~finite ~cumulative ~private_ind ~indnames in
+  let mie, pl = interp_mutual_inductive_constr ~template ~sigma ~ctx_params ~udecl
+    ~indnames ~relevances ~arities
+    ~arityconcl ~constructors ~env:env0 ~env_ar ~poly ~finite ~cumulative ~private_ind
+    in
   (mie, pl, impls)
 
 

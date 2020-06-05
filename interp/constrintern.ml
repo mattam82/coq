@@ -1945,7 +1945,7 @@ let internalize globalenv env pattern_mode (_, ntnvars as lvar) c =
                let tyi = intern_type env' ty in
                let binder_index,fix_args = impls_binder_list 1 bl in
                let tyimpls = impls_type_list ~args:fix_args binder_index tyi in
-               let env_rec = push_name_env ntnvars tyimpls env (CAst.make @@ Name id.CAst.v) in
+               let env_rec = push_name_env ntnvars tyimpls env_rec (CAst.make @@ Name id.CAst.v) in
                env_rec, (n, bl, tyi, bl_impls)) env dl
         in
         let idl = Array.map2 (fun (_,_,_,_,bd) (n,bl,ty,before_impls) ->

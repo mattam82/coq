@@ -912,7 +912,7 @@ let error_illegal_rec_call renv fx (arg_renv,arg) =
 
 let error_partial_apply renv fx =
   raise (FixGuardError (renv.env,NotEnoughArgumentsForFixCall fx))
-
+(*
 let prrecarg r =
   let open Pp in
   match r with
@@ -922,7 +922,7 @@ let prrecarg r =
   | Declarations.Imbr (mind,i) ->
      str "Imbr[" ++ MutInd.print mind ++ pr_comma () ++ int i ++ str "]"
 
-let pr_tree = Rtree.pp_tree prrecarg
+let pr_tree = Rtree.pp_tree prrecarg *)
 
 let filter_stack_domain env p stack =
   let absctx, ar = dest_lam_assum env p in
@@ -945,8 +945,6 @@ let filter_stack_domain env p stack =
         | Not_subterm | Dead_code -> elt
         | Subterm(s,path) ->
             let recargs = get_recargs_approx env path ind args in
-            Feedback.msg_debug Pp.(str"Intersecting " ++ pr_tree recargs ++ spc () ++ str" and " ++ pr_tree path);
-
             let path = inter_wf_paths path recargs in
             SArg (lazy (Subterm(s,path))))
       | _ -> (SArg (lazy Not_subterm))
