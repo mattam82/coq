@@ -368,7 +368,7 @@ let check_cast env c ct k expected_type =
    the App case of execute; from this constraints, the expected
    dynamic constraints of the form u<=v are enforced *)
 
-let type_of_inductive_knowing_parameters env (ind,u as pind) args =
+let type_of_inductive_knowing_parameters env (ind,_ as pind) args =
   let (mib,_mip) as spec = lookup_mind_specif env ind in
   check_hyps_inclusion env (GlobRef.IndRef ind) mib.mind_hyps;
   let t,cst = Inductive.constrained_type_of_inductive_knowing_parameters
@@ -377,8 +377,8 @@ let type_of_inductive_knowing_parameters env (ind,u as pind) args =
   check_constraints cst env;
   t
 
-let type_of_inductive env (ind,u as pind) =
-  let (mib,mip as spec) = lookup_mind_specif env ind in
+let type_of_inductive env (ind,_ as pind) =
+  let (mib,_mip as spec) = lookup_mind_specif env ind in
   check_hyps_inclusion env (GlobRef.IndRef ind) mib.mind_hyps;
   let t,cst = Inductive.constrained_type_of_inductive spec pind in
   check_constraints cst env;

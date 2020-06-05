@@ -69,7 +69,7 @@ Module Test4.
     Inductive A (P2 : Set) : Type :=
     | ca : A P2 -> A P2
     with B (P2 : Set) : A P2 -> Type :=
-         | cb (a : A P2) : B _ (ca a) -> B P2 a
+         | cb (a : A P2) : B _ (ca _ a) -> B P2 a
          | param (x : Param) (a : A P2) : B P2 a.
   End S.
 

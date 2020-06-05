@@ -304,3 +304,5 @@ Definition polyidty : Ty emp_ctx :=
   Pi U (El (coetm subst_ty_U vz)).
 
 Eval compute in interp_Ty _  polyidty tt.
+
+End WithElim.

@@ -114,7 +114,7 @@ let instantiate_params full t u args sign =
   let () = if not (List.is_empty rem_args) then fail () in
   substl subs ty
 
-let full_inductive_instantiate (mib,_mip) ((mind,i),u as pind) params sign =
+let full_inductive_instantiate (mib,_mip) (_,u as pind) params sign =
   let dummy = Sorts.prop in
   let t = Term.mkArity (Vars.subst_instance_context u sign,dummy) in
   let t = Vars.substl (ind_ind_subst pind) t in

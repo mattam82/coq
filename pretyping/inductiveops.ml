@@ -385,7 +385,8 @@ let get_arity env ((ind,u),params) =
     end in
   let parsign = Vars.subst_instance_context u parsign in
   let arproperlength = List.length mip.mind_arity_ctxt - List.length parsign in
-  let mind_arity_ctxt = substl_rel_context (Inductive.ind_ind_subst (ind,u)) mip.mind_arity_ctxt in
+  let mind_arity_ctxt = substl_rel_context (Inductive.ind_ind_subst (ind,u))
+    mip.mind_arity_ctxt in
   let arsign,_ = List.chop arproperlength mind_arity_ctxt in
   let subst = subst_of_rel_context_instance parsign params in
   let arsign = Vars.subst_instance_context u arsign in
