@@ -435,7 +435,11 @@ let declare_structure ~cumulative finite ubinders univs paramimpls params templa
     { mind_entry_typename = id;
       mind_entry_arity = arity;
       mind_entry_consnames = [idbuild];
-      mind_entry_lc = [type_constructor] }
+      (** The kernel supports inductive-inductive types where constructors
+        can refer to previous ones in the block. We do not currently allow
+        such dependencies for mutual records, so we simply lift the constructor's
+        types over the previous constructors types. *)
+      mind_entry_lc = [Vars.liftn i (succ nparams) type_constructor] }
   in
   let blocks = List.mapi mk_block record_data in
   let check_template (id, _, min_univ, _, _, fields, _, _) =

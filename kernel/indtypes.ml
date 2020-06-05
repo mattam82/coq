@@ -429,9 +429,11 @@ let compute_projections (kn, i as ind) mib =
   let pkt = mib.mind_packets.(i) in
   let u = Univ.make_abstract_instance (Declareops.inductive_polymorphic_context mib) in
   let subst = List.init mib.mind_ntypes (fun i -> mkIndU ((kn, mib.mind_ntypes - i - 1), u)) in
+  let substc = Inductive.constructor_subst kn mib u i 1 in
   let (ctx, cty) = pkt.mind_nf_lc.(0) in
   let cty = it_mkProd_or_LetIn cty ctx in
-  let rctx, _ = decompose_prod_assum (substl subst cty) in
+  (** We substitutive inductive and constructor references. *)
+  let rctx, _ = decompose_prod_assum (substl subst (substl substc cty)) in
   let ctx, paramslet = List.chop pkt.mind_consnrealdecls.(0) rctx in
   (** We build a substitution smashing the lets in the record parameters so
       that typechecking projections requires just a substitution and not
