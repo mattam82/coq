@@ -759,63 +759,76 @@ struct
       | None -> sigma
     in
     let names,newenv = push_rec_types ~hypnaming sigma (names,ftys) env in
-    (* We define partial bodies for all the fixpoints, where the body of a given
-      fixpoint is an existential variables. These will be gradually refined by
-      typechecking.  *)
-    let sigma, bodies, fixdecls =
-      let indexes =
-        match fixkind with
-        | GFix (vn,i) -> 
-          Some (Array.mapi
-            (fun i n ->
-                match n with
-                | Some n -> n
-                | None -> Context.Rel.length ctxtv.(i) - 1) vn)
-        | GCoFix _ -> None
-      in
-      let sigma, bodies =
-        Array.fold_left_map_i (fun i sigma (na, decls, e, ar) ->
-          let ty = lift (nbfix - i) ar in
-          new_evar env_ar sigma ty) sigma ftydecls
-      in
-      let mkfix i =
-        match indexes with
-        | Some indexes -> lift i (mkFix ((indexes, i), (names, ftys, bodies)))
-        | None -> lift i (mkCoFix (i, (names, ftys, bodies))) 
-      in
-      let fixes = Array.init nbfix mkfix in
-      let ctx = Array.rev_to_list
-                  (Array.map2_i (fun i na fix -> LocalDef (na, fix, ftys.(i)))
-                                names fixes)
-      in
-      sigma, Array.map (fun x -> destEvar sigma x) bodies, ctx
-    in
-    (* env_ar has "partial" fixpoints defininitions for all the 
-      mutual fixpoints. *)
-    let fixdecls, env_ar = push_rel_context ~hypnaming sigma fixdecls env in
+    let is_recrec = not (Array.for_all_i (fun i -> noccur_between sigma 0 i) 0 ftys) in
     let sigma, vdefj =
-      CArray.fold_left2_map_i (fun i sigma (na, decls, ctxt, ar) def ->
-        (* we lift nbfix times the type in tycon, because of
-	        the (nbfix - i) variables pushed to env_ar *)
-        let (ctxt,ty) = decompose_prod_n_assum sigma (Context.Rel.length ctxt)
-            (lift (nbfix - i) ar) in
-        (* ctxt, ty is in env_ar = env, f_i : F_i (for all i) *)
-        let ctxt, nenv = push_rel_context ~hypnaming sigma ctxt env_ar in
-        (* env, f_i : F_i, ctxt |- ty *)
-        let sigma, j = pretype (mk_tycon ty) nenv sigma def in
-        (* env, f_i : F_i, ctxt |- j = def : ty *)
-        let uj_val = it_mkLambda_or_LetIn j.uj_val ctxt in
-        let uj_type = it_mkProd_or_LetIn j.uj_type ctxt in
-        (* env, f_i : F_i |- uj_val, uj_type *)
-        let _, inst, _, _ = push_rel_context_to_named_context ~hypnaming !!env_ar sigma uj_val in
-        let sigma = Evd.define (fst bodies.(i)) inst sigma in
-        let sigma = match Evarsolve.reconsider_unif_constraints
-                          Evarconv.evar_unify Evarconv.(default_flags_of TransparentState.full) sigma with
-          | Evarsolve.Success sigma -> sigma
-          | _ -> sigma
+      if is_recrec then
+        (* We define partial bodies for all the fixpoints, where the body of a given
+          fixpoint is an existential variables. These will be gradually refined by
+          typechecking.  *)
+        let sigma, bodies, fixdecls =
+          let indexes =
+            match fixkind with
+            | GFix (vn,i) ->
+              Some (Array.mapi
+                (fun i n ->
+                    match n with
+                    | Some n -> n
+                    | None -> Context.Rel.length ctxtv.(i) - 1) vn)
+            | GCoFix _ -> None
+          in
+          let sigma, bodies =
+            Array.fold_left_map_i (fun i sigma (na, decls, e, ar) ->
+              let ty = lift (nbfix - i) ar in
+              new_evar env_ar sigma ty) sigma ftydecls
+          in
+          let mkfix i =
+            match indexes with
+            | Some indexes -> lift i (mkFix ((indexes, i), (names, ftys, bodies)))
+            | None -> lift i (mkCoFix (i, (names, ftys, bodies)))
+          in
+          let fixes = Array.init nbfix mkfix in
+          let ctx = Array.rev_to_list
+                      (Array.map2_i (fun i na fix -> LocalDef (na, fix, ftys.(i)))
+                                    names fixes)
+          in
+          sigma, Array.map (fun x -> destEvar sigma x) bodies, ctx
         in
-        sigma, { uj_val; uj_type })
-      sigma ftydecls vdef 
+        (* env_ar has "partial" fixpoints defininitions for all the
+          mutual fixpoints. *)
+        let fixdecls, env_ar = push_rel_context ~hypnaming sigma fixdecls env in
+          CArray.fold_left2_map_i (fun i sigma (na, decls, ctxt, ar) def ->
+            (* we lift nbfix times the type in tycon, because of
+              the (nbfix - i) variables pushed to env_ar *)
+            let (ctxt,ty) = decompose_prod_n_assum sigma (Context.Rel.length ctxt)
+                (lift (nbfix - i) ar) in
+            (* ctxt, ty is in env_ar = env, f_i : F_i (for all i) *)
+            let ctxt, nenv = push_rel_context ~hypnaming sigma ctxt env_ar in
+            (* env, f_i : F_i, ctxt |- ty *)
+            let sigma, j = pretype (mk_tycon ty) nenv sigma def in
+            (* env, f_i : F_i, ctxt |- j = def : ty *)
+            let uj_val = it_mkLambda_or_LetIn j.uj_val ctxt in
+            let uj_type = it_mkProd_or_LetIn j.uj_type ctxt in
+            (* env, f_i : F_i |- uj_val, uj_type *)
+            let _, inst, _, _ = push_rel_context_to_named_context ~hypnaming !!env_ar sigma uj_val in
+            let sigma = Evd.define (fst bodies.(i)) inst sigma in
+            let sigma = match Evarsolve.reconsider_unif_constraints
+                              Evarconv.evar_unify Evarconv.(default_flags_of TransparentState.full) sigma with
+              | Evarsolve.Success sigma -> sigma
+              | _ -> sigma
+            in
+            sigma, { uj_val; uj_type })
+          sigma ftydecls vdef
+      else
+        CArray.fold_left2_map_i (fun i sigma (na, decls, ctxt, ar) def ->
+          (* we lift nbfix times the type in tycon, because of
+            the (nbfix - i) variables pushed to env_ar *)
+          let (ctxt,ty) = decompose_prod_n_assum sigma (Context.Rel.length ctxt)
+              (lift (nbfix - i) ar) in
+           let ctxt,nenv = push_rel_context ~hypnaming sigma ctxt newenv in
+           let sigma, j = pretype (mk_tycon ty) nenv sigma def in
+           sigma, { uj_val = it_mkLambda_or_LetIn j.uj_val ctxt;
+                    uj_type = it_mkProd_or_LetIn j.uj_type ctxt })
+        sigma ftydecls vdef
     in
     let ftys = Array.map (nf_evar sigma) ftys in
     let vdefj = Array.map (fun x -> j_nf_evar sigma x) vdefj in
