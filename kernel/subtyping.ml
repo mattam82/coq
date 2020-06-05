@@ -119,6 +119,7 @@ let check_variance error v1 v2 =
 let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2=
   let kn1 = KerName.make mp1 l in
   let kn2 = KerName.make mp2 l in
+  let mind = MutInd.make1 kn1 in
   let error why = error_signature_mismatch l spec2 why in
   let check_conv why cst poly f = check_conv_error error why cst poly f in
   let mib1 =
@@ -135,7 +136,7 @@ let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2
       cst (inductive_is_polymorphic mib1) (infer_conv_leq ?l2r:None ?evars:None ?ts:None) env t1 t2
   in
 
-  let check_packet cst p1 p2 =
+  let check_packet i cst p1 p2 =
     let check f test why = if not (test (f p1) (f p2)) then error why in
       check (fun p -> p.mind_consnames) (Array.equal Id.equal) NotSameConstructorNamesField;
       check (fun p -> p.mind_typename) Id.equal NotSameInductiveNameInBlockField;
@@ -150,20 +151,21 @@ let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2
       (* nparams done *)
       (* params_ctxt done because part of the inductive types *)
       (* Don't check the sort of the type if polymorphic *)
-      let ty1 = type_of_inductive ((mib1, p1), inst) in
-      let ty2 = type_of_inductive ((mib2, p2), inst) in
+      (** We use [mind] in both cases for recursive occurences of previous inductives
+        in the block (we checked they are equal already) *)
+      let ty1 = type_of_inductive (mib1, p1) ((mind,i),inst) in
+      let ty2 = type_of_inductive (mib2, p2) ((mind,i),inst) in
       let cst = check_inductive_type cst p2.mind_typename ty1 ty2 in
         cst
   in
-  let mind = MutInd.make1 kn1 in
   let check_cons_types i cst p1 p2 =
     Array.fold_left3
       (fun cst id t1 t2 -> check_conv (NotConvertibleConstructorField id) cst
         (inductive_is_polymorphic mib1) (infer_conv ?l2r:None ?evars:None ?ts:None) env t1 t2)
       cst
       p2.mind_consnames
-      (arities_of_specif ((mind, i), inst) (mib1, p1))
-      (arities_of_specif ((mind, i), inst) (mib2, p2))
+      (arities_of_specif (mib1, p1) ((mind, i), inst))
+      (arities_of_specif (mib2, p2) ((mind, i), inst))
   in
   let check f test why = if not (test (f mib1) (f mib2)) then error (why (f mib2)) in
   check (fun mib -> mib.mind_finite<>CoFinite) (==) (fun x -> FiniteInductiveFieldExpected x);
@@ -209,7 +211,7 @@ let check_inductive cst env mp1 l info1 mp2 mib2 spec2 subst1 subst2 reso1 reso2
   end;
   (* we first check simple things *)
   let cst =
-    Array.fold_left2 check_packet cst mib1.mind_packets mib2.mind_packets
+    Array.fold_left2_i check_packet cst mib1.mind_packets mib2.mind_packets
   in
   (* and constructor types in the end *)
   let cst =

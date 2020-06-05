@@ -99,7 +99,7 @@ let construct_of_constr_const env tag typ =
 let construct_of_constr_block = construct_of_constr false
 
 let type_of_ind env (ind, u) =
-  type_of_inductive (Inductive.lookup_mind_specif env ind, u)
+  type_of_inductive (Inductive.lookup_mind_specif env ind) (ind, u)
 
 let build_branches_type env sigma (mind,_ as ind) mib mip u params p =
   let rtbl = mip.mind_reloc_tbl in

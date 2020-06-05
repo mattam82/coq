@@ -196,7 +196,7 @@ let retype ?(polyprop=true) sigma =
       in
       EConstr.of_constr
         (Inductive.type_of_inductive_knowing_parameters
-           ~polyprop (mip, u) paramtyps)
+           ~polyprop mip (ind, u) paramtyps)
     | Construct (cstr, u) ->
       let u = EInstance.kind sigma u in
       EConstr.of_constr (type_of_constructor env (cstr, u))

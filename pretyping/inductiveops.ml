@@ -26,27 +26,27 @@ open Context.Rel.Declaration
 (* The following three functions are similar to the ones defined in
    Inductive, but they expect an env *)
 
-let type_of_inductive env (ind,u) =
+let type_of_inductive env (ind,u as pind) =
  let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
  Typeops.check_hyps_inclusion env (GlobRef.IndRef ind) mib.mind_hyps;
- Inductive.type_of_inductive (specif,u)
+ Inductive.type_of_inductive specif pind
 
 (* Return type as quoted by the user *)
 let type_of_constructor env (cstr,u) =
  let (mib,_ as specif) =
    Inductive.lookup_mind_specif env (inductive_of_constructor cstr) in
  Typeops.check_hyps_inclusion env (GlobRef.ConstructRef cstr) mib.mind_hyps;
- Inductive.type_of_constructor (cstr,u) specif
+ Inductive.type_of_constructor specif (cstr,u)
 
 (* Return constructor types in user form *)
 let type_of_constructors env (ind,u as indu) =
  let specif = Inductive.lookup_mind_specif env ind in
-  Inductive.type_of_constructors indu specif
+  Inductive.type_of_constructors specif indu
 
 (* Return constructor types in normal form *)
 let arities_of_constructors env (ind,u as indu) =
  let specif = Inductive.lookup_mind_specif env ind in
-  Inductive.arities_of_constructors indu specif
+  Inductive.arities_of_constructors specif indu
 
 (* [inductive_family] = [inductive_instance] applied to global parameters *)
 type inductive_family = pinductive * constr list
@@ -102,7 +102,7 @@ let mis_is_recursive (ind,mib,mip) =
     mip.mind_recargs
 
 let mis_nf_constructor_type ((ind,u),mib,mip) j =
-  Inductive.arity_of_constructor ((ind,j),u) (mib,mip)
+  Inductive.arity_of_constructor (mib,mip) ((ind,j),u)
 
 (* Number of constructors *)
 
@@ -624,7 +624,7 @@ let type_case_branches_with_names env sigma indspec p c =
   let (mib,mip as specif) = Inductive.lookup_mind_specif env (fst ind) in
   let nparams = mib.mind_nparams in
   let (params,realargs) = List.chop nparams args in
-  let lbrty = Inductive.build_branches_type ind specif params p in
+  let lbrty = Inductive.build_branches_type specif ind params p in
   let lbrty = Array.map EConstr.of_constr lbrty in
   (* Build case type *)
   let conclty = lambda_appvect_assum (mip.mind_nrealdecls+1) p (Array.of_list (realargs@[c])) in

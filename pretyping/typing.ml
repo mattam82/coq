@@ -42,7 +42,7 @@ let inductive_type_knowing_parameters env sigma (ind,u) jl =
       let s = Reductionops.sort_of_arity env sigma j.uj_type in
       Sorts.univ_of_sort (EConstr.ESorts.kind sigma s)) jl
   in
-  Inductive.type_of_inductive_knowing_parameters (mspec,u) paramstyp
+  Inductive.type_of_inductive_knowing_parameters mspec (ind,u) paramstyp
 
 let type_judgment env sigma j =
   match EConstr.kind sigma (whd_all env sigma j.uj_type) with
@@ -172,7 +172,7 @@ let type_case_branches env sigma (ind,largs) pj c =
   let p = pj.uj_val in
   let params = List.map EConstr.Unsafe.to_constr params in
   let sigma, ps = is_correct_arity env sigma c pj ind specif params in
-  let lc = build_branches_type ind specif params (EConstr.to_constr ~abort_on_undefined_evars:false sigma p) in
+  let lc = build_branches_type specif ind params (EConstr.to_constr ~abort_on_undefined_evars:false sigma p) in
   let lc = Array.map EConstr.of_constr lc in
   let n = (snd specif).Declarations.mind_nrealdecls in
   let ty = whd_betaiota env sigma (lambda_applist_assum sigma (n+1) p (realargs@[c])) in
@@ -312,7 +312,7 @@ let type_of_inductive env sigma (ind,u) =
   let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
   let () = check_hyps_inclusion env sigma (GR.IndRef ind) mib.mind_hyps in
   let u = EInstance.kind sigma u in
-  let ty, csts = Inductive.constrained_type_of_inductive (specif,u) in
+  let ty, csts = Inductive.constrained_type_of_inductive specif (ind,u) in
   let sigma = Evd.add_constraints sigma csts in
   sigma, (EConstr.of_constr (rename_type ty (GR.IndRef ind)))
 
@@ -321,7 +321,7 @@ let type_of_constructor env sigma ((ind,_ as ctor),u) =
   let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
   let () = check_hyps_inclusion env sigma (GR.IndRef ind) mib.mind_hyps in
   let u = EInstance.kind sigma u in
-  let ty, csts = Inductive.constrained_type_of_constructor (ctor,u) specif in
+  let ty, csts = Inductive.constrained_type_of_constructor specif (ctor,u) in
   let sigma = Evd.add_constraints sigma csts in
   sigma, (EConstr.of_constr (rename_type ty (GR.ConstructRef ctor)))
 

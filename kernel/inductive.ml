@@ -72,9 +72,8 @@ let ind_subst mind mib u =
   ind_subst_gen mind ntypes u
 
 (* Instantiate inductives in inductive type *)
-let inductive_instantiate mind u i ty =
-  let s = ind_subst_gen mind i u in
-    substl s (subst_instance_constr u ty)
+let inductive_subst mind i u =
+  ind_subst_gen mind i u
 
 (* Instantiate constructors in constructor type *)
 let constructor_subst mind mib u i n =
@@ -115,13 +114,14 @@ let instantiate_params full t u args sign =
   let () = if not (List.is_empty rem_args) then fail () in
   substl subs ty
 
-let full_inductive_instantiate mib u params sign =
+let full_inductive_instantiate (mib,_mip) ((mind,i),u) params sign =
   let dummy = Sorts.prop in
   let t = Term.mkArity (Vars.subst_instance_context u sign,dummy) in
+  let t = Vars.substl (inductive_subst mind i u) t in
     fst (Term.destArity (instantiate_params true t u params mib.mind_params_ctxt))
 
-let full_constructor_instantiate ((mind,i),u,(mib,_),params) n t =
-  let inst_ind = constructor_instantiate (mind,i) n u mib t in
+let full_constructor_instantiate (mib,_) (i,u) params n t =
+  let inst_ind = constructor_instantiate i n u mib t in
   instantiate_params true inst_ind u params mib.mind_params_ctxt
 
 (************************************************************************)
@@ -235,10 +235,11 @@ let check_instance mib u =
       | Polymorphic uctx -> Instance.length u = AUContext.size uctx)
   then CErrors.anomaly Pp.(str "bad instance length on mutind.")
 
-let type_of_inductive_gen ?(polyprop=true) ((mib,mip),u) paramtyps =
+let type_of_inductive_gen ?(polyprop=true) (mib,mip) ((mind,i),u) paramtyps =
   check_instance mib u;
+  let isubst = inductive_subst mind i u in
   match mip.mind_arity with
-  | RegularArity a -> subst_instance_constr u a.mind_user_arity
+  | RegularArity a -> Vars.substl isubst (subst_instance_constr u a.mind_user_arity)
   | TemplateArity ar ->
     let templ = match mib.mind_template with
     | None -> assert false
@@ -251,23 +252,23 @@ let type_of_inductive_gen ?(polyprop=true) ((mib,mip),u) paramtyps =
          when applied to Prop params *)
       if not polyprop && not (is_type0m_univ ar.template_level) && Sorts.is_prop s
       then raise (SingletonInductiveBecomesProp mip.mind_typename);
-      Term.mkArity (List.rev ctx,s)
+      Vars.substl isubst (Term.mkArity (List.rev ctx,s))
 
-let type_of_inductive pind =
-  type_of_inductive_gen pind []
+let type_of_inductive specif pind =
+  type_of_inductive_gen specif pind []
 
-let constrained_type_of_inductive ((mib,_mip),u as pind) =
-  let ty = type_of_inductive pind in
+let constrained_type_of_inductive (mib,_mip as specif) (_, u as pind) =
+  let ty = type_of_inductive specif pind in
   let cst = instantiate_inductive_constraints mib u in
-    (ty, cst)
+  (ty, cst)
 
-let constrained_type_of_inductive_knowing_parameters ((mib,_mip),u as pind) args =
-  let ty = type_of_inductive_gen pind args in
+let constrained_type_of_inductive_knowing_parameters (mib,_mip as specif) (_,u as pind) args =
+  let ty = type_of_inductive_gen specif pind args in
   let cst = instantiate_inductive_constraints mib u in
-    (ty, cst)
+  (ty, cst)
 
-let type_of_inductive_knowing_parameters ?(polyprop=true) mip args =
-  type_of_inductive_gen ~polyprop mip args
+let type_of_inductive_knowing_parameters ?(polyprop=true) mip pind args =
+  type_of_inductive_gen ~polyprop mip pind args
 
 (* The max of an array of universes *)
 
@@ -285,7 +286,7 @@ let max_inductive_sort =
 (************************************************************************)
 (* Type of a constructor *)
 
-let type_of_constructor (cstr, u) (mib,mip) =
+let type_of_constructor (mib,mip) (cstr, u) =
   check_instance mib u;
   let ind = inductive_of_constructor cstr in
   let specif = mip.mind_user_lc in
@@ -294,7 +295,7 @@ let type_of_constructor (cstr, u) (mib,mip) =
   if i > nconstr then user_err Pp.(str "Not enough constructors in the type.");
   constructor_instantiate ind i u mib specif.(i-1)
 
-let arity_of_constructor (cstr, u) (mib,mip) =
+let arity_of_constructor (mib,mip) (cstr, u) =
   check_instance mib u;
   let ind = inductive_of_constructor cstr in
   let specif = mip.mind_nf_lc in
@@ -304,12 +305,12 @@ let arity_of_constructor (cstr, u) (mib,mip) =
   let (ctx, cty) = specif.(i - 1) in
   constructor_instantiate ind i u mib (Term.it_mkProd_or_LetIn cty ctx)
 
-let constrained_type_of_constructor (_cstr,u as cstru) (mib,_mip as ind) =
-  let ty = type_of_constructor cstru ind in
+let constrained_type_of_constructor (mib,_mip as ind) (_cstr,u as cstru) =
+  let ty = type_of_constructor ind cstru in
   let cst = instantiate_inductive_constraints mib u in
     (ty, cst)
 
-let arities_of_specif ((kn,i),u) (mib,mip) =
+let arities_of_specif (mib,mip) ((kn,i),u) =
   let specif = mip.mind_nf_lc in
   let map j (ctx, c) =
     let cty = Term.it_mkProd_or_LetIn c ctx in
@@ -319,7 +320,7 @@ let arities_of_specif ((kn,i),u) (mib,mip) =
 
 let arities_of_constructors = arities_of_specif
 
-let type_of_constructors (ind,u) (mib,mip) =
+let type_of_constructors (mib,mip) (ind,u) =
   let specif = mip.mind_user_lc in
     Array.mapi (fun i -> constructor_instantiate ind (i+1) u mib) specif
 
@@ -337,9 +338,9 @@ let inductive_sort_family mip =
 let mind_arity mip =
   mip.mind_arity_ctxt, inductive_sort_family mip
 
-let get_instantiated_arity (_ind,u) (mib,mip) params =
+let get_instantiated_arity (_mib,mip as specif) pind params =
   let sign, s = mind_arity mip in
-  full_inductive_instantiate mib u params sign, s
+  full_inductive_instantiate specif pind params sign, s
 
 let elim_sort (_,mip) = mip.mind_kelim
 
@@ -349,7 +350,7 @@ let is_primitive_record (mib,_) =
   | PrimRecord _ -> true
   | NotRecord | FakeRecord -> false
 
-let build_dependent_inductive ind (_,mip) params =
+let build_dependent_inductive (_,mip) ind params =
   let realargs,_ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
   Term.applist
     (mkIndU ind,
@@ -364,8 +365,8 @@ let check_allowed_sort ksort specif =
     let s = inductive_sort_family (snd specif) in
     raise (LocalArity (Some(elim_sort specif, ksort,s,error_elim_explain ksort s)))
 
-let is_correct_arity env c pj ind specif params =
-  let arsign,_ = get_instantiated_arity ind specif params in
+let is_correct_arity env c pj specif ind params =
+  let arsign,_ = get_instantiated_arity specif ind params in
   let rec srec env pt ar =
     let pt' = whd_all env pt in
     match kind pt', ar with
@@ -380,7 +381,7 @@ let is_correct_arity env c pj ind specif params =
          let ksort = match kind (whd_all env' a2) with
          | Sort s -> Sorts.family s
          | _ -> raise (LocalArity None) in
-         let dep_ind = build_dependent_inductive ind specif params in
+         let dep_ind = build_dependent_inductive specif ind params in
          let _ =
            try conv env a1 dep_ind
            with NotConvertible -> raise (LocalArity None) in
@@ -400,10 +401,10 @@ let is_correct_arity env c pj ind specif params =
 
 (* [p] is the predicate, [i] is the constructor number (starting from 0),
    and [cty] is the type of the constructor (params not instantiated) *)
-let build_branches_type (ind,u) (_,mip as specif) params p =
+let build_branches_type (_,mip as specif) (ind,u as pind) params p =
   let build_one_branch i (ctx, c) =
     let cty = Term.it_mkProd_or_LetIn c ctx in
-    let typi = full_constructor_instantiate (ind,u,specif,params) (i+1) cty in
+    let typi = full_constructor_instantiate specif pind params (i+1) cty in
     let (cstrsign,ccl) = Term.decompose_prod_assum typi in
     let nargs = Context.Rel.length cstrsign in
     let (_,allargs) = decompose_app ccl in
@@ -426,8 +427,8 @@ let type_case_branches env (pind,largs) pj c =
   let nparams = inductive_params specif in
   let (params,realargs) = List.chop nparams largs in
   let p = pj.uj_val in
-  let () = is_correct_arity env c pj pind specif params in
-  let lc = build_branches_type pind specif params p in
+  let () = is_correct_arity env c pj specif pind params in
+  let lc = build_branches_type specif pind params p in
   let ty = build_case_type env (snd specif).mind_nrealdecls p c realargs in
   (lc, ty)
 
@@ -630,13 +631,14 @@ let ienv_push_var (env, lra) (x,a,ra) =
 let ienv_push_inductive (env, ra_env) ((mind,u),lpar) =
   let mib = Environ.lookup_mind mind env in
   let ntypes = mib.mind_ntypes in
-  let push_ind specif env =
-    let r = specif.mind_relevance in
+  let push_ind i oib env =
+    let r = oib.mind_relevance in
     let anon = Context.make_annot Anonymous r in
-    let decl = LocalAssum (anon, hnf_prod_applist env (type_of_inductive ((mib,specif),u)) lpar) in
+    let ty = type_of_inductive (mib,oib) ((mind,i),u) in
+    let decl = LocalAssum (anon, hnf_prod_applist env ty lpar) in
     push_rel decl env
   in
-  let env = Array.fold_right push_ind mib.mind_packets env in
+  let env = Array.fold_right_i push_ind mib.mind_packets env in
   let rc = Array.mapi (fun j t -> (Imbr (mind,j),t)) (Rtree.mk_rec_calls ntypes) in
   let lra_ind = Array.rev_to_list rc in
   let ra_env = List.map (fun (r,t) -> (r,Rtree.lift ntypes t)) ra_env in

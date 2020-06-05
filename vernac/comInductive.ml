@@ -135,7 +135,9 @@ let model_conclusion env sigma ind_rel params n nc arity_indices =
   let sigma,model_indices =
     List.fold_right
       (fun (_,t) (sigma, subst) ->
-        let t = EConstr.Vars.substl subst (EConstr.Vars.liftn n (List.length subst + 1) (EConstr.Vars.liftn 1 (List.length params + List.length subst + 1) t)) in
+        let t = EConstr.Vars.substl subst
+          (EConstr.Vars.liftn n (List.length subst + 1)
+          (EConstr.Vars.liftn 1 (List.length params + List.length subst + 1) t)) in
         let sigma, c = Evarutil.new_evar env sigma t in
         sigma, c::subst)
       arity_indices (sigma, []) in

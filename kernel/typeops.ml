@@ -368,19 +368,19 @@ let check_cast env c ct k expected_type =
    the App case of execute; from this constraints, the expected
    dynamic constraints of the form u<=v are enforced *)
 
-let type_of_inductive_knowing_parameters env (ind,u) args =
+let type_of_inductive_knowing_parameters env (ind,u as pind) args =
   let (mib,_mip) as spec = lookup_mind_specif env ind in
   check_hyps_inclusion env (GlobRef.IndRef ind) mib.mind_hyps;
   let t,cst = Inductive.constrained_type_of_inductive_knowing_parameters
-      (spec,u) (Inductive.make_param_univs env args)
+    spec pind (Inductive.make_param_univs env args)
   in
   check_constraints cst env;
   t
 
-let type_of_inductive env (ind,u) =
-  let (mib,mip) = lookup_mind_specif env ind in
+let type_of_inductive env (ind,u as pind) =
+  let (mib,mip as spec) = lookup_mind_specif env ind in
   check_hyps_inclusion env (GlobRef.IndRef ind) mib.mind_hyps;
-  let t,cst = Inductive.constrained_type_of_inductive ((mib,mip),u) in
+  let t,cst = Inductive.constrained_type_of_inductive spec pind in
   check_constraints cst env;
   t
 
@@ -393,7 +393,7 @@ let type_of_constructor env (c,_u as cu) =
     check_hyps_inclusion env (GlobRef.ConstructRef c) mib.mind_hyps
   in
   let specif = lookup_mind_specif env (inductive_of_constructor c) in
-  let t,cst = constrained_type_of_constructor cu specif in
+  let t,cst = constrained_type_of_constructor specif cu in
   let () = check_constraints cst env in
   t
 
@@ -461,14 +461,14 @@ let type_of_global_in_context env r =
     let (mib,_ as specif) = Inductive.lookup_mind_specif env ind in
     let univs = Declareops.inductive_polymorphic_context mib in
     let inst = Univ.make_abstract_instance univs in
-    Inductive.type_of_inductive (specif, inst), univs
+    Inductive.type_of_inductive specif (ind,inst), univs
   | ConstructRef cstr ->
     let (mib,_ as specif) =
       Inductive.lookup_mind_specif env (inductive_of_constructor cstr)
     in
     let univs = Declareops.inductive_polymorphic_context mib in
     let inst = Univ.make_abstract_instance univs in
-    Inductive.type_of_constructor (cstr,inst) specif, univs
+    Inductive.type_of_constructor specif (cstr,inst), univs
 
 (************************************************************************)
 (************************************************************************)

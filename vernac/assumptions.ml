@@ -247,9 +247,9 @@ and traverse_inductive (curr, data, ax2ty) mind obj =
                  (Declareops.inductive_polymorphic_context mib))
               Level.var)
        in
-       Array.fold_left (fun accu oib ->
-          let pspecif = ((mib, oib), instance) in
-          let ind_type = Inductive.type_of_inductive pspecif in
+       Array.fold_left_i (fun i accu oib ->
+          let pspecif = (mib, oib) in
+          let ind_type = Inductive.type_of_inductive pspecif ((mind, i), instance) in
           let indr = oib.mind_relevance in
           let ind_name = Name oib.mind_typename in
           Context.Rel.add (Context.Rel.Declaration.LocalAssum (make_annot ind_name indr, ind_type)) accu)
