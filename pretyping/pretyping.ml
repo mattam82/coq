@@ -759,7 +759,7 @@ struct
       | None -> sigma
     in
     let names,newenv = push_rec_types ~hypnaming sigma (names,ftys) env in
-    let is_recrec = not (Array.for_all_i (fun i -> noccur_between sigma 0 i) 0 ftys) in
+    let is_recrec = not (Array.for_all_i (fun i -> noccur_between sigma 1 i) 1 ftys) in
     let sigma, vdefj =
       if is_recrec then
         (* We define partial bodies for all the fixpoints, where the body of a given
@@ -795,6 +795,8 @@ struct
         in
         (* env_ar has "partial" fixpoints defininitions for all the
           mutual fixpoints. *)
+        (* Feedback.msg_debug Pp.(pr_evar_map None !!env sigma); *)
+
         let fixdecls, env_ar = push_rel_context ~hypnaming sigma fixdecls env in
           CArray.fold_left2_map_i (fun i sigma (na, decls, ctxt, ar) def ->
             (* we lift nbfix times the type in tycon, because of

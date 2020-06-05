@@ -135,9 +135,13 @@ let model_conclusion env sigma ind_rel params n nc arity_indices =
   let sigma,model_indices =
     List.fold_right
       (fun (_,t) (sigma, subst) ->
+        (* t lives in [u_params; ind_0..ind_n-1; params; indices (of size #|subst|)]
+           and we want to move it to
+           [u_params; ind_0..ind_n-1..ind_k; cstrs; params; args (of size n)]
+        *)
         let t = EConstr.Vars.substl subst
           (EConstr.Vars.liftn n (List.length subst + 1)
-          (EConstr.Vars.liftn 1 (List.length params + List.length subst + 1) t)) in
+          (EConstr.Vars.liftn (1+nc) (List.length params + List.length subst + 1) t)) in
         let sigma, c = Evarutil.new_evar env sigma t in
         sigma, c::subst)
       arity_indices (sigma, []) in
@@ -476,7 +480,7 @@ let interp_params env udecl uparamsl paramsl =
 
 (* When a hole remains for a param, pretend the param is uniform and
    do the unification.
-   [env_ar_par] is [uparams; inds; constructors; params]
+   [env_ar_cstrs_par] is [uparams; inds; constructors; params]
  *)
 let maybe_unify_params_in env_ar_cstrs_par sigma ~ninds ~nparams ~ncstrs c =
   let is_ind sigma k c = match EConstr.kind sigma c with

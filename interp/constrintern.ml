@@ -1934,7 +1934,7 @@ let internalize globalenv env pattern_mode (_, ntnvars as lvar) c =
                  | _ -> anomaly Pp.(str "Non-structural recursive argument in non-program fixpoint")) recarg
                in
                let before, after = split_at_annot bl recarg in
-               let (env',rbefore) = List.fold_left intern_local_binder (env,[]) before in
+               let (env',rbefore) = List.fold_left intern_local_binder (env_rec,[]) before in
                let n = Option.map (fun _ -> List.count (fun c -> match DAst.get c with
                    | GLocalAssum _ -> true
                    | _ -> false (* remove let-ins *))
