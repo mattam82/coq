@@ -288,13 +288,15 @@ let solve_constraints_system levels level_bounds =
   v
 
 let inductive_levels env env_ar evd params names relevances (arities : Constr.types list) inds =
-  let env_par = EConstr.push_rel_context params env in
-  let env_par_ar, destarities =
-    List.fold_left3_map (fun env_par_ar na r ar ->
-      let da = Reduction.dest_arity env_par_ar ar in
-      let env_par_ar' = push_rel (LocalAssum (Context.make_annot (Name na) r, ar)) env_par_ar in
-      env_par_ar', (ar, env_par_ar, da))
-    env_par names relevances arities
+  let env_ar', destarities =
+    List.fold_left3_map (fun env_ar' na r ar ->
+      let env_ar_par = EConstr.push_rel_context params env_ar' in
+      let da = Reduction.dest_arity env_ar_par ar in
+      let env_ar' = push_rel (LocalAssum (Context.make_annot (Name na) r,
+        EConstr.Unsafe.to_constr (EConstr.it_mkProd_or_LetIn (EConstr.of_constr ar) params)))
+        env_ar' in
+      env_ar', (ar, env_ar_par, da))
+    env names relevances arities
   in
   let levels = List.map (fun (x,_,(ctx,a)) ->
     if Sorts.is_prop a || Sorts.is_sprop a then None
