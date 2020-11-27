@@ -337,7 +337,7 @@ let is_correct_arity env c pj ind specif params =
     match kind pt', ar with
       | Prod (na1,a1,t), (LocalAssum (_,a1'))::ar' ->
           let () =
-            try conv env a1 a1'
+            try conv_leq env a1 a1'
             with NotConvertible -> raise (LocalArity None) in
           srec (push_rel (LocalAssum (na1,a1)) env) t ar'
       (* The last Prod domain is the type of the scrutinee *)
@@ -348,7 +348,7 @@ let is_correct_arity env c pj ind specif params =
          | _ -> raise (LocalArity None) in
          let dep_ind = build_dependent_inductive ind specif params in
          let _ =
-           try conv env a1 dep_ind
+           try conv_leq env a1 dep_ind
            with NotConvertible -> raise (LocalArity None) in
            check_allowed_sort ksort specif
       | _, (LocalDef _ as d)::ar' ->
