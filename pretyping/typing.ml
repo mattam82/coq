@@ -111,6 +111,10 @@ let judge_of_apply env sigma funj argjv =
   in
   apply_rec sigma 1 funj.uj_type (Array.to_list argjv)
 
+
+let check_branch_type env sigma lfj explft =
+
+
 let check_branch_types env sigma (ind,u) cj (lfj,explft) =
   if not (Int.equal (Array.length lfj) (Array.length explft)) then
     error_number_branches env sigma cj (Array.length explft);
@@ -173,7 +177,7 @@ let type_case_branches env sigma (ind,largs) pj c =
   let params = List.map EConstr.Unsafe.to_constr params in
   let sigma, ps = is_correct_arity env sigma c pj ind specif params in
   let lc = build_branches_type ind specif params (EConstr.to_constr ~abort_on_undefined_evars:false sigma p) in
-  let lc = Array.map EConstr.of_constr lc in
+  let lc = Array.map (fun (ctx, ty) -> (List.map EConstr.of_rel_decl ctx, EConstr.of_constr ty)) lc in
   let n = (snd specif).Declarations.mind_nrealdecls in
   let ty = whd_betaiota env sigma (lambda_applist_assum sigma (n+1) p (realargs@[c])) in
   sigma, (lc, ty, Sorts.relevance_of_sort ps)

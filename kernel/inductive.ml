@@ -332,31 +332,31 @@ let check_allowed_sort ksort specif =
 
 let is_correct_arity env c pj ind specif params =
   let arsign,_ = get_instantiated_arity ind specif params in
-  let rec srec env pt ar =
+  let rec srec env ar pt =
     let pt' = whd_all env pt in
-    match kind pt', ar with
-      | Prod (na1,a1,t), (LocalAssum (_,a1'))::ar' ->
+    match ar, kind pt' with
+      | (LocalAssum (_,a1))::ar', Prod (na1,a1',t) ->
           let () =
             try conv_leq env a1 a1'
             with NotConvertible -> raise (LocalArity None) in
-          srec (push_rel (LocalAssum (na1,a1)) env) t ar'
+          srec (push_rel (LocalAssum (na1,a1)) env) ar' t
       (* The last Prod domain is the type of the scrutinee *)
-      | Prod (na1,a1,a2), [] -> (* whnf of t was not needed here! *)
-         let env' = push_rel (LocalAssum (na1,a1)) env in
+      | [], Prod (na1,a1',a2) -> (* whnf of t was not needed here! *)
+         let env' = push_rel (LocalAssum (na1,a1')) env in
          let ksort = match kind (whd_all env' a2) with
          | Sort s -> Sorts.family s
          | _ -> raise (LocalArity None) in
          let dep_ind = build_dependent_inductive ind specif params in
          let _ =
-           try conv_leq env a1 dep_ind
+           try conv_leq env dep_ind a1'
            with NotConvertible -> raise (LocalArity None) in
            check_allowed_sort ksort specif
-      | _, (LocalDef _ as d)::ar' ->
-          srec (push_rel d env) (lift 1 pt') ar'
+      | (LocalDef _ as d)::ar', _ ->
+          srec (push_rel d env) ar' (lift 1 pt')
       | _ ->
           raise (LocalArity None)
   in
-  try srec env pj.uj_type (List.rev arsign)
+  try srec env (List.rev arsign) pj.uj_type
   with LocalArity kinds ->
     error_elim_arity env ind c pj kinds
 
@@ -379,7 +379,7 @@ let build_branches_type (ind,u) (_,mip as specif) params p =
       let dep_cstr = Term.applist (mkConstructU (cstr,u),lparams@(Context.Rel.to_extended_list mkRel 0 cstrsign)) in
       vargs @ [dep_cstr] in
     let base = Term.lambda_appvect_assum (mip.mind_nrealdecls+1) (lift nargs p) (Array.of_list cargs) in
-    Term.it_mkProd_or_LetIn base cstrsign in
+    (cstrsign, base) in
   Array.mapi build_one_branch mip.mind_nf_lc
 
 (* [p] is the predicate, [c] is the match object, [realargs] is the

@@ -362,11 +362,38 @@ let type_of_constructor env (c,_u as cu) =
 
 (* Case. *)
 
-let check_branch_types env (ind,u) c ct lft explft =
-  try conv_leq_vecti env lft explft
+let conv_leq_ar env (ctx, ty) lft =
+  let open Context.Rel.Declaration in
+  let rec aux env ctx ar =
+    match ctx with
+    | (LocalAssum (_, a1) as d) :: ctx ->
+      let ar = whd_all env ar in
+      (match kind ar with
+      | Prod (_, a1', ar') ->
+        let () = conv_leq false env a1 a1' in
+        aux (push_rel d env) ctx ar'
+      | _ -> raise NotConvertible)
+    | (LocalDef _ as d) :: ctx->
+        aux (push_rel d env) ctx (lift 1 ar)
+    | [] -> conv_leq false env ar ty
+  in aux env (List.rev ctx) lft
+
+let conv_leq_vecti_ar env v1 v2 =
+  Array.fold_left2_i
+    (fun i _ t1 t2 ->
+      try conv_leq_ar env t1 t2
+      with NotConvertible -> raise (NotConvertibleVect i))
+    ()
+    v1
+    v2
+
+let check_branch_types env (ind,u) c ct explft lft =
+  try conv_leq_vecti_ar env explft lft
   with
       NotConvertibleVect i ->
-        error_ill_formed_branch env c ((ind,i+1),u) lft.(i) explft.(i)
+        error_ill_formed_branch env c ((ind,i+1),u) lft.(i)
+          (let (ctx, ty) = explft.(i) in
+          Term.it_mkProd_or_LetIn ty ctx)
     | Invalid_argument _ ->
         error_number_branches env (make_judge c ct) (Array.length explft)
 
@@ -404,7 +431,7 @@ let type_of_case env ci p pt iv c ct _lf lft =
   in
   let (bty,rslty) =
     type_case_branches env indspec (make_judge p pt) c in
-  let () = check_branch_types env pind c ct lft bty in
+  let () = check_branch_types env pind c ct bty lft in
   ci, rslty
 
 let type_of_projection env p c ct =

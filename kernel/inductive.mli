@@ -88,11 +88,11 @@ val inductive_params : mind_specif -> int
  *)
 val type_case_branches :
   env -> pinductive * constr list -> unsafe_judgment -> constr
-    -> types array * types
+    -> (rel_context * types) array * types
 
 val build_branches_type :
   pinductive -> mutual_inductive_body * one_inductive_body ->
-    constr list -> constr -> types array
+    constr list -> constr -> (rel_context * types) array
 
 (** Return the arity of an inductive type *)
 val mind_arity : one_inductive_body -> Constr.rel_context * Sorts.family

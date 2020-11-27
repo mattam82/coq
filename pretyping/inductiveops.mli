@@ -195,7 +195,8 @@ val arity_of_case_predicate :
   env -> inductive_family -> bool -> Sorts.t -> types
 
 val type_case_branches_with_names :
-  env -> evar_map -> pinductive * EConstr.constr list -> constr -> constr -> EConstr.types array * types
+  env -> evar_map -> pinductive * EConstr.constr list -> constr -> constr ->
+  (EConstr.rel_context * EConstr.types) array * types
 
 (** Annotation for cases *)
 val make_case_info : env -> inductive -> Sorts.relevance -> case_style -> case_info
