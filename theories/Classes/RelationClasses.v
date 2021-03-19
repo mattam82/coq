@@ -170,8 +170,7 @@ Section Defs.
   (** Any [Equivalence] declared in the context is automatically considered
    a rewrite relation. *)
     
-  Global Instance equivalence_rewrite_relation `(Equivalence eqA) : RewriteRelation eqA.
-  Defined.
+  Global Instance equivalence_rewrite_relation `(Equivalence eqA) : RewriteRelation eqA | 10 := {}.
 
   (** Leibniz equality. *)
   Section Leibniz.
@@ -188,13 +187,17 @@ Section Defs.
   
 End Defs.
 
-(** Default rewrite relations handled by [setoid_rewrite]. *)
+(* The rewrite relation class is indexed by the type and outputs the
+  sensible rewrite relations to use on a type. *)
+Global Hint Mode RewriteRelation + - : typeclass_instances.
+
+(** Default rewrite relations handled by [setoid_rewrite] on Prop. *)
 #[global]
-Instance: RewriteRelation impl.
-Defined.
+Instance inverse_impl_rewrite_relation : RewriteRelation (flip impl) | 3 := {}.
 #[global]
-Instance: RewriteRelation iff.
-Defined.
+Instance impl_rewrite_relation : RewriteRelation impl | 3 := {}.
+#[global]
+Instance iff_rewrite_relation : RewriteRelation iff | 2 := {}.
 
 (** Hints to drive the typeclass resolution avoiding loops
  due to the use of full unification. *)
@@ -456,8 +459,7 @@ Section Binary.
   Definition relation_equivalence : relation (relation A) :=
     @predicate_equivalence (_::_::Tnil).
 
-  Global Instance: RewriteRelation relation_equivalence.
-  Defined.
+  Global Instance relation_equivalence_rewrite_relation: RewriteRelation relation_equivalence := {}.
   
   Definition relation_conjunction (R : relation A) (R' : relation A) : relation A :=
     @predicate_intersection (A::A::Tnil) R R'.
