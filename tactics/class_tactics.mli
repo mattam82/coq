@@ -13,6 +13,10 @@
 open Names
 open EConstr
 
+(* This generic value type is used internally to allow for the interpretation
+  of tactic arguments to `Hint Extern If self`. Do not use. *)
+val val_callback : unit Proofview.tactic Geninterp.Val.typ
+
 val typeclasses_db : string
 
 val set_typeclasses_debug : bool -> unit

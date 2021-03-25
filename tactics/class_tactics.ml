@@ -254,6 +254,9 @@ let shelve_dependencies gls =
      Feedback.msg_debug (str" shelving dependent subgoals: " ++ pr_gls sigma gls);
    shelve_goals gls)
 
+let val_callback : unit Proofview.tactic Geninterp.Val.typ =
+  Geninterp.Val.create "typeclasses-eauto-callback"
+
 let hintmap_of env sigma hdc secvars concl =
   match hdc with
   | None -> fun db -> ModeMatch (NoMode, Hint_db.map_none ~secvars db)
@@ -262,6 +265,13 @@ let hintmap_of env sigma hdc secvars concl =
        if Hint_db.use_dn db then (* Using dnet *)
          Hint_db.map_eauto env sigma ~secvars hdc concl db
       else Hint_db.map_existential sigma ~secvars hdc concl db
+
+type hint_tactic =
+  | HintTactic of unit Proofview.tactic
+  | HintContinuation of
+    (unit Proofview.tactic ->
+      (* If tac1 Then tac2 *)
+      unit Proofview.tactic option * unit Proofview.tactic)
 
 (** Hack to properly solve dependent evars that are typeclasses *)
 let rec e_trivial_fail_db only_classes db_list local_db secvars =
@@ -283,7 +293,7 @@ let rec e_trivial_fail_db only_classes db_list local_db secvars =
     begin fun gl ->
     let tacs = e_trivial_resolve db_list local_db secvars only_classes
                                  (pf_env gl) (project gl) (pf_concl gl) in
-      tclFIRST (List.map (fun (x,_,_,_,_,_) -> x) tacs)
+      tclFIRST (List.map_filter (function (HintTactic x,_,_,_,_) -> Some x | _ -> None) tacs)
     end
   in
   let tacl =
@@ -309,79 +319,103 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
       | _ -> Evarsolve.AllowedEvars.all
     with e when CErrors.noncritical e -> Evarsolve.AllowedEvars.all
   in
-  let tac_of_hint =
-    fun (flags, h) ->
-      let b = FullHint.priority h in
-      let p = FullHint.pattern h in
-      let name = FullHint.name h in
-      let tac = function
-        | Res_pf h ->
-           if get_typeclasses_filtered_unification () then
-             let tac =
-               with_prods nprods h
-                          (fun diff ->
-                             matches_pattern concl p <*>
-                               unify_resolve_refine flags h diff)
-             in Tacticals.New.tclTHEN tac Proofview.shelve_unifiable
-           else
-             let tac =
-               with_prods nprods h (unify_resolve ~with_evars:false flags h) in
-               Proofview.tclBIND (Proofview.with_shelf tac)
-                  (fun (gls, ()) -> shelve_dependencies gls)
-        | ERes_pf h ->
-           if get_typeclasses_filtered_unification () then
-             let tac = (with_prods nprods h
-                  (fun diff ->
-                             matches_pattern concl p <*>
-                             unify_resolve_refine flags h diff)) in
-             Tacticals.New.tclTHEN tac Proofview.shelve_unifiable
-           else
-             let tac =
-               with_prods nprods h (unify_resolve ~with_evars:true flags h) in
-               Proofview.tclBIND (Proofview.with_shelf tac)
-                  (fun (gls, ()) -> shelve_dependencies gls)
-        | Give_exact h ->
-           if get_typeclasses_filtered_unification () then
-             let tac =
-               matches_pattern concl p <*>
-                 Proofview.Goal.enter
-                   (fun gl -> unify_resolve_refine flags h None) in
-             Tacticals.New.tclTHEN tac Proofview.shelve_unifiable
-           else
-             e_give_exact flags h
-      | Res_pf_THEN_trivial_fail h ->
-         let fst = with_prods nprods h (unify_resolve ~with_evars:true flags h) in
-         let snd = if complete then Tacticals.New.tclIDTAC
-                   else e_trivial_fail_db only_classes db_list local_db secvars in
-         Tacticals.New.tclTHEN fst snd
-      | Unfold_nth c ->
-         Proofview.tclPROGRESS (unfold_in_concl [AllOccurrences,c])
-      | Extern (p, tacast, thenopt) -> conclPattern concl p tacast
+  let tac_of_hint (flags, h) =
+    let b = FullHint.priority h in
+    let p = FullHint.pattern h in
+    let name = FullHint.name h in
+    let default tac = HintTactic (if complete then Tacticals.New.tclCOMPLETE tac else tac) in
+    let tac = function
+      | Res_pf h ->
+        let tac =
+        if get_typeclasses_filtered_unification () then
+            let tac =
+            with_prods nprods h
+                      (fun diff ->
+                          matches_pattern concl p <*>
+                            unify_resolve_refine flags h diff)
+          in Tacticals.New.tclTHEN tac Proofview.shelve_unifiable
+        else
+            let tac =
+              with_prods nprods h (unify_resolve ~with_evars:false flags h) in
+            Proofview.tclBIND (Proofview.with_shelf tac)
+                (fun (gls, ()) -> shelve_dependencies gls)
+      in default tac
+    | ERes_pf h ->
+      let tac =
+        if get_typeclasses_filtered_unification () then
+          let tac = (with_prods nprods h
+            (fun diff -> matches_pattern concl p <*>
+                        unify_resolve_refine flags h diff))
+          in Tacticals.New.tclTHEN tac Proofview.shelve_unifiable
+        else
+          let tac = with_prods nprods h (unify_resolve ~with_evars:true flags h) in
+            Proofview.tclBIND (Proofview.with_shelf tac)
+                (fun (gls, ()) -> shelve_dependencies gls)
+      in default tac
+    | Give_exact h ->
+      let tac =
+        if get_typeclasses_filtered_unification () then
+          let tac =
+            matches_pattern concl p <*>
+              Proofview.Goal.enter
+                (fun gl -> unify_resolve_refine flags h None) in
+          Tacticals.New.tclTHEN tac Proofview.shelve_unifiable
+          else e_give_exact flags h
+      in default tac
+    | Res_pf_THEN_trivial_fail h ->
+      let tac =
+        let fst = with_prods nprods h (unify_resolve ~with_evars:true flags h) in
+        let snd = if complete then Tacticals.New.tclIDTAC
+                  else e_trivial_fail_db only_classes db_list local_db secvars in
+        Tacticals.New.tclTHEN fst snd
+      in default tac
+    | Unfold_nth c ->
+      (* A bit strange to ask an unfold hint to complete the proof? *)
+      default (Proofview.tclPROGRESS (unfold_in_concl [AllOccurrences,c]))
+    | Extern (p, id, iftac, thentac) ->
+      let iftac ist =
+        match iftac with
+        | Some arg ->
+          let open Genarg in
+          let open Geninterp in
+          (* XXX poly??? *)
+          let ist = { lfun = ist; extra = TacStore.empty; poly = false } in
+          (match arg with
+            | GenArg (Glbwit wit, thentac) ->
+              Some (Ftactic.run (Geninterp.interp wit ist thentac) (fun _ -> Proofview.tclUNIT ())))
+        | None -> None
       in
-      let tac = FullHint.run h tac in
-      let tac = if complete then Tacticals.New.tclCOMPLETE tac else tac in
-      let pp =
-        match p with
-        | Some pat when get_typeclasses_filtered_unification () ->
-           str " with pattern " ++ Printer.pr_constr_pattern_env env sigma pat
-        | _ -> mt ()
-      in
-        match FullHint.repr h with
-        | Extern (_, _, thenopt) ->
-          let thentac =
-            match thenopt with
-            | Some arg ->
-              let open Genarg in
-              let open Geninterp in
-              (* XXX poly??? *)
-              let ist = { lfun = Id.Map.empty; extra = TacStore.empty; poly = false } in
-              (match arg with
-               | GenArg (Glbwit wit, thentac) ->
-                 Some (Ftactic.run (Geninterp.interp wit ist thentac) (fun _ -> Proofview.tclUNIT ())))
-            | None -> None
+      match id with
+      | Some lid ->
+        let cont k =
+          let tactic_binding =
+            Id.Map.singleton (CAst.with_val (fun x -> x) lid)
+            (Geninterp.Val.inject (Geninterp.Val.Base val_callback) k)
           in
-          (tac, b, true, thentac, name, lazy (FullHint.print env sigma h ++ pp))
-        | _ -> (tac, b, false, None, name, lazy (FullHint.print env sigma h ++ pp))
+          (iftac tactic_binding, conclPattern concl p ~ist:tactic_binding thentac)
+        in HintContinuation cont
+      | None -> HintTactic (conclPattern concl p thentac)
+    in
+    let pp =
+      match p with
+      | Some pat when get_typeclasses_filtered_unification () ->
+          str " with pattern " ++ Printer.pr_constr_pattern_env env sigma pat
+      | _ -> mt ()
+    in
+    let is_extern =
+      match FullHint.repr h with
+      | Extern _ -> true
+      | _ -> false
+    in
+    let tac =
+      match tac (FullHint.repr h) with
+      | HintTactic tac -> HintTactic (FullHint.run h (fun _ -> tac))
+      | HintContinuation tac ->
+        HintContinuation (fun k' ->
+          let iftac, thentac = tac k' in
+            (iftac, FullHint.run h (fun _ -> thentac)))
+    in
+      (tac, b, is_extern, name, lazy (FullHint.print env sigma h ++ pp))
   in
   let hint_of_db = hintmap_of env sigma hdc secvars concl in
   let hintl = List.map_filter (fun db -> match hint_of_db db with
@@ -769,7 +803,7 @@ module Search = struct
     let ortac = if backtrack then Proofview.tclOR else Proofview.tclORELSE in
     let idx = ref 1 in
     let foundone = ref false in
-    let rec onetac e (tac, pat, extern, thentac, name, pp) tl =
+    let rec onetac e (tac, pat, extern,  name, pp) tl =
       let derivs = path_derivate info.search_cut name in
       let pr_error ie =
         if !typeclasses_debug > 1 then
@@ -795,7 +829,7 @@ module Search = struct
           Feedback.msg_debug (header ++ str " failed with: " ++ msg)
         else ()
       in
-      let tac_of gls i j = Goal.enter begin fun gl' ->
+      let tac_of gls i j gl' =
         let sigma' = Goal.sigma gl' in
         let _concl = Goal.concl gl' in
         if !typeclasses_debug > 0 then
@@ -820,11 +854,7 @@ module Search = struct
             search_hints = hints';
             search_cut = derivs;
             search_best_effort = info.search_best_effort }
-        in
-        match thentac with
-        | None -> kont info'
-        | Some _ -> tclUNIT ()
-        end
+        in kont info'
       in
       let rec result (shelf, ()) i k =
         foundone := true;
@@ -841,7 +871,8 @@ module Search = struct
         let res =
           if j = 0 then tclUNIT ()
           else search_fixpoint ~best_effort:false ~allow_out_of_order:false
-                 (List.init j (fun j' -> (tac_of gls i (Option.default 0 k + j'))))
+                 (List.init j (fun j' ->
+                  Goal.enter (tac_of gls i (Option.default 0 k + j'))))
         in
         let finish nestedshelf sigma =
           let filter ev =
@@ -886,19 +917,22 @@ module Search = struct
       in
       if path_matches derivs [] then aux e tl
       else
-        let iftac =
-          with_shelf tac >>= fun s ->
-          let i = !idx in
-          incr idx;
-          result s i None
+        let firsttac tac =
+          with_shelf tac >>=
+          fun s -> let i = !idx in incr idx; result s i None
         in
         let elsetac e' =
           pr_error e';
           aux (merge_exceptions e e') tl
         in
-        match thentac with
-        | Some thentac -> tclIFCATCH iftac (fun () -> tclTHEN (thentac) (kont info)) elsetac
-        | None -> ortac iftac elsetac
+        match tac with
+        | HintTactic tac -> ortac (firsttac tac) elsetac
+        | HintContinuation ktac ->
+          let iftac, thentac = ktac (kont info) in
+          match iftac with
+          | Some iftac ->
+            tclIFCATCH iftac (fun () -> thentac) elsetac
+          | None -> ortac (firsttac thentac) elsetac
     and aux e = function
       | tac :: tacs -> onetac e tac tacs
       | [] ->

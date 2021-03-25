@@ -97,7 +97,7 @@ si après Intros la conclusion matche le pattern.
 
 (* conclPattern doit échouer avec error car il est rattrapé par tclFIRST *)
 
-let conclPattern concl pat tac =
+let conclPattern concl pat ?(ist=Id.Map.empty) tac =
   let constr_bindings env sigma =
     match pat with
     | None -> Proofview.tclUNIT Id.Map.empty
@@ -119,8 +119,9 @@ let conclPattern concl pat tac =
      | Val.Base tag -> Val.Dyn (tag, c)
      | _ -> assert false
      in
+
      let fold id c accu = Id.Map.add id (inj c) accu in
-     let lfun = Id.Map.fold fold constr_bindings Id.Map.empty in
+     let lfun = Id.Map.fold fold constr_bindings ist in
      let ist = { lfun
                ; poly
                ; extra = TacStore.empty } in
@@ -370,8 +371,8 @@ and tac_of_hint dbg db_list local_db concl (flags, h) =
          let info = Exninfo.reify () in
          Tacticals.New.tclFAIL ~info 0 (str"Unbound reference")
        end
-    | Extern (p, tacast, thentacast) ->
-      conclPattern concl p tacast
+    | Extern (p, id, iftacast, thentacast) ->
+      conclPattern concl p thentacast
   in
   let pr_hint env sigma =
     let origin = match FullHint.database h with

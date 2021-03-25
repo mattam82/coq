@@ -155,15 +155,23 @@ let interp_hints ~poly h =
           , hint_globref gr ))
     in
     HintsResolveEntry (List.flatten (List.map constr_hints_of_ind lqid))
-  | HintsExtern (pri, patcom, tacexp, thentacexp) ->
+  | HintsExtern { hint_extern_self = lid;
+    hint_extern_priority = pri;
+    hint_extern_pattern = patcom;
+    hint_extern_iftac = iftacexp;
+    hint_extern_body = bodytacexp } ->
     let pat = Option.map (fp sigma) patcom in
     let l = match pat with None -> [] | Some (l, _) -> l in
+    let thenvars =
+      match lid with
+      | Some lid -> CAst.with_val Id.Set.singleton lid
+      | None -> Id.Set.empty
+    in
     let ltacvars =
-      List.fold_left (fun accu x -> Id.Set.add x accu) Id.Set.empty l
+      List.fold_left (fun accu x -> Id.Set.add x accu) thenvars l
     in
     let tacenv = Genintern.({ (empty_glob_sign env) with ltacvars }) in
-    let _, tacexp = Genintern.generic_intern tacenv tacexp in
-    let emptyenv = Genintern.empty_glob_sign env in
-    let thentacexp = Option.map (fun x -> snd (Genintern.generic_intern emptyenv x)) thentacexp in
+    let iftacexp = Option.map (fun x -> snd (Genintern.generic_intern tacenv x)) iftacexp in
+    let _, bodytacexp = Genintern.generic_intern tacenv bodytacexp in
     HintsExternEntry
-      ({ Typeclasses.hint_priority = Some pri; hint_pattern = pat }, tacexp, thentacexp)
+      ({ Typeclasses.hint_priority = Some pri; hint_pattern = pat }, lid, iftacexp, bodytacexp)

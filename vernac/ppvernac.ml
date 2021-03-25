@@ -310,16 +310,17 @@ let pr_hints db h pr_c pr_pat =
     | HintsConstructors c ->
       keyword "Constructors"
       ++ spc() ++ prlist_with_sep spc pr_qualid c
-    | HintsExtern (n,c,tac,thentac) ->
+    | HintsExtern { hint_extern_self = lid; hint_extern_priority = n;
+      hint_extern_pattern = c; hint_extern_iftac = iftac; hint_extern_body = thentac } ->
+      let idmsg = match lid with Some lid -> CAst.with_val Id.print lid ++ spc() | None -> mt () in
       let pat = match c with None -> mt () | Some pat -> pr_pat pat in
-      let tacmsg = spc() ++ pr_gen tac in
-      let thentacmsg = match thentac with
+      let tacmsg = spc() ++ pr_gen thentac in
+      let tacmsg = match iftac with
         | None -> str " =>" ++ tacmsg
-        | Some thentac ->
-          keyword " If" ++ spc () ++ tacmsg ++ str" =>" ++
-          pr_gen thentac
+        | Some iftac ->
+          keyword " when" ++ spc () ++ pr_gen iftac ++ str" =>" ++ tacmsg
       in
-      keyword "Extern" ++ spc() ++ int n ++ spc() ++ pat ++ thentacmsg
+      keyword "Extern" ++ spc() ++ idmsg ++ int n ++ spc() ++ pat ++ tacmsg
   in
   hov 2 (keyword "Hint "++ pph ++ opth)
 
