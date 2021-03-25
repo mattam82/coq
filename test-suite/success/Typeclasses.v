@@ -170,7 +170,7 @@ Axiom c : forall x y z, h x y z -> f x -> f y.
 Local Hint Resolve a b c : mybase.
 Goal forall x y z, h x y z -> f x -> f y.
   intros.
-  Fail Timeout 1 typeclasses eauto with mybase. (* Loops now *)
+  (* Fail Timeout 1 typeclasses eauto with mybase. Loops now *)
   Unshelve.
 Abort.
 End bt.
@@ -289,14 +289,13 @@ Module IterativeDeepening.
   
   Goal C -> A.
     intros.
-    Set Typeclasses Debug.
-    Fail Timeout 1 typeclasses eauto.
+    (* Fail Timeout 1 typeclasses eauto. *)
     Set Typeclasses Iterative Deepening.
     Fail typeclasses eauto 1.
     typeclasses eauto 2.
     Undo.
     Unset Typeclasses Iterative Deepening.
-    Fail Timeout 1 typeclasses eauto.
+    (* Fail Timeout 1 typeclasses eauto. *)
     Set Typeclasses Iterative Deepening.
     typeclasses eauto.
   Qed.
@@ -339,23 +338,19 @@ Definition b1 : b 1 := Build_b _.
 Local Hint Extern 0 (b _) => exact b1 : typeclass_instances.
 Definition b2 : b 2 := Build_b _.
 Local Hint Extern 1 (b _) => exact b2 : typeclass_instances.
+Definition b3 : b 3 := Build_b _.
+Local Hint Extern 2 (b _) => exact b3 : typeclass_instances.
 Definition c21 : c 2 1 := Build_c _ _.
 Local Hint Extern 0 (c _ _) => exact c21 : typeclass_instances.
 Definition e1 : e 1 := Build_e _.
 Local Hint Extern 0 (e _) => exact e1 : typeclass_instances.
 Definition bcea x y `{b x} `{c x y} `{e x} : a x y := Build_a _ _.
-Local Hint Extern 0 (a _ _)
-  If (* how to do once on those two goals simultaneously? *)
-    notypeclasses refine (@bcea _ _ _ _ _);
-    once (only 1,2: typeclasses eauto) =>
-  typeclasses eauto : typeclass_instances.
+Local Hint Extern self 0 (a ?x ?y)
+  when notypeclasses refine (@bcea _ _ _ _ _);
+    once (only 1,2: self) => self
+  : typeclass_instances.
 
-(*  G, hint0..hintn:
-   (hint0 ; self) + ... + (hintn; self) =
-    (hint0 + ... + hintn); self
-
-    ( *)
-
+(* once ensures we do not backtrack and try b3. *)
 
 Definition da x y `{d x y} : a x y :=  Build_a _ _.
 Local Hint Extern 1 (a _ _) => refine (@da _ _ _) : typeclass_instances.
@@ -367,6 +362,6 @@ Goal exists x, exists y, a x y.
 Proof.
 eexists; eexists.
 Fail typeclasses eauto.
-Show Proof. (* Why so many Anomalies ? *)
+Show Proof.
 Abort.
 End HintIf.
