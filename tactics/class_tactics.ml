@@ -456,12 +456,16 @@ let e_possible_resolve db_list local_db secvars only_classes env sigma concl =
 let cut_of_hints h =
   List.fold_left (fun cut db -> PathOr (Hint_db.cut db, cut)) PathEmpty h
 
+type depth_item =
+  | Goal of int
+  | Branch of int * int
+
 let pr_depth l =
   let rec fmt elts =
     match elts with
     | [] -> []
-    | [n] -> [string_of_int n]
-    | n1::n2::rest ->
+    | Goal n :: rest -> string_of_int n :: fmt rest
+    | Branch (n1,n2)::rest ->
        (string_of_int n1 ^ "." ^ string_of_int n2) :: fmt rest
   in
   prlist_with_sep (fun () -> str "-") str (fmt (List.rev l))
@@ -555,7 +559,7 @@ let make_hints g (modes,st) only_classes sign =
 
 module Search = struct
   type autoinfo =
-    { search_depth : int list;
+    { search_depth : depth_item list;
       last_tac : Pp.t Lazy.t;
       search_dep : bool;
       search_only_classes : bool;
@@ -654,7 +658,7 @@ module Search = struct
         if !typeclasses_debug > 1 then
           let idx = if fst ie == NoApplicableEx then pred !idx else !idx in
           let header =
-            pr_depth (idx :: info.search_depth) ++ str": " ++
+            pr_depth (Goal idx :: info.search_depth) ++ str": " ++
               Lazy.force pp ++
               (if !foundone != true then
                  str" on" ++ spc () ++ pr_ev sigma (Proofview.Goal.goal gl)
@@ -673,12 +677,12 @@ module Search = struct
           Feedback.msg_debug (header ++ str " failed with: " ++ msg)
         else ()
       in
-      let tac_of gls i j gl' =
+      let tac_of kont gls i j gl' =
         let sigma' = Goal.sigma gl' in
         let _concl = Goal.concl gl' in
         if !typeclasses_debug > 0 then
           Feedback.msg_debug
-            (pr_depth (succ j :: i :: info.search_depth) ++ str" : " ++
+            (pr_depth (Branch (i, j) :: info.search_depth) ++ str" : " ++
                pr_ev sigma' (Proofview.Goal.goal gl'));
         let eq c1 c2 = EConstr.eq_constr sigma' c1 c2 in
         let hints' =
@@ -691,7 +695,7 @@ module Search = struct
         in
         let dep' = info.search_dep || Proofview.unifiable sigma' (Goal.goal gl') gls in
         let info' =
-          { search_depth = succ j :: i :: info.search_depth;
+          { search_depth = Branch (i, j) :: info.search_depth;
             last_tac = pp;
             search_dep = dep';
             search_only_classes = info.search_only_classes;
@@ -706,7 +710,7 @@ module Search = struct
         let j = List.length gls in
         (if !typeclasses_debug > 0 then
            Feedback.msg_debug
-             (pr_depth (i :: info.search_depth) ++ str": " ++ Lazy.force pp
+             (pr_depth (Goal i :: info.search_depth) ++ str": " ++ Lazy.force pp
               ++ str" on" ++ spc () ++ pr_ev sigma (Proofview.Goal.goal gl)
               ++ str", " ++ int j ++ str" subgoal(s)" ++
                 (Option.cata (fun k -> str " in addition to the first " ++ int k)
@@ -714,7 +718,8 @@ module Search = struct
         let res =
           if j = 0 then tclUNIT ()
           else tclDISPATCH
-                 (List.init j (fun j' -> (tac_of gls i (Option.default 0 k + j'))))
+                 (List.init j (fun j' ->
+                  Goal.enter (tac_of kont gls i (succ (Option.default 0 k + j')))))
         in
         let finish nestedshelf sigma =
           let filter ev =
@@ -731,7 +736,7 @@ module Search = struct
                int (Evar.repr ev) ++ spc () ++ pr_ev sigma ev in
              let unsolved = prlist_with_sep spc prunsolved remaining in
              Feedback.msg_debug
-               (pr_depth (i :: info.search_depth) ++
+               (pr_depth (Goal i :: info.search_depth) ++
                   str": after " ++ Lazy.force pp ++ str" finished, " ++
                   int (List.length remaining) ++
                   str " goals are shelved and unsolved ( " ++
@@ -770,7 +775,17 @@ module Search = struct
         match tac with
         | HintTactic tac -> ortac (firsttac tac) elsetac
         | HintContinuation ktac ->
-          let iftac, thentac = ktac (kont info) in
+          let wrap_kont =
+            Unsafe.tclGETGOALS >>= fun gls ->
+              let j = List.length gls in
+              let i = !idx in
+              let () = incr idx in
+              search_fixpoint ~best_effort:false ~allow_out_of_order:false
+                (List.init j (fun j' ->
+                  let gls = CList.map Proofview.drop_state gls in
+                  Proofview.Goal.enter (tac_of (fun info -> kont info) gls i (succ j'))))
+          in
+          let iftac, thentac = ktac wrap_kont in
           match iftac with
           | Some iftac ->
             tclIFCATCH iftac (fun () -> thentac) elsetac
@@ -807,7 +822,7 @@ module Search = struct
     let ldb = Hint_db.add_list env sigma hint info.search_hints in
     let info' =
       { info with search_hints = ldb; last_tac = lazy (str"intro");
-        search_depth = 1 :: 1 :: info.search_depth }
+        search_depth = Branch (1, 1) :: info.search_depth }
     in kont info'
 
   let intro info kont =
@@ -845,7 +860,7 @@ module Search = struct
     let tac sigma gls i =
       Goal.enter
         begin fun gl ->
-          search_tac_gl mst only_classes dep hints depth (succ i) sigma gls gl end
+          search_tac_gl mst only_classes dep hints depth (Goal (succ i)) sigma gls gl end
     in
     let tac_or_stuck sigma gls i =
       Proofview.tclOR

@@ -347,7 +347,7 @@ Local Hint Extern 0 (e _) => exact e1 : typeclass_instances.
 Definition bcea x y `{b x} `{c x y} `{e x} : a x y := Build_a _ _.
 Local Hint Extern self 0 (a ?x ?y)
   when notypeclasses refine (@bcea _ _ _ _ _);
-    once (only 1,2: self) => self
+    once (only 1-2: self) => self
   : typeclass_instances.
 
 (* once ensures we do not backtrack and try b3. *)
