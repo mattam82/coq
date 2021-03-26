@@ -25,13 +25,20 @@ val auto_flags_of_state : TransparentState.t -> Unification.unify_flags
 (** Try unification with the precompiled clause, then use registered Apply *)
 val unify_resolve : Unification.unify_flags -> hint -> unit Proofview.tactic
 
+(** Generic [conclPattern]:
+  @aises Constr_matching.PatternMatchingFailure in case the conclusion does not match the pattern.
+
+  Otherwise returns the bindings of pattern variables in the pattern extending the given ist, if any.
+  *)
+val conclPattern_gen : Environ.env -> Evd.evar_map -> ?ist:Geninterp.Val.t Id.Map.t ->
+  constr -> constr_pattern option -> Geninterp.Val.t Id.Map.t
+
 (** [ConclPattern concl pat ist tacast]:
-   if the term concl matches the pattern pat, (in sense of
-   [Pattern.somatches], then replace [?1] [?2] metavars in tacast by the
-   right values to build a tactic, binding additional Ltac variables using [ist]. *)
+  if the term concl matches the pattern pat, (in sense of
+  [Pattern.somatches], then replace [?1] [?2] metavars in tacast by the
+  right values to build a tactic, binding additional Ltac variables using [ist]. *)
 
 val conclPattern : constr -> constr_pattern option ->
-  ?ist:Geninterp.Val.t Id.Map.t ->
   Genarg.glob_generic_argument -> unit Proofview.tactic
 
 (** The Auto tactic *)

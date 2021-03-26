@@ -97,38 +97,42 @@ si après Intros la conclusion matche le pattern.
 
 (* conclPattern doit échouer avec error car il est rattrapé par tclFIRST *)
 
-let conclPattern concl pat ?(ist=Id.Map.empty) tac =
+let conclPattern_gen env sigma ?(ist=Id.Map.empty) concl pat =
   let constr_bindings env sigma =
     match pat with
-    | None -> Proofview.tclUNIT Id.Map.empty
-    | Some pat ->
-        try
-          Proofview.tclUNIT (Constr_matching.matches env sigma pat concl)
-        with Constr_matching.PatternMatchingFailure as exn ->
-          let _, info = Exninfo.capture exn in
-          Tacticals.New.tclZEROMSG ~info (str "pattern-matching failed")
+    | None -> Id.Map.empty
+    | Some pat -> Constr_matching.matches env sigma pat concl
   in
+  let constr_bindings = constr_bindings env sigma in
+  let open Genarg in
+  let open Geninterp in
+  let inj c = match val_tag (topwit Stdarg.wit_constr) with
+    | Val.Base tag -> Val.Dyn (tag, c)
+    | _ -> assert false
+  in
+  let fold id c accu = Id.Map.add id (inj c) accu in
+  Id.Map.fold fold constr_bindings ist
+
+let conclPattern concl pat tac =
   Proofview.Goal.enter begin fun gl ->
      let env = Proofview.Goal.env gl in
      let sigma = Tacmach.New.project gl in
-     constr_bindings env sigma >>= fun constr_bindings ->
      Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
-     let open Genarg in
-     let open Geninterp in
-     let inj c = match val_tag (topwit Stdarg.wit_constr) with
-     | Val.Base tag -> Val.Dyn (tag, c)
-     | _ -> assert false
-     in
-
-     let fold id c accu = Id.Map.add id (inj c) accu in
-     let lfun = Id.Map.fold fold constr_bindings ist in
-     let ist = { lfun
-               ; poly
-               ; extra = TacStore.empty } in
-     match tac with
-     | GenArg (Glbwit wit, tac) ->
-      Ftactic.run (Geninterp.interp wit ist tac) (fun _ -> Proofview.tclUNIT ())
-  end
+      (match conclPattern_gen env sigma concl pat with
+      | exception (Constr_matching.PatternMatchingFailure as exn) ->
+        let _, info = Exninfo.capture exn in
+        Tacticals.New.tclZEROMSG ~info (str "pattern-matching failed")
+      | bindings ->
+        let open Genarg in
+        let open Geninterp in
+        let ist = { lfun = bindings
+          ; poly
+          ; extra = TacStore.empty }
+        in
+        match tac with
+        | GenArg (Glbwit wit, tac) ->
+          Ftactic.run (Geninterp.interp wit ist tac) (fun _ -> Proofview.tclUNIT ()))
+    end
 
 (***********************************************************)
 (** A debugging / verbosity framework for trivial and auto *)

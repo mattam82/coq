@@ -374,29 +374,38 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
     | Unfold_nth c ->
       (* A bit strange to ask an unfold hint to complete the proof? *)
       default (Proofview.tclPROGRESS (unfold_in_concl [AllOccurrences,c]))
-    | Extern (p, id, iftac, thentac) ->
-      let iftac ist =
-        match iftac with
-        | Some arg ->
-          let open Genarg in
-          let open Geninterp in
-          (* XXX poly??? *)
-          let ist = { lfun = ist; extra = TacStore.empty; poly = false } in
-          (match arg with
-            | GenArg (Glbwit wit, thentac) ->
-              Some (Ftactic.run (Geninterp.interp wit ist thentac) (fun _ -> Proofview.tclUNIT ())))
-        | None -> None
+    | Extern (pat, id, iftac, thentac) ->
+      let call_tac arg ist =
+        let open Genarg in
+        let open Geninterp in
+        (* XXX poly??? *)
+        let ist = { lfun = ist; extra = TacStore.empty; poly = false } in
+        (match arg with
+          | GenArg (Glbwit wit, thentac) ->
+            Ftactic.run (Geninterp.interp wit ist thentac) (fun _ -> Proofview.tclUNIT ()))
       in
-      match id with
-      | Some lid ->
-        let cont k =
-          let tactic_binding =
+      let cont k =
+        let ist =
+          match id with
+          | Some lid ->
             Id.Map.singleton (CAst.with_val (fun x -> x) lid)
             (Geninterp.Val.inject (Geninterp.Val.Base val_callback) k)
+          | None -> Id.Map.empty
+        in
+        try
+          let ist = conclPattern_gen env sigma ~ist concl pat in
+          let iftac =
+            match iftac with
+            | Some arg -> Some (call_tac arg ist)
+            | None -> None
           in
-          (iftac tactic_binding, conclPattern concl p ~ist:tactic_binding thentac)
-        in HintContinuation cont
-      | None -> HintTactic (conclPattern concl p thentac)
+          (iftac, call_tac thentac ist)
+        with Constr_matching.PatternMatchingFailure as exn ->
+          let fail =
+            let _, info = Exninfo.capture exn in
+            Tacticals.New.tclZEROMSG ~info (str "pattern-matching failed")
+          in (None, fail)
+      in HintContinuation cont
     in
     let pp =
       match p with
@@ -650,19 +659,17 @@ module Search = struct
        This is an overapproximation. Evars could appear in this goal only
        and not any other *)
     let ortac = if backtrack then Proofview.tclOR else Proofview.tclORELSE in
-    let idx = ref 1 in
-    let foundone = ref false in
-    let rec onetac e (tac, pat, extern,  name, pp) tl =
+    let successes = ref 0 in
+    let rec onetac e (tac, pat, extern, name, pp) tl =
       let derivs = path_derivate info.search_cut name in
       let pr_error ie =
         if !typeclasses_debug > 1 then
-          let idx = if fst ie == NoApplicableEx then pred !idx else !idx in
           let header =
-            pr_depth (Goal idx :: info.search_depth) ++ str": " ++
-              Lazy.force pp ++
-              (if !foundone != true then
-                 str" on" ++ spc () ++ pr_ev sigma (Proofview.Goal.goal gl)
-               else mt ())
+            hov 0 (seq [pr_depth info.search_depth; str":"; spc ();
+                   Lazy.force pp;
+                    (if !successes = 0 then
+                      str" on " ++ pr_ev sigma (Proofview.Goal.goal gl)
+                    else mt ())])
           in
           let msg =
             match fst ie with
@@ -674,16 +681,16 @@ module Search = struct
             | NoApplicableEx -> str "Proof-search failed."
             | e -> CErrors.iprint ie
           in
-          Feedback.msg_debug (header ++ str " failed with: " ++ msg)
+          Feedback.msg_debug (hov 2 (seq [header; str " failed with:"; spc (); msg]))
         else ()
       in
-      let tac_of kont gls i j gl' =
+      let tac_of kont gls glid gl' =
         let sigma' = Goal.sigma gl' in
         let _concl = Goal.concl gl' in
         if !typeclasses_debug > 0 then
           Feedback.msg_debug
-            (pr_depth (Branch (i, j) :: info.search_depth) ++ str" : " ++
-               pr_ev sigma' (Proofview.Goal.goal gl'));
+            (hov 2 (pr_depth glid ++ str":" ++ spc () ++
+              pr_ev sigma' (Proofview.Goal.goal gl')));
         let eq c1 c2 = EConstr.eq_constr sigma' c1 c2 in
         let hints' =
           if extern && not (Context.Named.equal eq (Goal.hyps gl') (Goal.hyps gl))
@@ -695,7 +702,7 @@ module Search = struct
         in
         let dep' = info.search_dep || Proofview.unifiable sigma' (Goal.goal gl') gls in
         let info' =
-          { search_depth = Branch (i, j) :: info.search_depth;
+          { search_depth = glid;
             last_tac = pp;
             search_dep = dep';
             search_only_classes = info.search_only_classes;
@@ -704,13 +711,12 @@ module Search = struct
         in kont info'
       in
       let rec result (shelf, ()) i k =
-        foundone := true;
         Proofview.Unsafe.tclGETGOALS >>= fun gls ->
         let gls = CList.map Proofview.drop_state gls in
         let j = List.length gls in
         (if !typeclasses_debug > 0 then
            Feedback.msg_debug
-             (pr_depth (Goal i :: info.search_depth) ++ str": " ++ Lazy.force pp
+             (pr_depth (Goal i :: info.search_depth) ++ str":" ++ spc () ++ Lazy.force pp
               ++ str" on" ++ spc () ++ pr_ev sigma (Proofview.Goal.goal gl)
               ++ str", " ++ int j ++ str" subgoal(s)" ++
                 (Option.cata (fun k -> str " in addition to the first " ++ int k)
@@ -719,7 +725,8 @@ module Search = struct
           if j = 0 then tclUNIT ()
           else tclDISPATCH
                  (List.init j (fun j' ->
-                  Goal.enter (tac_of kont gls i (succ (Option.default 0 k + j')))))
+                  let glid = Branch (i, succ (Option.default 0 k + j')) :: info.search_depth in
+                  (glid, Goal.enter (tac_of kont gls glid))))
         in
         let finish nestedshelf sigma =
           let filter ev =
@@ -766,34 +773,45 @@ module Search = struct
       else
         let firsttac tac =
           with_shelf tac >>=
-          fun s -> let i = !idx in incr idx; result s i None
+          fun s ->
+            let () = incr successes in
+            let i = !successes in
+            result s i None
         in
         let elsetac e' =
           pr_error e';
           aux (merge_exceptions e e') tl
         in
         match tac with
-        | HintTactic tac -> ortac (firsttac tac) elsetac
+        | HintTactic tac ->
+          ortac (firsttac tac) elsetac
         | HintContinuation ktac ->
           let wrap_kont =
+            let kont_calls = ref 0 in
             Unsafe.tclGETGOALS >>= fun gls ->
+              let () = incr kont_calls in
+              let i = !kont_calls in
               let j = List.length gls in
-              let i = !idx in
-              let () = incr idx in
               search_fixpoint ~best_effort:false ~allow_out_of_order:false
                 (List.init j (fun j' ->
                   let gls = CList.map Proofview.drop_state gls in
-                  Proofview.Goal.enter (tac_of (fun info -> kont info) gls i (succ j'))))
+                  let glid = Branch (i, succ j') :: info.search_depth in
+                  glid, Proofview.Goal.enter (tac_of (fun info -> kont info) gls glid)))
           in
           let iftac, thentac = ktac wrap_kont in
           match iftac with
           | Some iftac ->
-            tclIFCATCH iftac (fun () -> thentac) elsetac
+            tclIFCATCH iftac (fun () ->
+              if !typeclasses_debug > 1 then
+                Feedback.msg_debug (hov 2 (pr_depth info.search_depth ++ spc () ++ Lazy.force pp ++
+                  spc () ++ str": condition succeeded, reaching a cut, dropping next candidates."));
+              let () = incr successes in
+              thentac) elsetac
           | None -> ortac (firsttac thentac) elsetac
     and aux e = function
       | x :: xs -> onetac e x xs
       | [] ->
-         if !foundone == false && !typeclasses_debug > 0 then
+         if Int.equal !successes 0 && !typeclasses_debug > 0 then
            Feedback.msg_debug
              (pr_depth info.search_depth ++ str": no match for " ++
                 Printer.pr_econstr_env (Goal.env gl) sigma concl ++
@@ -876,7 +894,8 @@ module Search = struct
       let gls = CList.map Proofview.drop_state gls in
       Proofview.tclEVARMAP >>= fun sigma ->
       let j = List.length gls in
-      (tclDISPATCH (List.init j (fun i -> tac_or_stuck sigma gls i)))
+      tclDISPATCH
+        (List.init j (fun i -> ([Goal (succ i)], tac sigma gls i)))
 
   let fix_iterative t =
     let rec aux depth =
