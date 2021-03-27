@@ -1670,16 +1670,45 @@ let wrap_hint_warning_fun env sigma t =
   in
   (ans, set_extra_data store sigma)
 
+type 'r hint_continuation =
+  'r Proofview.tactic ->
+  'r Proofview.tactic option * 'r Proofview.tactic
+
+type 'r hint_tactic =
+  | HintTactic of 'r Proofview.tactic
+  | HintContinuation of 'r hint_continuation
+let tclTHEN_hint tac k =
+  match k with
+  | HintTactic k -> HintTactic (Proofview.tclTHEN tac k)
+  | HintContinuation cont -> HintContinuation (fun k ->
+    let iftac, thentac = cont k in
+    match iftac with
+    | Some iftac -> (Some (Proofview.tclTHEN tac iftac), thentac)
+    | None -> (None, Proofview.tclTHEN tac thentac))
+
+let run_hint_continuation cont k =
+  let iftac, thentac = cont k in
+  match iftac with
+  | None -> thentac
+  | Some iftac ->
+    Proofview.tclIFCATCH iftac (fun () -> thentac) (fun e -> k)
+
+let tclCOMPLETE_hint tac =
+  match tac with
+  | HintTactic tac -> Tacticals.New.tclCOMPLETE tac
+  | HintContinuation cont ->
+    Tacticals.New.tclCOMPLETE (run_hint_continuation cont Tacticals.New.tclIDTAC)
+
 let run_hint tac k = match warn_hint () with
 | HintLax -> k tac.obj
 | HintWarn ->
   if is_imported tac then k tac.obj
-  else Proofview.tclTHEN (log_hint tac) (k tac.obj)
+  else tclTHEN_hint (log_hint tac) (k tac.obj)
 | HintStrict ->
   if is_imported tac then k tac.obj
   else
     let info = Exninfo.reify () in
-    Proofview.tclZERO ~info (UserError (None, (str "Tactic failure.")))
+    HintTactic (Proofview.tclZERO ~info (UserError (None, (str "Tactic failure."))))
 
 module FullHint =
 struct
