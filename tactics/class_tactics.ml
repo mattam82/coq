@@ -302,9 +302,11 @@ let rec e_trivial_fail_db only_classes db_list local_db secvars =
   in
   tclSOLVE tacl
 
-and e_my_find_search db_list local_db secvars hdc complete only_classes env sigma concl =
+and e_my_find_search db_list local_db secvars hdc complete only_classes env sigma oconcl =
   let open Proofview.Notations in
-  let prods, concl = EConstr.decompose_prod_assum sigma concl in
+  (* We split the conclusion for the limit intros option.
+    Does not apply to extern hints. *)
+  let prods, concl = EConstr.decompose_prod_assum sigma oconcl in
   let nprods = List.length prods in
   let allowed_evars =
     try
@@ -391,7 +393,7 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
           | None -> Id.Map.empty
         in
         try
-          let ist = conclPattern_gen env sigma ~ist concl pat in
+          let ist = conclPattern_gen env sigma ~ist oconcl pat in
           let iftac =
             match iftac with
             | Some arg -> Some (call_tac arg ist)
@@ -953,6 +955,8 @@ module Search = struct
         | HintTactic tac ->
           ortac (firsttac tac) elsetac
         | HintContinuation ktac ->
+          if !typeclasses_debug > 2 then
+            Feedback.msg_debug (hov 2 (pr_depth info.search_depth ++ str": trying" ++ spc () ++Lazy.force pp));
           let wrap_kont =
             let kont_calls = ref 0 in
             Unsafe.tclGETGOALS >>= fun gls ->
