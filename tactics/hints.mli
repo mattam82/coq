@@ -55,13 +55,24 @@ type 'a hints_path_atom_gen =
 type hints_path_atom = GlobRef.t hints_path_atom_gen
 type hint_db_name = string
 
+type 'r hint_continuation =
+  'r Proofview.tactic ->
+  'r Proofview.tactic option * 'r Proofview.tactic
+
+type 'r hint_tactic =
+  | HintTactic of 'r Proofview.tactic
+  | HintContinuation of 'r hint_continuation
+
+val tclTHEN_hint : unit Proofview.tactic -> 'a hint_tactic -> 'a hint_tactic
+val tclCOMPLETE_hint : unit hint_tactic -> unit Proofview.tactic
+val run_hint_continuation : unit hint_continuation -> unit Proofview.tactic -> unit Proofview.tactic
 module FullHint :
 sig
   type t
   val priority : t -> int
   val pattern : t -> Pattern.constr_pattern option
   val database : t -> string option
-  val run : t -> (hint hint_ast -> 'r Proofview.tactic) -> 'r Proofview.tactic
+  val run : t -> (hint hint_ast -> 'r hint_tactic) -> 'r hint_tactic
   val name : t -> hints_path_atom
   val print : env -> evar_map -> t -> Pp.t
 

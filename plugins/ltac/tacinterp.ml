@@ -2197,7 +2197,7 @@ let extern_callback_name = {
 
 let extern_callback_fun args ist = match args with
 | [cb] ->
-  let cb = match prj Class_tactics.val_callback cb with
+  let cb = match prj Auto.val_callback cb with
   | None -> assert false
   | Some cb -> cb
   in

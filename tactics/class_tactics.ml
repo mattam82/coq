@@ -254,9 +254,6 @@ let shelve_dependencies gls =
      Feedback.msg_debug (str" shelving dependent subgoals: " ++ pr_gls sigma gls);
    shelve_goals gls)
 
-let val_callback : unit Proofview.tactic Geninterp.Val.typ =
-  Geninterp.Val.create "typeclasses-eauto-callback"
-
 let hintmap_of env sigma hdc secvars concl =
   match hdc with
   | None -> fun db -> ModeMatch (NoMode, Hint_db.map_none ~secvars db)
@@ -265,13 +262,6 @@ let hintmap_of env sigma hdc secvars concl =
        if Hint_db.use_dn db then (* Using dnet *)
          Hint_db.map_eauto env sigma ~secvars hdc concl db
       else Hint_db.map_existential sigma ~secvars hdc concl db
-
-type hint_tactic =
-  | HintTactic of unit Proofview.tactic
-  | HintContinuation of
-    (unit Proofview.tactic ->
-      (* If tac1 Then tac2 *)
-      unit Proofview.tactic option * unit Proofview.tactic)
 
 (** Hack to properly solve dependent evars that are typeclasses *)
 let rec e_trivial_fail_db only_classes db_list local_db secvars =
@@ -375,37 +365,7 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
       (* A bit strange to ask an unfold hint to complete the proof? *)
       default (Proofview.tclPROGRESS (unfold_in_concl [AllOccurrences,c]))
     | Extern (pat, id, iftac, thentac) ->
-      let call_tac arg ist =
-        let open Genarg in
-        let open Geninterp in
-        (* XXX poly??? *)
-        let ist = { lfun = ist; extra = TacStore.empty; poly = false } in
-        (match arg with
-          | GenArg (Glbwit wit, thentac) ->
-            Ftactic.run (Geninterp.interp wit ist thentac) (fun _ -> Proofview.tclUNIT ()))
-      in
-      let cont k =
-        let ist =
-          match id with
-          | Some lid ->
-            Id.Map.singleton (CAst.with_val (fun x -> x) lid)
-            (Geninterp.Val.inject (Geninterp.Val.Base val_callback) k)
-          | None -> Id.Map.empty
-        in
-        try
-          let ist = conclPattern_gen env sigma ~ist oconcl pat in
-          let iftac =
-            match iftac with
-            | Some arg -> Some (call_tac arg ist)
-            | None -> None
-          in
-          (iftac, call_tac thentac ist)
-        with Constr_matching.PatternMatchingFailure as exn ->
-          let fail =
-            let _, info = Exninfo.capture exn in
-            Tacticals.New.tclZEROMSG ~info (str "pattern-matching failed")
-          in (None, fail)
-      in HintContinuation cont
+      conclPattern env sigma id concl pat iftac thentac
     in
     let pp =
       match p with
@@ -418,14 +378,7 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
       | Extern _ -> true
       | _ -> false
     in
-    let tac =
-      match tac (FullHint.repr h) with
-      | HintTactic tac -> HintTactic (FullHint.run h (fun _ -> tac))
-      | HintContinuation tac ->
-        HintContinuation (fun k' ->
-          let iftac, thentac = tac k' in
-            (iftac, FullHint.run h (fun _ -> thentac)))
-    in
+    let tac = FullHint.run h tac in
       (tac, b, is_extern, name, lazy (FullHint.print env sigma h ++ pp))
   in
   let hint_of_db = hintmap_of env sigma hdc secvars concl in
