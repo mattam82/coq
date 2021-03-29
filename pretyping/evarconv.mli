@@ -129,6 +129,10 @@ val set_solve_evars : (env -> evar_map -> constr -> evar_map * constr) -> unit
 val set_evar_conv : unify_fun -> unit
 
 (** The default unification algorithm with evars and universes. *)
+val default_evar_conv_x : unify_fun
+
+(** The current unification algorithm, by default [default_evar_conv_x],
+  otherwise set by [set_evar_conv_x] *)
 val evar_conv_x : unify_fun
 
 val evar_unify : Evarsolve.unifier

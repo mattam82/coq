@@ -1352,7 +1352,9 @@ let order_metas metas =
 let solve_simple_evar_eqn flags env evd ev rhs =
   match solve_simple_eqn Evarconv.evar_unify flags env evd (None,ev,rhs) with
   | UnifFailure (evd,reason) ->
-      error_cannot_unify env evd ~reason (mkEvar ev,rhs);
+      error_cannot_unify env evd ~reason (mkEvar ev,rhs)
+  | UnifStuck (evd, evs, cstrs) ->
+    error_cannot_unify env evd ~reason:(StuckConstraints (evs, cstrs)) (mkEvar ev, rhs)
   | Success evd -> evd
 
 (* [w_merge env sigma b metas evars] merges common instances in metas

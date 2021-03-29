@@ -287,7 +287,10 @@ let solve_remaining_evars ?hook flags env ?initial sigma =
   let program_mode = flags.program_mode in
   let frozen = frozen_and_pending_holes (initial, sigma) in
   let sigma =
-    match flags.use_typeclasses with
+    if !Typeclasses.typeclasses_unification then
+      let sigma, _ = Typeclasses.reify_unification_problems sigma in
+      apply_typeclasses ~program_mode ~fail_evar:false env sigma frozen
+    else match flags.use_typeclasses with
     | UseTC -> apply_typeclasses ~program_mode ~fail_evar:false env sigma frozen
     | NoUseTC | UseTCForConv -> sigma
   in

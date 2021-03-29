@@ -782,6 +782,13 @@ module Search = struct
     let successes = ref 0 in
     let rec onetac e (tac, pat, extern, name, pp) tl =
       let derivs = path_derivate info.search_cut name in
+      let header () =
+        hov 0 (seq [pr_depth info.search_depth; str": trying"; spc ();
+               Lazy.force pp;
+                (if !successes = 0 then
+                  str" on " ++ pr_ev sigma (Proofview.Goal.goal gl)
+                else mt ())])
+      in
       let pr_error ie =
         if !typeclasses_debug > 1 then
           let header =
@@ -904,12 +911,12 @@ module Search = struct
           pr_error e';
           aux (merge_exceptions e e') tl
         in
+        if !typeclasses_debug > 2 then
+          Feedback.msg_debug (hov 2 (header ()));
         match tac with
         | HintTactic tac ->
-          ortac (firsttac tac) elsetac
+            ortac (firsttac tac) elsetac
         | HintContinuation ktac ->
-          if !typeclasses_debug > 2 then
-            Feedback.msg_debug (hov 2 (pr_depth info.search_depth ++ str": trying" ++ spc () ++Lazy.force pp));
           let wrap_kont =
             let kont_calls = ref 0 in
             Unsafe.tclGETGOALS >>= fun gls ->
@@ -1352,8 +1359,11 @@ let initial_select_evars filter =
 
 let resolve_typeclass_evars debug depth unique env evd filter split fail =
   let evd =
-    try Evarconv.solve_unif_constraints_with_heuristics
-      ~flags:(Evarconv.default_flags_of (Typeclasses.classes_transparent_state ())) env evd
+    try
+      if not !Typeclasses.typeclasses_unification then
+        Evarconv.solve_unif_constraints_with_heuristics
+          ~flags:(Evarconv.default_flags_of (Typeclasses.classes_transparent_state ())) env evd
+      else evd
     with e when CErrors.noncritical e -> evd
   in
     resolve_all_evars debug depth unique env
@@ -1444,3 +1454,78 @@ let autoapply c i =
       let sigma = Typeclasses.make_unresolvables
           (fun ev -> Typeclasses.all_goals ev (Lazy.from_val (snd (Evd.find sigma ev).evar_source))) sigma in
       Proofview.Unsafe.tclEVARS sigma) end
+
+(* Turns unification problems into typeclass constraints *)
+let reify_unification_problems_tactic =
+  let open Proofview in
+  let open Proofview.Notations in
+  tclEVARMAP >>= fun sigma ->
+    let sigma', evs = reify_unification_problems sigma in
+    Unsafe.tclEVARS sigma'
+    (* >>= Tacticals.New.tclUNIT evs *)
+
+let classes_unify flags env sigma cv_pb x y =
+  match Evarconv.default_evar_conv_x flags env sigma cv_pb x y with
+  | Evarsolve.Success sigma as res -> res
+  | Evarsolve.UnifFailure _ as x -> x
+  | Evarsolve.UnifStuck (sigma, evs, cstrs) ->
+    Feedback.msg_debug Pp.(str "Unification got stuck");
+    let sigma' = List.fold_right Evd.add_conv_pb cstrs sigma in
+    Evarsolve.Success sigma'
+
+let _get_typeclasses_unification =
+  let optwrite v =
+    let init = !typeclasses_unification in
+    typeclasses_unification := v;
+    if !typeclasses_unification = true && init != true then
+      Evarconv.set_evar_conv (fun flags env sigma cv_pb x y -> classes_unify flags env sigma cv_pb x y)
+    else ()
+      (* Evarconv.set_evar_conv Evarconv.evar_conv_x *)
+  in
+  let optread () = !typeclasses_unification in
+  let open Goptions in
+  let _ = declare_bool_option {
+      optdepr = false;
+      optkey = ["Typeclasses"; "Unification"];
+      optread; optwrite
+    } in
+  optread
+
+let solve_unify i cv_pb x y =
+  let open Proofview in
+  let open Proofview.Notations in
+  let solve_unify gl =
+    let env = Goal.env gl in
+    let sigma = Goal.sigma gl in
+    let hintdb = try Hints.searchtable_map i with Not_found ->
+      CErrors.user_err (Pp.str ("Unknown hint database " ^ i ^ "."))
+    in
+    let flags = Evarconv.default_flags_of (Hints.Hint_db.transparent_state hintdb) in
+    let conv_pb =
+      if EConstr.isRefX sigma (Coqlib.lib_ref "core.bool.true") cv_pb then Some Reduction.CUMUL
+      else if EConstr.isRefX sigma (Coqlib.lib_ref "core.bool.false") cv_pb then Some Reduction.CONV
+      else None
+    in
+    match conv_pb with
+    | None ->
+      Tacticals.New.tclZEROMSG Pp.(str"Cannot unquote conversion problem:" ++ spc () ++
+        Printer.pr_econstr_env env sigma cv_pb)
+    | Some cv_pb ->
+      match Evarconv.default_evar_conv_x flags env sigma cv_pb x y with
+      | Evarsolve.Success sigma' ->
+        Unsafe.tclEVARS sigma' <*>
+        Tactics.simplest_split (* Construct the instance *)
+      | Evarsolve.UnifStuck (sigma, evs, cstrs) ->
+        Feedback.msg_debug Pp.(str "Unification got stuck");
+        let sigma' = List.fold_right Evd.add_conv_pb cstrs sigma in
+        Unsafe.tclEVARS sigma' <*>
+        reify_unification_problems_tactic
+      | Evarsolve.UnifFailure (sigma, error) ->
+        let msg = Pp.(str"Cannot unify " ++
+          Printer.pr_econstr_env env sigma x ++ str" and " ++
+          Printer.pr_econstr_env env sigma y) in
+          (*(match e with
+          | None -> mt ()
+          | Some x -> Himsg.expl)*)
+        Tacticals.New.tclZEROMSG msg
+  in Goal.enter solve_unify

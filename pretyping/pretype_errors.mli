@@ -28,6 +28,7 @@ type unification_error =
   | InstanceNotSameType of Evar.t * env * types * types
   | UnifUnivInconsistency of Univ.univ_inconsistency
   | CannotSolveConstraint of Evd.evar_constraint * unification_error
+  | StuckConstraints of Evar.Set.t * Evd.evar_constraint list
   | ProblemBeyondCapabilities
 
 type position = (Id.t * Locus.hyp_location_flag) option

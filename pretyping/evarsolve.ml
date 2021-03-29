@@ -73,9 +73,10 @@ type unification_kind =
 
 type unification_result =
   | Success of evar_map
+  | UnifStuck of evar_map * Evar.Set.t * evar_constraint list
   | UnifFailure of evar_map * unification_error
 
-let is_success = function Success _ -> true | UnifFailure _ -> false
+let is_success = function Success _ -> true | UnifStuck _ | UnifFailure _ -> false
 
 let test_success unify flags b env evd c c' rhs =
   is_success (unify flags b env evd c c' rhs)
@@ -227,7 +228,7 @@ let recheck_applications unify flags env evdref t =
             (match unify flags TypeUnification env !evdref Reduction.CUMUL argsty.(i) dom with
              | Success evd -> evdref := evd;
                              aux (succ i) (subst1 args.(i) codom)
-             | UnifFailure (evd, reason) -> raise (IllTypedInstance (env, ty, argsty.(i))))
+             | UnifStuck _ | UnifFailure _ -> raise (IllTypedInstance (env, ty, argsty.(i))))
          | _ -> raise (IllTypedInstance (env, ty, argsty.(i)))
        else ()
      in aux 0 fty
@@ -814,7 +815,7 @@ let check_evar_instance unify flags env evd evk1 body =
   in
   match unify flags TypeUnification evenv evd Reduction.CUMUL ty evi.evar_concl with
   | Success evd -> evd
-  | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
+  | UnifStuck _ | UnifFailure _ -> raise (IllTypedInstance (evenv,ty,evi.evar_concl))
 
 (***************)
 (* Unification *)
@@ -1190,6 +1191,7 @@ let filter_compatible_candidates unify flags env evd evi args rhs c =
   let c' = instantiate_evar_array evi c args in
   match unify flags TermUnification env evd Reduction.CONV rhs c' with
   | Success evd -> Inl (c,evd)
+  | UnifStuck _
   | UnifFailure _ -> Inr c'
 
 (* [restrict_candidates ... filter ev1 ev2] restricts the candidates
@@ -1774,7 +1776,10 @@ let reconsider_unif_constraints unify flags evd =
        | Success evd ->
            (match unify flags TermUnification env evd pbty t1 t2 with
            | Success _ as x -> x
+           | UnifStuck (evd, evs, stuck) as x -> x
            | UnifFailure (i,e) -> UnifFailure (i,CannotSolveConstraint (x,e)))
+       | UnifStuck (evd, evs, stuck) ->
+          UnifFailure (evd, StuckConstraints (evs, stuck))
        | UnifFailure _ as x -> x)
     (Success evd)
     pbs

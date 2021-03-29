@@ -131,3 +131,10 @@ val classes_transparent_state : unit -> TransparentState.t
 
 val solve_all_instances_hook : (env -> evar_map -> evar_filter -> bool -> bool -> bool -> evar_map) Hook.t
 val solve_one_instance_hook : (env -> evar_map -> EConstr.types -> bool -> evar_map * EConstr.constr) Hook.t
+
+(** Typeclass reification of unification problems *)
+
+val typeclasses_unification : bool ref
+
+(** Turns pending unification constraints into `Unify` typeclass constraints. *)
+val reify_unification_problems : Evd.evar_map -> Evd.evar_map * Evar.t list

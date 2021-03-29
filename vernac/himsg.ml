@@ -77,6 +77,8 @@ let rec contract3' env sigma a b c = function
   | NotSameArgSize | NotSameHead | NoCanonicalStructure
   | MetaOccurInBody _ | InstanceNotSameType _ | ProblemBeyondCapabilities
   | UnifUnivInconsistency _ as x -> contract3 env sigma a b c, x
+  | StuckConstraints (evs, cstrs) ->
+    let x = contract3 env sigma a b c in x,StuckConstraints (evs, cstrs)
   | CannotSolveConstraint ((pb,env',t,u),x) ->
       let env',t,u = contract2 env' sigma t u in
       let y,x = contract3' env sigma a b c x in
@@ -289,6 +291,11 @@ let explain_generalization env sigma (name,var) j =
   str "it has type" ++ spc () ++ pt ++
   spc () ++ str "which should be Set, Prop or Type."
 
+let pr_cstr sigma (pb,env,t,u) =
+  let env = make_all_name_different env sigma in
+  (pr_leconstr_env env sigma t ++
+  str " == " ++ pr_leconstr_env env sigma u)
+
 let explain_unification_error env sigma p1 p2 = function
   | None -> mt()
   | Some e ->
@@ -336,11 +343,13 @@ let explain_unification_error env sigma p1 p2 = function
      | UnifUnivInconsistency p ->
        [str "universe inconsistency: " ++
         Univ.explain_universe_inconsistency (Termops.pr_evd_level sigma) p]
-     | CannotSolveConstraint ((pb,env,t,u),e) ->
-        let env = make_all_name_different env sigma in
-        (strbrk "cannot satisfy constraint " ++ pr_leconstr_env env sigma t ++
-        str " == " ++ pr_leconstr_env env sigma u)
-        :: aux t u e
+     | CannotSolveConstraint ((_, _, t, u) as cstr,e) ->
+        (strbrk "cannot satisfy constraint " ++ pr_cstr sigma cstr) :: aux t u e
+      | StuckConstraints (evs, cstrs) ->
+        [str"contraint is stuck on variables: " ++
+          prlist_with_sep spc Evar.print (Evar.Set.elements evs) ++
+          str "and constraints: " ++
+          prlist_with_sep spc (pr_cstr sigma) cstrs]
      | ProblemBeyondCapabilities ->
         []
      in

@@ -51,6 +51,12 @@ let debug_unification = CDebug.create ~name:"unification" ()
 
 let debug_ho_unification = CDebug.create ~name:"ho-unification" ()
 
+let use_stuck =
+  Goptions.declare_bool_option_and_ref
+    ~depr:false
+    ~key:["Unification";"Stuck"]
+    ~value:false
+
 (*******************************************)
 (* Functions to deal with impossible cases *)
 (*******************************************)
@@ -124,6 +130,13 @@ let flex_kind_of_term flags env evd c sk =
     | Meta _ -> Rigid
     | Fix _ -> Rigid (* happens when the fixpoint is partially applied (should check it?) *)
     | Cast _ | App _ | Case _ -> assert false
+
+let pr_flex =
+  let open Pp in
+  function
+  | Rigid -> str"rigid"
+  | MaybeFlexible t -> str"maybe-flexible"
+  | Flexible _ -> str"flexible"
 
 let apprec_nohdbeta flags env evd c =
   let (t,sk as appr) = Reductionops.whd_nored_state env evd (c, []) in
@@ -304,12 +317,24 @@ let rec ise_try evd = function
   | f1::l ->
       match f1 evd with
       | Success _ as x -> x
+      | UnifStuck (evd1, evs1, cstrs1) as x ->
+        (match ise_try evd l with
+        | Success _ as x -> x
+        | UnifStuck _ (* We favor the first stuck solution *)
+        | UnifFailure _ -> x)
       | UnifFailure (evd1,e1) ->
           match ise_try evd l with
           | Success _ as x -> x
+          | UnifStuck _ as x -> x
           | UnifFailure (evd2,e2) ->
               let evd,e = join_failures evd1 evd2 e1 e2 in
               UnifFailure (evd,e)
+
+let extend_stuck evs cstrs = function
+  | Success i' -> UnifStuck (i', evs, cstrs)
+  | UnifStuck (i', evs', cstrs') ->
+    UnifStuck (i', Evar.Set.union evs evs', List.append cstrs cstrs')
+  | UnifFailure _ as x -> x
 
 let ise_and evd l =
   let rec ise_and i = function
@@ -318,8 +343,10 @@ let ise_and evd l =
     | f1::l ->
         match f1 i with
         | Success i' -> ise_and i' l
-        | UnifFailure _ as x -> x in
-  ise_and evd l
+        | UnifStuck (i', evs, cstrs) ->
+          extend_stuck evs cstrs (ise_and i' l)
+        | UnifFailure _ as x -> x
+  in ise_and evd l
 
 let ise_array2 evd f v1 v2 =
   let rec allrec i = function
@@ -327,6 +354,8 @@ let ise_array2 evd f v1 v2 =
     | n ->
         match f i v1.(n) v2.(n) with
         | Success i' -> allrec i' (n-1)
+        | UnifStuck (i', evs, cstrs) ->
+          extend_stuck evs cstrs (allrec i' (n - 1))
         | UnifFailure _ as x -> x in
   let lv1 = Array.length v1 in
   if Int.equal lv1 (Array.length v2) then allrec evd (pred lv1)
@@ -338,6 +367,8 @@ let rec ise_inst2 evd f l1 l2 = match l1, l2 with
 | c1 :: l1, c2 :: l2 ->
   match ise_inst2 evd f l1 l2 with
   | Success evd' -> f evd' c1 c2
+  | UnifStuck (evd', evs, cstrs) ->
+    extend_stuck evs cstrs (f evd' c1 c2)
   | UnifFailure _ as x -> x
 
 (* Applicative node of stack are read from the outermost to the innermost
@@ -348,6 +379,7 @@ let rec ise_app_rev_stack2 env f evd revsk1 revsk2 =
      begin
        match ise_app_rev_stack2 env f evd revsk1 revsk2 with
        | (_, UnifFailure _) as x -> x
+       | x, UnifStuck (i', evs, cstrs) -> x, extend_stuck evs cstrs (f env i' CONV t1 t2)
        | x, Success i' -> x, f env i' CONV t1 t2
      end
   | _, _ -> (revsk1,revsk2), Success evd
@@ -383,6 +415,9 @@ let rec ise_stack2 no_app env evd f sk1 sk2 =
           (fun i -> ise_array2 i (fun ii -> f env ii CONV) c1 c2)]
         with
         | Success i' -> ise_rev_stack2 true i' q1 q2
+        | UnifStuck (i', evs, cstrs) ->
+          let x, res = ise_rev_stack2 true i' q1 q2 in
+          x, extend_stuck evs cstrs res
         | UnifFailure _ as x -> fail x
       end
     | Stack.Proj (p1)::q1, Stack.Proj (p2)::q2 ->
@@ -397,6 +432,9 @@ let rec ise_stack2 no_app env evd f sk1 sk2 =
           (fun i -> ise_array2 i (fun ii -> f (push_rec_types recdef1 env) ii CONV) bds1 bds2);
           (fun i -> snd (ise_stack2 no_app env i f a1 a2))] with
         | Success i' -> ise_rev_stack2 true i' q1 q2
+        | UnifStuck (i', evs, cstrs) ->
+          let x, res = ise_rev_stack2 true i' q1 q2 in
+          x, extend_stuck evs cstrs res
         | UnifFailure _ as x -> fail x
       else fail (UnifFailure (i,NotSameHead))
     | Stack.App _ :: _, Stack.App _ :: _ ->
@@ -404,6 +442,9 @@ let rec ise_stack2 no_app env evd f sk1 sk2 =
          begin match ise_app_rev_stack2 env f i revsk1 revsk2 with
                |_,(UnifFailure _ as x) -> fail x
                |(l1, l2), Success i' -> ise_rev_stack2 true i' l1 l2
+               |(l1, l2), UnifStuck (i', evs, cstrs) ->
+                let x, res = ise_rev_stack2 true i' l1 l2 in
+                x, extend_stuck evs cstrs res
          end
     |_, _ -> fail (UnifFailure (i,(* Maybe improve: *) NotSameHead))
   in ise_rev_stack2 false evd (List.rev sk1) (List.rev sk2)
@@ -437,7 +478,9 @@ let rec exact_ise_stack2 env evd f sk1 sk2 =
     | Stack.App _ :: _, Stack.App _ :: _ ->
          begin match ise_app_rev_stack2 env f i revsk1 revsk2 with
                |_,(UnifFailure _ as x) -> x
-               |(l1, l2), Success i' -> ise_rev_stack2 i' l1 l2
+               | (l1, l2), Success i' -> ise_rev_stack2 i' l1 l2
+               | (l1, l2), UnifStuck (i', evs, cstrs) ->
+                extend_stuck evs cstrs (ise_rev_stack2 i' l1 l2)
          end
     |_, _ -> UnifFailure (i,(* Maybe improve: *) NotSameHead)
   in
@@ -602,7 +645,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
            case/fix/proj in E' (why?) or r[redex]=?n *)
         switch (evar_conv_x flags env i' pbty) (Stack.zip evd (termF,l)) (Stack.zip evd (termO,r))
     | None, Success i' -> switch (evar_conv_x flags env i' pbty) termF termO
-    | _, (UnifFailure _ as x) -> x
+    | _, (UnifFailure _ | UnifStuck _ as x) -> x
     | Some _, _ -> UnifFailure (evd,NotSameArgSize) in
   let eta_lambda env evd onleft term (term',sk') =
     (* Reduces an equation [env |- <(fun na:c1 => c'1)|empty> = <term'|sk'>] to
@@ -710,7 +753,13 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
     in
     match Stack.list_of_app_stack skF with
     | None ->
-        ise_try evd [consume_stack l2r apprF apprR; eta]
+        ise_try evd [consume_stack l2r apprF apprR; eta;
+          (fun i ->
+            if use_stuck () then
+              (Feedback.msg_debug Pp.(str"Finiding that " ++ Evar.print (fst ev) ++ str " is stuck");
+              UnifStuck (i, Evar.Set.singleton (fst ev),
+              switch (fun x y -> [(pbty, env, Stack.zip i x, Stack.zip i y)]) apprF apprR))
+            else quick_fail i)]
     | Some lF ->
         let tR = Stack.zip evd apprR in
           miller_pfenning l2r
@@ -726,6 +775,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
                          i,mkEvar ev
                        else
                          i,Stack.zip evd apprF in
+                         (* switch (fun x y -> UnifStuck (i, Evar.Set.singleton (fst ev), [(pbty,env,x,y)]))
+                         tF tR *)
                      switch (fun x y -> Success (Evarutil.add_unification_pb (pbty,env,x,y) i))
                        tF tR
                    else
@@ -799,10 +850,12 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
     | _, _ -> anomaly (Pp.str "Unexpected result from ise_stack2.")
   in
   let app_empty = match sk1, sk2 with [], [] -> true | _ -> false in
+  let flex1 = flex_kind_of_term flags env evd term1 sk1 in
+  let flex2 = flex_kind_of_term flags env evd term2 sk2 in
   (* Evar must be undefined since we have flushed evars *)
-  let () = debug_unification (fun () -> Pp.(v 0 (pr_state env evd appr1 ++ cut () ++ pr_state env evd appr2 ++ cut ()))) in
-  match (flex_kind_of_term flags env evd term1 sk1,
-         flex_kind_of_term flags env evd term2 sk2) with
+  let () = debug_unification (fun () -> Pp.(v 0 (pr_state env evd appr1 ++ str" (" ++ pr_flex flex1 ++ str")" ++ cut () ++
+    pr_state env evd appr2 ++ str" (" ++ pr_flex flex2 ++ str ")" ++ cut ()))) in
+  match (flex1, flex2) with
     | Flexible (sp1,al1), Flexible (sp2,al2) ->
       (* Notations:
          - "sk" is a stack (or, more abstractly, an evaluation context, written E)
@@ -818,16 +871,22 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
         let f1 i = first_order env i term1 term2 sk1 sk2
         and f2 i =
           if Evar.equal sp1 sp2 then
-            match ise_stack2 false env i (evar_conv_x flags) sk1 sk2 with
-            |None, Success i' ->
-              Success (solve_refl (fun flags p env i pbty a1 a2 ->
+            let solve_fn flags p env i pbty a1 a2 =
                 let flags =
                   match p with
                   | TypeUnification -> default_flags env
                   | TermUnification -> flags
                 in
-                is_success (evar_conv_x flags env i pbty a1 a2)) flags
+                is_success (evar_conv_x flags env i pbty a1 a2)
+            in
+            match ise_stack2 false env i (evar_conv_x flags) sk1 sk2 with
+            | None, Success i' ->
+              Success (solve_refl solve_fn flags
                 env i' (position_problem true pbty) sp1 al1 al2)
+            | None, UnifStuck (i', evs, cstrs) ->
+              extend_stuck evs cstrs
+               (Success (solve_refl solve_fn flags
+                env i' (position_problem true pbty) sp1 al1 al2))
             |_, (UnifFailure _ as x) -> x
             |Some _, _ -> UnifFailure (i,NotSameArgSize)
           else UnifFailure (i,NotSameHead)
@@ -840,6 +899,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
              NotSameHead. *)
           match consume true appr1 appr2 i with
           | Success _ as x -> x
+          | UnifStuck _ as x -> x
           | UnifFailure _ -> quick_fail i
         in
         ise_try evd [f1; f2; f3; f4; f5]
@@ -990,7 +1050,10 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
           (try
              if not flags.with_cs then raise Not_found
              else conv_record flags env i (check_conv_record env i appr1 appr2)
-           with Not_found -> UnifFailure (i,NoCanonicalStructure))
+           with Not_found ->
+            if EConstr.isEvar i v1 then
+              UnifStuck (i, Evar.Set.singleton (fst (EConstr.destEvar i v1)), [(pbty, env, term1, term2)])
+            else UnifFailure (i,NoCanonicalStructure))
         and f4 i =
           evar_eqappr_x flags env i pbty
             (whd_betaiota_deltazeta_for_iota_state
@@ -1004,7 +1067,10 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
           (try
              if not flags.with_cs then raise Not_found
              else conv_record flags env i (check_conv_record env i appr2 appr1)
-           with Not_found -> UnifFailure (i,NoCanonicalStructure))
+           with Not_found ->
+            if EConstr.isEvar i v2 then
+              UnifStuck (i, Evar.Set.singleton (fst (EConstr.destEvar i v2)), [(pbty, env, term1, term2)])
+            else UnifFailure (i,NoCanonicalStructure))
         and f4 i =
           evar_eqappr_x flags env i pbty appr1
             (whd_betaiota_deltazeta_for_iota_state
@@ -1066,6 +1132,8 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
             match ise_stack2 false env evd (evar_conv_x flags) sk1 sk2 with
             |None, Success i' ->
               ise_inst2 i' (fun i' -> evar_conv_x flags env i' CONV) al1 al2
+            | None, UnifStuck (i', evs, cstrs) ->
+              extend_stuck evs cstrs (ise_inst2 i' (fun i' -> evar_conv_x flags env i' CONV) al1 al2)
             |_, (UnifFailure _ as x) -> x
             |Some _, _ -> UnifFailure (evd,NotSameArgSize)
           else UnifFailure (evd,NotSameHead)
@@ -1098,7 +1166,7 @@ and evar_eqappr_x ?(rhs_is_already_stuck = false) flags env evd pbty
 
         | (Meta _, _) | (_, Meta _) ->
           begin match ise_stack2 true env evd (evar_conv_x flags) sk1 sk2 with
-          |_, (UnifFailure _ as x) -> x
+          |_, (UnifFailure _ | UnifStuck _ as x) -> x
           |None, Success i' -> evar_conv_x flags env i' CONV term1 term2
           |Some (sk1',sk2'), Success i' -> evar_conv_x flags env i' CONV (Stack.zip i' (term1,sk1')) (Stack.zip i' (term2,sk2'))
           end
@@ -1191,18 +1259,18 @@ and eta_constructor flags env evd ((ind, i), u) sk1 (term2,sk2) =
            UnifFailure(evd,NotSameHead))
     | _ -> UnifFailure (evd,NotSameHead)
 
-let evar_conv_x flags = evar_conv_x flags
+let default_evar_conv_x flags = evar_conv_x flags
 
-let evar_unify = conv_fun evar_conv_x
+let evar_unify = conv_fun default_evar_conv_x
 
 (* Profiling *)
-let evar_conv_x =
+let default_evar_conv_x =
   if Flags.profile then
     let evar_conv_xkey = CProfile.declare_profile "evar_conv_x" in
-      CProfile.profile6 evar_conv_xkey evar_conv_x
-  else evar_conv_x
+      CProfile.profile6 evar_conv_xkey default_evar_conv_x
+  else default_evar_conv_x
 
-let evar_conv_hook_get, evar_conv_hook_set = Hook.make ~default:evar_conv_x ()
+let evar_conv_hook_get, evar_conv_hook_set = Hook.make ~default:default_evar_conv_x ()
 
 let evar_conv_x flags = Hook.get evar_conv_hook_get flags
 
@@ -1250,6 +1318,7 @@ let default_occurrence_test ~allowed_evars ts _ origsigma _ env sigma _ c pat =
   let flags = { (default_flags_of ~subterm_ts:ts ts) with allowed_evars } in
   match evar_conv_x flags env sigma CONV c pat with
   | Success sigma -> true, sigma
+  | UnifStuck (sigma', evs, cstrs) -> false, sigma
   | UnifFailure _ -> false, sigma
 
 let default_occurrences_selection ?(allowed_evars=AllowedEvars.all) ts n =
@@ -1731,6 +1800,7 @@ let rec solve_unconstrained_evars_with_candidates flags env evd =
             let evd = instantiate_evar evar_unify flags env evd evk a in
             match reconsider_unif_constraints evar_unify flags evd with
             | Success evd -> solve_unconstrained_evars_with_candidates flags env evd
+            | UnifStuck _ -> aux l
             | UnifFailure _ -> aux l
           with
           | IllTypedInstance _ -> aux l
@@ -1768,6 +1838,8 @@ let solve_unif_constraints_with_heuristics env
                let reason = CannotSolveConstraint (pb,ProblemBeyondCapabilities) in
                aux evd pbs progress ((pb, reason):: stuck)
             end
+        | UnifStuck (evd, evs, cstrs) ->
+            aux evd pbs progress ((pb,StuckConstraints (evs, cstrs)) :: stuck)
         | UnifFailure (evd,reason) ->
            if is_beyond_capabilities reason then
              aux evd pbs progress ((pb,reason) :: stuck)
@@ -1799,6 +1871,8 @@ let unify_delay ?flags env evd t1 t2 =
   in
   match evar_conv_x flags env evd CONV t1 t2 with
   | Success evd' -> evd'
+  | UnifStuck (evd', evs, cstrs) ->
+    List.fold_right Evd.add_conv_pb cstrs evd'
   | UnifFailure (evd',e) -> raise (UnableToUnify (evd',e))
 
 let unify_leq_delay ?flags env evd t1 t2 =
@@ -1809,6 +1883,8 @@ let unify_leq_delay ?flags env evd t1 t2 =
   in
   match evar_conv_x flags env evd CUMUL t1 t2 with
   | Success evd' -> evd'
+  | UnifStuck (evd', evs, cstrs) ->
+    List.fold_right Evd.add_conv_pb cstrs evd'
   | UnifFailure (evd',e) -> raise (UnableToUnify (evd',e))
 
 let unify ?flags ?(with_ho=true) env evd cv_pb ty1 ty2 =
@@ -1821,5 +1897,24 @@ let unify ?flags ?(with_ho=true) env evd cv_pb ty1 ty2 =
   match res with
   | Success evd ->
      solve_unif_constraints_with_heuristics ~flags ~with_ho env evd
+  | UnifStuck (evd', evs, cstrs) ->
+    solve_unif_constraints_with_heuristics ~flags ~with_ho env
+      (List.fold_right Evd.add_conv_pb cstrs evd')
   | UnifFailure (evd, reason) ->
      raise (PretypeError (env, evd, CannotUnify (ty1, ty2, Some reason)))
+(*
+let unify_delay_ref =
+  ref (fun ?flags env sigma t u -> evar_unify_delay ?flags env sigma t u)
+let unify_leq_delay_ref =
+  ref (fun ?flags env sigma t u -> evar_unify_leq_delay ?flags env sigma t u)
+let unify_ref =
+  ref (fun ?flags with_ho env sigma cv_pb t u -> evar_unify ?flags ~with_ho env sigma cv_pb t u)
+
+let unify_delay ?flags env sigma t u =
+  !unify_delay_ref ?flags env sigma t u
+
+let unify_leq_delay ?flags env sigma t u =
+  !unify_leq_delay_ref ?flags env sigma t u
+
+let unify ?flags ?(with_ho=true) env sigma cv_pb t u =
+  !unify_ref ?flags with_ho env sigma cv_pb t u *)

@@ -25,6 +25,18 @@ Typeclasses Opaque id const flip compose arrow impl iff not all.
 
 Ltac class_apply c := autoapply c with typeclass_instances.
 
+(** The Unify type class reifies unification problems, on which
+  unification hints can be applied. Instances should verify
+  that `u` is *convertible* or in the *cumulativity* relation with `v`,
+  and not merely propositionally equal.
+  Note that in general we might be comparing terms in different types,
+  due to cumulativity and types being themselves partially defined.
+  *)
+Class Unify (cumul : bool) {A : Type} {B : Type} (u : A) (v : B) := mkUnify {}.
+
+Register Unify as core.classes.unify.
+Register mkUnify as core.classes.unify.make.
+
 (** The unconvertible typeclass, to test that two objects of the same type are
    actually different. *)
 

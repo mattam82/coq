@@ -19,6 +19,7 @@ open Typeclasses_errors
 open Context.Rel.Declaration
 
 (*i*)
+let typeclasses_unification = ref false
 
 (* Core typeclasses hints *)
 type 'a hint_info_gen =
@@ -250,3 +251,36 @@ let resolve_typeclasses ?(filter=no_goals) ?(unique=get_typeclasses_unique_solut
     ?(split=true) ?(fail=true) env evd =
   if not (has_typeclasses filter evd) then evd
   else solve_all_instances env evd filter unique split fail
+
+
+let lib_constr n = lazy (UnivGen.constr_of_monomorphic_global @@ Coqlib.lib_ref n)
+
+let unify_class = lazy (Coqlib.lib_ref "core.classes.unify")
+
+let call_retyping env sigma x =
+  try Retyping.get_type_of ~lax:true env sigma x
+  with Retyping.RetypeError e ->
+  CErrors.user_err Pp.(hov 2 (str"While retyping:" ++ spc ()))
+    (* Printer.pr_econstr_env ~lax:true env sigma x ++ spc () ++
+    Retyping.print_retype_error e)) *)
+
+let reify_unification_problem env sigma pb x y =
+  let sigma, unify = Evarutil.new_global sigma (Lazy.force unify_class) in
+  let tyx = call_retyping env sigma x in
+  let tyy = call_retyping env sigma y in
+  let cum =
+    match pb with
+    | Reduction.CONV -> Lazy.force (lib_constr "core.bool.false")
+    | Reduction.CUMUL -> Lazy.force (lib_constr "core.bool.true")
+  in
+  let app = EConstr.mkApp (unify, [| EConstr.of_constr cum; tyx; tyy; x; y |]) in
+  let sigma, ev = Evarutil.new_evar ~typeclass_candidate:true env sigma app in
+  sigma, EConstr.destEvar sigma ev
+
+let reify_unification_problems sigma =
+  let sigma, pbs = Evd.extract_all_conv_pbs sigma in
+  let fold (sigma, evs) (pb, env, x, y) =
+    let sigma, ev = reify_unification_problem env sigma pb x y in
+    sigma, fst ev :: evs
+  in
+  List.fold_left fold (sigma, []) pbs

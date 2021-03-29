@@ -251,6 +251,7 @@ let matches_core env sigma allow_bound_rels
   in
   let rec sorec ctx env subst p t =
     let cT = strip_outer_cast sigma t in
+
     match p, EConstr.kind sigma cT with
       | PSoApp (n,args),m ->
         let fold (ans, seen) = function
@@ -308,14 +309,14 @@ let matches_core env sigma allow_bound_rels
       | PApp (c1,arg1), App (c2,arg2) ->
         (match c1, EConstr.kind sigma c2 with
         | PRef (GlobRef.ConstRef r), Proj (pr,c) when not (Environ.QConstant.equal env r (Projection.constant pr))
-            || Projection.unfolded pr ->
+             ->
           raise PatternMatchingFailure
         | PProj (pr1,c1), Proj (pr,c) ->
           if Environ.QProjection.equal env pr1 pr then
             try Array.fold_left2 (sorec ctx env) (sorec ctx env subst c1 c) arg1 arg2
             with Invalid_argument _ -> raise PatternMatchingFailure
           else raise PatternMatchingFailure
-        | _, Proj (pr,c) when not (Projection.unfolded pr) ->
+        | _, Proj (pr,c) ->
           (try let term = Retyping.expand_projection env sigma pr c (Array.to_list arg2) in
                  sorec ctx env subst p term
            with Retyping.RetypeError _ -> raise PatternMatchingFailure)
@@ -324,7 +325,7 @@ let matches_core env sigma allow_bound_rels
           with Invalid_argument _ -> raise PatternMatchingFailure)
 
       | PApp (PRef (GlobRef.ConstRef c1), _), Proj (pr, c2)
-        when Projection.unfolded pr || not (Environ.QConstant.equal env c1 (Projection.constant pr)) ->
+        when not (Environ.QConstant.equal env c1 (Projection.constant pr)) ->
         raise PatternMatchingFailure
 
       | PApp (c, args), Proj (pr, c2) ->

@@ -59,6 +59,7 @@ type unify_flags = {
 
 type unification_result =
   | Success of evar_map
+  | UnifStuck of evar_map * Evar.Set.t * evar_constraint list
   | UnifFailure of evar_map * Pretype_errors.unification_error
 
 val is_success : unification_result -> bool

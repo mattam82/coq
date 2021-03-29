@@ -88,3 +88,11 @@ module Search : sig
     (** Note: there might be stuck goals due to mode declarations
       remaining even in case of success of the tactic. *)
 end
+
+(** Solve a `Unify` typeclass constraint using regular unification.
+  In case the unification constraint is stuck, it can generate the reduced constraints as subgoals. *)
+val solve_unify : Hints.hint_db_name -> constr -> constr -> constr -> unit Proofview.tactic
+
+(** Turns pending unification constraints in then current evar map into
+  `Unify` typeclass constraints. *)
+val reify_unification_problems_tactic : unit Proofview.tactic

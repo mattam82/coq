@@ -127,6 +127,16 @@ TACTIC EXTEND autoapply
 | [ "autoapply" constr(c) "with" preident(i) ] -> { autoapply c i }
 END
 
+TACTIC EXTEND autoconv
+| [ "auto_conv" constr(cum) constr(c) "and" constr(c') "with" preident(i) ] -> {
+  solve_unify i cum c c' }
+END
+
+TACTIC EXTEND reify_unif_problems
+| [ "reify_unification_problems" ] -> { Class_tactics.reify_unification_problems_tactic }
+END
+
+
 {
 
 (** TODO: DEPRECATE *)
