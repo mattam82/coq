@@ -359,14 +359,17 @@ end) = struct
         if isRefX sigma (coq_eq_ref ()) head then None
         else
           (try
-           let params, args = Array.chop (Array.length args - 2) args in
-           let env' = push_rel_context rels env in
-           let (evars, (evar, _)) = Evarutil.new_type_evar env' sigma Evd.univ_flexible in
-           let evars, inst =
-             app_poly env (evars,Evar.Set.empty)
-               rewrite_relation_class [| evar; mkApp (c, params) |] in
-           let _ = Typeclasses.resolve_one_typeclass env' (goalevars evars) inst in
-             Some (it_mkProd_or_LetIn t rels)
+            let params, args = Array.chop (Array.length args - 2) args in
+            let env' = push_rel_context rels env in
+            let (evars, (evar, _)) = Evarutil.new_type_evar env' sigma Evd.univ_flexible in
+            let (evars, evset), inst =
+              app_poly env (evars,Evar.Set.empty)
+                rewrite_relation_class [| evar; mkApp (c, params) |] in
+            let evars', inst =
+            (* We check that this is a well-typed application, resolving the evar for the type *)
+            Typing.solve_evars env evars inst in
+            let _ = Typeclasses.resolve_one_typeclass env' evars' inst in
+              Some (it_mkProd_or_LetIn t rels)
            with e when CErrors.noncritical e -> None)
   | _ -> None
 
