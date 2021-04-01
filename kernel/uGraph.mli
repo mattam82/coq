@@ -106,7 +106,7 @@ val check_subtype : lbound:Bound.t -> AUContext.t check_function
 
 type node =
 | Alias of Level.t * int
-| Node of int LMap.t
+| Node of int LMap.t * int LMap.t
 
 val repr : t -> node LMap.t
 

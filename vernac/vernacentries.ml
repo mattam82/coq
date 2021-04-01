@@ -312,10 +312,13 @@ let print_registered () =
 let dump_universes output g =
   let open Univ in
   let dump_arc u = function
-    | UGraph.Node ltle ->
+    | UGraph.Node (ltle, gtge) ->
       Univ.LMap.iter (fun v weight ->
           let typ = Le weight in
           output typ u v) ltle;
+      (* Univ.LMap.iter (fun v weight ->
+        let typ = Le (-weight) in
+        output typ u v) gtge; *)
     | UGraph.Alias (v, n) ->
       output (Eq n) u v
   in
@@ -340,7 +343,7 @@ let dump_universes_gen prl g s =
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold, dir = back, arrowhead=crow, label=\" %i\"];\n" right left n
           | Univ.Eq n ->
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed, dir = both, label=\" %s\"];\n" left right
-              (right ^ "=" ^ add_incr left n)
+              (left ^ "=" ^ add_incr right n)
       end, begin fun () ->
         if Lazy.is_val init then Printf.fprintf output "}\n";
         close_out output
@@ -391,7 +394,7 @@ let sort_universes g =
   in
   let get_next u = match LMap.find u g with
   | UGraph.Alias _ -> assert false (* nodes are normalized *)
-  | UGraph.Node ltle -> ltle
+  | UGraph.Node (ltle, gtge) -> ltle
   in
   (* Compute the longest chain of Lt constraints from Set to any universe *)
   let rec traverse accu todo = match todo with
@@ -423,7 +426,7 @@ let sort_universes g =
   let ulevels = Array.cons Level.set ulevels in
   (* Add the normal universes *)
   let fold (cur, ans) u =
-    let ans = LMap.add cur (UGraph.Node (LMap.singleton u 1)) ans in
+    let ans = LMap.add cur (UGraph.Node (LMap.singleton u 1, LMap.empty)) ans in
     (u, ans)
   in
   let _, ans = Array.fold_left fold (Level.prop, LMap.empty) ulevels in

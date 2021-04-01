@@ -239,13 +239,16 @@ let pr_incr n =
 
 let pr_arc prl = let open Pp in
   function
-  | u, G.Node ltle ->
-    if LMap.is_empty ltle then mt ()
+  | u, G.Node (ltle, gtge) ->
+    if LMap.is_empty ltle && LMap.is_empty gtge then mt ()
     else
       prl u ++ str " " ++
       v 0
         (pr_pmap spc (fun (v, weight) -> pr_weight_arc (Le weight) (prl v))
             ltle) ++
+      v 0
+        (pr_pmap spc (fun (v, weight) -> prl v ++ pr_weight_arc (Le weight) (prl u))
+            gtge) ++
       fnl ()
   | u, G.Alias (v, n) ->
     if n < 0 then
@@ -256,7 +259,7 @@ let pr_arc prl = let open Pp in
 
 type node = G.node =
 | Alias of Level.t * int
-| Node of int LMap.t
+| Node of int LMap.t * int LMap.t
 
 let repr g = G.repr g.graph
 

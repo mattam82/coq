@@ -67,7 +67,8 @@ module Make (Point:Point) : sig
 
   type node =
   | Alias of Point.t * int (* A node v s.t. u = v + n *)
-  | Node of int Point.Map.t (** Nodes v s.t. u + n <= v *)
+  | Node of int Point.Map.t (* Nodes v s.t. u + n <= v *)
+    * int Point.Map.t
   type repr = node Point.Map.t
   val repr : t -> repr
 
