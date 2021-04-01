@@ -150,7 +150,7 @@ let enforce_leq_alg u v g =
   | Inl x -> x
   | Inr e -> raise e
 
-let enforce_leq_alg u ve g =
+(*let enforce_leq_alg u ve g =
   Feedback.msg_debug Pp.(hov 2 (str"enforce_leq_alg " ++ Universe.pr u ++ str" and " ++ Universe.pr ve));
   try
      let r = enforce_leq_alg u ve g in
@@ -158,7 +158,7 @@ let enforce_leq_alg u ve g =
      r
   with e ->
     Feedback.msg_debug Pp.(str"inconsistent");
-    raise e
+    raise e*)
 
 
 let enforce_leq_alg u v g =

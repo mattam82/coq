@@ -287,8 +287,10 @@ GRAMMAR EXTEND Gram
       | -> { NoInline } ] ]
   ;
   univ_constraint:
-    [ [ l = universe_name; ord = [ "<" -> { Univ.Le 1 } | "=" -> { Univ.Eq } | "<=" -> { Univ.Le 0 } ];
-        r = universe_name -> { (l, ord, r) } ] ]
+    [ [ l = universe;
+        ord = [ "<" -> { Univ.Le 1 } | "=" -> { Univ.Eq } | "<=" -> { Univ.Le 0 } ];
+        r = universe ->
+        { (l, ord, r) } ] ]
   ;
   univ_decl:
     [ [  "@{" ; l = LIST0 identref; ext = [ "+" -> { true } | -> { false } ];

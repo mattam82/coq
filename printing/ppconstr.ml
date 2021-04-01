@@ -162,7 +162,7 @@ let tag_var = tag Tag.variable
   let pr_univ_expr (u,n) =
     pr_sort_name_expr u ++ (match n with 0 -> mt () | _ -> str"+" ++ int n)
 
-  let pr_univ l =
+  let pr_universe_expr l =
     match l with
       | [x] -> pr_univ_expr x
       | l -> str"max(" ++ prlist_with_sep (fun () -> str",") pr_univ_expr l ++ str")"
@@ -175,7 +175,7 @@ let tag_var = tag Tag.variable
     | UNamed [CSet,0] -> tag_type (str "Set")
     | UAnonymous {rigid=true} -> tag_type (str "Type")
     | UAnonymous {rigid=false} -> tag_type (str "Type") ++ pr_univ_annot (fun _ -> str "_") ()
-    | UNamed u -> hov 0 (tag_type (str "Type") ++ pr_univ_annot pr_univ u)
+    | UNamed u -> hov 0 (tag_type (str "Type") ++ pr_univ_annot pr_universe_expr u)
 
   let pr_univ_level_expr = function
     | UNamed CSProp -> tag_type (str "SProp")

@@ -310,6 +310,7 @@ module Constr =
     let global = Entry.create "global"
     let universe_name = Entry.create "universe_name"
     let universe_level = Entry.create "universe_level"
+    let universe = Entry.create "universe"
     let sort = Entry.create "sort"
     let sort_family = Entry.create "sort_family"
     let pattern = Entry.create "pattern"

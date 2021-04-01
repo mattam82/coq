@@ -1202,8 +1202,11 @@ let intern_sort_name ~local_univs = function
         else
           CErrors.user_err Pp.(str "Undeclared universe " ++ pr_qualid qid ++ str".")
 
+let intern_universe ~local_univs =
+  List.map (on_fst (intern_sort_name ~local_univs))
+
 let intern_sort ~local_univs s =
-  map_glob_sort_gen (List.map (on_fst (intern_sort_name ~local_univs))) s
+  map_glob_sort_gen (intern_universe ~local_univs) s
 
 let intern_instance ~local_univs us =
   Option.map (List.map (map_glob_sort_gen (intern_sort_name ~local_univs))) us
@@ -2654,14 +2657,17 @@ let interp_known_level evd u =
   let u = intern_sort_name ~local_univs:{bound = bound_univs evd; unb_univs=false} u in
   Pretyping.known_glob_level evd u
 
+let interp_universe evd u =
+  let u = intern_universe ~local_univs:{bound = bound_univs evd; unb_univs=false} u in
+  Pretyping.interp_universe evd u
+
 let interp_univ_constraints env evd cstrs =
   let interp (evd,cstrs) (u, d, u') =
-    let ul = interp_known_level evd u in
-    let u'l = interp_known_level evd u' in
-    let cstr = (ul,d,u'l) in
-    let cstrs' = Univ.Constraint.add cstr cstrs in
-    try let evd = Evd.add_constraints evd (Univ.Constraint.singleton cstr) in
-        evd, cstrs'
+    let evd, ul = interp_universe evd u in
+    let evd, u'l = interp_universe evd u' in
+    try
+      let cstr = Evd.interp_constraint evd ul d u'l in
+      Evd.add_constraints evd cstr, Univ.Constraint.union cstr cstrs
     with Univ.UniverseInconsistency e as exn ->
       let _, info = Exninfo.capture exn in
       CErrors.user_err ~hdr:"interp_constraint" ~info

@@ -190,6 +190,7 @@ module Constr :
     val ident : Id.t Entry.t
     val global : qualid Entry.t
     val universe_name : sort_name_expr Entry.t
+    val universe : (sort_name_expr * int) list Entry.t
     val universe_level : univ_level_expr Entry.t
     val sort : sort_expr Entry.t
     val sort_family : Sorts.family Entry.t

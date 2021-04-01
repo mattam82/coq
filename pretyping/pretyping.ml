@@ -148,17 +148,12 @@ let sort_name sigma = function
     (try Evd.add_global_univ sigma u with UGraph.AlreadyDeclared -> sigma), u
   | GLocalUniv l -> universe_level_name sigma l
 
-let sort_info ?loc evd l =
+let interp_universe ?loc evd l =
     List.fold_left (fun (evd, u) (l,n) ->
       let evd', u' = sort_name evd l in
       let u' = Univ.Universe.make u' in
-      let u' = match n with
-      | 0 -> u'
-      | 1 -> Univ.Universe.super u'
-      | n ->
-        user_err ?loc ~hdr:"sort_info"
-          (Pp.(str "Cannot interpret universe increment +" ++ int n))
-      in (evd', Univ.sup u u'))
+      let u' = Univ.Universe.addn n u' in
+      (evd', Univ.sup u u'))
     (evd, Univ.Universe.type0m) l
 
 type inference_hook = env -> evar_map -> Evar.t -> (evar_map * constr) option
@@ -444,7 +439,7 @@ let sort ?loc evd : glob_sort -> _ = function
   | UAnonymous {rigid} ->
     let evd, l = new_univ_level_variable ?loc (if rigid then univ_rigid else univ_flexible) evd in
     evd, Univ.Universe.make l
-  | UNamed l -> sort_info ?loc evd l
+  | UNamed l -> interp_universe ?loc evd l
 
 let judge_of_sort ?loc evd s =
   let judge =

@@ -205,6 +205,8 @@ val check_duplicate : ?loc:Loc.t -> (qualid * constr_expr) list -> unit
 
 val interp_known_level : Evd.evar_map -> sort_name_expr -> Univ.Level.t
 
+val interp_universe : Evd.evar_map -> (sort_name_expr * int) list -> Evd.evar_map * Univ.Universe.t
+
 (** Local universe and constraint declarations. *)
 val interp_univ_decl : Environ.env -> universe_decl_expr ->
                        Evd.evar_map * UState.universe_decl

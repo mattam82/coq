@@ -20,12 +20,13 @@ type sort_name_expr =
   | CRawType of Univ.Level.t (** Universes like "foo.1" have no qualid form *)
 
 type univ_level_expr  = sort_name_expr Glob_term.glob_sort_gen
-type sort_expr = (sort_name_expr * int) list Glob_term.glob_sort_gen
+type universe_expr = (sort_name_expr * int) list
+type sort_expr = universe_expr Glob_term.glob_sort_gen
 
 type instance_expr = univ_level_expr list
 
 (** Constraints don't have anonymous universes *)
-type univ_constraint_expr = sort_name_expr * Univ.constraint_type * sort_name_expr
+type univ_constraint_expr = universe_expr * Univ.constraint_type * universe_expr
 
 type universe_decl_expr = (lident list, univ_constraint_expr list) UState.gen_universe_decl
 type cumul_univ_decl_expr =

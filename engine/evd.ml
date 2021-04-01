@@ -1055,15 +1055,8 @@ let set_leq_sort env evd s1 s2 =
   match is_eq_sort s1 s2 with
   | None -> evd
   | Some (u1, u2) ->
-    Feedback.msg_debug Pp.(hov 2 (str"set_leq_sort " ++ Univ.Universe.pr u1 ++ str" and " ++ Univ.Universe.pr u2));
      if not (type_in_type env) then
-       try let sigma = add_universe_constraints evd (UnivProblem.Set.singleton (UnivProblem.ULe (u1,0,u2))) in
-          Feedback.msg_debug Pp.(hov 2 (str"succeeded")); sigma
-     with e ->
-      Feedback.msg_debug Pp.(hov 2 (str"raised" ++ CErrors.print e));
-      raise e
-
-
+       add_universe_constraints evd (UnivProblem.Set.singleton (UnivProblem.ULe (u1,0,u2)))
      else evd
 
 let check_eq evd s s' =
@@ -1093,6 +1086,14 @@ let universe_of_name evd s = UState.universe_of_name evd.universes s
 let universe_binders evd = UState.universe_binders evd.universes
 
 let universes evd = UState.ugraph evd.universes
+
+let interp_constraint evd u1 n u2 =
+  let u1 = normalize_universe evd u1
+  and u2 = normalize_universe evd u2 in
+  let cstr = match n with
+    | Univ.Le n -> UnivProblem.ULe (u1, n, u2)
+    | Univ.Eq -> UnivProblem.UEq (u1, u2)
+  in UnivProblem.to_constraints ~force_weak:true (universes evd) (UnivProblem.Set.singleton cstr)
 
 let update_sigma_univs ugraph evd =
   { evd with universes = UState.update_sigma_univs evd.universes ugraph }
