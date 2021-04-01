@@ -1040,7 +1040,7 @@ let set_eq_sort env d s1 s2 =
       d
 
 let set_eq_level d u1 u2 =
-  add_constraints d (Univ.enforce_eq_level u1 u2 Univ.Constraint.empty)
+  add_constraints d (Univ.enforce_eq_level u1 0 u2 Univ.Constraint.empty)
 
 let set_leq_level d u1 u2 =
   add_constraints d (Univ.enforce_leq_level u1 0 u2 Univ.Constraint.empty)
@@ -1092,7 +1092,7 @@ let interp_constraint evd u1 n u2 =
   and u2 = normalize_universe evd u2 in
   let cstr = match n with
     | Univ.Le n -> UnivProblem.ULe (u1, n, u2)
-    | Univ.Eq -> UnivProblem.UEq (u1, u2)
+    | Univ.Eq n -> UnivProblem.UEq (Univ.Universe.addn n u1, u2)
   in UnivProblem.to_constraints ~force_weak:true (universes evd) (UnivProblem.Set.singleton cstr)
 
 let update_sigma_univs ugraph evd =

@@ -73,6 +73,67 @@ sig
   val pr : (Level.t -> Pp.t) -> t -> Pp.t
   (** Pretty-printing *)
 end
+module LevelExpr :
+sig
+  type t
+  (** Type of universe level expressions: a level + an increment. *)
+
+  val set : t
+  val prop : t
+  val sprop : t
+  val type1 : t
+  (** The set and prop universe levels. *)
+
+  val is_small : t -> bool
+  (** Is the universe set or prop? *)
+
+  val is_sprop : t -> bool
+  val is_prop : t -> bool
+  val is_set : t -> bool
+  (** Is it specifically Prop or Set *)
+  val is_type1 : t -> bool
+
+  val compare : t -> t -> int
+  (** Comparison function *)
+
+  val equal : t -> t -> bool
+  (** Equality function *)
+
+  val hash : t -> int
+
+  val make : Level.t -> t
+
+  val successor : t -> t
+
+  val addn : int -> t -> t
+
+  val pr_with : (Level.t -> Pp.t) -> t -> Pp.t
+  (** Pretty-printing *)
+
+  val pr : t -> Pp.t
+  (** Pretty-printing *)
+
+  val to_string : t -> string
+  (** Debug printing *)
+
+  (* [is_level] is true only for (l, 0) *)
+  val is_level : t -> bool
+  val level : t -> Level.t option
+
+  (* val get_level : t -> Level.t *)
+  (* val map : (Level.t -> Level.t) -> t -> t *)
+end
+
+(** Sets of universe level expressions *)
+module LESet :
+sig
+  include CSig.SetS with type elt = LevelExpr.t
+
+  val pr : (Level.t -> Pp.t) -> t -> Pp.t
+  (** Pretty-printing *)
+
+  val of_array : LevelExpr.t array -> t
+end
 
 module Universe :
 sig
@@ -180,7 +241,7 @@ val univ_level_rem : Level.t -> Universe.t -> Universe.t -> Universe.t
 
 (** {6 Constraints. } *)
 
-type constraint_type = AcyclicGraph.constraint_type = Le of int | Eq
+type constraint_type = AcyclicGraph.constraint_type = Le of int | Eq of int
 type univ_constraint = Level.t * constraint_type * Level.t
 
 module Constraint : sig
@@ -198,12 +259,12 @@ type 'a constrained = 'a * Constraint.t
 val constraints_of : 'a constrained -> Constraint.t
 
 (** Enforcing Constraint.t. *)
-type 'a constraint_function = 'a -> 'a -> Constraint.t -> Constraint.t
+type 'a constraint_function = 'a -> int -> 'a -> Constraint.t -> Constraint.t
 
 val enforce_eq : Universe.t constraint_function
-val enforce_leq : Universe.t -> int -> Universe.t -> Constraint.t -> Constraint.t
+val enforce_leq : Universe.t constraint_function
 val enforce_eq_level : Level.t constraint_function
-val enforce_leq_level : Level.t -> int -> Level.t -> Constraint.t -> Constraint.t
+val enforce_leq_level : Level.t constraint_function
 
 (** Type explanation is used to decorate error messages to provide
   useful explanation why a given constraint is rejected. It is composed
@@ -318,8 +379,8 @@ end
 
 val enforce_eq_instances : Instance.t constraint_function
 
-val enforce_eq_variance_instances : Variance.t array -> Instance.t constraint_function
-val enforce_leq_variance_instances : Variance.t array -> Instance.t constraint_function
+val enforce_eq_variance_instances : Variance.t array -> Instance.t -> Instance.t -> Constraint.t -> Constraint.t
+val enforce_leq_variance_instances : Variance.t array -> Instance.t -> Instance.t -> Constraint.t -> Constraint.t
 
 type 'a puniverses = 'a * Instance.t
 val out_punivs : 'a puniverses -> 'a
@@ -481,7 +542,7 @@ val compact_univ : Universe.t -> Universe.t * int list
 
 (** {6 Pretty-printing of universes. } *)
 
-val pr_constraint_type : constraint_type -> Pp.t
+val pr_constraint : ('a -> Pp.t) -> ('a * constraint_type * 'a) -> Pp.t
 val pr_constraints : (Level.t -> Pp.t) -> Constraint.t -> Pp.t
 val pr_universe_context : (Level.t -> Pp.t) -> ?variance:Variance.t array ->
   UContext.t -> Pp.t

@@ -117,8 +117,8 @@ let enforce_eq_instances_univs strict x y c =
 let to_constraints ~force_weak g s =
   let tr cst acc =
     match cst with
-    | ULub (l, l') -> Constraint.add (l, Eq, l') acc
-    | UWeak (l, l') when force_weak -> Constraint.add (l, Eq, l') acc
+    | ULub (l, l') -> Constraint.add (l, Eq 0, l') acc
+    | UWeak (l, l') when force_weak -> Constraint.add (l, Eq 0, l') acc
     | UWeak  _-> acc
     | ULe (l, n, l') ->
       if UGraph.check_leq g l n l'
@@ -127,7 +127,7 @@ let to_constraints ~force_weak g s =
     | UEq (l, l') ->
       if UGraph.check_eq g l l'
       then acc
-      else enforce_eq l l' acc
+      else enforce_eq l 0 l' acc
   in
   Set.fold tr s Constraint.empty
 

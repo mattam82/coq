@@ -195,7 +195,7 @@ let allowed_sorts {ind_squashed;ind_univ;ind_min_univ=_;ind_has_relevant_arg=_;m
 let unbounded_from_below u cstrs =
   Univ.Constraint.for_all (fun (l, d, r) ->
       match d with
-      | Eq -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
+      | Eq _ -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
       | Le _ -> not (Univ.Level.equal r u))
     cstrs
 

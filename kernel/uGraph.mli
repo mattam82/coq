@@ -105,8 +105,8 @@ val check_subtype : lbound:Bound.t -> AUContext.t check_function
 (** {6 Dumping} *)
 
 type node =
-| Alias of Level.t
-| Node of int LMap.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
+| Alias of Level.t * int
+| Node of int LMap.t
 
 val repr : t -> node LMap.t
 

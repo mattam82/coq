@@ -919,7 +919,7 @@ let () =
 let infer_eq (univs, cstrs as cuniv) u u' =
   if UGraph.check_eq univs u u' then cuniv
   else
-    univs, (Univ.enforce_eq u u' cstrs)
+    univs, (Univ.enforce_eq u 0 u' cstrs)
 
 let infer_leq (univs, cstrs as cuniv) u u' =
   if UGraph.check_leq univs u 0 u' then cuniv
@@ -952,7 +952,7 @@ let infer_convert_instances ~flex u u' (univs,cstrs) =
     if flex then
       if UGraph.check_eq_instances univs u u' then cstrs
       else raise NotConvertible
-    else Univ.enforce_eq_instances u u' cstrs
+    else Univ.enforce_eq_instances u 0 u' cstrs
   in (univs, cstrs')
 
 let infer_inductive_instances cv_pb variance u1 u2 (univs,csts') =

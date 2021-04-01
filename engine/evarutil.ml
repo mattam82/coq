@@ -834,7 +834,7 @@ let compare_cumulative_instances cv_pb variances u u' sigma =
       | Irrelevant -> cstrs, Set.add (UWeak (u,u')) soft
       | Covariant when cv_pb == Reduction.CUMUL ->
         Univ.Constraint.add (u,Univ.Le 0,u') cstrs, soft
-      | Covariant | Invariant -> Univ.Constraint.add (u,Univ.Eq,u') cstrs, soft)
+      | Covariant | Invariant -> Univ.Constraint.add (u,Univ.Eq 0,u') cstrs, soft)
       (cstrs,soft) variances (Univ.Instance.to_array u) (Univ.Instance.to_array u')
   in
   match Evd.add_constraints sigma cstrs with

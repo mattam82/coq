@@ -203,11 +203,11 @@ let process_universe_constraints uctx cstrs =
         (* Two rigid/global levels, none of them being local,
             one of them being Prop/Set, disallow *)
         if Level.is_small l' || Level.is_small r' then
-          raise (UniverseInconsistency (Eq, l, r, None))
+          raise (UniverseInconsistency (Eq 0, l, r, None))
         else if fo then
           raise UniversesDiffer
     in
-    enforce_eq_level l' r' local
+    enforce_eq_level l' 0 r' local
   in
   let equalize_universes l r local = match varinfo l, varinfo r with
   | Inr l', Inr r' -> equalize_variables false l l' r r' local
@@ -220,10 +220,10 @@ let process_universe_constraints uctx cstrs =
         let lu = Universe.make l in
         if univ_level_mem l r then
           enforce_leq inst 0 lu local
-        else raise (UniverseInconsistency (Eq, lu, r, None))
+        else raise (UniverseInconsistency (Eq 0, lu, r, None))
   | Inl _, Inl _ (* both are algebraic *) ->
     if UGraph.check_eq univs l r then local
-    else raise (UniverseInconsistency (Eq, l, r, None))
+    else raise (UniverseInconsistency (Eq 0, l, r, None))
   in
   let unify_universes cst local =
     let cst = nf_constraint cst in
@@ -255,7 +255,7 @@ let add_constraints uctx cstrs =
     let cstr' = let open UnivProblem in
       match d with
       | Le n -> ULe (l, n, r)
-      | Eq -> UEq (l, r)
+      | Eq n -> UEq (Universe.addn n l, r)
     in UnivProblem.Set.add cstr' acc)
     cstrs UnivProblem.Set.empty
   in
@@ -285,7 +285,7 @@ let constrain_variables diff uctx =
           | Some u ->
              (LSet.add l univs,
               LMap.remove l vars,
-              Constraint.add (l, Eq, Option.get (Universe.level u)) cstrs)
+              Constraint.add (l, Eq 0, Option.get (Universe.level u)) cstrs)
           | None -> (univs, vars, cstrs)
         with Not_found | Option.IsNone -> (univs, vars, cstrs))
       diff (univs, uctx.univ_variables, local)

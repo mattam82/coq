@@ -316,10 +316,14 @@ let dump_universes output g =
       Univ.LMap.iter (fun v weight ->
           let typ = Le weight in
           output typ u v) ltle;
-    | UGraph.Alias v ->
-      output Eq u v
+    | UGraph.Alias (v, n) ->
+      output (Eq n) u v
   in
   Univ.LMap.iter dump_arc g
+let add_incr s n =
+  if Int.equal n 0 then s
+  else if n < 0 then s ^ "- " ^ string_of_int (-n)
+  else s ^ "+ " ^ string_of_int n
 
 let dump_universes_gen prl g s =
   let output = open_out s in
@@ -330,12 +334,13 @@ let dump_universes_gen prl g s =
       begin fun kind left right ->
         let () = Lazy.force init in
         match kind with
-          | Univ.Le n when n > 0 -> (* FIXME *)
-            Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold];\n" right left
+          | Univ.Le 0 ->
+            Printf.fprintf output "  \"%s\" -> \"%s\" [style=solid, dir = back, arrowhead=crow];\n" right left
           | Univ.Le n ->
-            Printf.fprintf output "  \"%s\" -> \"%s\" [style=solid];\n" right left
-          | Univ.Eq ->
-            Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed];\n" left right
+            Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold, dir = back, arrowhead=crow, label=\" %i\"];\n" right left n
+          | Univ.Eq n ->
+            Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed, dir = both, label=\" %s\"];\n" left right
+              (right ^ "=" ^ add_incr left n)
       end, begin fun () ->
         if Lazy.is_val init then Printf.fprintf output "}\n";
         close_out output
@@ -343,9 +348,9 @@ let dump_universes_gen prl g s =
     end else begin
       begin fun kind left right ->
         let kind = match kind with
-          | Univ.Le n when n > 0 -> "<" (* FIXME *)
-          | Univ.Le n -> "<="
-          | Univ.Eq -> "="
+          | Univ.Le n when n > 0 -> "+" ^ string_of_int n ^ "<=" (* FIXME *)
+          | Univ.Le n -> "<=" ^ string_of_int (-n) ^ "+ "
+          | Univ.Eq n -> "+" ^ string_of_int n ^ "="
         in
         Printf.fprintf output "%s %s %s ;\n" left kind right
       end, (fun () -> close_out output)
@@ -380,19 +385,20 @@ let universe_subgraph ?loc kept univ =
 
 let sort_universes g =
   let open Univ in
-  let rec normalize u = match LMap.find u g with
-  | UGraph.Alias u -> normalize u
-  | UGraph.Node _ -> u
+  let rec normalize u w = match LMap.find u g with
+  | UGraph.Alias (u, n) -> normalize u (w + n)
+  | UGraph.Node _ -> (u, w)
   in
   let get_next u = match LMap.find u g with
-  | UGraph.Alias u -> assert false (* nodes are normalized *)
+  | UGraph.Alias _ -> assert false (* nodes are normalized *)
   | UGraph.Node ltle -> ltle
   in
   (* Compute the longest chain of Lt constraints from Set to any universe *)
   let rec traverse accu todo = match todo with
   | [] -> accu
   | (u, n) :: todo ->
-    let () = assert (Level.equal (normalize u) u) in
+    let u', n = normalize u n in
+    let () = assert (Level.equal u' u) in
     let n = match LMap.find u accu with
     | m -> if m < n then Some n else None
     | exception Not_found -> Some n
@@ -403,14 +409,14 @@ let sort_universes g =
       let accu = LMap.add u n accu in
       let next = get_next u in
       let fold v weight todo =
-        let v = normalize v in
-        (v, n + weight) :: todo
+        let v, n' = normalize v weight in
+        (v, n' + n) :: todo
       in
       let todo = LMap.fold fold next todo in
       traverse accu todo
   in
   (* Only contains normalized nodes *)
-  let levels = traverse LMap.empty [normalize Level.set, 0] in
+  let levels = traverse LMap.empty [normalize Level.set 0] in
   let max_level = LMap.fold (fun _ n accu -> max n accu) levels 0 in
   let dummy_mp = Names.DirPath.make [Names.Id.of_string "Type"] in
   let ulevels = Array.init max_level (fun i -> Level.(make (UGlobal.make dummy_mp i))) in
@@ -425,8 +431,9 @@ let sort_universes g =
   let fold u _ ans =
     if Level.is_small u then ans
     else
-      let n = LMap.find (normalize u) levels in
-      LMap.add u (UGraph.Alias ulevels.(n)) ans
+      let un, weight = normalize u 0 in
+      let n = LMap.find un levels in
+      LMap.add u (UGraph.Alias (ulevels.(n), weight)) ans
   in
   LMap.fold fold g ans
 

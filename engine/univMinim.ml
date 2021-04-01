@@ -52,9 +52,9 @@ let choose_canonical ctx flexible algs s =
 (* Eq < Le _ *)
 let compare_constraint_type d d' =
   match d, d' with
-  | Eq, Eq -> 0
-  | Eq, _ -> -1
-  | _, Eq -> 1
+  | Eq n, Eq m -> Int.compare n m
+  | Eq _, _ -> -1
+  | _, Eq _ -> 1
   | Le n, Le m -> Int.compare n m
 
 type lowermap = constraint_type LMap.t
@@ -121,7 +121,7 @@ let compute_lbound left =
     List.fold_left (fun lbound (d, l) ->
       match d with
       | Le n (* l + n <= ?u *) -> sup (Universe.addn n l) lbound
-      | Eq -> assert false)
+      | Eq _ -> assert false)
       None left
 
 let instantiate_with_lbound u lbound lower ~alg ~enforce (ctx, us, algs, insts, cstrs) =
@@ -136,15 +136,15 @@ let instantiate_with_lbound u lbound lower ~alg ~enforce (ctx, us, algs, insts, 
      LBMap.add u {enforce;alg;lbound;lower} insts, cstrs),
     {enforce; alg; lbound; lower}
 
-type constraints_map = (Univ.constraint_type * Univ.LMap.key) list Univ.LMap.t
+(* type constraints_map = (Univ.constraint_type * Univ.LMap.key) list Univ.LMap.t *)
 
-let _pr_constraints_map (cmap:constraints_map) =
+(* let _pr_constraints_map (cmap:constraints_map) =
   let open Pp in
   LMap.fold (fun l cstrs acc ->
     Level.pr l ++ str " => " ++
       prlist_with_sep spc (fun (d,r) -> pr_constraint_type d ++ Level.pr r) cstrs ++
       fnl () ++ acc)
-    cmap (mt ())
+    cmap (mt ()) *)
 
 let remove_alg l (ctx, us, algs, insts, cstrs) =
   (ctx, us, LSet.remove l algs, insts, cstrs)
@@ -342,12 +342,12 @@ let normalize_context_set ~lbound g ctx us algs weak =
     let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in
     (* Add equalities for globals which can't be merged anymore. *)
     let cstrs = LSet.fold (fun g cst ->
-      Constraint.add (canon, Eq, g) cst) global
+      Constraint.add (canon, Eq 0, g) cst) global
       cstrs
     in
     (* Also add equalities for rigid variables *)
     let cstrs = LSet.fold (fun g cst ->
-      Constraint.add (canon, Eq, g) cst) rigid
+      Constraint.add (canon, Eq 0, g) cst) rigid
       cstrs
     in
     let canonu = Some (Universe.make canon) in
@@ -363,7 +363,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
       let set_to a b =
         (LSet.remove a ctx,
          LMap.add a (Some (Universe.make b)) us,
-         UGraph.enforce_constraint (a,Eq,b) g)
+         UGraph.enforce_constraint (a,Eq 0,b) g)
       in
       if UGraph.check_constraint g (u,Le 0,v) || UGraph.check_constraint g (v,Le 0,u)
       then acc
@@ -382,7 +382,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
         let u = norm u and v = norm v in
         match d with
         | Le n when n <= 0 && Level.equal u v -> noneqs
-        | Eq when Level.equal u v -> noneqs
+        | Eq 0 when Level.equal u v -> noneqs
         | _ -> Constraint.add (u,d,v) noneqs)
       noneqs Constraint.empty
   in

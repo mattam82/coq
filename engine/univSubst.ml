@@ -16,7 +16,7 @@ open Univ
 
 let enforce_univ_constraint (u,d,v) =
   match d with
-  | Eq -> enforce_eq u v
+  | Eq n -> enforce_eq u n v
   | Le n -> enforce_leq u n v
 
 let subst_univs_level fn l =

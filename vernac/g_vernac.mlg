@@ -288,7 +288,7 @@ GRAMMAR EXTEND Gram
   ;
   univ_constraint:
     [ [ l = universe;
-        ord = [ "<" -> { Univ.Le 1 } | "=" -> { Univ.Eq } | "<=" -> { Univ.Le 0 } ];
+        ord = [ "<" -> { Univ.Le 1 } | "=" -> { Univ.Eq 0 } | "<=" -> { Univ.Le 0 } ];
         r = universe ->
         { (l, ord, r) } ] ]
   ;

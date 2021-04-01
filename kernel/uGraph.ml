@@ -75,7 +75,7 @@ let check_eq g u v =
 let check_eq_level g u v =
   u == v ||
   type_in_type g ||
-  (not (Level.is_sprop u || Level.is_sprop v) && G.check_eq g.graph u v)
+  (not (Level.is_sprop u || Level.is_sprop v) && G.check_eq g.graph u 0 v)
 
 let empty_universes = {graph=G.empty; sprop_cumulative=false; type_in_type=false}
 
@@ -84,19 +84,19 @@ let initial_universes =
   let g = G.empty in
   let g = G.add ~rank:big_rank Level.prop g in
   let g = G.add ~rank:big_rank Level.set g in
-  {empty_universes with graph=G.enforce_lt Level.prop Level.set g}
+  {empty_universes with graph=G.enforce_leq Level.prop 1 Level.set g}
 
 let initial_universes_with g = {g with graph=initial_universes.graph}
 
 let enforce_constraint (u,d,v) g =
   match d with
   | Le n -> G.enforce_leq u n v g
-  | Eq -> G.enforce_eq u v g
+  | Eq n -> G.enforce_eq u n v g
 
 let enforce_constraint (u,d,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> g_map (enforce_constraint cst) g
-  | true, (Eq|Le 0), true -> g
+  | true, (Eq 0|Le 0), true -> g
   | true, Le 0, false when g.sprop_cumulative -> g
   | _ ->  raise (UniverseInconsistency (d,Universe.make u, Universe.make v, None))
 
@@ -109,12 +109,12 @@ let merge_constraints csts g = Constraint.fold enforce_constraint csts g
 let check_constraint g (u,d,v) =
   match d with
   | Le n -> G.check_leq g u n v
-  | Eq -> G.check_eq g u v
+  | Eq n -> G.check_eq g u n v
 
 let check_constraint g (u,d,v as cst) =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> check_constraint g.graph cst
-  | true, (Eq|Le 0), true -> true
+  | true, (Eq 0|Le 0), true -> true
   | true, Le 0, false -> g.sprop_cumulative || type_in_type g
   | _ -> type_in_type g
 
@@ -231,6 +231,12 @@ let pr_pmap sep pr map =
   let cmp (u,_) (v,_) = Level.compare u v in
   Pp.prlist_with_sep sep pr (List.sort cmp (LMap.bindings map))
 
+let pr_incr n =
+  let open Pp in
+  if Int.equal n 0 then mt()
+  else if n < 0 then str"- " ++ int (-n)
+  else str"+ " ++ int n
+
 let pr_arc prl = let open Pp in
   function
   | u, G.Node ltle ->
@@ -241,11 +247,15 @@ let pr_arc prl = let open Pp in
         (pr_pmap spc (fun (v, weight) -> pr_weight_arc (Le weight) (prl v))
             ltle) ++
       fnl ()
-  | u, G.Alias v ->
-    prl u  ++ str " = " ++ prl v ++ fnl ()
+  | u, G.Alias (v, n) ->
+    if n < 0 then
+      prl u  ++ pr_incr (-n) ++ str " = " ++ prl v ++ fnl ()
+    else
+      prl u  ++ str " = " ++ prl v ++pr_incr n ++ fnl ()
+
 
 type node = G.node =
-| Alias of Level.t
+| Alias of Level.t * int
 | Node of int LMap.t
 
 let repr g = G.repr g.graph
