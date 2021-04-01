@@ -313,8 +313,8 @@ let dump_universes output g =
   let open Univ in
   let dump_arc u = function
     | UGraph.Node ltle ->
-      Univ.LMap.iter (fun v strict ->
-          let typ = if strict then Lt else Le in
+      Univ.LMap.iter (fun v weight ->
+          let typ = Le weight in
           output typ u v) ltle;
     | UGraph.Alias v ->
       output Eq u v
@@ -330,9 +330,9 @@ let dump_universes_gen prl g s =
       begin fun kind left right ->
         let () = Lazy.force init in
         match kind with
-          | Univ.Lt ->
+          | Univ.Le n when n > 0 -> (* FIXME *)
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold];\n" right left
-          | Univ.Le ->
+          | Univ.Le n ->
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=solid];\n" right left
           | Univ.Eq ->
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed];\n" left right
@@ -343,8 +343,8 @@ let dump_universes_gen prl g s =
     end else begin
       begin fun kind left right ->
         let kind = match kind with
-          | Univ.Lt -> "<"
-          | Univ.Le -> "<="
+          | Univ.Le n when n > 0 -> "<" (* FIXME *)
+          | Univ.Le n -> "<="
           | Univ.Eq -> "="
         in
         Printf.fprintf output "%s %s %s ;\n" left kind right
@@ -372,7 +372,7 @@ let universe_subgraph ?loc kept univ =
   let kept = List.fold_left (fun kept q -> LSet.add (parse q) kept) LSet.empty kept in
   let csts = UGraph.constraints_for ~kept univ in
   let add u newgraph =
-    let strict = UGraph.check_constraint univ (Level.set,Lt,u) in
+    let strict = UGraph.check_constraint univ (Level.set,Le 1,u) in
     UGraph.add_universe u ~lbound:UGraph.Bound.Set ~strict newgraph
   in
   let univ = LSet.fold add kept UGraph.initial_universes in
@@ -402,9 +402,9 @@ let sort_universes g =
     | Some n ->
       let accu = LMap.add u n accu in
       let next = get_next u in
-      let fold v lt todo =
+      let fold v weight todo =
         let v = normalize v in
-        if lt then (v, n + 1) :: todo else (v, n) :: todo
+        (v, n + weight) :: todo
       in
       let todo = LMap.fold fold next todo in
       traverse accu todo
@@ -417,7 +417,7 @@ let sort_universes g =
   let ulevels = Array.cons Level.set ulevels in
   (* Add the normal universes *)
   let fold (cur, ans) u =
-    let ans = LMap.add cur (UGraph.Node (LMap.singleton u true)) ans in
+    let ans = LMap.add cur (UGraph.Node (LMap.singleton u 1)) ans in
     (u, ans)
   in
   let _, ans = Array.fold_left fold (Level.prop, LMap.empty) ulevels in

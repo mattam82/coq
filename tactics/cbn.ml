@@ -441,7 +441,7 @@ let magically_constant_of_fixbody env sigma reference bd = function
             let subst = Set.fold (fun cst acc ->
                 let l, r = match cst with
                   | ULub (u, v) | UWeak (u, v) -> u, v
-                  | UEq (u, v) | ULe (u, v) ->
+                  | UEq (u, v) | ULe (u, _, v) ->
                     let get u = Option.get (Universe.level u) in
                     get u, get v
                 in

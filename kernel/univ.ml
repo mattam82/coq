@@ -335,10 +335,10 @@ struct
 
     let hash = ExprHash.hash
 
-    let leq (u,n) (v,n') =
+    let leq (u,n) k (v,n') =
       let cmp = Level.compare u v in
-        if Int.equal cmp 0 then n <= n'
-        else if n <= n' then
+        if Int.equal cmp 0 then n + k <= n'
+        else if n + k <= n' then
           (Level.is_prop u && not (Level.is_sprop v))
         else false
 
@@ -548,17 +548,13 @@ let super = Universe.super
 
 let universe_level = Universe.level
 
-
-type constraint_type = AcyclicGraph.constraint_type = Lt | Le | Eq
+type constraint_type = AcyclicGraph.constraint_type = Le of int | Eq
 
 type explanation = (constraint_type * Level.t) list
 
 let constraint_type_ord c1 c2 = match c1, c2 with
-| Lt, Lt -> 0
-| Lt, _ -> -1
-| Le, Lt -> 1
-| Le, Le -> 0
-| Le, Eq -> -1
+| Le n, Le m -> Int.compare n m
+| Le _, Eq -> -1
 | Eq, Eq -> 0
 | Eq, _ -> 1
 
@@ -566,12 +562,24 @@ let constraint_type_ord c1 c2 = match c1, c2 with
 
 type univ_constraint = Level.t * constraint_type * Level.t
 
+let pr_weight_arc op prv =
+  match op with
+  | Eq -> str"= " ++ prv
+  | Le 1 -> str"< " ++ prv
+  | Le 0 -> str"<= " ++ prv
+  | Le n ->
+    if n > 0 then
+      str "+ " ++ int n ++ str"<= " ++ prv
+    else str "<= " ++ prv ++ str" + " ++ int (-n)
+
 let pr_constraint_type op =
   let op_str = match op with
-    | Lt -> " < "
-    | Le -> " <= "
-    | Eq -> " = "
-  in str op_str
+    | Le 1 -> str" < "
+    | Le 0 -> str" <= "
+    | Le n when n > 0 -> str" + " ++ int n ++ str" < "
+    | Le n -> str" < " ++ int n ++ str" + "
+    | Eq -> str" = "
+  in op_str
 
 module UConstraintOrd =
 struct
@@ -592,7 +600,7 @@ struct
 
   let pr prl c =
     v 0 (prlist_with_sep spc (fun (u1,op,u2) ->
-      hov 0 (prl u1 ++ pr_constraint_type op ++ prl u2))
+      hov 0 (prl u1 ++ spc () ++ pr_weight_arc op (prl u2)))
        (elements c))
 
 end
@@ -657,45 +665,36 @@ let enforce_eq u v c =
   if check_univ_eq u v then c
   else enforce_eq u v c
 
-let constraint_add_leq v u c =
+let constraint_add_leq u k v c =
   (* We just discard trivial constraints like u<=u *)
-  if Universe.Expr.equal v u then c
+  if Universe.Expr.equal v u && k <= 0 then c
   else
-    match v, u with
+    match u, v with
     | (x,n), (y,m) ->
-    let j = m - n in
-      if j = -1 (* n = m+1, v+1 <= u <-> v < u *) then
-        Constraint.add (x,Lt,y) c
-      else if j <= -1 (* n = m+k, v+k <= u and k>0 *) then
-        if Level.equal x y then (* u+k <= u with k>0 *)
-          Constraint.add (x,Lt,x) c
-        else anomaly (Pp.str"Unable to handle arbitrary u+k <= v constraints.")
-      else if j = 0 then
-        Constraint.add (x,Le,y) c
-      else (* j >= 1 *) (* m = n + k, u <= v+k *)
-        if Level.equal x y then c (* u <= u+k, trivial *)
-        else if Level.is_small x then c (* Prop,Set <= u+S k, trivial *)
-        else Constraint.add (x,Le,y) c (* u <= v implies u <= v+k *)
+      let j = k + (n - m) in
+      Constraint.add (x,Le j,y) c
 
-let check_univ_leq_one u v = Universe.exists (Universe.Expr.leq u) v
+let check_univ_leq_one u n v = Universe.exists (Universe.Expr.leq u n) v
 
-let check_univ_leq u v =
-  Universe.for_all (fun u -> check_univ_leq_one u v) u
+let check_univ_leq u n v =
+  Universe.for_all (fun u -> check_univ_leq_one u n v) u
 
-let enforce_leq u v c =
+let enforce_leq u n v c =
   match Universe.is_sprop u, Universe.is_sprop v with
-  | true, true -> c
-  | true, false -> Constraint.add (Level.sprop,Le,Level.prop) c
-  | false, true -> Constraint.add (Level.prop,Le,Level.sprop) c
+  | true, true -> if n <= 0 then c else Constraint.add (Level.sprop,Le n,Level.prop) c
+  | true, false ->
+      (* Is that just supposed to fail?? *)
+      Constraint.add (Level.sprop,Le n,Level.prop) c
+  | false, true -> Constraint.add (Level.prop,Le n,Level.sprop) c
   | false, false ->
-    List.fold_left (fun c v -> (List.fold_left (fun c u -> constraint_add_leq u v c) c u)) c v
+    List.fold_left (fun c v -> (List.fold_left (fun c u -> constraint_add_leq u n v c) c u)) c v
 
-let enforce_leq u v c =
-  if check_univ_leq u v then c
-  else enforce_leq u v c
+let enforce_leq u n v c =
+  if check_univ_leq u n v then c
+  else enforce_leq u n v c
 
-let enforce_leq_level u v c =
-  if Level.equal u v then c else Constraint.add (u,Le,v) c
+let enforce_leq_level u n v c =
+  if Level.equal u v && n <= 0 then c else Constraint.add (u,Le n,v) c
 
 (* Miscellaneous functions to remove or test local univ assumed to
    occur in a universe *)
@@ -756,7 +755,7 @@ struct
   let leq_constraint csts variance u u' =
     match variance with
     | Irrelevant -> csts
-    | Covariant -> enforce_leq_level u u' csts
+    | Covariant -> enforce_leq_level u 0 u' csts
     | Invariant -> enforce_eq_level u u' csts
 
   let eq_constraint csts variance u u' =
@@ -1101,10 +1100,14 @@ let subst_univs_level_instance subst i =
     if i == i' then i
     else i'
 
+let is_trivial_refl = function
+  | Le n -> n <= 0
+  | Eq -> true
+
 let subst_univs_level_constraint subst (u,d,v) =
   let u' = subst_univs_level_level subst u
   and v' = subst_univs_level_level subst v in
-    if d != Lt && Level.equal u' v' then None
+    if is_trivial_refl d && Level.equal u' v' then None
     else Some (u',d,v')
 
 let subst_univs_level_constraints subst csts =
@@ -1224,9 +1227,6 @@ exception UniverseInconsistency of univ_inconsistency
 
 let explain_universe_inconsistency prl (o,u,v,p : univ_inconsistency) =
   let pr_uni = Universe.pr_with prl in
-  let pr_rel = function
-    | Eq -> str"=" | Lt -> str"<" | Le -> str"<="
-  in
   let reason = match p with
     | None -> mt()
     | Some p ->
@@ -1234,10 +1234,10 @@ let explain_universe_inconsistency prl (o,u,v,p : univ_inconsistency) =
       if p = [] then mt ()
       else
         str " because" ++ spc() ++ pr_uni v ++
-        prlist (fun (r,v) -> spc() ++ pr_rel r ++ str" " ++ prl v)
+        prlist (fun (r,v) -> spc() ++ pr_weight_arc r (prl v))
           p ++
         (if Universe.equal (Universe.make (snd (List.last p))) u then mt() else
            (spc() ++ str "= " ++ pr_uni u))
   in
     str "Cannot enforce" ++ spc() ++ pr_uni u ++ spc() ++
-      pr_rel o ++ spc() ++ pr_uni v ++ reason
+      pr_weight_arc o (pr_uni v) ++ reason

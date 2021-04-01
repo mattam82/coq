@@ -184,7 +184,7 @@ let process_universe_constraints uctx cstrs =
     | ULub (u, v) -> ULub (level_subst_of normalize u, level_subst_of normalize v)
     | UWeak (u, v) -> UWeak (level_subst_of normalize u, level_subst_of normalize v)
     | UEq (u, v) -> UEq (subst_univs_universe normalize u, subst_univs_universe normalize v)
-    | ULe (u, v) -> ULe (subst_univs_universe normalize u, subst_univs_universe normalize v)
+    | ULe (u, n, v) -> ULe (subst_univs_universe normalize u, n, subst_univs_universe normalize v)
   in
   let is_local l = LMap.mem l !vars in
   let varinfo x =
@@ -219,7 +219,7 @@ let process_universe_constraints uctx cstrs =
       else
         let lu = Universe.make l in
         if univ_level_mem l r then
-          enforce_leq inst lu local
+          enforce_leq inst 0 lu local
         else raise (UniverseInconsistency (Eq, lu, r, None))
   | Inl _, Inl _ (* both are algebraic *) ->
     if UGraph.check_eq univs l r then local
@@ -230,37 +230,9 @@ let process_universe_constraints uctx cstrs =
       if UnivProblem.is_trivial cst then local
       else
           match cst with
-          | ULe (l, r) ->
-            begin match Univ.Universe.level r with
-            | None ->
-              if UGraph.check_leq univs l r then local
-              else user_err Pp.(str "Algebraic universe on the right")
-            | Some r' ->
-              if Level.is_small r' then
-                  if not (Universe.is_levels l)
-                  then (* l contains a +1 and r=r' small so l <= r impossible *)
-                    raise (UniverseInconsistency (Le, l, r, None))
-                  else
-                    if UGraph.check_leq univs l r then match Univ.Universe.level l with
-                    | Some l ->
-                      Univ.Constraint.add (l, Le, r') local
-                    | None -> local
-                    else
-                    let levels = Universe.levels l in
-                    let fold l' local =
-                      let l = Universe.make l' in
-                      if Level.is_small l' || is_local l' then
-                        equalize_variables false l l' r r' local
-                      else raise (UniverseInconsistency (Le, l, r, None))
-                    in
-                    LSet.fold fold levels local
-              else
-                match Univ.Universe.level l with
-                | Some l ->
-                  Univ.Constraint.add (l, Le, r') local
-                | None ->
-                  if UGraph.check_leq univs l r then local else enforce_leq l r local
-              end
+          | ULe (l, n, r) ->
+            if UGraph.check_leq univs l n r then local
+            else enforce_leq l n r local
           | ULub (l, r) ->
               equalize_variables true (Universe.make l) l (Universe.make r) r local
           | UWeak (l, r) ->
@@ -282,9 +254,7 @@ let add_constraints uctx cstrs =
     let l = Universe.make l and r = Universe.make r in
     let cstr' = let open UnivProblem in
       match d with
-      | Lt ->
-        ULe (Universe.super l, r)
-      | Le -> ULe (l, r)
+      | Le n -> ULe (l, n, r)
       | Eq -> UEq (l, r)
     in UnivProblem.Set.add cstr' acc)
     cstrs UnivProblem.Set.empty
@@ -440,6 +410,14 @@ let is_bound l lbound = match lbound with
   | UGraph.Bound.Prop -> Level.is_prop l
   | UGraph.Bound.Set -> Level.is_set l
 
+let is_le = function
+  | Le 0 -> true
+  | _ -> false
+
+let is_lt = function
+  | Le 1 -> true
+  | _ -> false
+
 let restrict_universe_context ~lbound (univs, csts) keep =
   let removed = LSet.diff univs keep in
   if LSet.is_empty removed then univs, csts
@@ -452,7 +430,7 @@ let restrict_universe_context ~lbound (univs, csts) keep =
   let allkept = LSet.union (UGraph.domain UGraph.initial_universes) (LSet.diff allunivs removed) in
   let csts = UGraph.constraints_for ~kept:allkept g in
   let csts = Constraint.filter (fun (l,d,r) ->
-      not ((is_bound l lbound && d == Le) || (Level.is_prop l && d == Lt && Level.is_set r))) csts in
+      not ((is_bound l lbound && is_le d) || (Level.is_prop l && is_lt d && Level.is_set r))) csts in
   (LSet.inter univs keep, csts)
 
 let restrict uctx vars =
@@ -617,7 +595,7 @@ let make_flexible_variable uctx ~algebraic u =
         in
         let has_upper_constraint () =
           Constraint.exists
-            (fun (l,d,r) -> d == Lt && Level.equal l u)
+            (fun (l,d,r) -> is_lt d && Level.equal l u)
             (ContextSet.constraints cstrs)
         in
         if not (LMap.exists substu_not_alg uvars || has_upper_constraint ())
@@ -646,11 +624,11 @@ let subst_univs_context_with_def def usubst (uctx, cst) =
   (LSet.diff uctx def, UnivSubst.subst_univs_constraints usubst cst)
 
 let is_trivial_leq (l,d,r) =
-  Level.is_prop l && (d == Le || d == Lt) && Level.is_set r
+  Level.is_prop l && (is_le d || is_lt d) && Level.is_set r
 
 (* Prop < i <-> Set+1 <= i <-> Set < i *)
 let translate_cstr (l,d,r as cstr) =
-  if Level.equal Level.prop l && d == Lt && not (Level.equal Level.set r) then
+  if Level.equal Level.prop l && is_lt d && not (Level.equal Level.set r) then
     (Level.set, d, r)
   else cstr
 

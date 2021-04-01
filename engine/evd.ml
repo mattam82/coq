@@ -1043,7 +1043,7 @@ let set_eq_level d u1 u2 =
   add_constraints d (Univ.enforce_eq_level u1 u2 Univ.Constraint.empty)
 
 let set_leq_level d u1 u2 =
-  add_constraints d (Univ.enforce_leq_level u1 u2 Univ.Constraint.empty)
+  add_constraints d (Univ.enforce_leq_level u1 0 u2 Univ.Constraint.empty)
 
 let set_eq_instances ?(flex=false) d u1 u2 =
   add_universe_constraints d
@@ -1055,8 +1055,15 @@ let set_leq_sort env evd s1 s2 =
   match is_eq_sort s1 s2 with
   | None -> evd
   | Some (u1, u2) ->
+    Feedback.msg_debug Pp.(hov 2 (str"set_leq_sort " ++ Univ.Universe.pr u1 ++ str" and " ++ Univ.Universe.pr u2));
      if not (type_in_type env) then
-       add_universe_constraints evd (UnivProblem.Set.singleton (UnivProblem.ULe (u1,u2)))
+       try let sigma = add_universe_constraints evd (UnivProblem.Set.singleton (UnivProblem.ULe (u1,0,u2))) in
+          Feedback.msg_debug Pp.(hov 2 (str"succeeded")); sigma
+     with e ->
+      Feedback.msg_debug Pp.(hov 2 (str"raised" ++ CErrors.print e));
+      raise e
+
+
      else evd
 
 let check_eq evd s s' =

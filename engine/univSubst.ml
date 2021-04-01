@@ -17,8 +17,7 @@ open Univ
 let enforce_univ_constraint (u,d,v) =
   match d with
   | Eq -> enforce_eq u v
-  | Le -> enforce_leq u v
-  | Lt -> enforce_leq (super u) v
+  | Le n -> enforce_leq u n v
 
 let subst_univs_level fn l =
   try Some (fn l)

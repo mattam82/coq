@@ -119,6 +119,9 @@ sig
   val super : t -> t
   (** The universe strictly above *)
 
+  val addn : int -> t -> t
+  (** The universe n levels above *)
+
   val sup   : t -> t -> t
   (** The l.u.b. of 2 universes *)
 
@@ -177,7 +180,7 @@ val univ_level_rem : Level.t -> Universe.t -> Universe.t -> Universe.t
 
 (** {6 Constraints. } *)
 
-type constraint_type = AcyclicGraph.constraint_type = Lt | Le | Eq
+type constraint_type = AcyclicGraph.constraint_type = Le of int | Eq
 type univ_constraint = Level.t * constraint_type * Level.t
 
 module Constraint : sig
@@ -198,9 +201,9 @@ val constraints_of : 'a constrained -> Constraint.t
 type 'a constraint_function = 'a -> 'a -> Constraint.t -> Constraint.t
 
 val enforce_eq : Universe.t constraint_function
-val enforce_leq : Universe.t constraint_function
+val enforce_leq : Universe.t -> int -> Universe.t -> Constraint.t -> Constraint.t
 val enforce_eq_level : Level.t constraint_function
-val enforce_leq_level : Level.t constraint_function
+val enforce_leq_level : Level.t -> int -> Level.t -> Constraint.t -> Constraint.t
 
 (** Type explanation is used to decorate error messages to provide
   useful explanation why a given constraint is rejected. It is composed
@@ -490,6 +493,8 @@ val explain_universe_inconsistency : (Level.t -> Pp.t) ->
 
 val pr_universe_level_subst : universe_level_subst -> Pp.t
 val pr_universe_subst : universe_subst -> Pp.t
+
+val pr_weight_arc : constraint_type -> Pp.t -> Pp.t
 
 (** {6 Hash-consing } *)
 

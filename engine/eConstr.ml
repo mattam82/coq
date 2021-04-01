@@ -487,7 +487,7 @@ let compare_cumulative_instances cv_pb nargs_ok variances u u' cstrs =
            let u' = Univ.Universe.make u' in
            (match cv_pb with
             | Reduction.CONV -> Set.add (UEq (u,u')) cstrs
-            | Reduction.CUMUL -> Set.add (ULe (u,u')) cstrs)
+            | Reduction.CUMUL -> Set.add (ULe (u,0,u')) cstrs)
          | Invariant ->
            let u = Univ.Universe.make u in
            let u' = Univ.Universe.make u' in
@@ -560,7 +560,7 @@ let test_constr_universes env sigma leq m n =
       if Sorts.equal s1 s2 then true
       else
         (cstrs := Set.add
-           (ULe (Sorts.univ_of_sort s1,Sorts.univ_of_sort s2)) !cstrs;
+           (ULe (Sorts.univ_of_sort s1,0,Sorts.univ_of_sort s2)) !cstrs;
          true)
     in
     let rec eq_constr' nargs m n = compare_gen kind eq_universes eq_sorts eq_constr' nargs m n in

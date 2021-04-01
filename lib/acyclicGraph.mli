@@ -10,7 +10,7 @@
 
 (** Graphs representing strict orders *)
 
-type constraint_type = Lt | Le | Eq
+type constraint_type = Le of int | Eq
 
 module type Point = sig
   type t
@@ -50,11 +50,11 @@ module Make (Point:Point) : sig
   type 'a check_function = t -> 'a -> 'a -> bool
 
   val check_eq : Point.t check_function
-  val check_leq : Point.t check_function
+  val check_leq : t -> Point.t -> int -> Point.t -> bool
   val check_lt : Point.t check_function
 
   val enforce_eq : Point.t -> Point.t -> t -> t
-  val enforce_leq : Point.t -> Point.t -> t -> t
+  val enforce_leq : Point.t -> int -> Point.t -> t -> t
   val enforce_lt : Point.t -> Point.t -> t -> t
 
   val constraints_of : t -> Point.Constraint.t * Point.Set.t list
@@ -69,7 +69,7 @@ module Make (Point:Point) : sig
 
   type node =
   | Alias of Point.t
-  | Node of bool Point.Map.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
+  | Node of int Point.Map.t (** Nodes v s.t. u + n <= v *)
   type repr = node Point.Map.t
   val repr : t -> repr
 

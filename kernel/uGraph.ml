@@ -48,33 +48,29 @@ let set_type_in_type b g = {g with type_in_type=b}
 
 let type_in_type g = g.type_in_type
 
-let check_smaller_expr g (u,n) (v,m) =
-  let diff = n - m in
-    match diff with
-    | 0 -> G.check_leq g.graph u v
-    | 1 -> G.check_lt g.graph u v
-    | x when x < 0 -> G.check_leq g.graph u v
-    | _ -> false
+let check_smaller_expr g (u,n) k (v,m) =
+  let diff = k + (n - m) in
+  G.check_leq g.graph u diff v
 
-let exists_bigger g ul l =
+let exists_bigger g ul n l =
   Universe.exists (fun ul' ->
-    check_smaller_expr g ul ul') l
+    check_smaller_expr g ul n ul') l
 
-let real_check_leq g u v =
-  Universe.for_all (fun ul -> exists_bigger g ul v) u
+let real_check_leq g u n v =
+  Universe.for_all (fun ul -> exists_bigger g ul n v) u
 
-let check_leq g u v =
+let check_leq g u n v =
   type_in_type g ||
-  Universe.equal u v || (g.sprop_cumulative && Universe.is_sprop u) ||
+  (Universe.equal u v && n <= 0) || (g.sprop_cumulative && Universe.is_sprop u && n = 0) ||
   (not (Universe.is_sprop u) && not (Universe.is_sprop v) &&
-    (is_type0m_univ u ||
-     real_check_leq g u v))
+    ((is_type0m_univ u && n = 0) ||
+     real_check_leq g u n v))
 
 let check_eq g u v =
   type_in_type g ||
   Universe.equal u v ||
   (not (Universe.is_sprop u || Universe.is_sprop v) &&
-   (real_check_leq g u v && real_check_leq g v u))
+   (real_check_leq g u 0 v && real_check_leq g v 0 u))
 
 let check_eq_level g u v =
   u == v ||
@@ -94,15 +90,14 @@ let initial_universes_with g = {g with graph=initial_universes.graph}
 
 let enforce_constraint (u,d,v) g =
   match d with
-  | Le -> G.enforce_leq u v g
-  | Lt -> G.enforce_lt u v g
+  | Le n -> G.enforce_leq u n v g
   | Eq -> G.enforce_eq u v g
 
 let enforce_constraint (u,d,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> g_map (enforce_constraint cst) g
-  | true, (Eq|Le), true -> g
-  | true, Le, false when g.sprop_cumulative -> g
+  | true, (Eq|Le 0), true -> g
+  | true, Le 0, false when g.sprop_cumulative -> g
   | _ ->  raise (UniverseInconsistency (d,Universe.make u, Universe.make v, None))
 
 let enforce_constraint cst g =
@@ -113,32 +108,27 @@ let merge_constraints csts g = Constraint.fold enforce_constraint csts g
 
 let check_constraint g (u,d,v) =
   match d with
-  | Le -> G.check_leq g u v
-  | Lt -> G.check_lt g u v
+  | Le n -> G.check_leq g u n v
   | Eq -> G.check_eq g u v
 
 let check_constraint g (u,d,v as cst) =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> check_constraint g.graph cst
-  | true, (Eq|Le), true -> true
-  | true, Le, false -> g.sprop_cumulative || type_in_type g
+  | true, (Eq|Le 0), true -> true
+  | true, Le 0, false -> g.sprop_cumulative || type_in_type g
   | _ -> type_in_type g
 
 let check_constraints csts g = Constraint.for_all (check_constraint g) csts
 
 let leq_expr (u,m) (v,n) =
-  let d = match m - n with
-    | 1 -> Lt
-    | diff -> assert (diff <= 0); Le
-  in
-  (u,d,v)
+  (u,Le (m - n),v)
 
 let enforce_leq_alg u v g =
   let open Util in
   let enforce_one (u,v) = function
     | Inr _ as orig -> orig
     | Inl (cstrs,g) as orig ->
-      if check_smaller_expr g u v then orig
+      if check_smaller_expr g u 0 v then orig
       else
         (let c = leq_expr u v in
          match enforce_constraint c g with
@@ -160,18 +150,29 @@ let enforce_leq_alg u v g =
   | Inl x -> x
   | Inr e -> raise e
 
+let enforce_leq_alg u ve g =
+  Feedback.msg_debug Pp.(hov 2 (str"enforce_leq_alg " ++ Universe.pr u ++ str" and " ++ Universe.pr ve));
+  try
+     let r = enforce_leq_alg u ve g in
+     Feedback.msg_debug Pp.(str "succeeded");
+     r
+  with e ->
+    Feedback.msg_debug Pp.(str"inconsistent");
+    raise e
+
+
 let enforce_leq_alg u v g =
   match Universe.is_sprop u, Universe.is_sprop v with
   | true, true -> Constraint.empty, g
   | false, false -> enforce_leq_alg u v g
   | left, _ ->
     if left && g.sprop_cumulative then Constraint.empty, g
-    else raise (UniverseInconsistency (Le, u, v, None))
+    else raise (UniverseInconsistency (Le 0, u, v, None))
 
 (* sanity check wrapper *)
 let enforce_leq_alg u v g =
   let _,g as cg = enforce_leq_alg u v g in
-  assert (check_leq g u v);
+  assert (check_leq g u 0 v);
   cg
 
 module Bound =
@@ -183,7 +184,7 @@ exception AlreadyDeclared = G.AlreadyDeclared
 let add_universe u ~lbound ~strict g =
   let lbound = match lbound with Bound.Prop -> Level.prop | Bound.Set -> Level.set in
   let graph = G.add u g.graph in
-  let d = if strict then Lt else Le in
+  let d = if strict then Le 1 else Le 0 in
   enforce_constraint (lbound,d,u) {g with graph}
 
 let add_universe_unconstrained u g = {g with graph=G.add u g.graph}
@@ -237,8 +238,7 @@ let pr_arc prl = let open Pp in
     else
       prl u ++ str " " ++
       v 0
-        (pr_pmap spc (fun (v, strict) ->
-              (if strict then str "< " else str "<= ") ++ prl v)
+        (pr_pmap spc (fun (v, weight) -> pr_weight_arc (Le weight) (prl v))
             ltle) ++
       fnl ()
   | u, G.Alias v ->
@@ -246,7 +246,7 @@ let pr_arc prl = let open Pp in
 
 type node = G.node =
 | Alias of Level.t
-| Node of bool LMap.t
+| Node of int LMap.t
 
 let repr g = G.repr g.graph
 

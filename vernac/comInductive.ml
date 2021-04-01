@@ -311,7 +311,7 @@ let inductive_levels env evd arities inds =
         (* Constructors contribute. *)
         let evd =
           if Sorts.is_set du then
-            if not (Evd.check_leq evd cu Univ.type0_univ) then
+            if not (Evd.check_leq evd cu 0 Univ.type0_univ) then
               raise (InductiveError LargeNonPropInductiveNotInType)
             else evd
           else evd
@@ -327,7 +327,7 @@ let inductive_levels env evd arities inds =
         let duu = Sorts.univ_of_sort du in
         let template_prop, evd =
           if not (Univ.is_small_univ duu) && Univ.Universe.equal cu duu then
-            if is_flexible_sort evd duu && not (Evd.check_leq evd Univ.type0_univ duu)
+            if is_flexible_sort evd duu && not (Evd.check_leq evd Univ.type0_univ 0 duu)
             then if Term.isArity arity
             (* If not a syntactic arity, the universe may be used in a
                polymorphic instance and so cannot be lowered to Prop.

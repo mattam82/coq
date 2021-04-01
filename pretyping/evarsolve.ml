@@ -1374,10 +1374,10 @@ let solve_evar_evar ?(force=false) f unify flags env evd pbty (evk1,args1 as ev1
         if i == j || Evd.check_eq evd ui uj
         then (* Shortcut, i = j *)
           evd
-        else if Evd.check_leq evd ui uj then
+        else if Evd.check_leq evd ui 0 uj then
           let t2 = it_mkProd_or_LetIn (mkSort i) ctx2 in
           downcast evk2 t2 evd
-        else if Evd.check_leq evd uj ui then
+        else if Evd.check_leq evd uj 0 ui then
           let t1 = it_mkProd_or_LetIn (mkSort j) ctx1 in
           downcast evk1 t1 evd
         else

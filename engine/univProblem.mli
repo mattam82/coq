@@ -21,7 +21,7 @@ open Univ
 *)
 
 type t =
-  | ULe of Universe.t * Universe.t
+  | ULe of Universe.t * int * Universe.t
   | UEq of Universe.t * Universe.t
   | ULub of Level.t * Level.t
   | UWeak of Level.t * Level.t

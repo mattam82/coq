@@ -653,7 +653,7 @@ val set_eq_instances : ?flex:bool ->
   evar_map -> Univ.Instance.t -> Univ.Instance.t -> evar_map
 
 val check_eq : evar_map -> Univ.Universe.t -> Univ.Universe.t -> bool
-val check_leq : evar_map -> Univ.Universe.t -> Univ.Universe.t -> bool
+val check_leq : evar_map -> Univ.Universe.t -> int -> Univ.Universe.t -> bool
 
 val check_constraints : evar_map -> Univ.Constraint.t -> bool
 

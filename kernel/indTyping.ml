@@ -77,7 +77,7 @@ let check_univ_leq ?(is_real_arg=false) env u info =
     else info
   in
   (* Inductive types provide explicit lifting from SProp to other universes, so allow SProp <= any. *)
-  if Univ.Universe.is_sprop u || UGraph.check_leq (universes env) u ind_univ
+  if Univ.Universe.is_sprop u || UGraph.check_leq (universes env) u 0 ind_univ
   then { info with ind_min_univ = Option.map (Universe.sup u) info.ind_min_univ }
   else if is_impredicative_univ env ind_univ
        && Option.is_empty info.ind_min_univ then { info with ind_squashed = true }
@@ -196,7 +196,7 @@ let unbounded_from_below u cstrs =
   Univ.Constraint.for_all (fun (l, d, r) ->
       match d with
       | Eq -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
-      | Lt | Le -> not (Univ.Level.equal r u))
+      | Le _ -> not (Univ.Level.equal r u))
     cstrs
 
 (* Returns the list [x_1, ..., x_n] of levels contributing to template

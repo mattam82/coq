@@ -12,25 +12,26 @@ open Univ
 open UnivSubst
 
 type t =
-  | ULe of Universe.t * Universe.t
+  | ULe of Universe.t * int * Universe.t
   | UEq of Universe.t * Universe.t
   | ULub of Level.t * Level.t
   | UWeak of Level.t * Level.t
 
 
 let is_trivial = function
-  | ULe (u, v) | UEq (u, v) -> Universe.equal u v
+  | ULe (u, n, v) -> Universe.equal u v && n <= 0
+  | UEq (u, v) -> Universe.equal u v
   | ULub (u, v) | UWeak (u, v) -> Level.equal u v
 
 let subst_univs fn = function
-  | ULe (u, v) ->
+  | ULe (u, n, v) ->
     let u' = subst_univs_universe fn u and v' = subst_univs_universe fn v in
-    if Universe.equal u' v' then None
-    else Some (ULe (u',v'))
+    if Universe.equal u' v' && n <= 0 then None
+    else Some (ULe (u', n, v'))
   | UEq (u, v) ->
     let u' = subst_univs_universe fn u and v' = subst_univs_universe fn v in
     if Universe.equal u' v' then None
-    else Some (ULe (u',v'))
+    else Some (UEq (u', v'))
   | ULub (u, v) ->
     let u' = level_subst_of fn u and v' = level_subst_of fn v in
     if Level.equal u' v' then None
@@ -47,9 +48,12 @@ module Set = struct
 
     let compare x y =
       match x, y with
-      | ULe (u, v), ULe (u', v') ->
+      | ULe (u, n, v), ULe (u', n', v') ->
         let i = Universe.compare u u' in
-        if Int.equal i 0 then Universe.compare v v'
+        if Int.equal i 0 then
+          let i' = Universe.compare v v' in
+            if i' = 0 then Int.compare n n'
+            else i'
         else i
       | UEq (u, v), UEq (u', v') ->
         let i = Universe.compare u u' in
@@ -76,7 +80,7 @@ module Set = struct
     else add cst s
 
   let pr_one = let open Pp in function
-    | ULe (u, v) -> Universe.pr u ++ str " <= " ++ Universe.pr v
+    | ULe (u, n, v) -> Universe.pr u ++ str " " ++ pr_weight_arc (Le n) (Universe.pr v)
     | UEq (u, v) -> Universe.pr u ++ str " = " ++ Universe.pr v
     | ULub (u, v) -> Level.pr u ++ str " /\\ " ++ Level.pr v
     | UWeak (u, v) -> Level.pr u ++ str " ~ " ++ Level.pr v
@@ -111,31 +115,19 @@ let enforce_eq_instances_univs strict x y c =
       ax ay c
 
 let to_constraints ~force_weak g s =
-  let invalid () =
-    raise (Invalid_argument "to_constraints: non-trivial algebraic constraint between universes")
-  in
   let tr cst acc =
     match cst with
     | ULub (l, l') -> Constraint.add (l, Eq, l') acc
     | UWeak (l, l') when force_weak -> Constraint.add (l, Eq, l') acc
     | UWeak  _-> acc
-    | ULe (l, l') ->
-      begin match Universe.level l, Universe.level l' with
-        | Some l, Some l' -> Constraint.add (l, Le, l') acc
-        | None, Some _ -> enforce_leq l l' acc
-        | _, None ->
-          if UGraph.check_leq g l l'
-          then acc
-          else invalid ()
-      end
+    | ULe (l, n, l') ->
+      if UGraph.check_leq g l n l'
+      then acc
+      else enforce_leq l n l' acc
     | UEq (l, l') ->
-      begin match Universe.level l, Universe.level l' with
-        | Some l, Some l' -> Constraint.add (l, Eq, l') acc
-        | None, _ | _, None ->
-          if UGraph.check_eq g l l'
-          then acc
-          else invalid ()
-      end
+      if UGraph.check_eq g l l'
+      then acc
+      else enforce_eq l l' acc
   in
   Set.fold tr s Constraint.empty
 

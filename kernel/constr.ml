@@ -988,7 +988,7 @@ let leq_constr_univs univs m n =
     let eq_sorts s1 s2 = s1 == s2 ||
       UGraph.check_eq univs (Sorts.univ_of_sort s1) (Sorts.univ_of_sort s2) in
     let leq_sorts s1 s2 = s1 == s2 ||
-      UGraph.check_leq univs (Sorts.univ_of_sort s1) (Sorts.univ_of_sort s2) in
+      UGraph.check_leq univs (Sorts.univ_of_sort s1) 0 (Sorts.univ_of_sort s2) in
     let rec eq_constr' nargs m n =
       m == n || compare_head_gen eq_universes eq_sorts eq_constr' nargs m n
     in
@@ -1034,7 +1034,7 @@ let leq_constr_univs_infer univs m n =
       if Sorts.equal s1 s2 then true
       else
         let u1 = Sorts.univ_of_sort s1 and u2 = Sorts.univ_of_sort s2 in
-        if UGraph.check_leq univs u1 u2 then true
+        if UGraph.check_leq univs u1 0 u2 then true
         else
           (try let c, _ = UGraph.enforce_leq_alg u1 u2 univs in
             cstrs := Univ.Constraint.union c !cstrs;

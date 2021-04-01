@@ -27,7 +27,7 @@ val type_in_type : t -> bool
 
 type 'a check_function = t -> 'a -> 'a -> bool
 
-val check_leq : Universe.t check_function
+val check_leq : t -> Universe.t -> int -> Universe.t -> bool
 val check_eq : Universe.t check_function
 val check_eq_level : Level.t check_function
 
@@ -106,7 +106,7 @@ val check_subtype : lbound:Bound.t -> AUContext.t check_function
 
 type node =
 | Alias of Level.t
-| Node of bool LMap.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
+| Node of int LMap.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
 
 val repr : t -> node LMap.t
 

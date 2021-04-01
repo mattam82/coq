@@ -864,7 +864,7 @@ let check_eq univs u u' =
   if not (UGraph.check_eq univs u u') then raise NotConvertible
 
 let check_leq univs u u' =
-  if not (UGraph.check_leq univs u u') then raise NotConvertible
+  if not (UGraph.check_leq univs u 0 u') then raise NotConvertible
 
 let check_sort_cmp_universes env pb s0 s1 univs =
   let open Sorts in
@@ -922,7 +922,7 @@ let infer_eq (univs, cstrs as cuniv) u u' =
     univs, (Univ.enforce_eq u u' cstrs)
 
 let infer_leq (univs, cstrs as cuniv) u u' =
-  if UGraph.check_leq univs u u' then cuniv
+  if UGraph.check_leq univs u 0 u' then cuniv
   else
     let cstrs', _ = UGraph.enforce_leq_alg u u' univs in
       univs, Univ.Constraint.union cstrs cstrs'

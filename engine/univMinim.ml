@@ -49,16 +49,13 @@ let choose_canonical ctx flexible algs s =
               let canon = LSet.choose algs in
                 canon, (global, rigid, LSet.remove canon flexible)
 
-(* Eq < Le < Lt *)
+(* Eq < Le _ *)
 let compare_constraint_type d d' =
   match d, d' with
   | Eq, Eq -> 0
   | Eq, _ -> -1
   | _, Eq -> 1
-  | Le, Le -> 0
-  | Le, _ -> -1
-  | _, Le -> 1
-  | Lt, Lt -> 0
+  | Le n, Le m -> Int.compare n m
 
 type lowermap = constraint_type LMap.t
 
@@ -122,18 +119,15 @@ let compute_lbound left =
     | Some l' -> Some (Universe.sup l l')
   in
     List.fold_left (fun lbound (d, l) ->
-      if d == Le (* l <= ?u *) then sup l lbound
-      else (* l < ?u *)
-        (assert (d == Lt);
-         if not (Universe.level l == None) then
-           sup (Universe.super l) lbound
-         else None))
+      match d with
+      | Le n (* l + n <= ?u *) -> sup (Universe.addn n l) lbound
+      | Eq -> assert false)
       None left
 
 let instantiate_with_lbound u lbound lower ~alg ~enforce (ctx, us, algs, insts, cstrs) =
   if enforce then
     let inst = Universe.make u in
-    let cstrs' = enforce_leq lbound inst cstrs in
+    let cstrs' = enforce_leq lbound 0 inst cstrs in
       (ctx, us, LSet.remove u algs,
        LBMap.add u {enforce;alg;lbound;lower} insts, cstrs'),
       {enforce; alg; lbound=inst; lower}
@@ -164,29 +158,36 @@ let not_lower lower (d,l) =
   Univ.Universe.exists
     (fun (l,i) ->
        let d =
-         if i == 0 then d
+         if Int.equal i 0 then d
          else match d with
-           | Le -> Lt
+           | Le 0 -> Le 1
            | d -> d
        in
        try let d' = LMap.find l lower in
          (* If d is stronger than the already implied lower
           * constraints we must keep it. *)
+        (*FIXME do we have the right order here? *)
          compare_constraint_type d d' > 0
        with Not_found ->
          (* No constraint existing on l *) true) l
 
+let is_le = function
+  | Le 0 -> true
+  | _ -> false
+
+let is_lt = function
+  | Le 1 -> true
+  | _ -> false
+
+
 exception UpperBoundedAlg
 
 (** [enforce_uppers upper lbound cstrs] interprets [upper] as upper
-   constraints to [lbound], adding them to [cstrs].
-
-    @raise UpperBoundedAlg if any [upper] constraints are strict and
-   [lbound] algebraic. *)
+   constraints to [lbound], adding them to [cstrs]. *)
 let enforce_uppers upper lbound cstrs =
   List.fold_left (fun cstrs (d, r) ->
-      if d == Univ.Le then
-        enforce_leq lbound (Universe.make r) cstrs
+      if is_le d then
+        enforce_leq lbound 0 (Universe.make r) cstrs
       else
         match Universe.level lbound with
         | Some lev -> Constraint.add (lev, d, r) cstrs
@@ -281,7 +282,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
     with Not_found -> instance acc u
   in
     LMap.fold (fun u v (ctx, us, algs, seen, cstrs as acc) ->
-      if v == None then fst (aux acc u)
+      if Option.is_empty v then fst (aux acc u)
       else LSet.remove u ctx, us, LSet.remove u algs, seen, cstrs)
       us (ctx, us, algs, lbounds, cstrs)
 
@@ -302,13 +303,13 @@ let normalize_context_set ~lbound g ctx us algs weak =
   let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
   (* Keep the Prop/Set <= i constraints separate for minimization *)
   let smallles, csts =
-    Constraint.partition (fun (l,d,r) -> d == Le && is_minimal ~lbound l) csts
+    Constraint.partition (fun (l,d,r) -> is_le d && is_minimal ~lbound l) csts
   in
   let smallles = if get_set_minimization ()
     then Constraint.filter (fun (l,d,r) -> LMap.mem r us && not (Level.is_sprop l)) smallles
     else Constraint.empty
   in
-  let smallles = Constraint.map (fun (_,_,r) -> Level.set, Le, r) smallles in
+  let smallles = Constraint.map (fun (_,_,r) -> Level.set, Le 0, r) smallles in
   let csts, partition =
     (* We first put constraints in a normal-form: all self-loops are collapsed
        to equalities. *)
@@ -331,8 +332,8 @@ let normalize_context_set ~lbound g ctx us algs weak =
   (* We ignore the trivial Prop/Set <= i constraints. *)
   let noneqs =
     Constraint.filter
-      (fun (l,d,r) -> not ((d == Le && is_bound l lbound) ||
-                           (Level.is_prop l && d == Lt && Level.is_set r)))
+      (fun (l,d,r) -> not ((is_le d && is_bound l lbound) ||
+                           (Level.is_prop l && is_lt d && Level.is_set r)))
       csts
   in
   let noneqs = Constraint.union noneqs smallles in
@@ -364,7 +365,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
          LMap.add a (Some (Universe.make b)) us,
          UGraph.enforce_constraint (a,Eq,b) g)
       in
-      if UGraph.check_constraint g (u,Le,v) || UGraph.check_constraint g (v,Le,u)
+      if UGraph.check_constraint g (u,Le 0,v) || UGraph.check_constraint g (v,Le 0,u)
       then acc
       else
       if LMap.mem u us
@@ -379,8 +380,10 @@ let normalize_context_set ~lbound g ctx us algs weak =
     let norm = level_subst_of (normalize_univ_variable_opt_subst us) in
     Constraint.fold (fun (u,d,v) noneqs ->
         let u = norm u and v = norm v in
-        if d != Lt && Level.equal u v then noneqs
-        else Constraint.add (u,d,v) noneqs)
+        match d with
+        | Le n when n <= 0 && Level.equal u v -> noneqs
+        | Eq when Level.equal u v -> noneqs
+        | _ -> Constraint.add (u,d,v) noneqs)
       noneqs Constraint.empty
   in
   (* Compute the left and right set of flexible variables, constraints
