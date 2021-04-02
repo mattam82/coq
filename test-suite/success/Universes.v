@@ -1,11 +1,103 @@
-(*Module myset.
+Polymorphic Section leleeq.
+  Universe u v.
+  Print Universes "file.dot".
+  Constraint u <= v.
+  Print Universes "file.dot".
+  Constraint v <= u.
+  Print Universes "file.dot".
+End leleeq.
+
+Polymorphic Section leqset'.
+  Universe u.
+  Print Universes "file.dot".
+  Constraint u <= Set.
+  Print Universes "file.dot".
+  Fail Constraint Set <= Prop.
+  Print Universes "file.dot".
+  Fail Constraint u <= Prop.
+  Print Universes "file.dot".
+End leqset'.
+
+Polymorphic Section leleeq'.
+  Universe u v w.
+  Print Universes "file.dot".
+  Constraint u  <= v + 1.
+  Print Universes "file.dot".
+  Constraint u <= Set+1.
+  Print Universes "file.dot".
+
+  Constraint v + 1 <= u.
+  Print Universes "file.dot".
+  Fail Constraint v + 2 <= u.
+  Print Universes "file.dot".
+End leleeq'.
+
+Polymorphic Section leqset.
+  Universe u.
+  Print Universes "file.dot".
+  Constraint u <= Set.
+  Print Universes "file.dot".
+  Check ((fun x : Type@{u} => x) : forall (_ : Set), Set).
+End leqset.
+
+Polymorphic Section leq2scompat.
+  Universe u v.
+  Print Universes "file.dot".
+  Constraint u <= v.
+  Constraint v <= Set.
+  Print Universes "file.dot".
+End leq2scompat.
+
+Polymorphic Section eqset.
+  Universe u.
+  Print Universes "file.dot".
+  Constraint u <= Set+1.
+  Print Universes "file.dot".
+  Constraint Set+1 <= u.
+  Print Universes "file.dot".
+
+
+Universe u v w.
+  Constraint u <= v.
+  Constraint v <= w.
+  Print Universes "file.dot".
+  Constraint Set+1 = u.
+  Print Universes "file.dot".
+
+  Constraint Set+1 <= v.
+  Print Universes "file.dot".
+  Fail Constraint Set = v.
+  Fail Constraint Set = w.
+  Constraint Set+1 = w.
+  Print Universes "file.dot".
+
+
+
+  Constraint Set <= u.
+  Print Universes "file.dot".
+  Constraint u <= Set+1.
+  Print Universes "file.dot".
+  Constraint w <= Set+2.
+  Print Universes "file.dot".
+
+
+  Constraint w <= Set+2.
+  Print Universes "file.dot".
+  Constraint w <= Prop.
+  Print Universes "file.dot".
+
+End leleeq.
+
+
+Module myset.
   Universe myset.
   Universe u.
   Print Universes "file.dot".
   Constraint myset <= Set+1.
-  Set Printing Universes.
   Print Universes "file.dot".
-  Fail Constraint u + 1 <= myset.
+  Constraint u + 1 <= myset.
+  Print Universes "file.dot".
+
 End myset.*)
 
 Module Big.

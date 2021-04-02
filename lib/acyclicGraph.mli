@@ -20,6 +20,8 @@ module type Point = sig
 
   module Constraint : CSet.S with type elt = (t * constraint_type * t)
 
+  val source : t
+
   val equal : t -> t -> bool
   val compare : t -> t -> int
 
@@ -68,8 +70,8 @@ module Make (Point:Point) : sig
   type node =
   | Alias of Point.t * int (* A node v s.t. u = v + n *)
   | Node of int Point.Map.t (* Nodes v s.t. u + n <= v *)
-    * int Point.Map.t
-  type repr = node Point.Map.t
+    * Point.Set.t (* Nodes lower than u in the same component *)
+  type repr = (int * node) Point.Map.t
   val repr : t -> repr
 
 end

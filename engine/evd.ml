@@ -1093,7 +1093,7 @@ let interp_constraint evd u1 n u2 =
   let cstr = match n with
     | Univ.Le n -> UnivProblem.ULe (u1, n, u2)
     | Univ.Eq n -> UnivProblem.UEq (Univ.Universe.addn n u1, u2)
-  in UnivProblem.to_constraints ~force_weak:true (universes evd) (UnivProblem.Set.singleton cstr)
+  in UnivProblem.to_constraints ~force_weak:true ~enforce:true (universes evd) (UnivProblem.Set.singleton cstr)
 
 let update_sigma_univs ugraph evd =
   { evd with universes = UState.update_sigma_univs evd.universes ugraph }

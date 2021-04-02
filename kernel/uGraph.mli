@@ -106,13 +106,13 @@ val check_subtype : lbound:Bound.t -> AUContext.t check_function
 
 type node =
 | Alias of Level.t * int
-| Node of int LMap.t * int LMap.t
+| Node of int LMap.t * LSet.t
 
-val repr : t -> node LMap.t
+val repr : t -> (int * node) LMap.t
 
 (** {6 Pretty-printing of universes. } *)
 
-val pr_universes : (Level.t -> Pp.t) -> node LMap.t -> Pp.t
+val pr_universes : (Level.t -> Pp.t) -> (int * node) LMap.t -> Pp.t
 
 (** {6 Debugging} *)
 val check_universes_invariants : t -> unit

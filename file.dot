@@ -1,0 +1,6 @@
+digraph universes {
+  "Set" -> "Prop" [style=bold, dir = back, arrowhead=crow, label=" 1"];
+  "u" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "v" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "w" -> "Set" [style=solid, dir = back, arrowhead=crow];
+}

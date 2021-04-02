@@ -4966,7 +4966,7 @@ let constr_eq ~strict x y =
     let evd = Tacmach.New.project gl in
       match EConstr.eq_constr_universes env evd x y with
       | Some csts ->
-        let csts = UnivProblem.to_constraints ~force_weak:false (Evd.universes evd) csts in
+        let csts = UnivProblem.to_constraints ~force_weak:false ~enforce:(not strict) (Evd.universes evd) csts in
         if strict then
           if Evd.check_constraints evd csts then Proofview.tclUNIT ()
           else

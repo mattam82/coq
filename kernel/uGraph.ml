@@ -16,6 +16,8 @@ module G = AcyclicGraph.Make(struct
     module Map = LMap
     module Constraint = Constraint
 
+    let source = Level.set
+
     let equal = Level.equal
     let compare = Level.compare
 
@@ -231,6 +233,10 @@ let pr_pmap sep pr map =
   let cmp (u,_) (v,_) = Level.compare u v in
   Pp.prlist_with_sep sep pr (List.sort cmp (LMap.bindings map))
 
+let pr_pset sep pr map =
+  let cmp = Level.compare in
+  Pp.prlist_with_sep sep pr (List.sort cmp (LSet.elements map))
+
 let pr_incr n =
   let open Pp in
   if Int.equal n 0 then mt()
@@ -239,27 +245,27 @@ let pr_incr n =
 
 let pr_arc prl = let open Pp in
   function
-  | u, G.Node (ltle, gtge) ->
-    if LMap.is_empty ltle && LMap.is_empty gtge then mt ()
+  | u, (uw, G.Node (ltle, gtge)) ->
+    if LMap.is_empty ltle && LSet.is_empty gtge then mt ()
     else
-      prl u ++ str " " ++
+      prl u ++ pr_incr uw ++ str " " ++
       v 0
         (pr_pmap spc (fun (v, weight) -> pr_weight_arc (Le weight) (prl v))
             ltle) ++
       v 0
-        (pr_pmap spc (fun (v, weight) -> prl v ++ pr_weight_arc (Le weight) (prl u))
+        (pr_pset spc (fun v -> prl v ++ pr_weight_arc (Le 0) (prl u))
             gtge) ++
       fnl ()
-  | u, G.Alias (v, n) ->
-    if n < 0 then
-      prl u  ++ pr_incr (-n) ++ str " = " ++ prl v ++ fnl ()
+  | u, (uw, G.Alias (v, vw)) -> (* u + uw = v + n *)
+    if (vw - uw) < 0 then
+      prl v  ++ str " = " ++ prl u ++ pr_incr (uw - vw) ++ fnl ()
     else
-      prl u  ++ str " = " ++ prl v ++pr_incr n ++ fnl ()
+      prl u  ++ str " = " ++ prl v ++ pr_incr (vw - uw) ++ fnl ()
 
 
 type node = G.node =
 | Alias of Level.t * int
-| Node of int LMap.t * int LMap.t
+| Node of int LMap.t * LSet.t
 
 let repr g = G.repr g.graph
 

@@ -43,8 +43,10 @@ type 'a constraint_function = 'a -> 'a -> Set.t -> Set.t
 val enforce_eq_instances_univs : bool -> Instance.t constraint_function
 
 (** With [force_weak] UWeak constraints are turned into equalities,
-   otherwise they're forgotten. *)
-val to_constraints : force_weak:bool -> UGraph.t -> Set.t -> Constraint.t
+   otherwise they're forgotten.
+   With enforce, we enforce the constraints whether they are already implied or not.
+   *)
+val to_constraints : force_weak:bool -> enforce:bool -> UGraph.t -> Set.t -> Constraint.t
 
 (** [eq_constr_univs_infer_With kind1 kind2 univs m n] is a variant of
     {!eq_constr_univs_infer} taking kind-of-term functions, to expose

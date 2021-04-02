@@ -652,9 +652,9 @@ module Env = struct
     match EConstr.eq_constr_universes_proj env sigma x y with
     | Some csts -> (
       let csts =
-        UnivProblem.to_constraints ~force_weak:false (Evd.universes sigma) csts
+        UnivProblem.to_constraints ~force_weak:false ~enforce:false (Evd.universes sigma) csts
       in
-      match Evd.add_constraints sigma csts with
+      match Evd.add_constraints sigma  csts with
       | sigma -> Some (env, sigma)
       | exception Univ.UniverseInconsistency _ -> None )
     | None -> None
