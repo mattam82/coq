@@ -23,6 +23,29 @@ Polymorphic Section leleeq'.
   Print Universes "file.dot".
   Constraint u  <= v + 1.
   Print Universes "file.dot".
+  Constraint v  <= w.
+  Print Universes "file.dot".
+  Constraint w <= v+1.
+  Print Universes "file.dot".
+  Constraint v < w.
+  Fail Constraint w + 1 <= v + 1.
+  Print Universes "file.dot".
+End leleeq'.
+
+Polymorphic Section leleeq'.
+  Universe u v w k k'.
+  Print Universes "file.dot".
+  Constraint w + 2 <= u.
+  Print Universes "file.dot".
+  Constraint v <= u + 1.
+  Print Universes "file.dot".
+  Constraint u < k.
+  Print Universes "file.dot".
+  Constraint k' <= u + 1.
+  Print Universes "file.dot".
+  Constraint k <= u + 1.
+
+
   Constraint u <= Set+1.
   Print Universes "file.dot".
 

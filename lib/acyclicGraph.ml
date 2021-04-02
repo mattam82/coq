@@ -16,6 +16,8 @@ module type Point = sig
   module Set : CSig.SetS with type elt = t
   module Map : CMap.ExtS with type key = t and module Set := Set
 
+  module IMap : CMap.ExtS with type key = t * int
+
   module Constraint : CSet.S with type elt = (t * constraint_type * t)
 
   val source : t
@@ -69,8 +71,8 @@ module Make (Point:Point) = struct
     val empty : table
     val fresh : Point.t -> table -> t * table
     val fresh_alias : Point.t -> int -> table -> t * table
-    val mem : Point.t -> table -> bool
-    val find : Point.t -> table -> t
+    val mem : Point.t * int -> table -> bool
+    val find : Point.t * int -> table -> t
     val repr : t -> table -> Point.t * int
   end =
   struct
@@ -82,34 +84,34 @@ module Make (Point:Point) = struct
     type table = {
       tab_len : int;
       tab_fwd : (Point.t * int) Int.Map.t;
-      tab_bwd : int Point.Map.t
+      tab_bwd : int Point.IMap.t
     }
 
     let empty = {
       tab_len = 0;
       tab_fwd = Int.Map.empty;
-      tab_bwd = Point.Map.empty;
+      tab_bwd = Point.IMap.empty;
     }
-    let mem x t = Point.Map.mem x t.tab_bwd
-    let find x t = Point.Map.find x t.tab_bwd
+    let mem x t = Point.IMap.mem x t.tab_bwd
+    let find x t = Point.IMap.find x t.tab_bwd
     let repr n t = Int.Map.find n t.tab_fwd
 
     let fresh x t =
-      let () = assert (not @@ mem x t) in
+      let () = assert (not @@ mem (x, 0) t) in
       let n = t.tab_len in
       n, {
         tab_len = n + 1;
         tab_fwd = Int.Map.add n (x, 0) t.tab_fwd;
-        tab_bwd = Point.Map.add x n t.tab_bwd;
+        tab_bwd = Point.IMap.add (x, 0) n t.tab_bwd;
       }
 
     let fresh_alias x w t =
-      let () = assert (mem x t) in
+      let () = assert (mem (x, w) t) in
       let n = t.tab_len in
       n, {
         tab_len = n + 1;
         tab_fwd = Int.Map.add n (x, w) t.tab_fwd;
-        tab_bwd = t.tab_bwd;
+        tab_bwd = Point.IMap.add (x, w) n t.tab_bwd;
       }
 
   end
@@ -123,9 +125,9 @@ module Make (Point:Point) = struct
   (** The weights are always non_negative, we use an alias to ensure it *)
   type natural = int
 
-  let natural x =
+  (* let natural x =
     assert (0 <= x);
-    x
+    x *)
 
   (* Comparison on this type is pointer equality *)
   type canonical_node =
@@ -145,7 +147,7 @@ module Make (Point:Point) = struct
 
   type entry =
     | Canonical of canonical_node
-    | Equiv of Index.t * int
+    | Equiv of Index.t
 
   type t =
     { entries : entry PMap.t;
@@ -176,13 +178,13 @@ module Make (Point:Point) = struct
   (* Low-level function : makes u an alias for v + weight.
      Does not removes edges from n_edges, but decrements n_nodes.
      u should be entered as canonical before.  *)
-  let enter_equiv g u weight v =
+  let enter_equiv g u v =
     { entries =
         PMap.modify u (fun _ a ->
             match a with
             | Canonical n ->
               n.status <- NoMark;
-              Equiv (v, weight)
+              Equiv v
             | _ -> assert false) g.entries;
       index = g.index;
       n_nodes = g.n_nodes - 1;
@@ -205,16 +207,13 @@ module Make (Point:Point) = struct
                  g.entries }
 
   (* canonical representative : we follow the Equiv links *)
-  let rec repr g ?(w=0) u =
+  let rec repr g u =
     match PMap.find u g.entries with
-    | Equiv (v, w') -> repr g ~w:(w + w') v
-    | Canonical arc -> (arc, w)
+    | Equiv v -> repr g v
+    | Canonical arc -> arc
     | exception Not_found ->
       CErrors.anomaly ~label:"Univ.repr"
         Pp.(str"Universe " ++ Point.pr (fst (Index.repr u g.table)) ++ str" undefined.")
-
-  let repr_weight g u w =
-    repr g ~w u
 
   let shift_pmap k m =
     PMap.map (fun weight -> weight + k) m
@@ -227,14 +226,14 @@ module Make (Point:Point) = struct
     if Int.equal w 0 then arc.gtge
     else shift_pmap (- w) arc.gtge  *)
 
-  let repr_node g ?w u =
-    repr ?w g (Index.find u g.table)
+  let repr_node g ?(w=0) u =
+    repr g (Index.find (u, w) g.table)
 
   exception AlreadyDeclared
 
   (* Reindexes the given point, using the next available index. *)
   let use_index g u =
-    let u, w = repr g u in
+    let u = repr g u in
     let g = change_node g { u with ilvl = g.index } in
     assert (g.index > min_int);
     { g with index = g.index - 1 }
@@ -666,7 +665,7 @@ module Make (Point:Point) = struct
 
   exception Undeclared of Point.t
   let check_declared g us =
-    let check l = if not (Index.mem l g.table) then raise (Undeclared l) in
+    let check l = if not (Index.mem (l, 0) g.table) then raise (Undeclared l) in
     Point.Set.iter check us
 
   exception Found_explanation of (constraint_type * Point.t) list
@@ -811,36 +810,19 @@ module Make (Point:Point) = struct
     let idx, table = Index.fresh_alias p w g.table in
     { g with table }, idx
 
-  let make_alias g u w =
+  let make_successor g u w =
+    Feedback.msg_debug Pp.(str"Making successor of : " ++ pr_can_weight g (u, 0) ++ str " of weight " ++ pr_incr w);
     let p, w' = Index.repr u.canon g.table in
     let g, u' = fresh_alias g p (w + w') in
-    let ltle =
-      PMap.add u' 1  (fun weight ->
-        (* u + weight <= x -> (u' - w) + weight <= x <-> u' + (weight - w) <= x )*)
-        natural (weight - w))
-        u.ltle
-    in
-    let gtge, u, g = get_gtge g u in
-    let foldgt v g =
-      let canv, vw = repr g v in
-      let vltle, v, g = get_ltle g canv in
-      try
-        let vltle = PMap.modify u.canon (fun _ucanon weight ->
-        (* canv + vw + weight <= u <-> canv + vw + weight + w <= u'.
-           This can introduce another negative weight path *)
-           let weight' = weight + w in
-           if weight' < 0 then assert false
-           else weight') vltle
-          in change_node g { v with ltle = vltle }
-      with Not_found -> assert false
-    in
-    let g = PSet.fold foldgt gtge g in
-    let g, canu' = add_node u' ~ltle g in
-    Feedback.msg_debug Pp.(str"Inserting equivalence : " ++ pr_can_weight g (u, 0) ++ str" = " ++
-      pr_can_weight g (canu', 0) ++ pr_incr (-w));
-    let g = enter_equiv g u.canon (-w) u' in
-    let g = change_node g { canu' with ltle } in
-    g, canu'
+    let ltle = PMap.add u' w u.ltle in (* u + w <= u' *)
+    let g = change_node g { u with ltle } in
+    let g, canu' = add_node u' g in
+    Feedback.msg_debug Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
+      pr_can_weight g (canu', 0) ++ pr_incr (w));
+    (* let g = enter_equiv g u.canon (-w) u' in *)
+    let gtge = PSet.add u.canon canu'.gtge in
+    let g = change_node g { canu' with gtge } in
+    { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 1 }, canu'
 
   (* insert_edge u w v adds an edge u + w <= v *)
   let insert_edge w u v g =
@@ -852,14 +834,14 @@ module Make (Point:Point) = struct
       (* If we want to insert an arc of negative weight, we rather make an alias
         u' of u - w and replace u with u' + w everywhere. Then we can add u' <= v.
       *)
-      (Feedback.msg_debug Pp.(str"Building alias for " ++ pr_can_weight g (v, -w));
-      let g, canu' = make_alias g v (-w) in
-      let src, src_weight = repr_node g Point.source in
+      (let vn = v in Feedback.msg_debug Pp.(str"Building alias for " ++ pr_can_weight g (vn, -w));
+      let g, canv' = make_successor g v (-w) in
+      let src, src_weight = repr_node g (Point.source, 0) in
       Feedback.msg_debug Pp.(str"Source is represented by " ++ pr_can_weight g (src, src_weight));
       let () = assert (src_weight = 0) in
-      Feedback.msg_debug Pp.(str"Alias represents " ++ pr_can_weight g (canu', 0));
-      let g = insert_edge 0 src canu' g in
-      insert_edge 0 canu' v g)
+      Feedback.msg_debug Pp.(str"Alias represents " ++ pr_can_weight g (canv', 0));
+      let g = insert_edge 0 src canv' g in
+      insert_edge 0 u canv' g)
 
   (* enforce_eq g u n v will force u + n = v if possible, will fail otherwise *)
 
@@ -996,8 +978,8 @@ module Make (Point:Point) = struct
         ) g.entries; None
       with Found v -> Some v
 
-  type node = Alias of Point.t * int | Node of int Point.Map.t * Point.Set.t
-  type repr = (int * node) Point.Map.t
+  type node = Alias of Point.t * int | Node of int Point.IMap.t * Point.Set.t
+  type repr = node Point.IMap.t
 
   let repr g =
     let fold u n accu =
@@ -1006,8 +988,8 @@ module Make (Point:Point) = struct
       | Canonical n ->
         let fold v weight accu =
           let v, vw = Index.repr v g.table in
-          Point.Map.add v (vw + weight) accu in
-        let ltle = PMap.fold fold n.ltle Point.Map.empty in
+          Point.IMap.add (v, vw) weight accu in
+        let ltle = PMap.fold fold n.ltle Point.IMap.empty in
         let fold u accu = Point.Set.add (fst (Index.repr u g.table)) accu in
         let gtge = PSet.fold fold n.gtge Point.Set.empty in
         Node (ltle, gtge)
@@ -1015,8 +997,8 @@ module Make (Point:Point) = struct
         let v, vw = Index.repr v g.table in
         Alias (v, vw + n)
       in
-      Point.Map.add pu (uw, n) accu
+      Point.IMap.add (pu, uw) n accu
     in
-    PMap.fold fold g.entries Point.Map.empty
+    PMap.fold fold g.entries Point.IMap.empty
 
 end

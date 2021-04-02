@@ -10,10 +10,12 @@
 
 open Univ
 
+module ILMap = HMap.Make (LevelExpr)
 module G = AcyclicGraph.Make(struct
     type t = Level.t
     module Set = LSet
     module Map = LMap
+    module IMap = ILMap
     module Constraint = Constraint
 
     let source = Level.set
@@ -230,8 +232,8 @@ let check_universes_invariants g = G.check_invariants ~required_canonical:Level.
 (** Pretty-printing *)
 
 let pr_pmap sep pr map =
-  let cmp (u,_) (v,_) = Level.compare u v in
-  Pp.prlist_with_sep sep pr (List.sort cmp (LMap.bindings map))
+  let cmp (u,_) (v,_) = LevelExpr.compare u v in
+  Pp.prlist_with_sep sep pr (List.sort cmp (ILMap.bindings map))
 
 let pr_pset sep pr map =
   let cmp = Level.compare in
@@ -243,30 +245,29 @@ let pr_incr n =
   else if n < 0 then str"- " ++ int (-n)
   else str"+ " ++ int n
 
-let pr_arc prl = let open Pp in
+let pr_arc (prl : Univ.Level.t -> Pp.t) = let open Pp in
   function
-  | u, (uw, G.Node (ltle, gtge)) ->
-    if LMap.is_empty ltle && LSet.is_empty gtge then mt ()
+  | (u, uw), G.Node (ltle, gtge) ->
+    if ILMap.is_empty ltle && LSet.is_empty gtge then mt ()
     else
       prl u ++ pr_incr uw ++ str " " ++
       v 0
-        (pr_pmap spc (fun (v, weight) -> pr_weight_arc (Le weight) (prl v))
+        (pr_pmap spc (fun ((v, vw), weight) -> pr_weight_arc (Le weight) (prl v ++ pr_incr vw))
             ltle) ++
       v 0
         (pr_pset spc (fun v -> prl v ++ pr_weight_arc (Le 0) (prl u))
             gtge) ++
       fnl ()
-  | u, (uw, G.Alias (v, vw)) -> (* u + uw = v + n *)
+   | (u, uw), G.Alias (v, vw) -> (* u + uw = v + n *)
     if (vw - uw) < 0 then
       prl v  ++ str " = " ++ prl u ++ pr_incr (uw - vw) ++ fnl ()
     else
       prl u  ++ str " = " ++ prl v ++ pr_incr (vw - uw) ++ fnl ()
 
-
 type node = G.node =
 | Alias of Level.t * int
-| Node of int LMap.t * LSet.t
+| Node of int ILMap.t * LSet.t
 
 let repr g = G.repr g.graph
 
-let pr_universes prl g = pr_pmap Pp.mt (pr_arc prl) g
+let pr_universes (prl : Univ.Level.t -> Pp.t) g = pr_pmap Pp.mt (pr_arc prl) g

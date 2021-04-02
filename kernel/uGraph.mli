@@ -104,15 +104,17 @@ val check_subtype : lbound:Bound.t -> AUContext.t check_function
 
 (** {6 Dumping} *)
 
+module ILMap : CMap.ExtS with type key = LevelExpr.t
+
 type node =
 | Alias of Level.t * int
-| Node of int LMap.t * LSet.t
+| Node of int ILMap.t * LSet.t
 
-val repr : t -> (int * node) LMap.t
+val repr : t -> node ILMap.t
 
 (** {6 Pretty-printing of universes. } *)
 
-val pr_universes : (Level.t -> Pp.t) -> (int * node) LMap.t -> Pp.t
+val pr_universes : (Level.t -> Pp.t) -> node ILMap.t -> Pp.t
 
 (** {6 Debugging} *)
 val check_universes_invariants : t -> unit

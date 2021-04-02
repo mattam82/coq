@@ -17,6 +17,7 @@ module type Point = sig
 
   module Set : CSig.SetS with type elt = t
   module Map : CMap.ExtS with type key = t and module Set := Set
+  module IMap : CMap.ExtS with type key = t * int
 
   module Constraint : CSet.S with type elt = (t * constraint_type * t)
 
@@ -69,9 +70,9 @@ module Make (Point:Point) : sig
 
   type node =
   | Alias of Point.t * int (* A node v s.t. u = v + n *)
-  | Node of int Point.Map.t (* Nodes v s.t. u + n <= v *)
+  | Node of int Point.IMap.t (* Nodes v s.t. u + n <= v *)
     * Point.Set.t (* Nodes lower than u in the same component *)
-  type repr = (int * node) Point.Map.t
+  type repr = node Point.IMap.t
   val repr : t -> repr
 
 end

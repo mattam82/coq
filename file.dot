@@ -1,6 +1,14 @@
 digraph universes {
   "Set" -> "Prop" [style=bold, dir = back, arrowhead=crow, label=" 1"];
   "u" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "u+ 1" -> "Set" [style=solid, dir = back, arrowhead=crow];
   "v" -> "Set" [style=solid, dir = back, arrowhead=crow];
   "w" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "k" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "k'" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "u+ 1" -> "u" [style=bold, dir = back, arrowhead=crow, label=" 1"];
+  "k" -> "u" [style=bold, dir = back, arrowhead=crow, label=" 1"];
+  "u+ 1" -> "v" [style=solid, dir = back, arrowhead=crow];
+  "u" -> "w" [style=bold, dir = back, arrowhead=crow, label=" 2"];
+  "u+ 1" -> "k'" [style=solid, dir = back, arrowhead=crow];
 }

@@ -312,17 +312,18 @@ let print_registered () =
 let dump_universes output g =
   let open Univ in
   let dump_arc u = function
-    | uw, UGraph.Node (ltle, gtge) ->
-      Univ.LMap.iter (fun v weight ->
+    | UGraph.Node (ltle, gtge) ->
+      UGraph.ILMap.iter (fun v weight ->
           let typ = Le weight in
-          output typ (u, uw) v) ltle;
+          output typ u v) ltle;
       (* Univ.LMap.iter (fun v weight ->
         let typ = Le (-weight) in
         output typ u v) gtge; *)
-    | uw, UGraph.Alias (v, n) ->
-      output (Eq n) (u, uw) v
+    | UGraph.Alias (v, n) ->
+      output (Eq n) u (v, 0)
   in
-  Univ.LMap.iter dump_arc g
+  UGraph.ILMap.iter dump_arc g
+
 let add_incr s n =
   if Int.equal n 0 then s
   else if n < 0 then s ^ "- " ^ string_of_int (-n)
@@ -334,18 +335,19 @@ let dump_universes_gen prl g s =
     if Filename.check_suffix s ".dot" || Filename.check_suffix s ".gv" then begin
       (* the lazy unit is to handle errors while printing the first line *)
       let init = lazy (Printf.fprintf output "digraph universes {\n") in
-      begin fun kind (left, leftw) right ->
+      begin fun kind (left, leftw) (right, rightw) ->
         let () = Lazy.force init in
         let left = add_incr left leftw in
+        let right = add_incr right rightw in
         match kind with
           | Univ.Le 0 ->
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=solid, dir = back, arrowhead=crow];\n" right left
-          | Univ.Le n when n > 0 ->
+          | Univ.Le n ->(* when n > 0 -> *)
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold, dir = back, arrowhead=crow, label=\" %i\"];\n"
             right left n
-          | Univ.Le n ->
+          (* | Univ.Le n ->
               Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold, dir = back, arrowhead=crow, label=\" %i\"];\n"
-              (add_incr right n) left 0
+              (add_incr right n) left 0 *)
           | Univ.Eq n ->
             Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed, dir = both, label=\" %s\"];\n" left right
               (left ^ "=" ^ add_incr right n)
@@ -354,8 +356,9 @@ let dump_universes_gen prl g s =
         close_out output
       end
     end else begin
-      begin fun kind (left, leftw) right ->
+      begin fun kind (left, leftw) (right, rightw) ->
         let left = add_incr left leftw in
+        let right = add_incr right rightw in
         let kind = match kind with
           | Univ.Le n when n > 0 -> "+" ^ string_of_int n ^ "<=" (* FIXME *)
           | Univ.Le n -> "<=" ^ string_of_int (-n) ^ "+ "
@@ -365,7 +368,7 @@ let dump_universes_gen prl g s =
       end, (fun () -> close_out output)
     end
   in
-  let output_constraint k (l, wl) r = output_constraint k (prl l, wl) (prl r) in
+  let output_constraint k (l, wl) (r, wr) = output_constraint k (prl l, wl) (prl r, wr) in
   try
     dump_universes output_constraint g;
     close ();
@@ -392,59 +395,61 @@ let universe_subgraph ?loc kept univ =
   let univ = LSet.fold add kept UGraph.initial_universes in
   UGraph.merge_constraints csts univ
 
-let sort_universes (g : (int * UGraph.node) Univ.LMap.t) =
+let _sort_universes (g : UGraph.node UGraph.ILMap.t) =
   let open Univ in
-  let rec normalize u w = match LMap.find u g with
-  | uw, UGraph.Alias (u, n) -> normalize u (uw + w + n)
-  | uw, UGraph.Node _ -> (u, uw + w)
+  let open UGraph in
+  let rec normalize u : LevelExpr.t = match ILMap.find u g with
+  | (UGraph.Alias (u, n)) -> normalize (LevelExpr.addn n (u, 0))
+  | (UGraph.Node _) -> u
   in
-  let get_next u = match LMap.find u g with
-  | uw, UGraph.Alias _ -> assert false (* nodes are normalized *)
-  | uw, UGraph.Node (ltle, gtge) -> uw, ltle
+  let get_next u = match UGraph.ILMap.find u g with
+  | (UGraph.Alias _) -> assert false (* nodes are normalized *)
+  | (UGraph.Node (ltle, gtge)) -> ltle
   in
   (* Compute the longest chain of Lt constraints from Set to any universe *)
   let rec traverse accu todo = match todo with
   | [] -> accu
-  | (u, n) :: todo ->
-    let u', n = normalize u n in
-    let () = assert (Level.equal u' u) in
-    let n = match LMap.find u accu with
+  | u :: todo ->
+    let (_, n as u') = normalize u in
+    let () = assert (LevelExpr.equal u' u) in
+    let n' = match ILMap.find u accu with
     | m -> if m < n then Some n else None
     | exception Not_found -> Some n
     in
-    match n with
+    match n' with
     | None -> traverse accu todo
-    | Some n ->
-      let accu = LMap.add u n accu in
-      let uw, next = get_next u in
+    | Some n' ->
+      let accu = UGraph.ILMap.add u n' accu in
+      let next = get_next u in
       let fold v weight todo =
-        let v, n' = normalize v weight in
+        let v, n' = normalize (LevelExpr.addn weight v) in
         (v, n' + n) :: todo
       in
-      let todo = LMap.fold fold next todo in
+      let todo = UGraph.ILMap.fold fold next todo in
       traverse accu todo
   in
   (* Only contains normalized nodes *)
-  let levels = traverse LMap.empty [normalize Level.set 0] in
-  let max_level = LMap.fold (fun _ n accu -> max n accu) levels 0 in
+  let levels = traverse ILMap.empty [normalize (Level.set, 0)] in
+  let max_level = ILMap.fold (fun _ n accu -> max n accu) levels 0 in
   let dummy_mp = Names.DirPath.make [Names.Id.of_string "Type"] in
   let ulevels = Array.init max_level (fun i -> Level.(make (UGlobal.make dummy_mp i))) in
   let ulevels = Array.cons Level.set ulevels in
   (* Add the normal universes *)
   let fold (cur, ans) u =
-    let ans = LMap.add cur (0, UGraph.Node (LMap.singleton u 1, LSet.empty)) ans in
+    let u = (u, 0) in
+    let ans = ILMap.add cur (0, UGraph.Node (ILMap.singleton u 1, LSet.empty)) ans in
     (u, ans)
   in
-  let _, ans = Array.fold_left fold (Level.prop, LMap.empty) ulevels in
+  let _, ans = Array.fold_left fold (LevelExpr.prop, ILMap.empty) ulevels in
   (* Add alias pointers *)
   let fold u _ ans =
-    if Level.is_small u then ans
+    if LevelExpr.is_small u then ans
     else
-      let un, weight = normalize u 0 in
-      let n = LMap.find un levels in
-      LMap.add u (0, UGraph.Alias (ulevels.(n), weight)) ans
+      let un = normalize u in
+      let n = ILMap.find un levels in
+      ILMap.add u (0, UGraph.Alias (ulevels.(n), snd un)) ans
   in
-  LMap.fold fold g ans
+  ILMap.fold fold g ans
 
 let print_universes ?loc ~sort ~subgraph dst =
   let univ = Global.universes () in
@@ -453,7 +458,7 @@ let print_universes ?loc ~sort ~subgraph dst =
     | Some g -> universe_subgraph ?loc g univ
   in
   let univ = UGraph.repr univ in
-  let univ = if sort then sort_universes univ else univ in
+  let univ = (*if sort then sort_universes univ else*) univ in
   let pr_remaining =
     if Global.is_joined_environment () then mt ()
     else str"There may remain asynchronous universe constraints"

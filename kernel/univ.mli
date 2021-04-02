@@ -75,7 +75,7 @@ sig
 end
 module LevelExpr :
 sig
-  type t
+  type t = Level.t * int
   (** Type of universe level expressions: a level + an increment. *)
 
   val set : t
