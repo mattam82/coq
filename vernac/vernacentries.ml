@@ -349,8 +349,9 @@ let dump_universes_gen prl g s =
               Printf.fprintf output "  \"%s\" -> \"%s\" [style=bold, dir = back, arrowhead=crow, label=\" %i\"];\n"
               (add_incr right n) left 0 *)
           | Univ.Eq n ->
-            Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed, dir = both, label=\" %s\"];\n" left right
-              (left ^ "=" ^ add_incr right n)
+            Printf.fprintf output "  \"%s\" -> \"%s\" [style=dashed, dir = both, label=\" %s\"];\n" left
+              (add_incr right n)
+              "="
       end, begin fun () ->
         if Lazy.is_val init then Printf.fprintf output "}\n";
         close_out output

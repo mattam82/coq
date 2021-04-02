@@ -135,6 +135,7 @@ module Make (Point:Point) = struct
       ltle: natural PMap.t;  (* canon + n <= x
             > 0: strict (lt) constraint.
             = 0: weak  (le) constraint. *)
+      succ: Index.t option;
       gtge: PSet.t;
       rank : int;
       klvl: int;
@@ -480,7 +481,7 @@ module Make (Point:Point) = struct
           pr_can_weight g (a, n) ++ str " <= " ++ pr_can_weight g (a, weighta));
         (* There is a lt edge inside the new component. This is a
             "bad cycle". *)
-        if n > weighta then raise CycleDetected
+        if n > 0 then raise CycleDetected
         else PMap.remove a.canon accu
       | exception Not_found -> accu
     in
@@ -639,6 +640,7 @@ module Make (Point:Point) = struct
     let node = {
       canon = v;
       ltle = PMap.empty;
+      succ = None;
       gtge = PSet.empty;
       rank;
       klvl = 0;
@@ -803,41 +805,70 @@ module Make (Point:Point) = struct
     let idx, table = Index.fresh_alias p w g.table in
     { g with table }, idx
 
-  let get_alias g p w =
-    try g, Index.find (p, w) g.table
-    with Not_found -> fresh_alias g p w
+  let find_alias g p w =
+    Index.find (p, w) g.table
 
-  let make_successor g u w =
+  (* let insert_successor_edge w u v g =
+    if w <= 0 then g
+    else (match u.succ with
+      | Some succ ->
+        aux (w - 1) (repr g succ) v g
+      | None -> g) *)
+
+  let insert_edge w u v g =
+    let rec aux w u v g =
+      (let vn = v in
+      Feedback.msg_debug Pp.(str"Inserting edge : " ++ pr_can g u ++pr_incr w ++ str" <= " ++ pr_can g vn));
+      let g = insert_edge w u v g in
+      if w <= 0 then g
+      else (match u.succ with
+        | Some succ ->
+          Feedback.msg_debug Pp.(str"Found successor");
+          aux (w - 1) (repr g succ) v g
+        | None -> g)
+    in aux w u v g
+
+  let find_successor g u w =
     Feedback.msg_debug Pp.(str"Making successor of : " ++ pr_can_weight g (u, 0) ++ str " of weight " ++ pr_incr w);
     let p, w' = Index.repr u.canon g.table in
-    let g, u' = get_alias g p (w + w') in
-    let ltle = PMap.add u' w u.ltle in (* u + w <= u' *)
-    let g = change_node g { u with ltle } in
-    let g, canu' = add_node u' g in
-    Feedback.msg_debug Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
-      pr_can_weight g (canu', 0) ++ pr_incr (w));
-    (* let g = enter_equiv g u.canon (-w) u' in *)
-    let gtge = PSet.add u.canon canu'.gtge in
-    let g = change_node g { canu' with gtge } in
-    { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 1 }, canu'
+    try
+      let u' = find_alias g p (w + w') in
+      g, repr g u'
+    with Not_found ->
+      let g, u' = fresh_alias g p (w + w') in
+      let ltle = PMap.add u' w u.ltle in (* u + w <= u' *)
+      let g, canu' = add_node u' g in
+      let g = change_node g { u with ltle; succ = Some canu'.canon } in
+      Feedback.msg_debug Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
+        pr_can_weight g (canu', 0) ++ pr_incr (w));
+      let gtge = PSet.add u.canon canu'.gtge in
+      let g = change_node g { canu' with gtge } in
+      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 1 } in
+      let g =
+        PMap.fold (fun v weight g ->
+          if weight > 0 then
+            insert_edge (weight-1) (repr g canu'.canon) (repr g v) g
+          else g)
+          u.ltle g
+      in g, repr g canu'.canon
 
   (* insert_edge u w v adds an edge u + w <= v *)
   let insert_edge w u v g =
     Feedback.msg_debug (let vn = v in
     Pp.(str"Inserting edge of weight " ++ int w ++ str " between " ++
     pr_can_weight g (u, 0) ++ str" and " ++ pr_can_weight g (vn, 0)));
-    if w >= 0 then insert_edge w u v g
-    else
-      (* If we want to insert an arc of negative weight, we rather make an alias
+    if w = 0 then insert_edge w u v g
+    else if w < 0 then
+      (* If we want to insert an arc of positive weight, we rather make an alias
         u' of u - w and replace u with u' + w everywhere. Then we can add u' <= v.
       *)
-      (let vn = v in Feedback.msg_debug Pp.(str"Building alias for " ++ pr_can_weight g (vn, -w));
-      let g, canv' = make_successor g v (-w) in
-      let src = repr_node g Point.source in
-      Feedback.msg_debug Pp.(str"Source is represented by " ++ pr_can g src);
+      (let g, canv' = find_successor g v (-w) in
       Feedback.msg_debug Pp.(str"Alias represents " ++ pr_can g canv');
-      let g = insert_edge 0 src canv' g in
       insert_edge 0 u canv' g)
+    else
+      (let g, canu' = find_successor g u w in
+      Feedback.msg_debug Pp.(str"Alias represents " ++ pr_can g canu');
+      insert_edge 0 canu' v g)
 
   (* enforce_eq g u n v will force u + n = v if possible, will fail otherwise *)
 

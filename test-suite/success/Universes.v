@@ -20,6 +20,14 @@ End leqset'.
 
 Polymorphic Section leleeq'.
   Universe u v w.
+  Constraint v <= w.
+  Constraint v+1 <= w.
+  Print Universes "file.dot".
+  Constraint w <= v.
+  Print Universes "file.dot".
+
+Polymorphic Section leleeq'.
+  Universe u v w.
   Print Universes "file.dot".
   Constraint u  <= v + 1.
   Print Universes "file.dot".
@@ -28,14 +36,26 @@ Polymorphic Section leleeq'.
   Constraint w <= v+1.
   Print Universes "file.dot".
   Constraint v < w.
-  Fail Constraint w + 1 <= v + 1.
   Print Universes "file.dot".
+  Constraint w <= v.
+  Print Universes "file.dot".
+
 End leleeq'.
 
-Polymorphic Section leleeq'.
-  Universe u v w k k'.
+Polymorphic Section succtheory.
+  Universe u v w x.
   Print Universes "file.dot".
-  Constraint w + 2 <= u.
+  Constraint u + 1 <= w.
+  Print Universes "file.dot".
+  Constraint x <= u + 1.
+  Print Universes "file.dot".
+  (* Constraint u <= v.
+  Constraint v <= u. *)
+  Print Universes "file.dot".
+  Constraint u+1 = x.
+  Print Universes "file.dot".
+
+  Constraint w <= u+1.
   Print Universes "file.dot".
   Constraint v <= u + 1.
   Print Universes "file.dot".
