@@ -2666,7 +2666,7 @@ let interp_univ_constraints env evd cstrs =
     let evd, ul = interp_universe evd u in
     let evd, u'l = interp_universe evd u' in
     try
-      let cstr = Evd.interp_constraint evd ul d u'l in
+      let cstr = Evd.interp_constraint evd ~enforce:true ul d u'l in
       Evd.add_constraints evd cstr, Univ.Constraint.union cstr cstrs
     with Univ.UniverseInconsistency e as exn ->
       let _, info = Exninfo.capture exn in

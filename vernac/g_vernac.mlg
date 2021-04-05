@@ -206,7 +206,7 @@ let test_variance_ident =
 (* Gallina declarations *)
 GRAMMAR EXTEND Gram
   GLOBAL: gallina gallina_ext thm_token def_token assumption_token def_body of_type
-    record_field decl_notations fix_definition ident_decl univ_decl;
+    record_field decl_notations fix_definition ident_decl univ_decl univ_constraint;
 
   gallina:
       (* Definition, Theorem, Variable, Axiom, ... *)
@@ -247,7 +247,7 @@ GRAMMAR EXTEND Gram
           { VernacPrimitive(id, r, typopt) }
       | IDENT "Universe"; l = LIST1 identref -> { VernacUniverse l }
       | IDENT "Universes"; l = LIST1 identref -> { VernacUniverse l }
-      | IDENT "Constraint"; l = LIST1 univ_constraint SEP "," -> { VernacConstraint l }
+      | IDENT "Constraint"; l = LIST1 univ_constraint SEP "," -> { VernacConstraint (Enforce, l) }
   ] ]
   ;
   register_token:
@@ -958,7 +958,9 @@ GRAMMAR EXTEND Gram
           { VernacRemoveOption ([table], v) } ]]
   ;
   query_command: (* TODO: rapprocher Eval et Check *)
-    [ [ IDENT "Eval"; r = red_expr; "in"; c = lconstr; "." ->
+    [ [ IDENT "Check"; IDENT "Constraint"; l = LIST1 univ_constraint SEP ","; "." ->
+        { fun g -> VernacConstraint (Check, l) }
+      | IDENT "Eval"; r = red_expr; "in"; c = lconstr; "." ->
           { fun g -> VernacCheckMayEval (Some r, g, c) }
       | IDENT "Compute"; c = lconstr; "." ->
           { fun g -> VernacCheckMayEval (Some (Genredexpr.CbvVm None), g, c) }

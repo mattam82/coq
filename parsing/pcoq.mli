@@ -154,6 +154,7 @@ module Prim :
     val name : lname Entry.t
     val identref : lident Entry.t
     val univ_decl : universe_decl_expr Entry.t
+    val univ_constraint : univ_constraint_expr Entry.t
     val ident_decl : ident_decl Entry.t
     val pattern_ident : lident Entry.t
     val pattern_identref : lident Entry.t [@@ocaml.deprecated "Use Prim.pattern_identref"]

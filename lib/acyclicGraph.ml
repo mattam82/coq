@@ -24,11 +24,14 @@ module type Point = sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
 
-  type explanation = (constraint_type * t) list
+  type explanation = (constraint_type * (t * int)) list
   val error_inconsistency : constraint_type -> t -> t -> explanation lazy_t option -> 'a
 
   val pr : t -> Pp.t
 end
+
+let debug_universes str = ()
+  (* Feedback.msg_debug str *)
 
 module Make (Point:Point) = struct
 
@@ -123,7 +126,7 @@ module Make (Point:Point) = struct
   type status = NoMark | Visited of int | ToMerge of int
 
   (** The weights are always non_negative, we use an alias to ensure it *)
-  type natural = int
+  (* type natural = int *)
 
   (* let natural x =
     assert (0 <= x);
@@ -132,11 +135,10 @@ module Make (Point:Point) = struct
   (* Comparison on this type is pointer equality *)
   type canonical_node =
     { canon: Index.t;
-      ltle: natural PMap.t;  (* canon + n <= x
-            > 0: strict (lt) constraint.
-            = 0: weak  (le) constraint. *)
-      succ: Index.t option;
-      gtge: PSet.t;
+      le: PSet.t; (* weak  (le) constraint. *)
+      succ: Index.t option; (* Successor *)
+      pred : Index.t option; (* Predecessor *)
+      ge: PSet.t;
       rank : int;
       klvl: int;
       ilvl: int;
@@ -216,9 +218,6 @@ module Make (Point:Point) = struct
       CErrors.anomaly ~label:"Univ.repr"
         Pp.(str"Universe " ++ Point.pr (fst (Index.repr u g.table)) ++ str" undefined.")
 
-  let shift_pmap k m =
-    PMap.map (fun weight -> weight + k) m
-
   let repr_node g ?(w=0) u =
     repr g (Index.find (u, w) g.table)
 
@@ -249,42 +248,37 @@ module Make (Point:Point) = struct
     PMap.iter (fun l u ->
         match u with
         | Canonical u ->
-          PMap.iter (fun v _strict ->
+          PSet.iter (fun v ->
               incr n_edges;
               let v = repr g v in
               assert (topo_compare u v = -1);
               if u.klvl = v.klvl then
-                assert (PSet.mem u.canon v.gtge ||
-                        PSet.exists (fun l -> u == repr g l) v.gtge))
-            u.ltle;
+                assert (PSet.mem u.canon v.ge ||
+                        PSet.exists (fun l -> u == repr g l) v.ge))
+            u.le;
           PSet.iter (fun v ->
               let v = repr g v in
               assert (v.klvl = u.klvl &&
-                      (PMap.mem u.canon v.ltle ||
-                       PMap.exists (fun l _ -> u == repr g l) v.ltle))
-            ) u.gtge;
+                      (PSet.mem u.canon v.le ||
+                       PSet.exists (fun l -> u == repr g l) v.le))
+            ) u.ge;
           assert (u.status = NoMark);
           assert (Index.equal l u.canon);
           assert (u.ilvl > g.index);
-          assert (not (PMap.mem u.canon u.ltle));
+          assert (not (PSet.mem u.canon u.le));
           incr n_nodes
         | Equiv _ -> assert (not (required_canonical l)))
       g.entries;
     assert (!n_edges = g.n_edges);
     assert (!n_nodes = g.n_nodes)
 
-  let add_pmap_min u weightu v map =
-    match PMap.find v map with
-    | exception Not_found -> PMap.add u weightu map
-    | weightv -> PMap.add u (min weightu weightv) (PMap.remove v map)
-
-  let clean_ltle g ltle =
-    PMap.fold (fun u weight acc ->
+  let clean_le g le =
+    PSet.fold (fun u acc ->
         let un = repr g u in
         let uu = un.canon in
         if Index.equal uu u then acc
-        else (add_pmap_min uu weight u (fst acc), true))
-      ltle (ltle, false)
+        else (PSet.add uu (PSet.remove u (fst acc)), true))
+      le (le, false)
 
   let clean_gtge g gtge =
     PSet.fold (fun u acc ->
@@ -294,28 +288,34 @@ module Make (Point:Point) = struct
         else PSet.add uu (PSet.remove u (fst acc)), true)
       gtge (gtge, false)
 
+  let clean_opt g p =
+    Option.Smart.map (fun u -> (repr g u).canon) p
+
   (* [get_ltle] and [get_gtge] return ltle and gtge arcs.
      Moreover, if one of these lists is dirty (e.g. points to a
      non-canonical node), these functions clean this node in the
      graph by removing some duplicate edges *)
   let get_ltle g u =
-    let ltle, chgt_ltle = clean_ltle g u.ltle in
-    if not chgt_ltle then u.ltle, u, g
+    let le, chgt_ltle = clean_le g u.le in
+    let succ = clean_opt g u.succ in
+    if not chgt_ltle && succ == u.succ then
+      u.succ, u.le, u, g
     else
-      let sz = PMap.cardinal u.ltle in
-      let sz2 = PMap.cardinal ltle in
-      let u = { u with ltle } in
+      let sz = PSet.cardinal u.le in
+      let sz2 = PSet.cardinal le in
+      let u = { u with le; succ } in
       let g = change_node g u in
       let g = { g with n_edges = g.n_edges + sz2 - sz } in
-      u.ltle, u, g
+      u.succ, u.le, u, g
 
   let get_gtge g u =
-    let gtge, chgt_gtge = clean_gtge g u.gtge in
-    if not chgt_gtge then u.gtge, u, g
+    let ge, chgt_ge = clean_gtge g u.ge in
+    let pred = clean_opt g u.pred in
+    if not chgt_ge && pred == u.pred then u.pred, u.ge, u, g
     else
-      let u = { u with gtge } in
+      let u = { u with ge; pred } in
       let g = change_node g u in
-      u.gtge, u, g
+      u.pred, u.ge, u, g
 
   (* [revert_graph] rollbacks the changes made to mutable fields in
      nodes in the graph.
@@ -347,7 +347,12 @@ module Make (Point:Point) = struct
       (min (float_of_int g.n_edges ** 0.5)
          (float_of_int g.n_nodes ** (2./.3.)))
 
-  (* x = u, weight = -1, u.gtge = [v -> 1, Set -> 1] *)
+  let add_opt x s =
+    match x with
+    | Some x -> PSet.add x s
+    | None -> s
+
+  (* x = u, weight = -1, u.ge = [v -> 1, Set -> 1] *)
   let rec backward_traverse to_revert b_traversed count g x =
     let x = repr g x in
     let count = count - 1 in
@@ -357,11 +362,11 @@ module Make (Point:Point) = struct
     end;
     let visit to_revert =
       x.status <- Visited 0;
-      let gtge, x, g = get_gtge g x in
+      let gt, ge, x, g = get_gtge g x in
       let to_revert, b_traversed, count, g =
         PSet.fold (fun y (to_revert, b_traversed, count, g) ->
             backward_traverse to_revert b_traversed count g y)
-          gtge (to_revert, b_traversed, count, g)
+          (add_opt gt ge) (to_revert, b_traversed, count, g)
       in
       to_revert, x.canon::b_traversed, count, g
     in
@@ -374,20 +379,21 @@ module Make (Point:Point) = struct
     let y = repr g y in
     if y.klvl < v_klvl then begin
       let y = { y with klvl = v_klvl;
-                       gtge = if x == y then PSet.empty
-                         else PSet.singleton x.canon }
+                       ge = if x == y then PSet.empty
+                         else PSet.singleton x.canon;
+                       pred = None }
       in
       let g = change_node g y in
-      let ltle, y, g = get_ltle g y in
+      let lt, le, y, g = get_ltle g y in
       let f_traversed, g =
-        PMap.fold (fun z weightz (f_traversed, g) ->
+        PSet.fold (fun z (f_traversed, g) ->
             forward_traverse f_traversed g v_klvl y z)
-          ltle (f_traversed, g)
+          (add_opt lt le) (f_traversed, g)
       in
       y.canon::f_traversed, g
     end else if y.klvl = v_klvl && x != y then
       let g = change_node g
-          { y with gtge = PSet.add x.canon y.gtge } in
+          { y with ge = PSet.add x.canon y.ge } in
       f_traversed, g
     else f_traversed, g
 
@@ -407,15 +413,15 @@ module Make (Point:Point) = struct
     let p, w = Index.repr n.canon g.table in
     Pp.(Point.pr p ++ pr_incr (w + weight))
   let pr_to_merge g =
-    Pp.(prlist_with_sep pr_comma (pr_can_weight g))
+    Pp.(prlist_with_sep pr_comma (pr_can g))
   let pr_edges g map =
-    let fold k weight acc =
+    let fold k acc =
       let vn = repr g k in
       let open Pp in
-      hov 2 (str"..." ++ pr_incr weight ++ str " <= " ++ pr_can g vn ++ fnl()) ++
+      hov 2 (str"..." ++ str " <= " ++ pr_can g vn ++ fnl()) ++
       spc () ++ acc
     in
-    Index.Map.fold fold map (Pp.mt())
+    Index.Set.fold fold map (Pp.mt())
 
   let pr_edges_inv g map =
   let fold k acc =
@@ -434,12 +440,13 @@ module Make (Point:Point) = struct
         begin u.status <- ToMerge 0; true, to_revert end
       else
         begin
-          Feedback.msg_debug Pp.(str"In visit to merge, looking at " ++ pr_can g u);
-          Feedback.msg_debug Pp.(str " gtge = " ++ pr_edges_inv g u.gtge);
+          debug_universes Pp.(str"In visit to merge, looking at " ++ pr_can g u);
+          debug_universes Pp.(str " gtge = " ++ pr_edges_inv g (add_opt u.pred u.ge));
           let merge, to_revert = PSet.fold
               (fun y (merge, to_revert) ->
                 let merge', to_revert = find_to_merge to_revert g y v in
-                 merge' || merge, to_revert) u.gtge (false, to_revert)
+                 merge' || merge, to_revert)
+                 (add_opt u.pred u.ge) (false, to_revert)
           in
           u.status <- if merge then ToMerge 0 else Visited 0;
           merge, to_revert
@@ -455,45 +462,54 @@ module Make (Point:Point) = struct
   (* let max_union k w w' = Some (max w w') *)
   (* let min_union k w w' = Some (min w w') *)
 
-  let get_new_edges g weight to_merge =
+  let get_new_edges g succ to_merge =
     (* Computing edge sets. *)
-    let ltle =
-      let fold acc (n, weightn) =
-        let fold u weightu acc =
-          match PMap.find u acc with
-          | n -> (* Already a path from the component to u *)
-            if n >= weightu then acc
-            else PMap.add u weightu acc
-          | exception Not_found -> PMap.add u weightu acc
-        in
-        PMap.fold fold (shift_pmap weightn n.ltle) acc
-      in
+    let lt, le =
       match to_merge with
       | [] -> assert false
-      | (hd, weighthd) :: tl -> List.fold_left fold (shift_pmap weighthd hd.ltle) tl
+      | hd :: tl ->
+        let les acc n =
+          PSet.union n.le acc
+        in
+        let le = List.fold_left les hd.le tl in
+        let le, _ =  clean_le g le in
+        let lts acc n =
+          match n.succ with
+          | Some succ -> PSet.add succ acc
+          | None -> acc
+        in
+        let lt = List.fold_left lts (Option.cata PSet.singleton PSet.empty hd.succ) tl in
+        lt, le
     in
-    let ltle, _ = clean_ltle g ltle in
-    Feedback.msg_debug Pp.(str" new edges: " ++ pr_edges g ltle);
-    let fold accu (a, weighta) =
-      match PMap.find a.canon ltle with
-      | n ->
-        Feedback.msg_debug Pp.(str"Cycle detection: " ++
-          pr_can_weight g (a, n) ++ str " <= " ++ pr_can_weight g (a, weighta));
+    debug_universes Pp.(str" new le edges: " ++ pr_edges g le);
+    debug_universes Pp.(str" new successor edges: " ++ pr_edges g lt);
+    let fold accu a =
+      if PSet.mem a.canon lt then
+        (debug_universes Pp.(str"Cycle detection: positive weight loop on " ++ pr_can g a);
         (* There is a lt edge inside the new component. This is a
             "bad cycle". *)
-        if n > 0 then raise CycleDetected
-        else PMap.remove a.canon accu
-      | exception Not_found -> accu
+        raise CycleDetected)
+      else if PSet.mem a.canon le then
+        PSet.remove a.canon accu
+      else accu
     in
-    let ltle = List.fold_left fold ltle to_merge in
-    Feedback.msg_debug Pp.(str" after checking for cycles: " ++ pr_edges g ltle);
+    let le = List.fold_left fold le to_merge in
+    debug_universes Pp.(str" after checking for cycles: " ++ pr_edges g le);
     let gtge =
-      List.fold_left (fun acc (n, weight) -> PSet.union acc n.gtge)
+      List.fold_left (fun acc n-> PSet.union acc n.ge)
         PSet.empty to_merge
     in
     let gtge, _ = clean_gtge g gtge in
-    let gtge = List.fold_left (fun acc (n, _) -> PSet.remove n.canon acc) gtge to_merge in
-    (ltle, gtge)
+    let gtge = List.fold_left (fun acc n -> PSet.remove n.canon acc) gtge to_merge in
+    let lt, lts =
+      if PSet.is_empty lt then None, lt
+      else (match succ with
+        | Some s -> succ, PSet.remove s lt
+        | None ->
+          let can = PSet.choose lt in
+          Some can, PSet.remove can lt)
+    in
+    (lt, lts, le, gtge)
 
   let is_to_merge = function
     | ToMerge _ -> true
@@ -501,16 +517,24 @@ module Make (Point:Point) = struct
 
   let get_to_merge u =
     match u.status with
-    | ToMerge w -> Some (u, w)
+    | ToMerge w -> Some u
     | _ -> None
 
   let pr_index g i = pr_can g (repr g i)
+
+  let opt_size = function
+  | Some _ -> 1
+  | None -> 0
+
+  let opt_to_set = function
+  | None -> PSet.empty
+  | Some v -> PSet.singleton v
 
   let reorder g u v =
     (* STEP 2: backward search in the k-level of u. *)
     let delta = get_delta g in
     let vn = v in
-    Feedback.msg_debug Pp.(str"reordering: u = " ++
+    debug_universes Pp.(str"reordering: u = " ++
       pr_index g u ++ str" and v = " ++
       pr_index g vn);
 
@@ -555,31 +579,34 @@ module Make (Point:Point) = struct
       else [], b_traversed, f_traversed
     in
     let () =
-      Feedback.msg_debug Pp.(str"Found to merge: " ++ hov 0 (pr_to_merge g to_merge))
+      debug_universes Pp.(str"Found to merge: " ++ hov 0 (pr_to_merge g to_merge))
     in
     let to_reindex, g =
       match to_merge with
       | [] -> List.rev_append f_reindex b_reindex, g
       | n0::q0 ->
         (* Computing new root. *)
-        let (root, weight), rank_rest =
-          List.fold_left (fun (((best, _bestweight), _rank_rest) as acc) (n, weight as node) ->
-              if n.rank >= best.rank then node, best.rank else acc)
+        let root, rank_rest =
+          List.fold_left (fun ((best, _rank_rest) as acc) n ->
+              if n.rank >= best.rank then n, best.rank else acc)
             (n0, min_int) q0
         in
-        Feedback.msg_debug Pp.(str"Chosen new root: " ++ pr_can_weight g (root, weight));
-        let ltle, gtge = get_new_edges g weight to_merge in
+        debug_universes Pp.(str"Chosen new root: " ++ pr_can g root);
+        let succ, lts, le, ge = get_new_edges g root.succ to_merge in
         (* Inserting the new root. *)
-        Feedback.msg_debug Pp.(str"Inserting new root with edges: ltle = " ++ pr_edges g ltle ++ spc () ++ str " gtge = " ++ pr_edges_inv g gtge);
+        debug_universes Pp.(str"Inserting new root with edges: le = " ++ pr_edges g le ++ spc () ++ str " ge = " ++ pr_edges_inv g ge
+          ++ str" succ = " ++ pr_edges g (opt_to_set succ));
         let g = change_node g
-            { root with ltle; gtge;
+            { root with le; ge; succ;
                         rank = max root.rank (rank_rest + 1); }
         in
-
+        let lts' = List.map (repr g) (PSet.elements lts) in
+        debug_universes Pp.(str"Successors to update: " ++ pr_to_merge g lts');
         (* Inserting shortcuts for old nodes. *)
-        let g = List.fold_left (fun g (n,_) ->
-            if Index.equal n.canon root.canon then g else
-              (Feedback.msg_debug Pp.(str"Inserting equivalence : " ++ pr_can g n ++
+        let g = List.fold_left (fun g n ->
+            if Index.equal n.canon root.canon then g
+            else
+              (debug_universes Pp.(str"Inserting equivalence : " ++ pr_can g n ++
               str " = " ++ pr_can g root);
               enter_equiv g n.canon root.canon))
             g to_merge
@@ -587,10 +614,10 @@ module Make (Point:Point) = struct
 
         (* Updating g.n_edges *)
         let oldsz =
-          List.fold_left (fun sz u -> sz+PMap.cardinal (fst u).ltle)
+          List.fold_left (fun sz u -> sz+PSet.cardinal u.le)
             0 to_merge
         in
-        let sz = PMap.cardinal ltle in
+        let sz = PSet.cardinal le + opt_size succ + PSet.cardinal lts in
         let g = { g with n_edges = g.n_edges + sz - oldsz } in
 
         (* Not clear in the paper: we have to put the newly
@@ -604,7 +631,7 @@ module Make (Point:Point) = struct
 
   (* Assumes [u] and [v] are already in the graph. *)
   (* Does NOT assume that ucan != vcan. *)
-  let insert_edge weight ucan vcan g =
+  let insert_le ucan vcan g =
     try
       let u = ucan.canon and v = vcan.canon in
       (* STEP 1: do we need to reorder nodes ? *)
@@ -613,21 +640,16 @@ module Make (Point:Point) = struct
       (* STEP 6: insert the new edge in the graph. *)
       let u = repr g u in
       let v = repr g v in
-      if u == v then
-        if weight > 0 then raise CycleDetected else g
+      if u == v then g
       else
         let g =
-          try let oldweight = PMap.find v.canon u.ltle in
-            if weight > oldweight then
-              change_node g { u with ltle = PMap.add v.canon weight u.ltle }
-            else g
-          with Not_found ->
-            { (change_node g { u with ltle = PMap.add v.canon weight u.ltle })
+          if PSet.mem v.canon u.le then g
+          else { (change_node g { u with le = PSet.add v.canon u.le })
               with n_edges = g.n_edges + 1 }
         in
-        if u.klvl <> v.klvl || PSet.mem u.canon v.gtge then g
+        if u.klvl <> v.klvl || PSet.mem u.canon v.ge then g
         else
-          let v = { v with gtge = PSet.add u.canon v.gtge } in
+          let v = { v with ge = PSet.add u.canon v.ge } in
           change_node g v
     with
     | CycleDetected as e -> raise e
@@ -636,52 +658,85 @@ module Make (Point:Point) = struct
       let () = cleanup_marks g in
       raise e
 
-  let add_node ?(rank=0) ?(ltle=PMap.empty) ?(gtge=PSet.empty) v g =
+  (*let rec insert_eq ucan vcan g =
+    if ucan == vcan then g
+    else let g = insert_le ucan vcan g in
+      insert_le vcan ucan g
+
+  and insert_le ucan vcan g =
+    let g, succ = insert_le_succ ucan vcan g in
+    match succ with
+    | None -> g
+    | Some (succ, succs) ->
+      List.fold_right (insert_eq (repr g succ)) succs g*)
+
+  let add_node ?(rank=0) ?succ ?pred v g =
+    let klvl = match pred with Some u -> (repr g u).klvl + 1 | None -> 0 in
     let node = {
       canon = v;
-      ltle = PMap.empty;
-      succ = None;
-      gtge = PSet.empty;
+      le = PSet.empty;
+      succ;
+      ge = PSet.empty;
+      pred;
       rank;
-      klvl = 0;
+      klvl;
       ilvl = g.index;
       status = NoMark;
     }
     in
     let entries = PMap.add v (Canonical node) g.entries in
-    { entries; index = g.index - 1; n_nodes = g.n_nodes + 1; n_edges = g.n_edges; table = g.table }, node
+    { entries; index = g.index - 1; n_nodes = g.n_nodes + 1;
+      n_edges = g.n_edges + opt_size succ + opt_size pred; table = g.table }, node
 
-  let add ?(rank=0) v g =
+  let add ?(rank=0) ?pred v g =
     if Index.mem (v,0) g.table then raise AlreadyDeclared
     else
       let () = assert (g.index > min_int) in
       let v, table = Index.fresh v g.table in
-      fst (add_node ~rank v { g with table })
+      let pred = Option.map (fun p -> Index.find (p, 0) table) pred in
+      let g, node = add_node ~rank ?pred v { g with table } in
+      match pred with
+      | None -> g
+      | Some pred ->
+        change_node g { (repr g pred) with succ = Some node.canon }
 
   exception Undeclared of Point.t
   let check_declared g us =
     let check l = if not (Index.mem (l, 0) g.table) then raise (Undeclared l) in
     Point.Set.iter check us
 
-  exception Found_explanation of (constraint_type * Point.t) list
+  exception Found_explanation of (constraint_type * (Point.t * int)) list
 
-  let repr_expl g idx =
+  let repr_expl_left g idx =
     let can = repr g idx in
     let expl =
       if can.canon == idx then []
       else
         let p, w = Index.repr can.canon g.table in
-        [(Eq w, p)]
+        [(Eq 0, (p, w))]
+    in
+    can, expl
+  let repr_expl_right g idx =
+    let can = repr g idx in
+    let expl =
+      if can.canon == idx then None
+      else
+        let p, w = Index.repr idx g.table in
+        Some (p, w)
     in
     can, expl
 
   let get_explanation u v weight g =
-    let v, explv = repr_expl g (Index.find (v, 0) g.table) in
+    let vidx = Index.find (v, 0) g.table in
+    let uidx = Index.find (u, 0) g.table in
+    (let vp = v in debug_universes Pp.(str "Looking for path from: " ++ Point.pr u ++ str " to " ++ Point.pr vp ++ str " of weight " ++
+     pr_incr weight));
+    let v, explv = repr_expl_left g vidx in
     let visited_strict = ref PMap.empty in
     let rec traverse weight u =
       if u == v then
-        (Feedback.msg_debug Pp.(str "found: " ++ pr_can_weight g (u, 0) ++ str " weight is" ++ pr_incr weight);
-        if weight > 0 then Some [] else None)
+        (debug_universes Pp.(str "found: " ++ pr_can_weight g (u, 0) ++ str " weight is" ++ pr_incr weight);
+        if weight >= 0 then Some [] else None)
       else if topo_compare u v = 1 then None
       else
         let visited =
@@ -691,31 +746,36 @@ module Make (Point:Point) = struct
         in
         if visited then None
         else begin
-          visited_strict := PMap.add u.canon weight !visited_strict;
+          visited_strict := PMap.add u.canon 0 !visited_strict;
           try
-            PMap.iter (fun u' weightu' ->
-                Feedback.msg_debug Pp.(str "traversing: " ++ pr_repr_weight g (u', 0) ++ str "->" ++ pr_incr weightu' ++ str " weight is " ++ pr_incr weight);
-                let canu', explu' = repr_expl g u' in
-                match traverse (weight - weightu') canu' with
-                | None -> ()
-                | Some exp ->
-                  let pu', wu' = Index.repr canu'.canon g.table in
-                  let typ = Le (wu' + weightu') in
-                  let expl = (typ, pu') in
-                  let expleq = List.append explu' (expl :: exp) in
-                  raise (Found_explanation expleq))
-              u.ltle;
+            let visit weight u' =
+              debug_universes Pp.(str "traversing: " ++ pr_repr_weight g (u', 0) ++ str" weight is " ++ int weight);
+              let canu', explu' = repr_expl_right g u' in
+              match traverse weight canu' with
+              | None -> ()
+              | Some exp ->
+                let pu'', wu'' = Index.repr canu'.canon g.table in
+                let typ = Le weight in
+                let expleq =
+                  match explu' with
+                  | None -> (typ, (pu'', wu'')) :: exp
+                  | Some (pu', wu') -> (typ, (pu', wu')) :: (Eq 0, (pu'', wu'')) :: exp
+                in
+                raise (Found_explanation expleq)
+            in
+            Option.iter (visit 1) u.succ;
+            PSet.iter (visit 0) u.le;
             None
           with Found_explanation exp -> Some exp
         end
     in
-    let u, explu = repr_expl g (Index.find (u, 0) g.table) in
+    let u, explu = repr_expl_left g uidx in
     let make_expl exp =
       List.append explu (List.append exp explv)
     in
     if u == v then
       let p, w = Index.repr v.canon g.table in
-      make_expl [Eq w, p]
+      make_expl [Eq 0, (p, w)]
     else match traverse weight u with Some exp -> make_expl exp | None -> assert false
 
   let get_explanation u v vn g =
@@ -742,20 +802,17 @@ module Make (Point:Point) = struct
             if u.status = NoMark then u::to_revert else to_revert
           in
           u.status <- Visited weight;
-          if try let w' = PMap.find v.canon u.ltle in
-              w' >= weight
-            with Not_found -> false
-          then raise (Found to_revert)
+          if PSet.mem v.canon u.le then raise (Found to_revert)
           else
             begin
+              let visit weight u next_todo =
+                let u = repr g u in
+                if u == v && weight >= 0 then raise (Found to_revert)
+                else if topo_compare u v = 1 then next_todo
+                else (u, weight)::next_todo
+              in
               let next_todo =
-                PMap.fold (fun u weightu next_todo ->
-                    let u = repr g u in
-                    let weight = weight - weightu in
-                    if u == v && weight >= 0 then raise (Found to_revert)
-                    else if topo_compare u v = 1 then next_todo
-                    else (u, weight)::next_todo)
-                  u.ltle next_todo
+                PSet.fold (visit weight) u.le (Option.fold_right (visit (succ weight)) u.succ next_todo)
               in
               loop to_revert todo next_todo
             end
@@ -815,60 +872,128 @@ module Make (Point:Point) = struct
         aux (w - 1) (repr g succ) v g
       | None -> g) *)
 
-  let insert_edge w u v g =
+  (* let insert_edge_le u v g =
     let rec aux w u v g =
       (let vn = v in
-      Feedback.msg_debug Pp.(str"Inserting edge : " ++ pr_can g u ++pr_incr w ++ str" <= " ++ pr_can g vn));
+      debug_universes Pp.(str"Inserting edge : " ++ pr_can g u ++pr_incr w ++ str" <= " ++ pr_can g vn));
       let g = insert_edge w u v g in
       if w <= 0 then g
       else (match u.succ with
         | Some succ ->
-          Feedback.msg_debug Pp.(str"Found successor");
+          debug_universes Pp.(str"Found successor");
           aux (w - 1) (repr g succ) v g
         | None -> g)
-    in aux w u v g
+    in aux w u v g *)
+
+  let rec find_succ g (p, w) u k =
+    match u.succ with
+    | Some s ->
+      if k = 1 then g, repr g s
+      else (* w > 1 *)
+        find_succ g (p, w + 1) (repr g s) (k - 1)
+    | None ->
+      let g, u' = fresh_alias g p (w + 1) in
+      let g, canu' = add_node u' ~pred:u.canon g in
+      let u = { u with succ = Some canu'.canon } in
+      let g = change_node g u in
+      debug_universes Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
+        pr_can_weight g (canu', 0));
+      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 2 } in
+      find_succ g (p, w) u k
+  let rec find_pred g (p, w) u k =
+    match u.pred with
+    | Some s ->
+      if k = -1 then g, repr g s
+      else (* w > 1 *)
+        find_pred g (p, w - 1) (repr g s) (k + 1)
+    | None ->
+      let g, u' = fresh_alias g p (w - 1) in
+      let g, canu' = add_node u' ~succ:u.canon g in
+      let u = { u with pred = Some canu'.canon } in
+      let g = change_node g u in
+      debug_universes Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
+        pr_can_weight g (canu', 0));
+      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 2 } in
+      find_pred g (p, w) u k
 
   let find_successor g u w =
-    Feedback.msg_debug Pp.(str"Making successor of : " ++ pr_can_weight g (u, 0) ++ str " of weight " ++ pr_incr w);
+    debug_universes Pp.(str"Making successor of : " ++ pr_can_weight g (u, 0) ++ str " of weight " ++ pr_incr w);
     let p, w' = Index.repr u.canon g.table in
     try
       let u' = find_alias g p (w + w') in
       g, repr g u'
-    with Not_found ->
-      let g, u' = fresh_alias g p (w + w') in
-      let ltle = PMap.add u' w u.ltle in (* u + w <= u' *)
-      let g, canu' = add_node u' g in
-      let g = change_node g { u with ltle; succ = Some canu'.canon } in
-      Feedback.msg_debug Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
-        pr_can_weight g (canu', 0) ++ pr_incr (w));
-      let gtge = PSet.add u.canon canu'.gtge in
-      let g = change_node g { canu' with gtge } in
-      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 1 } in
-      let g =
-        PMap.fold (fun v weight g ->
-          if weight > 0 then
-            insert_edge (weight-1) (repr g canu'.canon) (repr g v) g
-          else g)
-          u.ltle g
-      in g, repr g canu'.canon
+    with Not_found -> find_succ g (p, w') u w
+  let _find_predecessor g u w =
+    debug_universes Pp.(str"Making predecessor of : " ++ pr_can_weight g (u, 0) ++ str " of weight " ++ pr_incr w);
+    let p, w' = Index.repr u.canon g.table in
+    try
+      let u' = find_alias g p (w + w') in
+      g, repr g u'
+    with Not_found -> find_pred g (p, w') u w
+
+  let merge_successors g =
+    let rec find_next_succ g orig dest x =
+      let x = repr g x in
+      let lt, le, x, g = get_ltle g x in
+      match lt with
+      | Some succ' ->
+        let succ' = repr g succ' in
+        (* debug_universes (Pp.(str"merge_successors: found following successor of " ++ pr_index g orig  ++ str " -> " ++ pr_index g dest ++
+          str" " ++ pr_can g x ++ str" successor: " ++ pr_can g succ')); *)
+        if search_path 0 succ' (repr g dest) g then
+          (* (debug_universes (Pp.(str"merge_successors: found path between " ++ pr_can g succ'  ++ str " and " ++
+          pr_index g orig)); *)
+          let g = insert_le x (repr g orig) g in
+          insert_le (repr g dest) succ' g
+        else g
+          (* (debug_universes (Pp.(str"merge_successors: no path between " ++ pr_can g succ'  ++ str " and " ++
+          pr_index g orig)); *)
+      | None ->
+        PSet.fold (fun succ' g ->
+          find_next_succ g orig dest succ') le g
+    and visit x g =
+      let xcan = repr g x in
+      let lt, le, xcan, g = get_ltle g xcan in
+      match lt with
+      | Some succ ->
+        (* debug_universes
+        (Pp.(str"merge_successors: found succ " ++ pr_can g xcan  ++ str " -> " ++ pr_index g succ)); *)
+        (* x has a direct successor, we need to merge all intermediate universes
+           that participate in any other positive weight path from x to its successor *)
+          PSet.fold (fun succ' g ->
+            find_next_succ g x succ succ') le g
+      | None ->
+        PSet.fold visit le g
+    in
+    let src = Index.find (Point.source, 0) g.table in
+    visit src g
+
+  (* Look for any successor above v and set u <= v to ensure upper bounds are respected *)
+  let _saturate_successors u v g =
+    let v = repr g v.canon in
+    PSet.fold (fun vnext g ->
+      insert_le u (repr g vnext) g) v.le g
 
   (* insert_edge u w v adds an edge u + w <= v *)
   let insert_edge w u v g =
-    Feedback.msg_debug (let vn = v in
+    debug_universes (let vn = v in
     Pp.(str"Inserting edge of weight " ++ int w ++ str " between " ++
     pr_can_weight g (u, 0) ++ str" and " ++ pr_can_weight g (vn, 0)));
-    if w = 0 then insert_edge w u v g
+    if w = 0 then insert_le u v g
     else if w < 0 then
-      (* If we want to insert an arc of positive weight, we rather make an alias
-        u' of u - w and replace u with u' + w everywhere. Then we can add u' <= v.
+      (* If we want to insert an arc of positive or negative weight, we rather make an alias
+        u' of u + w and replace u with u' + w everywhere. Then we can add u' <= v.
       *)
       (let g, canv' = find_successor g v (-w) in
-      Feedback.msg_debug Pp.(str"Alias represents " ++ pr_can g canv');
-      insert_edge 0 u canv' g)
+      debug_universes Pp.(str"Alias represents " ++ pr_can g canv');
+      insert_le u canv' g)
     else
       (let g, canu' = find_successor g u w in
-      Feedback.msg_debug Pp.(str"Alias represents " ++ pr_can g canu');
-      insert_edge 0 canu' v g)
+      debug_universes Pp.(str"Alias represents " ++ pr_can g canu');
+      insert_le canu' v g)
+
+  let insert_edge w u v g =
+    merge_successors (insert_edge w u v g)
 
   (* enforce_eq g u n v will force u + n = v if possible, will fail otherwise *)
 
@@ -887,7 +1012,7 @@ module Make (Point:Point) = struct
       let g = insert_edge n ucan vcan g in  (* Cannot fail *)
       try insert_edge (-n) vcan ucan g
       with CycleDetected ->
-        Point.error_inconsistency (Eq (-n)) v u (get_explanation v u (-n) g)
+        Point.error_inconsistency (Eq (-n)) v u (get_explanation u v (-n) g)
 
   (* enforce_leq g u v will force u<=v if possible, will fail otherwise *)
   let enforce_leq u n v g =
@@ -895,7 +1020,7 @@ module Make (Point:Point) = struct
     let vcan = repr_node g v in
     try insert_edge n ucan vcan g
     with CycleDetected ->
-      Point.error_inconsistency (Le n) u v (get_explanation u v (-n) g)
+      Point.error_inconsistency (Le n) u v (get_explanation v u (succ n) g)
 
   (* enforce_lt u v will force u<v if possible, will fail otherwise *)
   (* let enforce_lt u v g =
@@ -915,12 +1040,14 @@ module Make (Point:Point) = struct
     let uf = UF.create () in
     let constraints_of u v acc =
       match v with
-      | Canonical {canon=u; ltle; _} ->
-        PMap.fold (fun v weight acc ->
-            let u, uw = Index.repr u g.table in
-            let v, vw = Index.repr v g.table in
-            let typ = Le (uw - vw + weight) in
-            Constraint.add (u,typ,v) acc) ltle acc
+      | Canonical {canon=u; le; succ; _} ->
+        let visit weight v acc =
+          let u, uw = Index.repr u g.table in
+          let v, vw = Index.repr v g.table in
+          let typ = Le (uw - vw + weight) in
+          Constraint.add (u,typ,v) acc
+        in
+        PSet.fold (visit 0) le (Option.fold_right (visit 1) succ acc)
       | Equiv v ->
         let u, uw = Index.repr u g.table in
         let v, vw = Index.repr v g.table in
@@ -966,16 +1093,14 @@ module Make (Point:Point) = struct
            add_from u csts todo
          | exception Not_found ->
            (* v is not equal to any kept point *)
-           let todo = PMap.fold (fun v' weight' todo ->
-               (v', weight + weight') :: todo)
-               v.ltle todo
-           in
+           let todo = Option.fold_right (fun v' todo -> (v', succ weight) :: todo) v.succ todo in
+           let todo = PSet.fold (fun v' todo -> (v', weight) :: todo) v.le todo in
            add_from u csts todo)
     in
     PSet.fold (fun u csts ->
         let ru = repr g u in
-        PMap.fold (fun v weight csts -> add_from u csts [v,weight])
-          ru.ltle csts)
+        let csts = Option.fold_right (fun v csts -> add_from u csts [v, 1]) ru.succ csts in
+        PSet.fold (fun v csts -> add_from u csts [v,0]) ru.le csts)
       kept csts
 
   let domain g =
@@ -1010,12 +1135,13 @@ module Make (Point:Point) = struct
       let pu, uw = Index.repr u g.table in
       let n = match n with
       | Canonical n ->
-        let fold v weight accu =
+        let fold w v accu =
           let v, vw = Index.repr v g.table in
-          Point.IMap.add (v, vw) weight accu in
-        let ltle = PMap.fold fold n.ltle Point.IMap.empty in
+          Point.IMap.add (v, vw) w accu in
+        let ltle = PSet.fold (fold 0) n.le Point.IMap.empty in
+        let ltle = Option.fold_right (fold 1) n.succ ltle in
         let fold u accu = Point.Set.add (fst (Index.repr u g.table)) accu in
-        let gtge = PSet.fold fold n.gtge Point.Set.empty in
+        let gtge = PSet.fold fold n.ge Point.Set.empty in
         Node (ltle, gtge)
       | Equiv v ->
         let v, vw = Index.repr v g.table in

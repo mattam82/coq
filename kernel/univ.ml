@@ -596,7 +596,7 @@ let universe_level = Universe.level
 
 type constraint_type = AcyclicGraph.constraint_type = Le of int | Eq of int
 
-type explanation = (constraint_type * Level.t) list
+type explanation = (constraint_type * LevelExpr.t) list
 
 let constraint_type_ord c1 c2 = match c1, c2 with
 | Le n, Le m -> Int.compare n m
@@ -1272,6 +1272,11 @@ type univ_inconsistency = constraint_type * universe * universe * explanation La
 
 (* Do not use in this file as we may be type-in-type *)
 exception UniverseInconsistency of univ_inconsistency
+let pr_incr n =
+  let open Pp in
+  if Int.equal n 0 then mt()
+  else if n < 0 then (str" - " ++ int (-n))
+  else (str" + " ++ int n)
 
 let explain_universe_inconsistency prl (o,u,v,p : univ_inconsistency) =
   let pr_uni = Universe.pr_with prl in
@@ -1282,9 +1287,9 @@ let explain_universe_inconsistency prl (o,u,v,p : univ_inconsistency) =
       if p = [] then mt ()
       else
         str " because" ++ spc() ++ pr_uni v ++
-        prlist (fun (r,v) -> spc() ++ pr_weight_arc r (prl v))
+        prlist (fun (r,(v, w)) -> spc() ++ pr_weight_arc r (prl v ++ pr_incr w))
           p ++
-        (if Universe.equal (Universe.make (snd (List.last p))) u then mt() else
+        (if Universe.equal [(snd (List.last p))] u then mt() else
            (spc() ++ str "= " ++ pr_uni u))
   in
     str "Cannot enforce" ++ spc() ++ pr_uni u ++ spc() ++

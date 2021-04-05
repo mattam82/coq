@@ -26,7 +26,7 @@ module type Point = sig
   val equal : t -> t -> bool
   val compare : t -> t -> int
 
-  type explanation = (constraint_type * t) list
+  type explanation = (constraint_type * (t * int)) list
   val error_inconsistency : constraint_type -> t -> t -> explanation lazy_t option -> 'a
 
   val pr : t -> Pp.t
@@ -41,7 +41,7 @@ module Make (Point:Point) : sig
   val check_invariants : required_canonical:(Point.t -> bool) -> t -> unit
 
   exception AlreadyDeclared
-  val add : ?rank:int -> Point.t -> t -> t
+  val add : ?rank:int -> ?pred:Point.t -> Point.t -> t -> t
   (** All points must be pre-declared through this function before
      they can be mentioned in the others. NB: use a large [rank] to
      keep the node canonical *)

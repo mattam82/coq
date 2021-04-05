@@ -928,9 +928,13 @@ let pr_vernac_expr v =
       hov 2 (keyword "Universe" ++ spc () ++
              prlist_with_sep (fun _ -> str",") pr_lident v)
     )
-  | VernacConstraint v ->
+  | VernacConstraint (enforce, v) ->
+    let enf = match enforce with
+    | Enforce -> mt()
+    | Check -> keyword "Check" ++ spc ()
+    in
     return (
-      hov 2 (keyword "Constraint" ++ spc () ++
+      hov 2 (enf ++ keyword "Constraint" ++ spc () ++
              prlist_with_sep (fun _ -> str",") pr_uconstraint v)
     )
 

@@ -141,7 +141,7 @@ let do_universe ~poly l =
   let () = input_univ_names (src, l) in
   DeclareUctx.declare_universe_context ~poly ctx
 
-let do_constraint ~poly l =
+let do_constraint ~enforce ~poly l =
   let open Univ in
   let env = Global.env () in
   let evd = Evd.from_env env in
@@ -149,9 +149,14 @@ let do_constraint ~poly l =
   let constraints = List.fold_left (fun acc (l, d, r) ->
       let evd, lu = u_of_id evd l in
       let evd, ru = u_of_id evd r in
-      let cstr = Evd.interp_constraint evd lu d ru in
+      let cstr = Evd.interp_constraint evd ~enforce lu d ru in
       Constraint.union cstr acc)
       Constraint.empty l
   in
-  let uctx = ContextSet.add_constraints constraints ContextSet.empty in
-  DeclareUctx.declare_universe_context ~poly uctx
+  if enforce then
+    let uctx = ContextSet.add_constraints constraints ContextSet.empty in
+    DeclareUctx.declare_universe_context ~poly uctx
+  else (* Checking *)
+    if Constraint.is_empty constraints then ()
+    else CErrors.user_err Pp.(hov 2 (str "Constraints are not implied by the universe constraints:" ++ spc () ++
+        v 0 (pr_constraints (Termops.pr_evd_level evd) constraints)))

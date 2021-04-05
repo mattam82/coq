@@ -22,4 +22,4 @@ val declare_univ_binders : GlobRef.t -> UnivNames.universe_binders -> unit
 val do_universe : poly:bool -> lident list -> unit
 
 (** Command [Constraint]. *)
-val do_constraint : poly:bool -> Constrexpr.univ_constraint_expr list -> unit
+val do_constraint : enforce:bool -> poly:bool -> Constrexpr.univ_constraint_expr list -> unit

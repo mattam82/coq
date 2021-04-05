@@ -20,11 +20,14 @@ End leqset'.
 
 Polymorphic Section leleeq'.
   Universe u v w.
-  Constraint v <= w.
-  Constraint v+1 <= w.
+  Constraint u <= v.
+  (* Constraint u <= w.
+  Constraint w <= v. *)
+  Constraint u+1 <= v.
   Print Universes "file.dot".
-  Constraint w <= v.
+  Fail Constraint v <= u.
   Print Universes "file.dot".
+End leleeq'.
 
 Polymorphic Section leleeq'.
   Universe u v w.
@@ -37,10 +40,27 @@ Polymorphic Section leleeq'.
   Print Universes "file.dot".
   Constraint v < w.
   Print Universes "file.dot".
-  Constraint w <= v.
+  Fail Constraint w <= v.
+  Print Universes "file.dot".
+  Check Constraint v+1 <= w.
+  Check Constraint v <= w.
+End leleeq'.
+
+Polymorphic Section succtheory.
+  Universe u v w.
+  Print Universes "file.dot".
+  Constraint u + 1 <= w.
+  Print Universes "file.dot".
+  Constraint v + 1 <= w.
+  Print Universes "file.dot".
+  Constraint u = v.
+  Print Universes "file.dot".
+  Constraint v = u.
   Print Universes "file.dot".
 
-End leleeq'.
+  Fail Constraint u = w.
+  Print Universes "file.dot".
+End succtheory.
 
 Polymorphic Section succtheory.
   Universe u v w x.
@@ -49,31 +69,17 @@ Polymorphic Section succtheory.
   Print Universes "file.dot".
   Constraint x <= u + 1.
   Print Universes "file.dot".
-  (* Constraint u <= v.
-  Constraint v <= u. *)
+  Constraint u <= v.
+  Constraint v <= u.
   Print Universes "file.dot".
-  Constraint u+1 = x.
+  Constraint u+1 <= x.
   Print Universes "file.dot".
 
   Constraint w <= u+1.
   Print Universes "file.dot".
-  Constraint v <= u + 1.
+  Constraint v <= w + 1.
   Print Universes "file.dot".
-  Constraint u < k.
-  Print Universes "file.dot".
-  Constraint k' <= u + 1.
-  Print Universes "file.dot".
-  Constraint k <= u + 1.
-
-
-  Constraint u <= Set+1.
-  Print Universes "file.dot".
-
-  Constraint v + 1 <= u.
-  Print Universes "file.dot".
-  Fail Constraint v + 2 <= u.
-  Print Universes "file.dot".
-End leleeq'.
+End succtheory.
 
 Polymorphic Section leqset.
   Universe u.
@@ -91,16 +97,17 @@ Polymorphic Section leq2scompat.
   Print Universes "file.dot".
 End leq2scompat.
 
-Polymorphic Section eqset.
+Polymorphic Section eqset1.
   Universe u.
   Print Universes "file.dot".
   Constraint u <= Set+1.
   Print Universes "file.dot".
   Constraint Set+1 <= u.
   Print Universes "file.dot".
+End eqset1.
 
-
-Universe u v w.
+Polymorphic Section leleeq.
+  Universe u v w.
   Constraint u <= v.
   Constraint v <= w.
   Print Universes "file.dot".
@@ -122,17 +129,10 @@ Universe u v w.
   Print Universes "file.dot".
   Constraint w <= Set+2.
   Print Universes "file.dot".
-
-
-  Constraint w <= Set+2.
-  Print Universes "file.dot".
-  Constraint w <= Prop.
-  Print Universes "file.dot".
-
 End leleeq.
 
 
-Module myset.
+Polymorphic Section myset.
   Universe myset.
   Universe u.
   Print Universes "file.dot".
@@ -140,16 +140,14 @@ Module myset.
   Print Universes "file.dot".
   Constraint u + 1 <= myset.
   Print Universes "file.dot".
-
-End myset.*)
+  Constraint u <= Set.
+  Print Universes "file.dot".
+  Constraint u + 1 <= Set+1.
+  Print Universes "file.dot".
+End myset.
 
 Module Big.
 Universes u1 u2 u3.
-Constraint u1 <= Set.
-Print Universes "file.dot".
-
-
-
 Constraint u1 <= u2 + 1.
 
 Constraint u2 + 1 <= u3.
@@ -166,9 +164,9 @@ Constraint u2 + 1 = u1.
 Print Universes "file.dot".
 Constraint u2 + 1 = u3.
 Print Universes "file.dot".
-Constraint u1 <= Set+1.
+(* Constraint u1 <= Set+1. *)
 Print Universes "file.dot".
-Constraint u2 <= Prop.
+(* Constraint u2 <= Prop. *)
 Print Universes "file.dot".
 
 (* Fail Constraint u < v. *)
@@ -186,7 +184,7 @@ Module LargeLe.
   Constraint u2 <= u3. (* Implied, no change *)
   Constraint u1 <= u3.
   Constraint u1 < u3.
-  Print Universes Subgraph (u1 u2 u3) "file.dot".
+  Print Universes "file.dot".
   Fail Constraint u1 = u3.
 
 End LargeLe.

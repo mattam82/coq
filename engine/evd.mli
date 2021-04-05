@@ -647,7 +647,8 @@ val normalize_universe_instance : evar_map -> Univ.Instance.t -> Univ.Instance.t
 
 val set_leq_sort : env -> evar_map -> Sorts.t -> Sorts.t -> evar_map
 val set_eq_sort : env -> evar_map -> Sorts.t -> Sorts.t -> evar_map
-val interp_constraint : evar_map -> Univ.Universe.t -> Univ.constraint_type -> Univ.Universe.t ->
+val interp_constraint : evar_map -> enforce:bool ->
+  Univ.Universe.t -> Univ.constraint_type -> Univ.Universe.t ->
   Univ.Constraint.t
 
 val set_eq_level : evar_map -> Univ.Level.t -> Univ.Level.t -> evar_map

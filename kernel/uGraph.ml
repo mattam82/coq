@@ -87,8 +87,8 @@ let initial_universes =
   let big_rank = 1000000 in
   let g = G.empty in
   let g = G.add ~rank:big_rank Level.prop g in
-  let g = G.add ~rank:big_rank Level.set g in
-  {empty_universes with graph=G.enforce_leq Level.prop 1 Level.set g}
+  let g = G.add ~rank:big_rank ~pred:Level.prop Level.set g in
+  {empty_universes with graph=g}
 
 let initial_universes_with g = {g with graph=initial_universes.graph}
 

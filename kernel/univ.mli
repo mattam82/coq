@@ -278,7 +278,7 @@ val enforce_leq_level : Level.t constraint_function
   system stores the graph and may result from combination of several
   Constraint.t...
 *)
-type explanation = (constraint_type * Level.t) list
+type explanation = (constraint_type * LevelExpr.t) list
 type univ_inconsistency = constraint_type * Universe.t * Universe.t * explanation Lazy.t option
 
 exception UniverseInconsistency of univ_inconsistency

@@ -1035,12 +1035,13 @@ let vernac_universe ~poly l =
                   str "use Monomorphic Universe instead");
   DeclareUniv.do_universe ~poly l
 
-let vernac_constraint ~poly l =
+let vernac_constraint ~enforce ~poly l =
   if poly && not (Global.sections_are_opened ()) then
     user_err ~hdr:"vernac_constraint"
                  (str"Polymorphic universe constraints can only be declared"
                   ++ str " inside sections, use Monomorphic Constraint instead");
-  DeclareUniv.do_constraint ~poly l
+  let enforce = match enforce with Enforce -> true | Check -> false in
+  DeclareUniv.do_constraint ~enforce ~poly l
 
 (**********************)
 (* Modules            *)
@@ -2197,8 +2198,8 @@ let translate_vernac ?loc ~atts v = let open Vernacextend in match v with
         vernac_combined_scheme id l)
   | VernacUniverse l ->
     VtDefault(fun () -> vernac_universe ~poly:(only_polymorphism atts) l)
-  | VernacConstraint l ->
-    VtDefault(fun () -> vernac_constraint ~poly:(only_polymorphism atts) l)
+  | VernacConstraint (enforce, l) ->
+    VtDefault(fun () -> vernac_constraint ~enforce ~poly:(only_polymorphism atts) l)
 
   (* Modules *)
   | VernacDeclareModule (export,lid,bl,mtyo) ->

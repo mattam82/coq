@@ -292,6 +292,8 @@ type extend_name =
 
 type discharge = DoDischarge | NoDischarge
 
+type enforce = Enforce | Check
+
 type hint_info_expr = Constrexpr.constr_pattern_expr Typeclasses.hint_info_gen
 
 type reference_or_constr =
@@ -338,7 +340,7 @@ type nonrec vernac_expr =
   | VernacScheme of (lident option * scheme) list
   | VernacCombinedScheme of lident * lident list
   | VernacUniverse of lident list
-  | VernacConstraint of univ_constraint_expr list
+  | VernacConstraint of enforce * univ_constraint_expr list
 
   (* Gallina extensions *)
   | VernacBeginSection of lident

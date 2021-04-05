@@ -278,6 +278,7 @@ module Prim =
     let name = Entry.create "name"
     let identref = Entry.create "identref"
     let univ_decl = Entry.create "univ_decl"
+    let univ_constraint = Entry.create "univ_constraint"
     let ident_decl = Entry.create "ident_decl"
     let pattern_ident = Entry.create "pattern_ident"
     let pattern_identref = pattern_ident (* To remove in 8.14 *)
