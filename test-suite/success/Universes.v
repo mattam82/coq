@@ -55,10 +55,12 @@ Polymorphic Section succtheory.
   Print Universes "file.dot".
   Constraint u = v.
   Print Universes "file.dot".
-  Constraint v = u.
+  Check Constraint v = u.
   Print Universes "file.dot".
 
   Fail Constraint u = w.
+  Print Universes "file.dot".
+  Fail Constraint w = u.
   Print Universes "file.dot".
 End succtheory.
 
@@ -146,10 +148,9 @@ Polymorphic Section myset.
   Print Universes "file.dot".
 End myset.
 
-Module Big.
+Polymorphic Section Big.
 Universes u1 u2 u3.
 Constraint u1 <= u2 + 1.
-
 Constraint u2 + 1 <= u3.
 (* Constraint u2 < u4. *)
 
@@ -159,7 +160,6 @@ Constraint u4 < u5. *)
 Print Universes "file.dot".
 Constraint u2 + 1 = u3.
 Print Universes "file.dot".
-
 Constraint u2 + 1 = u1.
 Print Universes "file.dot".
 Constraint u2 + 1 = u3.
@@ -175,32 +175,65 @@ Print Universes "file.dot".
 
 End Big.
 
-Module LargeLe.
+Polymorphic Section LargeLe.
   Universes u1 u2 u3.
   Constraint u2 = u1 + 1.
   Constraint u3 = u2 + 1.
-
-  Print Universes Subgraph (u1 u2 u3) "file.dot".
+  Print Universes "file.dot".
   Constraint u2 <= u3. (* Implied, no change *)
+  Print Universes "file.dot".
   Constraint u1 <= u3.
   Constraint u1 < u3.
   Print Universes "file.dot".
   Fail Constraint u1 = u3.
-
 End LargeLe.
 
+Polymorphic Section Plus2.
+  Universes x y k l.
+
+  Constraint x + 2 <= k.
+  Print Universes "file.dot".
+  Constraint x <= y.
+  Print Universes "file.dot".
+  Constraint y + 2 <= k.
+  Print Universes "file.dot".
+  Constraint y + 1 <= l.
+  Print Universes "file.dot".
+  Constraint y + 1 <= x+1.
+  Print Universes "file.dot".
+  Check Constraint x + 1 = y + 1.
+End Plus2.
+
+Polymorphic Section Plus2.
+Universes x y k l m.
+
+Constraint x + 2 <= k.
+Print Universes "file.dot".
+Constraint x <= y.
+Print Universes "file.dot".
+Constraint y + 2 <= k.
+Print Universes "file.dot".
+Constraint y + 2 <= m.
+Print Universes "file.dot".
+Constraint x + 1 <= m.
+Print Universes "file.dot".
+Constraint m <= x + 1.
+End Plus2.
 
 
-  Constraint u2 <= u1 + 2.
-  Print Universes Subgraph (u1 u2 u3) "file.dot".
-  Constraint u1 <= u2 + 1.
+Polymorphic Section Plus2Alias.
+Universes x y k l m.
 
-
-
-Constraint v + 3 <= w + 1.
-
-(* (* Constraint z + 4 <= w + 5.
-Constraint y + 4 <= w + 5. *)
-Constraint y + 4 <= w + 5. *)
-
-Print Universes Subgraph (u v w x y z) "file.dot".
+Constraint x + 2 <= k.
+Print Universes "file.dot".
+Constraint x <= y.
+Print Universes "file.dot".
+Constraint y + 2 <= k.
+Print Universes "file.dot".
+Constraint y + 1 <= l.
+Constraint y + 2 <= m.
+Print Universes "file.dot".
+Constraint m <= x+2.
+Print Universes "file.dot".
+Check Constraint x + 1 = y + 1.
+End Plus2.

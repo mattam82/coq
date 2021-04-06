@@ -30,8 +30,8 @@ module type Point = sig
   val pr : t -> Pp.t
 end
 
-let debug_universes str = ()
-  (* Feedback.msg_debug str *)
+let debug_universes str =
+  Feedback.msg_debug str
 
 module Make (Point:Point) = struct
 
@@ -272,11 +272,13 @@ module Make (Point:Point) = struct
     assert (!n_edges = g.n_edges);
     assert (!n_nodes = g.n_nodes)
 
-  let clean_le g le =
+  let clean_le g succ le =
     PSet.fold (fun u acc ->
         let un = repr g u in
         let uu = un.canon in
-        if Index.equal uu u then acc
+        if Option.cata (fun succ -> Index.equal uu succ) false succ then
+          (PSet.remove u (fst acc), true)
+        else if Index.equal uu u then acc
         else (PSet.add uu (PSet.remove u (fst acc)), true))
       le (le, false)
 
@@ -296,8 +298,8 @@ module Make (Point:Point) = struct
      non-canonical node), these functions clean this node in the
      graph by removing some duplicate edges *)
   let get_ltle g u =
-    let le, chgt_ltle = clean_le g u.le in
     let succ = clean_opt g u.succ in
+    let le, chgt_ltle = clean_le g succ u.le in
     if not chgt_ltle && succ == u.succ then
       u.succ, u.le, u, g
     else
@@ -472,7 +474,7 @@ module Make (Point:Point) = struct
           PSet.union n.le acc
         in
         let le = List.fold_left les hd.le tl in
-        let le, _ =  clean_le g le in
+        let le, _ =  clean_le g hd.succ le in
         let lts acc n =
           match n.succ with
           | Some succ -> PSet.add succ acc
@@ -501,15 +503,18 @@ module Make (Point:Point) = struct
     in
     let gtge, _ = clean_gtge g gtge in
     let gtge = List.fold_left (fun acc n -> PSet.remove n.canon acc) gtge to_merge in
-    let lt, lts =
-      if PSet.is_empty lt then None, lt
-      else (match succ with
-        | Some s -> succ, PSet.remove s lt
-        | None ->
-          let can = PSet.choose lt in
-          Some can, PSet.remove can lt)
+    let lt =
+      let succ = match succ with
+        | Some s -> PSet.add s lt
+        | None -> lt
+      in
+      let succ = PSet.elements succ in
+      let succ = List.sort (fun x y -> topo_compare (repr g y) (repr g x)) succ in
+      match succ with
+      | hd :: tl -> Some (hd, tl)
+      | [] -> None
     in
-    (lt, lts, le, gtge)
+    (lt, le, gtge)
 
   let is_to_merge = function
     | ToMerge _ -> true
@@ -581,9 +586,9 @@ module Make (Point:Point) = struct
     let () =
       debug_universes Pp.(str"Found to merge: " ++ hov 0 (pr_to_merge g to_merge))
     in
-    let to_reindex, g =
+    let to_reindex, succs, g =
       match to_merge with
-      | [] -> List.rev_append f_reindex b_reindex, g
+      | [] -> List.rev_append f_reindex b_reindex, None, g
       | n0::q0 ->
         (* Computing new root. *)
         let root, rank_rest =
@@ -592,15 +597,20 @@ module Make (Point:Point) = struct
             (n0, min_int) q0
         in
         debug_universes Pp.(str"Chosen new root: " ++ pr_can g root);
-        let succ, lts, le, ge = get_new_edges g root.succ to_merge in
+        let succs, le, ge = get_new_edges g root.succ to_merge in
         (* Inserting the new root. *)
+        let succ = Option.map fst succs in
         debug_universes Pp.(str"Inserting new root with edges: le = " ++ pr_edges g le ++ spc () ++ str " ge = " ++ pr_edges_inv g ge
           ++ str" succ = " ++ pr_edges g (opt_to_set succ));
         let g = change_node g
             { root with le; ge; succ;
                         rank = max root.rank (rank_rest + 1); }
         in
-        let lts' = List.map (repr g) (PSet.elements lts) in
+        let lts' =
+          match succs with
+          | Some (succ, succs) -> List.map (repr g) succs
+          | None -> []
+        in
         debug_universes Pp.(str"Successors to update: " ++ pr_to_merge g lts');
         (* Inserting shortcuts for old nodes. *)
         let g = List.fold_left (fun g n ->
@@ -614,43 +624,48 @@ module Make (Point:Point) = struct
 
         (* Updating g.n_edges *)
         let oldsz =
-          List.fold_left (fun sz u -> sz+PSet.cardinal u.le)
+          List.fold_left (fun sz u -> sz+PSet.cardinal u.le + opt_size u.succ)
             0 to_merge
         in
-        let sz = PSet.cardinal le + opt_size succ + PSet.cardinal lts in
+        let sz = PSet.cardinal le + opt_size succ in
         let g = { g with n_edges = g.n_edges + sz - oldsz } in
 
         (* Not clear in the paper: we have to put the newly
             created component just between B and F. *)
-        List.rev_append f_reindex (root.canon::b_reindex), g
+        List.rev_append f_reindex (root.canon::b_reindex), succs, g
 
     in
 
     (* STEP 5: reindex traversed nodes. *)
-    List.fold_left use_index g to_reindex
+    List.fold_left use_index g to_reindex, succs
 
   (* Assumes [u] and [v] are already in the graph. *)
   (* Does NOT assume that ucan != vcan. *)
-  let insert_le ucan vcan g =
+  let insert_le_succ ucan vcan g =
     try
       let u = ucan.canon and v = vcan.canon in
       (* STEP 1: do we need to reorder nodes ? *)
-      let g = if topo_compare ucan vcan <= 0 then g else reorder g u v in
+      let g, succ =
+        if topo_compare ucan vcan <= 0 then
+          (debug_universes (Pp.str "no reordering needed"); g, None)
+        else reorder g u v
+      in
 
       (* STEP 6: insert the new edge in the graph. *)
       let u = repr g u in
       let v = repr g v in
-      if u == v then g
+      if u == v then g, succ
       else
         let g =
           if PSet.mem v.canon u.le then g
+          else if Option.cata (fun succ -> (repr g succ) == v) false u.succ then g
           else { (change_node g { u with le = PSet.add v.canon u.le })
               with n_edges = g.n_edges + 1 }
         in
-        if u.klvl <> v.klvl || PSet.mem u.canon v.ge then g
+        if u.klvl <> v.klvl || PSet.mem u.canon v.ge then g, succ
         else
           let v = { v with ge = PSet.add u.canon v.ge } in
-          change_node g v
+          change_node g v, succ
     with
     | CycleDetected as e -> raise e
     | e ->
@@ -658,17 +673,24 @@ module Make (Point:Point) = struct
       let () = cleanup_marks g in
       raise e
 
-  (*let rec insert_eq ucan vcan g =
+  let rec insert_eq ucan vcan g =
     if ucan == vcan then g
-    else let g = insert_le ucan vcan g in
-      insert_le vcan ucan g
+    else
+      let g = insert_le ucan vcan g in
+      debug_universes Pp.(str"Inserted " ++ pr_can g ucan ++ str" <= " ++ pr_can g vcan);
+      let g = insert_le vcan ucan g in
+      debug_universes Pp.(str"Inserted " ++ pr_can g vcan ++ str" <= " ++ pr_can g ucan);
+      g
 
   and insert_le ucan vcan g =
-    let g, succ = insert_le_succ ucan vcan g in
+  debug_universes Pp.(str"Inserting " ++ pr_can g ucan ++ str" <= " ++ pr_can g vcan);
+  let g, succ = insert_le_succ ucan vcan g in
     match succ with
     | None -> g
     | Some (succ, succs) ->
-      List.fold_right (insert_eq (repr g succ)) succs g*)
+      debug_universes Pp.(str"Updating successors after insertion of " ++ pr_can g ucan ++ str" <= " ++ pr_can g vcan);
+      (* Maintain the invariant that there is a single successor to every point *)
+      List.fold_left (fun g succ' -> insert_eq (repr g succ') (repr g succ) g) g succs
 
   let add_node ?(rank=0) ?succ ?pred v g =
     let klvl = match pred with Some u -> (repr g u).klvl + 1 | None -> 0 in
@@ -831,6 +853,59 @@ module Make (Point:Point) = struct
         let () = cleanup_marks g in
         raise e
 
+
+  let search_path_succ u v g =
+    let rec loop to_revert todo next_todo =
+      match todo, next_todo with
+      | [], [] -> to_revert (* No path found *)
+      | [], _ -> loop to_revert next_todo []
+      | (u, weight, v)::todo, _ ->
+        match u.status with
+        | Visited w when w >= weight ->
+          loop to_revert todo next_todo
+        | _ ->
+          let to_revert =
+            if u.status = NoMark then u::to_revert else to_revert
+          in
+          u.status <- Visited weight;
+          if PSet.mem v.canon u.le then raise (Found to_revert)
+          else
+            begin
+              let visit strict u next_todo =
+                let u = repr g u in
+                let v, weight =
+                  if strict then
+                    match v.succ with
+                    | Some v' ->
+                      let v = repr g v' in
+                      v, weight
+                    | None -> v, succ weight
+                  else v, weight
+                in
+                if u == v && weight >= 0 then raise (Found to_revert)
+                else if topo_compare u v = 1 then next_todo
+                else (u, weight, v)::next_todo
+              in
+              let next_todo =
+                PSet.fold (visit false) u.le (Option.fold_right (visit true) u.succ next_todo)
+              in
+              loop to_revert todo next_todo
+            end
+    in
+    if u == v then true
+    else
+      try
+        let res, to_revert =
+          try false, loop [] [u, 0, v] []
+          with Found to_revert -> true, to_revert
+        in
+        List.iter (fun u -> u.status <- NoMark) to_revert;
+        res
+      with e ->
+        (* Unlikely event: fatal error or signal *)
+        let () = cleanup_marks g in
+        raise e
+
   (** Uncomment to debug the cycle detection algorithm. *)
   (*let insert_edge strict ucan vcan g =
     let check_invariants = check_invariants ~required_canonical:(fun _ -> false) in
@@ -898,7 +973,7 @@ module Make (Point:Point) = struct
       let g = change_node g u in
       debug_universes Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
         pr_can_weight g (canu', 0));
-      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 2 } in
+      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 1 } in
       find_succ g (p, w) u k
   let rec find_pred g (p, w) u k =
     match u.pred with
@@ -931,7 +1006,7 @@ module Make (Point:Point) = struct
       g, repr g u'
     with Not_found -> find_pred g (p, w') u w
 
-  let merge_successors g =
+  let _merge_successors g =
     let rec find_next_succ g orig dest x =
       let x = repr g x in
       let lt, le, x, g = get_ltle g x in
@@ -940,7 +1015,7 @@ module Make (Point:Point) = struct
         let succ' = repr g succ' in
         (* debug_universes (Pp.(str"merge_successors: found following successor of " ++ pr_index g orig  ++ str " -> " ++ pr_index g dest ++
           str" " ++ pr_can g x ++ str" successor: " ++ pr_can g succ')); *)
-        if search_path 0 succ' (repr g dest) g then
+        if search_path_succ succ' (repr g dest) g then
           (* (debug_universes (Pp.(str"merge_successors: found path between " ++ pr_can g succ'  ++ str " and " ++
           pr_index g orig)); *)
           let g = insert_le x (repr g orig) g in
@@ -968,6 +1043,102 @@ module Make (Point:Point) = struct
     let src = Index.find (Point.source, 0) g.table in
     visit src g
 
+  let incr_deg map x y =
+    try PMap.modify x (fun _ (preds, deg) -> (y :: preds, succ deg)) map
+    with Not_found -> PMap.add x ([y], 1) map
+
+  exception ZeroDegree
+  let decr_deg map x =
+    try PMap.modify x (fun _ (preds, deg) ->
+      if deg = 1 then raise ZeroDegree
+      else (preds, deg - 1)) map
+    with Not_found -> map
+
+  let topo_sort g =
+    let vertices =
+      PMap.filter (fun idx e -> match e with Canonical _ -> true | Equiv _ -> false) g.entries
+    in
+    let source = Index.find (Point.source, 0) g.table in
+    let in_degrees, g =
+      PMap.fold (fun idx e (indeg, g) ->
+        match e with
+        | Canonical can ->
+          let lt, le, x, g = get_ltle g can in
+          let incr weight y indeg =
+            (* debug_universes
+              Pp.(pr_can g x ++ str" -> " ++ pr_index g y); *)
+            incr_deg indeg y (idx, weight) in
+          let indeg = PSet.fold (incr 0) le indeg in
+          Option.fold_right (incr 1) lt indeg, g
+        | Equiv _ -> assert false)
+      vertices (PMap.empty, g)
+    in
+    (* let pr_indeg =
+      PMap.fold Pp.(fun idx indeg pp -> pr_index g idx ++ str" has in_degree " ++ int indeg ++ fnl () ++ pp)
+      indeg Pp.(mt())
+    in *)
+    (* debug_universes Pp.(str "Topological sorting, in_degrees: " ++ pr_indeg); *)
+    let queue = Queue.create () in
+    let order = ref [] in
+    (* let () = PMap.iter (fun idx indeg -> if Int.equal indeg 0 then Queue.push idx queue) indeg in *)
+    let () = Queue.push source queue in
+    let indeg = ref in_degrees in
+    while not (Queue.is_empty queue) do
+      let x = Queue.pop queue in
+      order := x :: !order;
+      (* debug_universes Pp.(str "Topological sorting, considering: " ++ pr_index g x); *)
+      let x = repr g x in
+      let lt, le, x, g = get_ltle g x in
+      PSet.iter (fun y ->
+        (* debug_universes Pp.(str "Topological sorting, successor: " ++ pr_index g y); *)
+        try indeg := decr_deg !indeg y;
+          (* debug_universes Pp.(str "Topological sorting, successor now has in_degree: " ++ int (PMap.find y !indeg)); *)
+        with ZeroDegree -> Queue.push y queue)
+        (add_opt lt le)
+    done;
+    let rem = PMap.fold (fun x (_, deg) acc -> if deg > 1 then x :: acc else acc) !indeg [] in
+    (* debug_universes Pp.(str "Cardinal of topological sorting: " ++ int (List.length !order) ++
+      str " Cardinal of initial graph: " ++ int (PMap.cardinal vertices) ++ str " remaining vertices " ++
+      prlist_with_sep spc (pr_index g) rem); *)
+    debug_universes Pp.(str "Topological ordering: " ++ prlist_with_sep spc (pr_index g) (List.rev !order));
+    assert (CList.is_empty rem);
+    in_degrees, List.rev !order
+
+  let lsp g =
+    let in_degrees, order = topo_sort g in
+    let rec max_path l acc =
+      match l with
+      | idx :: tl -> begin
+        match PMap.find idx in_degrees with
+        | exception Not_found -> max_path tl acc
+        | preds, _ ->
+          let maxpred =
+            List.fold_left (fun maxp (pred, w) ->
+              try let preddist = PMap.find pred acc in
+                    max maxp (preddist + w)
+              with Not_found -> (* Do not need to consider this predecessor *)
+                maxp) 0 preds
+          in
+          let acc = PMap.add idx maxpred acc in
+          max_path tl acc
+        end
+      | [] -> acc
+    in
+    let lsp x y =
+      let _, after = CList.split_when (fun idx -> idx == x) order in
+      let before, after = CList.split_when (fun idx -> idx == y) after in
+      match before with
+      | [] -> (* There is no path from x to y *) None
+      | x :: before ->
+        let lsps = max_path (List.append before [y]) (PMap.singleton x 0) in
+        debug_universes Pp.(str"Longest simple paths from " ++ pr_index g x ++ str " to " ++ pr_index g y ++ str " : " ++
+          PMap.fold (fun idx w acc ->
+            hv 0 (Pp.str " + " ++ int w ++ str " -> " ++ pr_index g idx ++ spc ()) ++ acc)
+            lsps (Pp.mt()));
+        Some lsps
+    in
+    g, lsp
+
   (* Look for any successor above v and set u <= v to ensure upper bounds are respected *)
   let _saturate_successors u v g =
     let v = repr g v.canon in
@@ -993,7 +1164,10 @@ module Make (Point:Point) = struct
       insert_le canu' v g)
 
   let insert_edge w u v g =
-    merge_successors (insert_edge w u v g)
+    let g = insert_edge w u v g in
+    let g, lsp = lsp g in
+    let () = ignore (lsp u.canon v.canon) in
+    g
 
   (* enforce_eq g u n v will force u + n = v if possible, will fail otherwise *)
 
@@ -1007,7 +1181,7 @@ module Make (Point:Point) = struct
       let g = insert_edge (-n) vcan ucan g in  (* Cannot fail *)
       try insert_edge n ucan vcan g
       with CycleDetected ->
-        Point.error_inconsistency (Eq (- n)) v u (get_explanation v u (n) g)
+        Point.error_inconsistency (Eq (- n)) u v (get_explanation v u (n) g)
     else
       let g = insert_edge n ucan vcan g in  (* Cannot fail *)
       try insert_edge (-n) vcan ucan g
@@ -1020,7 +1194,7 @@ module Make (Point:Point) = struct
     let vcan = repr_node g v in
     try insert_edge n ucan vcan g
     with CycleDetected ->
-      Point.error_inconsistency (Le n) u v (get_explanation v u (succ n) g)
+      Point.error_inconsistency (Le n) u v (get_explanation v u (- n) g)
 
   (* enforce_lt u v will force u<v if possible, will fail otherwise *)
   (* let enforce_lt u v g =

@@ -18,7 +18,7 @@ module G = AcyclicGraph.Make(struct
     module IMap = ILMap
     module Constraint = Constraint
 
-    let source = Level.set
+    let source = Level.prop
 
     let equal = Level.equal
     let compare = Level.compare
