@@ -154,6 +154,7 @@ module Make (Point:Point) = struct
 
   type t =
     { entries : entry PMap.t;
+      roots : PSet.t;
       index : int;
       n_nodes : int; n_edges : int;
       table : Index.table }
@@ -178,7 +179,7 @@ module Make (Point:Point) = struct
 
   (* Every Point.t has a unique canonical arc representative *)
 
-  (* Low-level function : makes u an alias for v + weight.
+  (* Low-level function : makes u an alias for v.
      Does not removes edges from n_edges, but decrements n_nodes.
      u should be entered as canonical before.  *)
   let enter_equiv g u v =
@@ -190,6 +191,7 @@ module Make (Point:Point) = struct
               Equiv v
             | _ -> assert false) g.entries;
       index = g.index;
+      roots = PSet.remove u g.roots;
       n_nodes = g.n_nodes - 1;
       n_edges = g.n_edges;
       table = g.table }
@@ -272,6 +274,14 @@ module Make (Point:Point) = struct
     assert (!n_edges = g.n_edges);
     assert (!n_nodes = g.n_nodes)
 
+  let clean_roots roots =
+    PSet.fold (fun u acc ->
+      let un = repr g u in
+      let uu = un.canon in
+      if Index.equal u uu then acc
+      else (PSet.add uu (PSet.remove u (fst acc)), true))
+      roots (roots, false)
+
   let clean_le g succ le =
     PSet.fold (fun u acc ->
         let un = repr g u in
@@ -292,6 +302,11 @@ module Make (Point:Point) = struct
 
   let clean_opt g p =
     Option.Smart.map (fun u -> (repr g u).canon) p
+
+  let get_roots g =
+    let roots, chgt_roots = clean_roots g.roots in
+    if not chgt_roots then g.roots, g
+    else let g = { g with roots } in g.roots, g
 
   (* [get_ltle] and [get_gtge] return ltle and gtge arcs.
      Moreover, if one of these lists is dirty (e.g. points to a
@@ -973,7 +988,8 @@ module Make (Point:Point) = struct
       let g = change_node g u in
       debug_universes Pp.(str"Inserted edge : " ++ pr_can_weight g (u, 0) ++ str" <= " ++
         pr_can_weight g (canu', 0));
-      let g = { g with n_nodes = g.n_nodes + 1; n_edges = g.n_edges + 1 } in
+      let roots = if w = 0 then PSet.add u.canon g.roots else g.roots in
+      let g = { g with n_nodes = g.n_nodes + 1; roots; n_edges = g.n_edges + 1 } in
       find_succ g (p, w) u k
   let rec find_pred g (p, w) u k =
     match u.pred with
@@ -1114,12 +1130,15 @@ module Make (Point:Point) = struct
         | preds, _ ->
           let maxpred =
             List.fold_left (fun maxp (pred, w) ->
-              try let preddist = PMap.find pred acc in
-                    max maxp (preddist + w)
-              with Not_found -> (* Do not need to consider this predecessor *)
-                maxp) 0 preds
+            try let preddist = PMap.find pred acc + w in
+                Option.cata (fun maxp -> Some (max maxp preddist)) (Some preddist) maxp
+            with Not_found -> (* Do not need to consider this predecessor *)
+              maxp) None preds
           in
-          let acc = PMap.add idx maxpred acc in
+          let acc = match maxpred with
+            | Some mpred -> PMap.add idx mpred acc
+            | None -> acc
+          in
           max_path tl acc
         end
       | [] -> acc
