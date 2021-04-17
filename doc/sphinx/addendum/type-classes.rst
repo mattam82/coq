@@ -468,7 +468,7 @@ Summary of the commands
        :n:`typeclasses eauto best_effort`.
 
      During type inference, typeclass resolution always uses the `best_effort` option:
-     in case of failure, it hence constructs a partial solution for the goals and gives
+     in case of failure, it constructs a partial solution for the goals and gives
      a more informative error message. It can be used the same way in interactive proofs
      to check which instances/hints are missing for a typeclass resolution to succeed.
 
