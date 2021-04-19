@@ -367,7 +367,7 @@ and e_my_find_search db_list local_db secvars hdc complete only_classes env sigm
       (* A bit strange to ask an unfold hint to complete the proof? *)
       default (Proofview.tclPROGRESS (unfold_in_concl [AllOccurrences,c]))
     | Extern (pat, id, iftac, thentac) ->
-      conclPattern env sigma id concl pat iftac thentac
+      conclPattern env sigma id oconcl pat iftac thentac
     in
     let pp =
       match p with
