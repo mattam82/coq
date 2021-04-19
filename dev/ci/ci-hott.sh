@@ -5,6 +5,5 @@ ci_dir="$(dirname "$0")"
 
 git_download hott
 
-( cd "${CI_BUILD_DIR}/hott" && ./autogen.sh -skip-submodules && ./configure \
-      && sed -i.bak 's/\(HOQC =.*\)/\1 -native-compiler no/' Makefile \
+( cd "${CI_BUILD_DIR}/hott" && coq_makefile -f _CoqProject -o Makefile
       && make && make validate )
