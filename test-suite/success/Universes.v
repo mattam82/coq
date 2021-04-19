@@ -29,6 +29,17 @@ Polymorphic Section leleeq'.
   Print Universes "file.dot".
 End leleeq'.
 
+Polymorphic Section compress.
+  Universe x y z top.
+  Print Universes "file.dot".
+  Constraint x + 1 <= top.
+  Print Universes "file.dot".
+  Constraint z  <= x+1.
+  Print Universes "file.dot".
+  Constraint x <= y.
+  Constraint y+1 <= z.
+  Print Universes "file.dot".
+
 Polymorphic Section leleeq'.
   Universe u v w.
   Print Universes "file.dot".

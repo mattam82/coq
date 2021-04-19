@@ -1,10 +1,13 @@
 digraph universes {
   "Set" -> "Prop" [style=bold, dir = back, arrowhead=crow, label=" 1"];
-  "u" -> "Set" [style=solid, dir = back, arrowhead=crow];
-  "v" -> "Set" [style=solid, dir = back, arrowhead=crow];
-  "w" -> "Set" [style=solid, dir = back, arrowhead=crow];
-  "u+ 1" -> "u" [style=bold, dir = back, arrowhead=crow, label=" 1"];
-  "w" -> "u+ 1" [style=solid, dir = back, arrowhead=crow];
-  "v+ 1" -> "v" [style=bold, dir = back, arrowhead=crow, label=" 1"];
-  "w" -> "v+ 1" [style=solid, dir = back, arrowhead=crow];
+  "x" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "y" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "z" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "top" -> "Set" [style=solid, dir = back, arrowhead=crow];
+  "x+ 1" -> "x" [style=bold, dir = back, arrowhead=crow, label=" 1"];
+  "y" -> "x" [style=solid, dir = back, arrowhead=crow];
+  "top" -> "x+ 1" [style=solid, dir = back, arrowhead=crow];
+  "y+ 1" -> "y" [style=bold, dir = back, arrowhead=crow, label=" 1"];
+  "z" -> "y+ 1" [style=solid, dir = back, arrowhead=crow];
+  "x+ 1" -> "z" [style=solid, dir = back, arrowhead=crow];
 }
