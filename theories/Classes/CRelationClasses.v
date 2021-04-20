@@ -31,7 +31,11 @@ Definition arrow (A B : Type) := A -> B.
 
 Definition flip {A B C : Type} (f : A -> B -> C) := fun x y => f y x.
 
-Definition iffT (A B : Type) := ((A -> B) * (B -> A))%type.
+Record iffT@{i j} (A : Type@{i}) (B : Type@{j}) : Type@{max(i,j)} :=
+  { iffT_fst : A -> B;
+    iffT_snd : B -> A }.
+Arguments iffT_fst {A B}.
+Arguments iffT_snd {A B}.
 
 (** We allow to unfold the [crelation] definition while doing morphism search. *)
 
@@ -47,7 +51,7 @@ Section Defs.
     fun x y => R x y -> False.
 
   (** Opaque for proof-search. *)
-  Typeclasses Opaque complement iffT.
+  Typeclasses Opaque complement.
   
   (** These are convertible. *)
   Lemma complement_inverse R : complement (flip R) = flip (complement R).
@@ -341,7 +345,7 @@ Section Binary.
   Global Instance relation_equivalence_equivalence :
     Equivalence relation_equivalence.
   Proof.
-    split; red; unfold relation_equivalence, iffT.
+    split; red; unfold relation_equivalence.
     - firstorder.
     - firstorder.
     - intros x y z X X0 x0 y0. specialize (X x0 y0). specialize (X0 x0 y0). firstorder.

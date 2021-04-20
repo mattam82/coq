@@ -424,8 +424,8 @@ Section GenericInstances.
     intros R R' HRR' S S' HSS' f g.
     unfold respectful , relation_equivalence in *; simpl in *.
     split ; intros H x y Hxy.
-    - apply (fst (HSS' _ _)). apply H. now apply (snd (HRR' _ _)).
-    - apply (snd (HSS' _ _)). apply H. now apply (fst (HRR' _ _)).
+    - apply (iffT_fst (HSS' _ _)). apply H. now apply (iffT_snd (HRR' _ _)).
+    - apply (iffT_snd (HSS' _ _)). apply H. now apply (iffT_fst (HRR' _ _)).
   Qed.
 
   (** [R] is Reflexive, hence we can build the needed proof. *)
@@ -528,8 +528,8 @@ Instance proper_proper {A} : Proper (relation_equivalence ==> eq ==> iffT) (@Pro
 Proof.
   intros R R' HRR' x y <-. red in HRR'.
   split ; red ; intros. 
-  - now apply (fst (HRR' _ _)).
-  - now apply (snd (HRR' _ _)).
+  - now apply (iffT_fst (HRR' _ _)).
+  - now apply (iffT_snd (HRR' _ _)).
 Qed.
 
 Ltac proper_reflexive :=
@@ -671,9 +671,9 @@ intros.
 apply proper_sym_arrow_iffT_2. 1-2: auto with crelations.
 intros x x' Hx y y' Hy Hr.
 transitivity x.
-- generalize (partial_order_equivalence x x'); compute; intuition.
+- generalize (partial_order_equivalence x x'); compute; firstorder.
 - transitivity y; auto.
-  generalize (partial_order_equivalence y y'); compute; intuition.
+  generalize (partial_order_equivalence y y'); compute; firstorder.
 Qed.
 
 (** From a [PartialOrder] to the corresponding [StrictOrder]:
@@ -718,9 +718,9 @@ Lemma StrictOrder_PartialOrder
   `(Equivalence A eqA, StrictOrder A R, Proper _ (eqA==>eqA==>iffT) R) :
   PartialOrder eqA (relation_disjunction R eqA).
 Proof.
-intros. intros x y. compute. intuition.
+intros. intros x y. compute. firstorder.
 elim (StrictOrder_Irreflexive x).
-transitivity y; auto.
+transitivity y; firstorder auto.
 Qed.
 
 #[global]
