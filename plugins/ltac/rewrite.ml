@@ -494,7 +494,15 @@ let decompose_app_rel env evd t =
   let (rel, t1, t2) = decompose_app_rel env evd t in
   let ty = try Retyping.get_type_of ~lax:true env evd rel with Retyping.RetypeError _ -> error_no_relation () in
   let () = if not (Reductionops.is_arity env evd ty) then error_no_relation () in
-  (rel, t1, t2)
+  let ty1, ty2, concl =
+    match Reductionops.splay_arity env evd ty with
+    | [_, ty1; _, ty2], concl ->
+      if noccurn evd 0 ty2 then
+        ty1, subst1 mkProp ty2, concl
+      else error_no_relation ()
+    | _ -> assert false
+  in
+  (rel, ty1, ty2, concl, t1, t2)
 
 let decompose_applied_relation env sigma (c,l) =
   let open Context.Rel.Declaration in
@@ -503,17 +511,14 @@ let decompose_applied_relation env sigma (c,l) =
     let sigma, cl = Clenv.make_evar_clause env sigma ty in
     let sigma = Clenv.solve_evar_clause env sigma true cl l in
     let { Clenv.cl_holes = holes; Clenv.cl_concl = t } = cl in
-    let (equiv, c1, c2) = decompose_app_rel env sigma t in
-    let ty1 = Retyping.get_type_of env sigma c1 in
-    let ty2 = Retyping.get_type_of env sigma c2 in
+    let (equiv, ty1, ty2, concl, c1, c2) = decompose_app_rel env sigma t in
     match evd_convertible env sigma ty1 ty2 with
     | None -> None
     | Some sigma ->
-      let sort = sort_of_rel env sigma equiv in
       let args = Array.map_of_list (fun h -> h.Clenv.hole_evar) holes in
       let value = mkApp (c, args) in
         Some (sigma, { prf=value;
-                car=ty1; rel = equiv; sort = Sorts.is_prop sort;
+                car=ty1; rel = equiv; sort = Sorts.is_prop (ESorts.kind sigma concl);
                 c1=c1; c2=c2; holes })
   in
     match find_rel ctype with
@@ -2105,7 +2110,7 @@ let setoid_proof ty fn fallback =
     Proofview.tclORELSE
       begin
         try
-          let rel, _, _ = decompose_app_rel env sigma concl in
+          let rel, ty1, ty2, concl, _, _ = decompose_app_rel env sigma concl in
           let (sigma, t) = Typing.type_of env sigma rel in
           let car = snd (List.hd (fst (Reductionops.splay_prod env sigma t))) in
             (try init_relation_classes () with _ -> raise Not_found);
@@ -2123,7 +2128,7 @@ let setoid_proof ty fn fallback =
                 | Hipattern.NoEquationFound ->
                     begin match e with
                     | (Not_found, _) ->
-                      let rel, _, _ = decompose_app_rel env sigma concl in
+                      let rel, _, _, _, _, _ = decompose_app_rel env sigma concl in
                       not_declared ~info env sigma ty rel
                     | (e, info) ->
                       Proofview.tclZERO ~info e
