@@ -681,7 +681,7 @@ module Search = struct
           else tclDISPATCH
                  (List.init j (fun j' ->
                   let glid = Branch (i, succ (Option.default 0 k + j')) :: info.search_depth in
-                  (glid, Goal.enter (tac_of kont gls glid))))
+                  Goal.enter (tac_of kont gls glid)))
         in
         let finish nestedshelf sigma =
           let filter ev =
@@ -749,11 +749,11 @@ module Search = struct
               let () = incr kont_calls in
               let i = !kont_calls in
               let j = List.length gls in
-              search_fixpoint ~best_effort:false ~allow_out_of_order:false
+              tclDISPATCH
                 (List.init j (fun j' ->
                   let gls = CList.map Proofview.drop_state gls in
                   let glid = Branch (i, succ j') :: info.search_depth in
-                  glid, Proofview.Goal.enter (tac_of (fun info -> kont info) gls glid)))
+                  Proofview.Goal.enter (tac_of (fun info -> kont info) gls glid)))
           in
           let iftac, thentac = ktac wrap_kont in
           match iftac with
@@ -852,7 +852,7 @@ module Search = struct
       Proofview.tclEVARMAP >>= fun sigma ->
       let j = List.length gls in
       tclDISPATCH
-        (List.init j (fun i -> ([Goal (succ i)], tac sigma gls i)))
+        (List.init j (fun i -> tac_or_stuck sigma gls i))
 
   let fix_iterative t =
     let rec aux depth =
