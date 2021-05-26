@@ -1129,26 +1129,26 @@ let () =
 
 let resolve_one_typeclass env ?(sigma=Evd.from_env env) gl unique =
   let (term, sigma) = Hints.wrap_hint_warning_fun env sigma begin fun sigma ->
-  let nc, gl, subst, _ = Evarutil.push_rel_context_to_named_context env sigma gl in
-  let (gl,t,sigma) = Goal.V82.mk_goal sigma nc gl in
-  let (ev, _) = destEvar sigma t in
-  let gls = { it = gl ; sigma = sigma; } in
-  let hints = searchtable_map typeclasses_db in
-  let st = Hint_db.transparent_state hints in
-  let modes = Hint_db.modes hints in
-  let depth = get_typeclasses_depth () in
-  let gls' =
+    let nc, gl, subst, _ = Evarutil.push_rel_context_to_named_context env sigma gl in
+    let (gl,t,sigma) = Goal.V82.mk_goal sigma nc gl in
+    let (ev, _) = destEvar sigma t in
+    let gls = { it = gl ; sigma = sigma; } in
+    let hints = searchtable_map typeclasses_db in
+    let st = Hint_db.transparent_state hints in
+    let modes = Hint_db.modes hints in
+    let depth = get_typeclasses_depth () in
+    let gls' =
       try
         Proofview.V82.of_tactic
-        (Search.eauto_tac (modes,st) ~only_classes:true ~depth [hints] ~dep:true) gls
+        (Tacticals.New.tclCOMPLETE (Search.eauto_tac (modes,st) ~only_classes:true ~depth [hints] ~dep:true)) gls
       with Tacticals.FailError _ -> raise Not_found
-  in
-  let evd = sig_sig gls' in
-  let t' = mkEvar (ev, subst) in
-  let term = Evarutil.nf_evar evd t' in
-  term, evd
-  end in
-  (sigma, term)
+    in
+    let evd = sig_sig gls' in
+    let t' = mkEvar (ev, subst) in
+    let term = Evarutil.nf_evar evd t' in
+    term, evd
+    end
+  in (sigma, term)
 
 let () =
   Hook.set Typeclasses.solve_one_instance_hook
