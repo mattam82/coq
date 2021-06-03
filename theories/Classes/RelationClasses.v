@@ -162,15 +162,12 @@ Section Defs.
    It helps choosing if a rewrite should be handled
    by the generalized or the regular rewriting tactic using leibniz equality.
    Users can declare an [RewriteRelation A RA] anywhere to declare default
-   relations. This is also done automatically by the [Declare Relation A RA]
-   commands. *)
+   relations on a given type `A`. This is also done automatically by
+   the [Declare Relation A RA] commands. It has no mode declaration:
+   it will assign `?A := Prop, ?R := iff` on an entirely unspecified query
+   `RewriteRelation ?A ?R`, or any prefered rewrite relation of priority < 2. *)
 
   Class RewriteRelation (RA : relation A).
-
-  (** Any [Equivalence] declared in the context is automatically considered
-   a rewrite relation. *)
-    
-  Global Instance equivalence_rewrite_relation `(Equivalence eqA) : RewriteRelation eqA | 10 := {}.
 
   (** Leibniz equality. *)
   Section Leibniz.
@@ -187,10 +184,6 @@ Section Defs.
   
 End Defs.
 
-(* The rewrite relation class is indexed by the type and outputs the
-  sensible rewrite relations to use on a type. *)
-Global Hint Mode RewriteRelation + - : typeclass_instances.
-
 (** Default rewrite relations handled by [setoid_rewrite] on Prop. *)
 #[global]
 Instance inverse_impl_rewrite_relation : RewriteRelation (flip impl) | 3 := {}.
@@ -198,6 +191,20 @@ Instance inverse_impl_rewrite_relation : RewriteRelation (flip impl) | 3 := {}.
 Instance impl_rewrite_relation : RewriteRelation impl | 3 := {}.
 #[global]
 Instance iff_rewrite_relation : RewriteRelation iff | 2 := {}.
+
+(** Any [Equivalence] declared in the context is automatically considered
+  a rewrite relation. This only applies if the relation is at least partially
+  defined: setoid_rewrite won't try to infer arbitrary user rewrite relations. *)
+
+Definition equivalence_rewrite_relation `(eqa : Equivalence A eqA) : RewriteRelation eqA :=
+  Build_RewriteRelation _.
+
+Ltac equiv_rewrite_relation R :=
+  tryif is_evar R then fail
+  else class_apply equivalence_rewrite_relation.
+
+#[global]
+Hint Extern 10 (@RewriteRelation ?A ?R) => equiv_rewrite_relation R : typeclass_instances.
 
 (** Hints to drive the typeclass resolution avoiding loops
  due to the use of full unification. *)

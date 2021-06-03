@@ -137,7 +137,7 @@ Ltac is_arity T :=
   equality relation on Prop or Type is seldome useful. *)
 Ltac eq_rewrite_relation A :=
   tryif is_arity A then fail
-  else exact (@eq_rewrite_relation A).
+  else solve [unshelve class_apply @eq_rewrite_relation].
 
 Global Hint Extern 100 (@RewriteRelation ?A _) => eq_rewrite_relation A : typeclass_instances.
 
@@ -153,9 +153,10 @@ Hint Extern 2 (ProperProxy ?R _) =>
   not_evar R; class_apply @proper_proper_proxy : typeclass_instances.
 
 (* This tactics takes a type and (partially defined) relation and tries
-   to find all instances matching it, feeding them to kont. *)
+   to find all instances matching it which completely determine the relation,
+   feeding them to kont. *)
 Ltac find_rewrite_relation A R kont :=
-  assert (@RewriteRelation A R); [typeclasses eauto|]; kont R.
+  assert (@RewriteRelation A R); [solve [unshelve typeclasses eauto]|]; kont R.
 
 (** This hint helps infer "generic" reflexive relations, based only on the type of the
     carrier, when the relation is only partially defined (contains evars). *)
@@ -559,6 +560,10 @@ Class PartialApplication.
 CoInductive normalization_done : Prop := did_normalization.
 
 Class Params {A : Type} (of : A) (arity : nat).
+(* #[global] Instance eq_pars : Params (@eq) 1 := {}.
+#[global] Instance iff_pars : Params (@iff) 0 := {}.
+#[global] Instance impl_pars : Params (@impl) 0 := {}.
+#[global] Instance flip_pars : Params (@flip) 3 := {}. *)
 
 Ltac partial_application_tactic :=
   let rec do_partial_apps H m cont := 
