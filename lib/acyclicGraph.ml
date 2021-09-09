@@ -134,7 +134,6 @@ module Make (Point:Point) = struct
   type t =
     { entries : entry KMap.t;
       index : int;
-      n_nodes : int; n_edges : int;
       table : Key.table }
 
   (** Used to cleanup mutable marks if a traversal function is
@@ -158,7 +157,6 @@ module Make (Point:Point) = struct
   (* Every Point.t has a unique canonical arc representative *)
 
   (* Low-level function : makes u an alias for v.
-     Does not removes edges from n_edges, but decrements n_nodes.
      u should be entered as canonical before.  *)
   let enter_equiv g u v =
     { entries =
@@ -169,8 +167,6 @@ module Make (Point:Point) = struct
               Equiv v
             | _ -> assert false) g.entries;
       index = g.index;
-      n_nodes = g.n_nodes - 1;
-      n_edges = g.n_edges;
       table = g.table }
 
   (* Low-level function : changes data associated with a canonical node.
@@ -216,13 +212,10 @@ module Make (Point:Point) = struct
   (* Checks most of the invariants of the graph. For debugging purposes. *)
   let check_invariants ~required_canonical g =
     let required_canonical u = required_canonical (Key.to_point u g.table) in
-    let n_edges = ref 0 in
-    let n_nodes = ref 0 in
     KMap.iter (fun l u ->
         match u with
         | Canonical u ->
           KMap.iter (fun v _strict ->
-              incr n_edges;
               let v = repr g v in
               assert (topo_compare u v = -1);
               if u.klvl = v.klvl then
@@ -238,12 +231,9 @@ module Make (Point:Point) = struct
           assert (u.status = NoMark);
           assert (Key.equal l u.canon);
           assert (u.ilvl > g.index);
-          assert (not (KMap.mem u.canon u.ltle));
-          incr n_nodes
+          assert (not (KMap.mem u.canon u.ltle))
         | Equiv _ -> assert (not (required_canonical l)))
-      g.entries;
-    assert (!n_edges = g.n_edges);
-    assert (!n_nodes = g.n_nodes)
+      g.entries
 
   let clean_ltle g ltle =
     KMap.fold (fun u strict acc ->
@@ -270,12 +260,7 @@ module Make (Point:Point) = struct
     let ltle, chgt_ltle = clean_ltle g u.ltle in
     if not chgt_ltle then u.ltle, u, g
     else
-      let sz = KMap.cardinal u.ltle in
-      let sz2 = KMap.cardinal ltle in
-      let u = { u with ltle } in
-      let g = change_node g u in
-      let g = { g with n_edges = g.n_edges + sz2 - sz } in
-      u.ltle, u, g
+      u.ltle, u, change_node g { u with ltle }
 
   let get_gtge g u =
     let gtge, chgt_gtge = clean_gtge g u.gtge in
@@ -470,14 +455,6 @@ module Make (Point:Point) = struct
             g to_merge
         in
 
-        (* Updating g.n_edges *)
-        let oldsz =
-          List.fold_left (fun sz u -> sz+KMap.cardinal u.ltle)
-            0 to_merge
-        in
-        let sz = KMap.cardinal ltle in
-        let g = { g with n_edges = g.n_edges + sz - oldsz } in
-
         (* Not clear in the paper: we have to put the newly
             created component just between B and F. *)
         List.rev_append f_reindex (root.canon::b_reindex), g
@@ -502,18 +479,13 @@ module Make (Point:Point) = struct
         if strict then raise CycleDetected else g
       else
         let g =
-          try let oldstrict = KMap.find v.canon u.ltle in
-            if strict && not oldstrict then
-              change_node g { u with ltle = KMap.add v.canon true u.ltle }
-            else g
-          with Not_found ->
-            { (change_node g { u with ltle = KMap.add v.canon strict u.ltle })
-              with n_edges = g.n_edges + 1 }
+          match strict, KMap.find v.canon u.ltle with
+          | exception Not_found | true, false ->
+             change_node g { u with ltle = KMap.add v.canon strict u.ltle }
+          | _ -> g
         in
         if u.klvl <> v.klvl || KSet.mem u.canon v.gtge then g
-        else
-          let v = { v with gtge = KSet.add u.canon v.gtge } in
-          change_node g v
+        else change_node g { v with gtge = KSet.add u.canon v.gtge }
     with
     | CycleDetected as e -> raise e
     | e ->
@@ -537,7 +509,7 @@ module Make (Point:Point) = struct
       }
       in
       let entries = KMap.add v (Canonical node) g.entries in
-      { entries; index = g.index - 1; n_nodes = g.n_nodes + 1; n_edges = g.n_edges; table }
+      { entries; index = g.index - 1; table }
 
   exception Undeclared of Point.t
   let check_declared g us =
@@ -700,7 +672,7 @@ module Make (Point:Point) = struct
       Point.error_inconsistency Lt u v (get_explanation false iv iu g)
 
   let empty =
-    { entries = KMap.empty; index = 0; n_nodes = 0; n_edges = 0; table = Key.empty }
+    { entries = KMap.empty; index = 0; table = Key.empty }
 
   (* Normalization *)
 
