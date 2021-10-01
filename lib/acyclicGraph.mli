@@ -10,7 +10,12 @@
 
 (** Graphs representing strict orders *)
 
-type constraint_type = Lt | Le | Eq
+type constraint_weight
+val weight_le : constraint_weight (* 0 *)
+val weight_lt : constraint_weight (* -1 *)
+val weight_of_int : int -> constraint_weight
+
+type constraint_type = Eq | Le
 
 module type Point = sig
   type t
@@ -18,13 +23,18 @@ module type Point = sig
   module Set : CSig.SetS with type elt = t
   module Map : CMap.ExtS with type key = t and module Set := Set
 
-  module Constraints : CSet.S with type elt = (t * constraint_type * t)
+  (* TODO : we should reduce ambiguity in constraints sets by
+     - not inserting Eq constraints (instead use a pair of Le constraints)
+     - use a map from pairs of points to weight, so that we cannot have edges
+       of different weights between the same pair of points. *)
+  module Constraints : CSet.S with type elt = (t * constraint_type * constraint_weight * t)
 
   val equal : t -> t -> bool
   val compare : t -> t -> int
 
-  type explanation = (constraint_type * t) list
-  val error_inconsistency : constraint_type -> t -> t -> explanation lazy_t option -> 'a
+  type explanation = (constraint_type * constraint_weight * t) list
+  val error_inconsistency :
+    t -> t -> constraint_type -> constraint_weight -> explanation lazy_t option -> 'a
 
   val pr : t -> Pp.t
 end
@@ -43,33 +53,36 @@ module Make (Point:Point) : sig
      they can be mentioned in the others. NB: use a large [rank] to
      keep the node canonical *)
 
+  (** [add_shift x y w g] Adds x as a shifted alias for y. I.e., we then
+     have x = y + w. *)
+  val add_shift : Point.t -> constraint_weight -> Point.t -> t -> t
+
   exception Undeclared of Point.t
   val check_declared : t -> Point.Set.t -> unit
-  (** @raise Undeclared if one of the points is not present in the graph. *)
+  (** @raise Undeclared if the points is not present in the graph. *)
 
-  type 'a check_function = t -> 'a -> 'a -> bool
+  val check_shift : t -> Point.t -> constraint_weight -> Point.t -> bool
 
-  val check_eq : Point.t check_function
-  val check_leq : Point.t check_function
-  val check_lt : Point.t check_function
+  val check : t -> Point.t -> constraint_weight -> Point.t -> bool
 
-  val enforce_eq : Point.t -> Point.t -> t -> t
-  val enforce_leq : Point.t -> Point.t -> t -> t
-  val enforce_lt : Point.t -> Point.t -> t -> t
+  val enforce_shift : Point.t-> constraint_weight -> Point.t -> t -> t
 
-  val constraints_of : t -> Point.Constraints.t * Point.Set.t list
+  val enforce : Point.t -> constraint_weight -> Point.t -> t -> t
+
+  val constraints_of : t -> Point.Constraints.t * constraint_weight Point.Map.t list
 
   val constraints_for : kept:Point.Set.t -> t -> Point.Constraints.t
 
   val domain : t -> Point.Set.t
 
-  val choose : (Point.t -> bool) -> t -> Point.t -> Point.t option
+  val choose : (Point.t -> bool) -> t -> Point.t ->
+               (constraint_weight * Point.t) option
 
   (** {5 High-level representation} *)
 
   type node =
-  | Alias of Point.t
-  | Node of bool Point.Map.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
+  | Alias of constraint_weight * Point.t
+  | Node of constraint_weight Point.Map.t
   type repr = node Point.Map.t
   val repr : t -> repr
 

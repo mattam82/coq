@@ -39,6 +39,7 @@ sig
   val filter_with : bool list -> 'a list -> 'a list
   val map_filter : ('a -> 'b option) -> 'a list -> 'b list
   val map_filter_i : (int -> 'a -> 'b option) -> 'a list -> 'b list
+  val rev_filter : ('a -> bool) -> 'a list -> 'a list
   val partitioni :
     (int -> 'a -> bool) -> 'a list -> 'a list * 'a list
   val map : ('a -> 'b) -> 'a list -> 'b list
@@ -393,6 +394,14 @@ let rec map_filter_i_loop' f i = function
 
 let map_filter_i f l =
   map_filter_i_loop' f 0 l
+
+let rec rev_filter_loop p acc = function
+  | [] -> acc
+  | x :: l ->
+    if p x then rev_filter_loop p (x :: acc) l
+    else rev_filter_loop p acc l
+
+let rev_filter p l = rev_filter_loop p [] l
 
 let partitioni p =
   let rec aux i = function

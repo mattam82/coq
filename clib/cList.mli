@@ -100,6 +100,10 @@ sig
   val map_filter_i : (int -> 'a -> 'b option) -> 'a list -> 'b list
   (** Like [map_filter] but with an index starting from [0] *)
 
+  val rev_filter : ('a -> bool) -> 'a list -> 'a list
+  (** [rev_filter p l] is equivalent to [List.rev (List.filter p l)],
+      but tail-recursive and more efficient. *)
+
   val partitioni : (int -> 'a -> bool) -> 'a list -> 'a list * 'a list
   (** Like [List.partition] but with an index starting from [0] *)
 
