@@ -14,6 +14,7 @@ sig
   val zero : t
   val minus_one : t
   val of_int : int -> t
+  val to_int : t -> int
   val inf : t
   val (+) : t -> t -> t
   val (-) : t -> t -> t
@@ -36,6 +37,7 @@ struct
 
   let zero = 0 and minus_one = -1 and inf = max_int
   let of_int = check_overflow
+  let to_int x = x
   let (+) x y =
     if x = inf || y = inf then inf
     else check_overflow (x+y)
@@ -405,6 +407,8 @@ module Make (Point:Point) = struct
     else if u.ilvl > v.ilvl then 1
     else if u.ilvl < v.ilvl then -1
     else (assert (u==v); 0)
+
+  module TMap = Map.Make(struct type t = scc let compare = topo_compare end)
 
   (* Checks most of the invariants of the graph. For debugging purposes. *)
   let check_invariants ~required_canonical g =
@@ -952,7 +956,7 @@ module Make (Point:Point) = struct
   (* domain g.entries = kept + removed *)
   let constraints_for ~kept g =
     let csts = ref Constraints.empty in
-    let add_cst u kind w v =
+    let add_constraint u kind w v =
       csts := Constraints.add (Key.to_point u g.table, kind, w, Key.to_point v g.table) !csts
     in
     let kept = Point.Set.fold (fun u accu -> KSet.add (Key.of_point u g.table) accu) kept KSet.empty in
@@ -960,54 +964,91 @@ module Make (Point:Point) = struct
     let rmap = KSet.fold (fun u rmap ->
         let w, ucan = repr_shift g u in
         if KSet.mem ucan kept then begin
-            if not (Key.equal u ucan) then add_cst u Eq w ucan;
+            if not (Key.equal u ucan) then add_constraint u Eq w ucan;
             KMap.add ucan (W.zero, ucan) rmap
         end else
           match KMap.find_opt ucan rmap with
-          | Some (w', v) -> add_cst u Eq W.(w+w') v; rmap
+          | Some (w', v) -> add_constraint u Eq W.(w+w') v; rmap
           | None -> KMap.add ucan (W.(-w), u) rmap)
       kept KMap.empty
     in
 
-    kept |> KSet.iter (fun u ->
-      if Key.equal (snd (KMap.find (snd (repr_shift g u)) rmap)) u then begin
-        (* FIXME : This algorithm is exponential in the worst case (this
-           is basically an exhaustive traversal of all the paths starting
-           from [u]). *)
-        let todo = Stack.create () in
-        Stack.push (u, W.zero) todo;
-        try while true do
-          let v, w = Stack.pop todo in
-          let start = Key.equal u v in
-          let w', v = repr_shift g v in
-          let w = W.(w+w') in
-          match if start then None else KMap.find_opt v rmap with
-          | Some (w', v') -> add_cst u Le W.(w+w') v'
-          | None ->
-            let vc, vi = repr_scc g v in
-            let n = Array.length vc.nodes in
-            let dist a b = DistMat.dist a b vc.dists in
-            for i = 0 to n - 1 do
-              match if i = vi then None else KMap.find_opt vc.nodes.(i) rmap with
-              | Some (w', v') -> add_cst u Le W.(w + dist vi i + w') v'
+    kept |> KSet.iter (fun u0 ->
+      let uw, u = repr_shift g u0 in
+      if Key.equal (snd (KMap.find u rmap)) u0 then begin
+        let todo = ref TMap.empty in
+        let push_todo v w =
+          let vw, v, vc, vi = repr g v in
+          let w = W.(w + vw) in
+          todo := !todo |> TMap.update vc (function
+              | Some vcw -> vcw.(vi) <- W.min vcw.(vi) w; Some vcw
               | None ->
-                let exception Implied in
-                try
-                  for j = 0 to n - 1 do
-                    if j <> vi && KMap.mem vc.nodes.(j) rmap && W.(dist vi j + dist j i = dist vi i)
-                    then raise Implied
-                  done;
-                  vc.fwd.(i) |> KMap.iter (fun v' wv' ->
-                                    Stack.push (v', W.(w + dist vi i + wv')) todo)
-                with Implied -> ()
-            done
-          done with Stack.Empty -> ()
-        end) ;
+                 let vcw = Array.make (Array.length vc.nodes) W.inf in
+                 vcw.(vi) <- w;
+                 Some vcw)
+        in
+        push_todo u uw;
+        while not (TMap.is_empty !todo) do
+          let vc, vcw = TMap.min_binding !todo in todo := TMap.remove vc !todo;
+          let n = Array.length vcw in
+          let dist a b = DistMat.dist a b vc.dists in
+          let d = Array.make n W.inf in
+          for i = 0 to n-1 do
+            if W.(vcw.(i) < inf) then
+              for j = 0 to n-1 do
+                d.(j) <- W.(min (vcw.(i) + dist i j) d.(j))
+              done
+          done;
+          for i = 0 to n-1 do
+            let exception Implied in
+            try
+              for j = 0 to n-1 do
+                if i <> j && not (Key.equal vc.nodes.(j) u) &&
+                   W.(d.(j) + dist j i = d.(i)) && KMap.mem vc.nodes.(j) rmap
+                then raise Implied
+              done;
+              match if Key.equal vc.nodes.(i) u then None else KMap.find_opt vc.nodes.(i) rmap with
+              | Some (w', v') -> add_constraint u0 Le W.(d.(i) + w') v'
+              | None ->
+                vc.fwd.(i) |> KMap.iter (fun v' wv' -> push_todo v' W.(d.(i) + wv'))
+            with Implied -> ()
+          done
+        done
+      end);
     !csts
 
   let domain g =
     KMap.fold (fun u _ acc -> Point.Set.add (Key.to_point u g.table) acc)
       g.entries Point.Set.empty
+
+  let model g =
+    let vals =
+      ref (g.entries
+           |> KMap.filter (fun _ -> function Shift _ -> false | _ -> true)
+           |> KMap.map (fun _ -> W.zero))
+    in
+    let min_val u l = vals := !vals |> KMap.modify u (fun _ l' -> W.min l l') in
+    KMap.fold (fun _ x acc -> match x with SccHead (c, _) -> c::acc | _ -> acc) g.entries []
+    |> List.sort topo_compare
+    |> List.iter (fun c ->
+       let n = Array.length c.nodes in
+       for j = 0 to n-1 do
+         for i = 0 to n-1 do
+           if i <> j then
+             min_val c.nodes.(j)
+               W.(KMap.find c.nodes.(i) !vals + DistMat.dist i j c.dists)
+         done;
+         c.fwd.(j) |> KMap.iter (fun v w ->
+           let wv, v = repr_shift g v in
+           min_val v W.(KMap.find c.nodes.(j) !vals + w + wv))
+       done);
+    g.entries |> KMap.iter (fun u -> function
+                     | Shift (w, v) ->
+                        let wv, v = repr_shift g v in
+                        vals := KMap.add u W.(w + wv + KMap.find v !vals) !vals
+                     | _ -> ());
+    KMap.fold (fun u w acc -> Point.Map.add (Key.to_point u g.table)
+                                (-W.to_int w) acc) !vals Point.Map.empty
 
   let choose p g u =
     let exception Found of (constraint_weight * Point.t) in

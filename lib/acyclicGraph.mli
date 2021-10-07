@@ -75,6 +75,8 @@ module Make (Point:Point) : sig
 
   val domain : t -> Point.Set.t
 
+  val model : t -> int Point.Map.t
+
   val choose : (Point.t -> bool) -> t -> Point.t ->
                (constraint_weight * Point.t) option
 
