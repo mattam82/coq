@@ -34,7 +34,7 @@ module type Point = sig
 
   type explanation = (constraint_type * constraint_weight * t) list
   val error_inconsistency :
-    t -> t -> constraint_type -> constraint_weight -> explanation lazy_t option -> 'a
+    t -> constraint_type -> constraint_weight -> t -> explanation lazy_t option -> 'a
 
   val pr : t -> Pp.t
 end
@@ -59,7 +59,7 @@ module Make (Point:Point) : sig
 
   exception Undeclared of Point.t
   val check_declared : t -> Point.Set.t -> unit
-  (** @raise Undeclared if the points is not present in the graph. *)
+  (** @raise Undeclared if one of the points is not present in the graph. *)
 
   val check_shift : t -> Point.t -> constraint_weight -> Point.t -> bool
 

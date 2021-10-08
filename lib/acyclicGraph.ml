@@ -71,7 +71,7 @@ module type Point = sig
 
   type explanation = (constraint_type * W.t * t) list
   val error_inconsistency :
-    t -> t -> constraint_type -> W.t -> explanation lazy_t option -> 'a
+    t -> constraint_type -> W.t -> t -> explanation lazy_t option -> 'a
 
   val pr : t -> Pp.t
 end
@@ -830,7 +830,7 @@ module Make (Point:Point) = struct
                   (Key.of_point u g.table) w (Key.of_point v g.table) g))
 
   let explained_error u ty w v g =
-    Point.error_inconsistency u v ty w (get_explanation v W.(-w) u g)
+    Point.error_inconsistency u ty w v (get_explanation v W.(-w) u g)
 
   (* To compare two nodes, we simply do a forward search.
      We implement two improvements:
