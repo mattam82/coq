@@ -160,7 +160,7 @@ let tag_var = tag Tag.variable
     | CRawType s -> Univ.Level.pr s
 
   let pr_univ_expr (u,n) =
-    pr_sort_name_expr u ++ (match n with 0 -> mt () | _ -> str"+" ++ int n)
+    pr_sort_name_expr u ++ Univ.pr_increment n
 
   let pr_univ l =
     match l with
@@ -186,6 +186,9 @@ let tag_var = tag Tag.variable
     | UNamed (CType u) -> tag_type (pr_qualid u)
     | UNamed (CRawType s) -> tag_type (Univ.Level.pr s)
 
+  let pr_univ_level_expr_expr (e, n) =
+    pr_univ_level_expr e ++ Univ.pr_increment n
+
   let pr_qualid sp =
     let (sl, id) = repr_qualid sp in
     let id = tag_ref (Id.print id) in
@@ -202,7 +205,7 @@ let tag_var = tag Tag.variable
   let pr_patvar = pr_id
 
   let pr_universe_instance l =
-    pr_opt_no_spc (pr_univ_annot (prlist_with_sep spc pr_univ_level_expr)) l
+    pr_opt_no_spc (pr_univ_annot (prlist_with_sep spc pr_univ_level_expr_expr)) l
 
   let pr_reference qid =
     if qualid_is_ident qid then tag_var (pr_id @@ qualid_basename qid)

@@ -1168,7 +1168,7 @@ let intern_sort ~local_univs s =
   map_glob_sort_gen (List.map (on_fst (intern_sort_name ~local_univs))) s
 
 let intern_instance ~local_univs us =
-  Option.map (List.map (map_glob_sort_gen (intern_sort_name ~local_univs))) us
+  Option.map (List.map (fun (l, i) -> map_glob_sort_gen (intern_sort_name ~local_univs) l, i)) us
 
 let intern_name_alias = function
   | { CAst.v = CRef(qid,u) } ->
@@ -1248,10 +1248,10 @@ let find_projection_data c =
   | GRef (GlobRef.ConstRef cst,us) -> Some (cst, us, [], Structure.projection_nparams cst)
   | _ -> None
 
-let glob_sort_of_level (level: glob_level) : glob_sort =
+let glob_sort_of_level_expr (level: glob_level * int) : glob_sort =
   match level with
-  | UAnonymous {rigid} -> UAnonymous {rigid}
-  | UNamed id -> UNamed [id,0]
+  | UAnonymous {rigid}, n -> UAnonymous {rigid}
+  | UNamed id, n -> UNamed [id,n]
 
 (* Is it a global reference or a syntactic definition? *)
 let intern_qualid ?(no_secvar=false) qid intern env ntnvars us args =
@@ -1286,7 +1286,7 @@ let intern_qualid ?(no_secvar=false) qid intern env ntnvars us args =
           DAst.make ?loc @@ GApp (DAst.make ?loc:loc' @@ GRef (ref, us), arg)
         | _ -> err ()
         end
-      | Some [s], GSort (UAnonymous {rigid=true}) -> DAst.make ?loc @@ GSort (glob_sort_of_level s)
+      | Some [s], GSort (UAnonymous {rigid=true}) -> DAst.make ?loc @@ GSort (glob_sort_of_level_expr s)
       | Some [_old_level], GSort _new_sort ->
         (* TODO: add old_level and new_sort to the error message *)
         user_err ?loc (str "Cannot change universe level of notation " ++ pr_qualid qid)
@@ -2785,15 +2785,15 @@ let interp_named_context_evars ?(program_mode=false) ?(impl_env=empty_internaliz
 
 (** Local universe and constraint declarations. *)
 
-let interp_known_level evd u =
+let interp_known_level_expr evd (u, n) =
   let u = intern_sort_name ~local_univs:{bound = bound_univs evd; unb_univs=false} u in
-  Pretyping.known_glob_level evd u
+  Univ.LevelExpr.make ~weight:n (Pretyping.known_glob_level evd u)
 
 let interp_univ_constraints env evd cstrs =
   let interp (evd,cstrs) (u, d, u') =
-    let ul = interp_known_level evd u in
-    let u'l = interp_known_level evd u' in
-    let cstr = (ul,d,u'l) in
+    let ul = interp_known_level_expr evd u in
+    let u'l = interp_known_level_expr evd u' in
+    let cstr = Univ.(mk_constraint ul d u'l) in
     let cstrs' = Univ.Constraints.add cstr cstrs in
     try let evd = Evd.add_constraints evd (Univ.Constraints.singleton cstr) in
         evd, cstrs'

@@ -398,12 +398,12 @@ let glob_level ?loc evd : glob_level -> _ = function
 let instance ?loc evd l =
   let evd, l' =
     List.fold_left
-      (fun (evd, univs) l ->
+      (fun (evd, univs) (l, i) ->
          let evd, l = glob_level ?loc evd l in
-         (evd, l :: univs)) (evd, [])
+         (evd, Univ.LevelExpr.make ~weight:i l :: univs)) (evd, [])
       l
   in
-  if List.exists (fun l -> Univ.Level.is_prop l) l' then
+  if List.exists (fun l -> Univ.LevelExpr.is_prop l) l' then
     user_err ?loc ~hdr:"pretype"
       (str "Universe instances cannot contain Prop, polymorphic" ++
        str " universe instances must be greater or equal to Set.");
@@ -485,12 +485,12 @@ let mark_obligation_evar sigma k evc =
 type 'a pretype_fun = ?loc:Loc.t -> program_mode:bool -> poly:bool -> bool -> type_constraint -> GlobEnv.t -> evar_map -> evar_map * 'a
 
 type pretyper = {
-  pretype_ref : pretyper -> GlobRef.t * glob_level list option -> unsafe_judgment pretype_fun;
+  pretype_ref : pretyper -> GlobRef.t * glob_level_expr list option -> unsafe_judgment pretype_fun;
   pretype_var : pretyper -> Id.t -> unsafe_judgment pretype_fun;
   pretype_evar : pretyper -> existential_name CAst.t * (lident * glob_constr) list -> unsafe_judgment pretype_fun;
   pretype_patvar : pretyper -> Evar_kinds.matching_var_kind -> unsafe_judgment pretype_fun;
   pretype_app : pretyper -> glob_constr * glob_constr list -> unsafe_judgment pretype_fun;
-  pretype_proj : pretyper -> (Constant.t * glob_level list option) * glob_constr list * glob_constr -> unsafe_judgment pretype_fun;
+  pretype_proj : pretyper -> (Constant.t * glob_level_expr list option) * glob_constr list * glob_constr -> unsafe_judgment pretype_fun;
   pretype_lambda : pretyper -> Name.t * binding_kind * glob_constr * glob_constr -> unsafe_judgment pretype_fun;
   pretype_prod : pretyper -> Name.t * binding_kind * glob_constr * glob_constr -> unsafe_judgment pretype_fun;
   pretype_letin : pretyper -> Name.t * glob_constr * glob_constr option * glob_constr -> unsafe_judgment pretype_fun;
@@ -503,7 +503,7 @@ type pretyper = {
   pretype_cast : pretyper -> glob_constr * glob_constr cast_type -> unsafe_judgment pretype_fun;
   pretype_int : pretyper -> Uint63.t -> unsafe_judgment pretype_fun;
   pretype_float : pretyper -> Float64.t -> unsafe_judgment pretype_fun;
-  pretype_array : pretyper -> glob_level list option * glob_constr array * glob_constr * glob_constr -> unsafe_judgment pretype_fun;
+  pretype_array : pretyper -> glob_level_expr list option * glob_constr array * glob_constr * glob_constr -> unsafe_judgment pretype_fun;
   pretype_type : pretyper -> glob_constr -> unsafe_type_judgment pretype_fun;
 }
 
@@ -1282,31 +1282,35 @@ let pretype_type self c ?loc ~program_mode ~poly resolve_tc valcon (env : GlobEn
         in
         discard_trace @@ inh_conv_coerce_to_tycon ?loc ~program_mode resolve_tc env sigma resj tycon
 
+  let glob_level_expr ?loc sigma (l, w) =
+    let sigma, u = glob_level ?loc sigma l in
+    sigma, Univ.LevelExpr.make ~weight:w u
+
   let pretype_array self (u,t,def,ty) =
     fun ?loc ~program_mode ~poly resolve_tc tycon env sigma ->
     let sigma, u = match u with
       | None -> sigma, None
-      | Some [u] ->
-        let sigma, u = glob_level ?loc sigma u in
-        sigma, Some u
+      | Some [l] -> let sigma, e = glob_level_expr ?loc sigma l in
+        sigma, Some e
       | Some u -> user_err ?loc Pp.(str "Universe instance should have length 1.")
     in
     let sigma, tycon' = split_as_array !!env sigma tycon in
     let sigma, jty = eval_type_pretyper self ~program_mode ~poly resolve_tc tycon' env sigma ty in
     (* XXX not sure if we need to be this complex, I wrote this while
        being confused by broken universe substitutions *)
-    let sigma, u = match Univ.Universe.level (Sorts.univ_of_sort jty.utj_type) with
+    let sigma, u = match Univ.Universe.level_expr (Sorts.univ_of_sort jty.utj_type) with
       | Some v ->
-        let sigma = Evd.make_nonalgebraic_variable sigma v in
-        let sigma = Option.cata (Evd.set_leq_level sigma v) sigma u in
+        let sigma = Evd.make_nonalgebraic_variable sigma (Univ.LevelExpr.get_level v) in
+        let sigma = Option.cata (Evd.set_leq_level_expr sigma v) sigma u in
         sigma, Option.default v u
       | None ->
         let sigma, u = match u with
           | Some u -> sigma, u
-          | None -> Evd.new_univ_level_variable UState.univ_flexible sigma
+          | None -> let sigma, l = Evd.new_univ_level_variable UState.univ_flexible sigma in
+          sigma, Univ.LevelExpr.make l
         in
         let sigma = Evd.set_leq_sort !!env sigma jty.utj_type
-            (Sorts.sort_of_univ (Univ.Universe.make u))
+            (Sorts.sort_of_univ (Univ.Universe.tip u))
         in
         sigma, u
     in

@@ -11,8 +11,8 @@
 open Univ
 open UnivSubst
 
-(** Unordered pairs of universe levels (ie (u,v) = (v,u)) *)
-module UPairSet : CSet.S with type elt = (Level.t * Level.t)
+(** Unordered pairs of universe level expressions (ie (u,v) = (v,u)) *)
+module UPairSet : CSet.S with type elt = (LevelExpr.t * LevelExpr.t)
 
 (** Simplification and pruning of constraints:
     [normalize_context_set ctx us]

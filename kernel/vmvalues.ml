@@ -51,7 +51,7 @@ type structured_constant =
   | Const_sort of Sorts.t
   | Const_ind of inductive
   | Const_b0 of tag
-  | Const_univ_level of Univ.Level.t
+  | Const_univ_level of Univ.LevelExpr.t
   | Const_val of structured_values
   | Const_uint of Uint63.t
   | Const_float of Float64.t
@@ -100,7 +100,7 @@ let eq_structured_constant c1 c2 = match c1, c2 with
 | Const_ind _, _ -> false
 | Const_b0 t1, Const_b0 t2 -> Int.equal t1 t2
 | Const_b0 _, _ -> false
-| Const_univ_level l1 , Const_univ_level l2 -> Univ.Level.equal l1 l2
+| Const_univ_level l1 , Const_univ_level l2 -> Univ.LevelExpr.equal l1 l2
 | Const_univ_level _ , _ -> false
 | Const_val v1, Const_val v2 -> eq_structured_values v1 v2
 | Const_val _, _ -> false
@@ -115,7 +115,7 @@ let hash_structured_constant c =
   | Const_sort s -> combinesmall 1 (Sorts.hash s)
   | Const_ind i -> combinesmall 2 (Ind.CanOrd.hash i)
   | Const_b0 t -> combinesmall 3 (Int.hash t)
-  | Const_univ_level l -> combinesmall 4 (Univ.Level.hash l)
+  | Const_univ_level l -> combinesmall 4 (Univ.LevelExpr.hash l)
   | Const_val v -> combinesmall 5 (hash_structured_values v)
   | Const_uint i -> combinesmall 6 (Uint63.hash i)
   | Const_float f -> combinesmall 7 (Float64.hash f)
@@ -144,7 +144,7 @@ let pp_struct_const = function
   | Const_sort s -> pp_sort s
   | Const_ind (mind, i) -> Pp.(MutInd.print mind ++ str"#" ++ int i)
   | Const_b0 i -> Pp.int i
-  | Const_univ_level l -> Univ.Level.pr l
+  | Const_univ_level l -> Univ.LevelExpr.pr l
   | Const_val _ -> Pp.str "(value)"
   | Const_uint i -> Pp.str (Uint63.to_string i)
   | Const_float f -> Pp.str (Float64.to_string f)
@@ -284,7 +284,7 @@ type whd =
   | Vfloat64 of float
   | Varray of values Parray.t
   | Vatom_stk of atom * stack
-  | Vuniv_level of Univ.Level.t
+  | Vuniv_level of Univ.LevelExpr.t
 
 (* Functions over arguments *)
 let nargs : arguments -> int = fun args -> Obj.size (Obj.repr args) - 3
@@ -299,7 +299,7 @@ let arg args i =
 (* Destructors ***********************************)
 (*************************************************)
 
-let uni_lvl_val (v : values) : Univ.Level.t =
+let uni_lvl_val (v : values) : Univ.LevelExpr.t =
     let whd = Obj.magic v in
     match whd with
     | Vuniv_level lvl -> lvl

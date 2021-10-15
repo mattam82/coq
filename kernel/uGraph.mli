@@ -29,6 +29,11 @@ type 'a check_function = t -> 'a -> 'a -> bool
 
 val check_leq : Universe.t check_function
 val check_eq : Universe.t check_function
+
+val check_leq_level_expr : LevelExpr.t check_function
+val check_eq_level_expr : LevelExpr.t check_function
+
+val check_leq_level : Level.t check_function
 val check_eq_level : Level.t check_function
 
 (** The initial graph of universes: Prop < Set *)
@@ -83,9 +88,9 @@ val empty_universes : t
 (** [constraints_of_universes g] returns [csts] and [partition] where
    [csts] are the non-Eq constraints and [partition] is the partition
    of the universes into equivalence classes. *)
-val constraints_of_universes : t -> Constraints.t * Level.Set.t list
+val constraints_of_universes : t -> Constraints.t * AcyclicGraph.constraint_weight Level.Map.t list
 
-val choose : (Level.t -> bool) -> t -> Level.t -> Level.t option
+val choose : (Level.t -> bool) -> t -> Level.t -> LevelExpr.t option
 (** [choose p g u] picks a universe verifying [p] and equal
    to [u] in [g]. *)
 
@@ -105,8 +110,8 @@ val check_subtype : lbound:Bound.t -> AbstractContext.t check_function
 (** {6 Dumping} *)
 
 type node =
-| Alias of Level.t
-| Node of bool Level.Map.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
+| Alias of constraint_weight * Level.t
+| Node of constraint_weight Level.Map.t (** Nodes v s.t. u < v (true) or u <= v (false) *)
 
 val repr : t -> node Level.Map.t
 

@@ -327,7 +327,7 @@ let judge_of_array env sigma u tj defj tyj =
     | _ -> assert false
   in
   let sigma = Evd.set_leq_sort env sigma tyj.utj_type
-      (Sorts.sort_of_univ (Univ.Universe.make ulev))
+      (Sorts.sort_of_univ (Univ.Universe.tip ulev))
   in
   let check_one sigma j = check_actual_type env sigma j tyj.utj_val in
   let sigma = check_one sigma defj in

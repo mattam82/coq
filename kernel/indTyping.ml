@@ -193,10 +193,10 @@ let allowed_sorts {ind_squashed;ind_univ;ind_min_univ=_;ind_has_relevant_arg=_;m
    can be used as an instance of l. All bounds from above, i.e.
    l <=/< r will be valid for any l' <= l. *)
 let unbounded_from_below u cstrs =
-  Univ.Constraints.for_all (fun (l, d, r) ->
+  Univ.Constraints.for_all (fun (l, d, _, r) ->
       match d with
       | Eq -> not (Univ.Level.equal l u) && not (Univ.Level.equal r u)
-      | Lt | Le -> not (Univ.Level.equal r u))
+      | Le -> not (Univ.Level.equal r u))
     cstrs
 
 (* Returns the list [x_1, ..., x_n] of levels contributing to template
@@ -374,7 +374,7 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
       | Monomorphic_ind_entry | Template_ind_entry _ ->
         CErrors.user_err Pp.(str "Inductive cannot be both monomorphic and universe cumulative.")
       | Polymorphic_ind_entry uctx ->
-        let univs = Instance.to_array @@ UContext.instance uctx in
+        let univs = LevelAbstraction.to_array @@ UContext.abstraction uctx in
         let univs = Array.map2 (fun a b -> a,b) univs variances in
         let univs = match sec_univs with
           | None -> univs
@@ -392,7 +392,7 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
     Univ.empty_level_subst, Monomorphic
   | Polymorphic_ind_entry uctx ->
     let (inst, auctx) = Univ.abstract_universes uctx in
-    let inst = Univ.make_instance_subst inst in
+    let inst = Univ.make_level_abstraction_subst inst in
     (inst, Polymorphic auctx)
   in
   let params = Vars.subst_univs_level_context usubst params in

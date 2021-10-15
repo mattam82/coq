@@ -65,7 +65,7 @@ type symbol =
   | SymbInd of inductive
   | SymbMeta of metavariable
   | SymbEvar of Evar.t
-  | SymbLevel of Univ.Level.t
+  | SymbLevel of Univ.LevelExpr.t
   | SymbProj of (inductive * int)
 
 type symbols = symbol array
@@ -77,9 +77,9 @@ val empty_symbols : symbols
 val mk_accu : atom -> t
 val mk_rel_accu : int -> t
 val mk_rels_accu : int -> int -> t array
-val mk_constant_accu : Constant.t -> Univ.Level.t array -> t
-val mk_ind_accu : inductive -> Univ.Level.t array -> t
-val mk_sort_accu : Sorts.t -> Univ.Level.t array -> t
+val mk_constant_accu : Constant.t -> Univ.LevelExpr.t array -> t
+val mk_ind_accu : inductive -> Univ.LevelExpr.t array -> t
+val mk_sort_accu : Sorts.t -> Univ.LevelExpr.t array -> t
 val mk_var_accu : Id.t -> t
 val mk_sw_accu : annot_sw -> accumulator -> t -> (t -> t)
 val mk_prod_accu : Name.t -> t -> t -> t

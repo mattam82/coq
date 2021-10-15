@@ -783,6 +783,9 @@ let existential_type0 = existential_type
 let add_constraints d c =
   { d with universes = UState.add_constraints d.universes c }
 
+let add_constraint d c =
+  { d with universes = UState.add_constraints d.universes (Univ.Constraints.singleton c) }
+
 let add_universe_constraints d c =
   { d with universes = UState.add_universe_constraints d.universes c }
 
@@ -1043,7 +1046,10 @@ let set_eq_level d u1 u2 =
   add_constraints d (Univ.enforce_eq_level u1 u2 Univ.Constraints.empty)
 
 let set_leq_level d u1 u2 =
-  add_constraints d (Univ.enforce_leq_level u1 u2 Univ.Constraints.empty)
+  add_constraints d (Univ.enforce_leq_level u1 0 u2 Univ.Constraints.empty)
+
+let set_leq_level_expr d u1 u2 =
+  add_constraint d (Univ.mk_constraint u1 Univ.Le u2)
 
 let set_eq_instances ?(flex=false) d u1 u2 =
   add_universe_constraints d

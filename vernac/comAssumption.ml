@@ -33,7 +33,7 @@ let declare_variable is_coe ~kind typ univs imps impl {CAst.v=name} =
   ()
 
 let instance_of_univ_entry = function
-  | UState.Polymorphic_entry univs -> Univ.UContext.instance univs
+  | UState.Polymorphic_entry univs -> Univ.UContext.abstract_instance univs
   | UState.Monomorphic_entry _ -> Univ.Instance.empty
 
 let declare_axiom is_coe ~poly ~local ~kind typ (univs, ubinders) imps nl {CAst.v=name} =

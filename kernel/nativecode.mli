@@ -48,7 +48,7 @@ val get_meta : symbols -> int -> metavariable
 
 val get_evar : symbols -> int -> Evar.t
 
-val get_level : symbols -> int -> Univ.Level.t
+val get_level : symbols -> int -> Univ.LevelExpr.t
 
 val get_proj : symbols -> int -> inductive * int
 

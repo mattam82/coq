@@ -35,7 +35,7 @@ type 'a t = {
   (** Are there polymorphic universes or constraints, including in previous sections. *)
   entries : section_entry list;
   (** Definitions introduced in the section *)
-  data : (Instance.t * AbstractContext.t) entry_map;
+  data : (LevelAbstraction.t * AbstractContext.t) entry_map;
   (** Additional data synchronized with the section *)
   custom : 'a;
 }
@@ -65,19 +65,19 @@ let push_context ctx sec =
     let sctx = sec.poly_universes in
     let poly_universes = UContext.union sctx ctx in
     let all_poly_univs =
-      Array.append sec.all_poly_univs (Instance.to_array @@ UContext.instance ctx)
+      Array.append sec.all_poly_univs (LevelAbstraction.to_array @@ UContext.abstraction ctx)
     in
     { sec with poly_universes; all_poly_univs; has_poly_univs = true }
 
 let rec is_polymorphic_univ u sec =
   let uctx = sec.poly_universes in
-  let here = Array.exists (fun u' -> Level.equal u u') (Instance.to_array (UContext.instance uctx)) in
+  let here = Array.exists (fun u' -> Level.equal u u') (LevelAbstraction.to_array (UContext.abstraction uctx)) in
   here || Option.cata (is_polymorphic_univ u) false sec.prev
 
 let push_constraints uctx sec =
   if sec.has_poly_univs &&
      Constraints.exists
-       (fun (l,_,r) -> is_polymorphic_univ l sec || is_polymorphic_univ r sec)
+       (fun (l,_,_,r) -> is_polymorphic_univ l sec || is_polymorphic_univ r sec)
        (snd uctx)
   then CErrors.user_err
       Pp.(str "Cannot add monomorphic constraints which refer to section polymorphic universes.");
@@ -118,7 +118,7 @@ let push_inductive ~poly ind s = push_global ~poly (SecInductive ind) s
 
 let empty_segment = {
   abstr_ctx = [];
-  abstr_subst = Instance.empty;
+  abstr_subst = LevelAbstraction.empty;
   abstr_uctx = AbstractContext.empty;
 }
 

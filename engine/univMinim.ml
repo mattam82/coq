@@ -29,38 +29,27 @@ let add_list_map u t map =
 
 (** Precondition: flexible <= ctx *)
 let choose_canonical ctx flexible algs s =
-  let global = Level.Set.diff s ctx in
-  let flexible, rigid = Level.Set.partition flexible (Level.Set.inter s ctx) in
+  let locals, globals = Level.Map.partition (fun l _ -> Level.Set.mem l ctx) s in
+  let flexible, rigid = Level.Map.partition (fun x _ -> flexible x) locals in
     (* If there is a global universe in the set, choose it *)
-    if not (Level.Set.is_empty global) then
-      let canon = Level.Set.choose global in
-        canon, (Level.Set.remove canon global, rigid, flexible)
+    if not (Level.Map.is_empty globals) then
+      let canon = Level.Map.choose globals in
+        canon, (Level.Map.remove (LevelExpr.get_level canon) globals, rigid, flexible)
     else (* No global in the equivalence class, choose a rigid one *)
-        if not (Level.Set.is_empty rigid) then
-          let canon = Level.Set.choose rigid in
-            canon, (global, Level.Set.remove canon rigid, flexible)
+        if not (Level.Map.is_empty rigid) then
+          let canon = Level.Map.choose rigid in
+            canon, (globals, Level.Map.remove (LevelExpr.get_level canon) rigid, flexible)
         else (* There are only flexible universes in the equivalence
                  class, choose a non-algebraic. *)
-          let algs, nonalgs = Level.Set.partition (fun x -> Level.Set.mem x algs) flexible in
-            if not (Level.Set.is_empty nonalgs) then
-              let canon = Level.Set.choose nonalgs in
-                canon, (global, rigid, Level.Set.remove canon flexible)
+          let algs, nonalgs = Level.Map.partition (fun x _ -> Level.Set.mem x algs) flexible in
+            if not (Level.Map.is_empty nonalgs) then
+              let canon = Level.Map.choose nonalgs in
+                canon, (globals, rigid, Level.Map.remove (LevelExpr.get_level canon) flexible)
             else
-              let canon = Level.Set.choose algs in
-                canon, (global, rigid, Level.Set.remove canon flexible)
+              let canon = Level.Map.choose algs in
+                canon, (globals, rigid, Level.Map.remove (LevelExpr.get_level canon) flexible)
 
-(* Eq < Le < Lt *)
-let compare_constraint_type d d' =
-  match d, d' with
-  | Eq, Eq -> 0
-  | Eq, _ -> -1
-  | _, Eq -> 1
-  | Le, Le -> 0
-  | Le, _ -> -1
-  | _, Le -> 1
-  | Lt, Lt -> 0
-
-type lowermap = constraint_type Level.Map.t
+type lowermap = constraint_weight Level.Map.t
 
 let lower_union =
   let merge k a b =
@@ -69,13 +58,13 @@ let lower_union =
     | None, Some _ -> b
     | None, None -> None
     | Some l, Some r ->
-       if compare_constraint_type l r >= 0 then a
+       if l >= r then a
        else b
   in Level.Map.merge merge
 
 let lower_add l c m =
   try let c' = Level.Map.find l m in
-      if compare_constraint_type c c' > 0 then
+      if c >= c' then
         Level.Map.add l c m
       else m
   with Not_found -> Level.Map.add l c m
@@ -121,13 +110,8 @@ let compute_lbound left =
     | None -> Some l
     | Some l' -> Some (Universe.sup l l')
   in
-    List.fold_left (fun lbound (d, l) ->
-      if d == Le (* l <= ?u *) then sup l lbound
-      else (* l < ?u *)
-        (assert (d == Lt);
-         if not (Universe.level l == None) then
-           sup (Universe.super l) lbound
-         else None))
+    List.fold_left (fun lbound (w, l) ->
+      sup (Universe.addn w l) lbound)
       None left
 
 let instantiate_with_lbound u lbound lower ~alg ~enforce (ctx, us, algs, insts, cstrs) =
@@ -155,7 +139,7 @@ let _pr_constraints_map (cmap:constraints_map) =
 let remove_alg l (ctx, us, algs, insts, cstrs) =
   (ctx, us, Level.Set.remove l algs, insts, cstrs)
 
-let not_lower lower (d,l) =
+let not_lower lower (w,l) =
   (* We're checking if (d,l) is already implied by the lower
      constraints on some level u. If it represents l < u (d is Lt
      or d is Le and i > 0, the i < 0 case is impossible due to
@@ -164,15 +148,16 @@ let not_lower lower (d,l) =
   Univ.Universe.exists
     (fun (l,i) ->
        let d =
-         if i == 0 then d
-         else match d with
+         if i == 0 then w
+         else w + 1
+         (* match d with
            | Le -> Lt
-           | d -> d
+           | d -> d*)
        in
        try let d' = Level.Map.find l lower in
          (* If d is stronger than the already implied lower
           * constraints we must keep it. *)
-         compare_constraint_type d d' > 0
+         d > d'
        with Not_found ->
          (* No constraint existing on l *) true) l
 
@@ -184,12 +169,12 @@ exception UpperBoundedAlg
     @raise UpperBoundedAlg if any [upper] constraints are strict and
    [lbound] algebraic. *)
 let enforce_uppers upper lbound cstrs =
-  List.fold_left (fun cstrs (d, r) ->
-      if d == Univ.Le then
+  List.fold_left (fun cstrs (w, r) ->
+      if w == 0 then
         enforce_leq lbound (Universe.make r) cstrs
       else
-        match Universe.level lbound with
-        | Some lev -> Constraints.add (lev, d, r) cstrs
+        match Universe.level_expr lbound with
+        | Some lev -> Constraints.add (mk_constraint lev Le (LevelExpr.make ~weight:w r)) cstrs
         | None -> raise UpperBoundedAlg)
     cstrs upper
 
@@ -285,7 +270,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       else Level.Set.remove u ctx, us, Level.Set.remove u algs, seen, cstrs)
       us (ctx, us, algs, lbounds, cstrs)
 
-module UPairs = OrderedType.UnorderedPair(Univ.Level)
+module UPairs = OrderedType.UnorderedPair(Univ.LevelExpr)
 module UPairSet = Set.Make (UPairs)
 
 let is_bound l lbound = match lbound with
@@ -302,13 +287,13 @@ let normalize_context_set ~lbound g ctx us algs weak =
   let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
   (* Keep the Prop/Set <= i constraints separate for minimization *)
   let smallles, csts =
-    Constraints.partition (fun (l,d,r) -> d == Le && is_minimal ~lbound l) csts
+    Constraints.partition (fun (l,d,w,r) -> d == Le && is_minimal ~lbound l) csts
   in
   let smallles = if get_set_minimization ()
-    then Constraints.filter (fun (l,d,r) -> Level.Map.mem r us && not (Level.is_sprop l)) smallles
+    then Constraints.filter (fun (l,d,w,r) -> Level.Map.mem r us && not (Level.is_sprop l)) smallles
     else Constraints.empty
   in
-  let smallles = Constraints.map (fun (_,_,r) -> Level.set, Le, r) smallles in
+  let smallles = Constraints.map (fun (_,_,w,r) -> Level.set, Le, w, r) smallles in
   let csts, partition =
     (* We first put constraints in a normal-form: all self-loops are collapsed
        to equalities. *)
@@ -322,7 +307,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
       else g
     in
     let g = Constraints.fold
-        (fun (l, d, r) g -> add_soft r (add_soft l g))
+        (fun (l, d, w, r) g -> add_soft r (add_soft l g))
         csts g
     in
     let g = UGraph.merge_constraints csts g in
@@ -331,45 +316,48 @@ let normalize_context_set ~lbound g ctx us algs weak =
   (* We ignore the trivial Prop/Set <= i constraints. *)
   let noneqs =
     Constraints.filter
-      (fun (l,d,r) -> not ((d == Le && is_bound l lbound) ||
-                           (Level.is_prop l && d == Lt && Level.is_set r)))
+      (fun (l,d,w,r) -> not ((d == Le && is_bound l lbound) ||
+                           (Level.is_prop l && d == Le && w < 0 && Level.is_set r)))
       csts
   in
   let noneqs = Constraints.union noneqs smallles in
   let flex x = Level.Map.mem x us in
   let ctx, us, eqs = List.fold_left (fun (ctx, us, cstrs) s ->
     let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in
+    let canonl, wc = canon in
     (* Add equalities for globals which can't be merged anymore. *)
-    let cstrs = Level.Set.fold (fun g cst ->
-      Constraints.add (canon, Eq, g) cst) global
+    let cstrs = Level.Map.fold (fun g w cst ->
+      Constraints.add (canonl, Eq, w - wc, g) cst) global
       cstrs
     in
     (* Also add equalities for rigid variables *)
-    let cstrs = Level.Set.fold (fun g cst ->
-      Constraints.add (canon, Eq, g) cst) rigid
+    let cstrs = Level.Map.fold (fun g w cst ->
+      Constraints.add (canonl, Eq, w - wc, g) cst) rigid
       cstrs
     in
-    let canonu = Some (Universe.make canon) in
-    let us = Level.Set.fold (fun f -> Level.Map.add f canonu) flexible us in
-      (Level.Set.diff ctx flexible, us, cstrs))
+    let canonu = Some (Universe.tip canon) in
+    let us = Level.Map.fold (fun f w -> Level.Map.add f (Option.map (Universe.addn (-w)) canonu)) flexible us in
+      (Level.Set.diff ctx (Level.Map.domain flexible), us, cstrs))
     (ctx, us, Constraints.empty) partition
   in
   (* Process weak constraints: when one side is flexible and the 2
      universes are unrelated unify them. *)
   let ctx, us, g = UPairSet.fold (fun (u,v) (ctx, us, g as acc) ->
-      let norm = level_subst_of (normalize_univ_variable_opt_subst us) in
+      let norm = LevelExpr.subst (level_subst_of (normalize_univ_variable_opt_subst us)) in
       let u = norm u and v = norm v in
       let set_to a b =
-        (Level.Set.remove a ctx,
-         Level.Map.add a (Some (Universe.make b)) us,
-         UGraph.enforce_constraint (a,Eq,b) g)
+        (Level.Set.remove (LevelExpr.get_level a) ctx,
+         Level.Map.add (LevelExpr.get_level a) (Some (Universe.tip b)) us,
+         UGraph.enforce_constraint (mk_constraint a Eq b) g)
       in
-      if UGraph.check_constraint g (u,Le,v) || UGraph.check_constraint g (v,Le,u)
+      if UGraph.check_constraint g (mk_constraint u Le v) || UGraph.check_constraint g (mk_constraint v Le u)
       then acc
       else
-      if Level.Map.mem u us
+        let ul = LevelExpr.get_level u in(* FIXME *)
+        let vl = LevelExpr.get_level v in(* FIXME *)
+      if Level.Map.mem ul us
       then set_to u v
-      else if Level.Map.mem v us
+      else if Level.Map.mem vl us
       then set_to v u
       else acc)
       weak (ctx, us, g)  in
@@ -377,22 +365,22 @@ let normalize_context_set ~lbound g ctx us algs weak =
      and contains only inequality constraints. *)
   let noneqs =
     let norm = level_subst_of (normalize_univ_variable_opt_subst us) in
-    Constraints.fold (fun (u,d,v) noneqs ->
+    Constraints.fold (fun (u,d,w,v) noneqs ->
         let u = norm u and v = norm v in
-        if d != Lt && Level.equal u v then noneqs
-        else Constraints.add (u,d,v) noneqs)
+        if w = 0 && LevelExpr.equal u v then noneqs
+        else Constraints.add (mk_constraint u d (LevelExpr.addn w v)) noneqs)
       noneqs Constraints.empty
   in
   (* Compute the left and right set of flexible variables, constraints
      mentioning other variables remain in noneqs. *)
   let noneqs, ucstrsl, ucstrsr =
-    Constraints.fold (fun (l,d,r as cstr) (noneq, ucstrsl, ucstrsr) ->
+    Constraints.fold (fun (l,d,w,r as cstr) (noneq, ucstrsl, ucstrsr) ->
       let lus = Level.Map.mem l us and rus = Level.Map.mem r us in
       let ucstrsl' =
-        if lus then add_list_map l (d, r) ucstrsl
+        if lus then add_list_map l (w, r) ucstrsl
         else ucstrsl
       and ucstrsr' =
-        add_list_map r (d, l) ucstrsr
+        add_list_map r (w, l) ucstrsr
       in
       let noneqs =
         if lus || rus then noneq

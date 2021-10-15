@@ -75,7 +75,7 @@ type symbol =
   | SymbInd of inductive
   | SymbMeta of metavariable
   | SymbEvar of Evar.t
-  | SymbLevel of Univ.Level.t
+  | SymbLevel of Univ.LevelExpr.t
   | SymbProj of (inductive * int)
 
 type symbols = symbol array

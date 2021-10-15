@@ -10,7 +10,7 @@
 
 module W :
 sig
-  type t
+  type t = int
   val zero : t
   val minus_one : t
   val of_int : int -> t

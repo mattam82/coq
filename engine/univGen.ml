@@ -26,8 +26,8 @@ let fresh_level () =
   Univ.Level.make (new_univ_global ())
 
 let fresh_instance auctx =
-  let inst = Array.init (AbstractContext.size auctx) (fun _ -> fresh_level()) in
-  let ctx = Array.fold_right Level.Set.add inst Level.Set.empty in
+  let inst = Array.init (AbstractContext.size auctx) (fun _ -> LevelExpr.make (fresh_level())) in
+  let ctx = Array.fold_right (fun l -> Level.Set.add (LevelExpr.get_level l)) inst Level.Set.empty in
   let inst = Instance.of_array inst in
   inst, (ctx, AbstractContext.instantiate inst auctx)
 
@@ -100,7 +100,7 @@ let fresh_universe_context_set_instance ctx =
     let univs',subst = Level.Set.fold
       (fun u (univs',subst) ->
         let u' = fresh_level () in
-          (Level.Set.add u' univs', Level.Map.add u u' subst))
+          (Level.Set.add u' univs', Level.Map.add u (LevelExpr.make u') subst))
       univs (Level.Set.empty, Level.Map.empty)
     in
     let cst' = subst_univs_level_constraints subst cst in

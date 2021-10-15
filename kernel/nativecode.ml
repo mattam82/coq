@@ -158,7 +158,7 @@ let eq_symbol sy1 sy2 =
   | SymbInd ind1, SymbInd ind2 -> Ind.CanOrd.equal ind1 ind2
   | SymbMeta m1, SymbMeta m2 -> Int.equal m1 m2
   | SymbEvar evk1, SymbEvar evk2 -> Evar.equal evk1 evk2
-  | SymbLevel l1, SymbLevel l2 -> Univ.Level.equal l1 l2
+  | SymbLevel l1, SymbLevel l2 -> Univ.LevelExpr.equal l1 l2
   | SymbProj (i1, k1), SymbProj (i2, k2) -> Ind.CanOrd.equal i1 i2 && Int.equal k1 k2
   | _, _ -> false
 
@@ -172,7 +172,7 @@ let hash_symbol symb =
   | SymbInd ind -> combinesmall 6 (Ind.CanOrd.hash ind)
   | SymbMeta m -> combinesmall 7 m
   | SymbEvar evk -> combinesmall 8 (Evar.hash evk)
-  | SymbLevel l -> combinesmall 9 (Univ.Level.hash l)
+  | SymbLevel l -> combinesmall 9 (Univ.LevelExpr.hash l)
   | SymbProj (i, k) -> combinesmall 10 (combine (Ind.CanOrd.hash i) k)
 
 module HashedTypeSymbol = struct
@@ -1018,12 +1018,13 @@ let cast_to_int v =
   | _ -> MLapp(MLprimitive Val_to_int, [|v|])
 
 let ml_of_instance instance u =
-  let ml_of_level l =
+    (* FIXME represent increments in level expressions *)
+  let ml_of_level (l, u) =
     match Univ.Level.var_index l with
     | Some i ->
        let univ = MLapp(MLprimitive MLmagic, [|MLlocal (Option.get instance)|]) in
        mkMLapp (MLprimitive MLarrayget) [|univ; MLint i|]
-    | None -> let i = push_symbol (SymbLevel l) in get_level_code i
+    | None -> let i = push_symbol (SymbLevel (l, u)) in get_level_code i
   in
   let u = Univ.Instance.to_array u in
   if Array.is_empty u then [||]

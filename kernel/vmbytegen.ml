@@ -141,7 +141,7 @@ module Config = struct
   let stack_safety_margin = 15
 end
 
-type argument = ArgLambda of lambda | ArgUniv of Univ.Level.t
+type argument = ArgLambda of lambda | ArgUniv of Univ.LevelExpr.t
 
 let empty_fv = { size= 0;  fv_rev = []; fv_fwd = FvMap.empty }
 let push_fv d e = {
@@ -788,11 +788,13 @@ and compile_get_global cenv (kn,u) sz cont =
     comp_app (fun _ _ _ cont -> Kgetglobal kn :: cont)
       compile_universe cenv () (Univ.Instance.to_array u) sz cont
 
-and compile_universe cenv uni sz cont =
+and compile_universe cenv (l, _ as uni) sz cont =
   set_max_stack_size sz;
-  match Univ.Level.var_index uni with
+  match Univ.Level.var_index l with
   | None -> compile_structured_constant cenv (Const_univ_level uni) sz cont
-  | Some idx -> pos_universe_var idx cenv sz :: cont
+  | Some idx ->
+    (* FIXME: how to propagate the increment? *)
+    pos_universe_var idx cenv sz :: cont
 
 and compile_constant env cenv kn u args sz cont =
   set_max_stack_size sz;
@@ -821,7 +823,7 @@ let is_univ_copy max u =
   if Array.length u = max then
     Array.fold_left_i (fun i acc u ->
         if acc then
-          match Univ.Level.var_index u with
+          match Univ.Level.var_index (Univ.LevelExpr.get_level u) with
           | None -> false
           | Some l -> l = i
         else false) true u

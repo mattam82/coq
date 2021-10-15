@@ -65,7 +65,7 @@ let abstract_universes = function
     Univ.empty_level_subst, Monomorphic
   | Entries.Polymorphic_entry uctx ->
     let (inst, auctx) = Univ.abstract_universes uctx in
-    let inst = Univ.make_instance_subst inst in
+    let inst = Univ.make_level_abstraction_subst inst in
     (inst, Polymorphic auctx)
 
 (** {6 Constants } *)

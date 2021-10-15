@@ -51,14 +51,14 @@ let compare_glob_universe_instances lt strictly_lt us1 us2 =
   | Some _, None -> strictly_lt := true; lt
   | None, Some _ -> false
   | Some l1, Some l2 ->
-     CList.for_all2eq (fun u1 u2 ->
+     CList.for_all2eq (fun (u1, n1) (u2, n2) ->
          match u1, u2 with
-         | UAnonymous {rigid=true}, UAnonymous {rigid=true} -> true
-         | UAnonymous {rigid=false}, UAnonymous {rigid=false} -> true
+         | UAnonymous {rigid=true}, UAnonymous {rigid=true} -> Int.equal n1 n2
+         | UAnonymous {rigid=false}, UAnonymous {rigid=false} -> Int.equal n1 n2
          | UAnonymous _, UAnonymous _ -> false
          | UNamed _, UAnonymous _ -> strictly_lt := true; lt
          | UAnonymous _, UNamed _ -> false
-         | UNamed _, UNamed _ -> glob_level_eq u1 u2) l1 l2
+         | UNamed _, UNamed _ -> glob_level_eq u1 u2 && Int.equal n1 n2) l1 l2
 
 (* Compute us1 <= us2, as a boolean *)
 let compare_glob_universe_instances_le us1 us2 =

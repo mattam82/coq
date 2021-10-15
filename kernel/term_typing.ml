@@ -77,7 +77,7 @@ let infer_primitive env { prim_entry_type = utyp; prim_entry_content = p; } =
   let univs, typ =
     match utyp with
     | None ->
-      let u = UContext.instance (AbstractContext.repr auctx) in
+      let u = UContext.abstract_instance (AbstractContext.repr auctx) in
       let typ = Typeops.type_of_prim_or_type env u p in
       let univs = if AbstractContext.is_empty auctx then Monomorphic
         else Polymorphic auctx
@@ -106,10 +106,10 @@ let infer_primitive env { prim_entry_type = utyp; prim_entry_content = p; } =
       let env = push_context ~strict:false uctx env in
       (* Now we know that uctx matches the auctx *)
       let typ = (Typeops.infer_type env typ).utj_val in
-      let () = check_primitive_type env p (UContext.instance uctx) typ in
+      let () = check_primitive_type env p (UContext.abstract_instance uctx) typ in
       let uctx = UContext.refine_names (AbstractContext.names auctx) uctx in
       let u, auctx = abstract_universes uctx in
-      let typ = Vars.subst_univs_level_constr (make_instance_subst u) typ in
+      let typ = Vars.subst_univs_level_constr (make_level_abstraction_subst u) typ in
       Polymorphic auctx, typ
   in
   let body = match p with
@@ -160,7 +160,7 @@ let infer_declaration env (dcl : constant_entry) =
             on the rest of the graph (up to transitivity). *)
         let env = push_context ~strict:false uctx env in
         let sbst, auctx = abstract_universes uctx in
-        let sbst = make_instance_subst sbst in
+        let sbst = make_level_abstraction_subst sbst in
         env, sbst, Polymorphic auctx
       in
       let j = Typeops.infer env body in
@@ -209,7 +209,7 @@ let infer_opaque env = function
       let env = push_context ~strict:false uctx env in
       let tj = Typeops.infer_type env typ in
       let sbst, auctx = abstract_universes uctx in
-      let usubst = make_instance_subst sbst in
+      let usubst = make_level_abstraction_subst sbst in
       let context = PolyTyCtx (env, tj, usubst, auctx, c.opaque_entry_secctx, feedback_id) in
       let def = OpaqueDef () in
       let typ = Vars.subst_univs_level_constr usubst tj.utj_val in

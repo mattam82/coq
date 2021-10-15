@@ -153,7 +153,7 @@ val intern_reference : qualid -> GlobRef.t option
 
 (** Returns None if not a reference or a syndef not bound to a name *)
 val intern_name_alias :
-  constr_expr -> (GlobRef.t * Glob_term.glob_level list option) option
+  constr_expr -> (GlobRef.t * Glob_term.glob_level_expr list option) option
 
 (** Expands abbreviations (syndef); raise an error if not existing *)
 val interp_reference : ltac_sign -> qualid -> glob_constr
@@ -211,7 +211,7 @@ val check_duplicate : ?loc:Loc.t -> (qualid * constr_expr) list -> unit
 (** Check that a list of record field definitions doesn't contain
     duplicates. *)
 
-val interp_known_level : Evd.evar_map -> sort_name_expr -> Univ.Level.t
+val interp_known_level_expr : Evd.evar_map -> (sort_name_expr * int) -> Univ.LevelExpr.t
 
 (** Local universe and constraint declarations. *)
 val interp_univ_decl : Environ.env -> universe_decl_expr ->

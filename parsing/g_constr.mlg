@@ -279,7 +279,7 @@ GRAMMAR EXTEND Gram
       | -> { [] } ] ]
   ;
   univ_annot:
-    [ [ "@{"; l = LIST0 universe_level; "}" -> { Some l }
+    [ [ "@{"; l = LIST0 universe_level_expr; "}" -> { Some l }
       | -> { None } ] ]
   ;
   universe_level:
@@ -289,6 +289,9 @@ GRAMMAR EXTEND Gram
       | "Type" -> { UAnonymous {rigid=true} }
       | "_" -> { UAnonymous {rigid=false} }
       | id = global -> { UNamed (CType id) } ] ]
+  ;
+  universe_level_expr:
+    [ [ l = universe_level; n = [ "+"; n = natural -> { n } | -> { 0 } ] -> { (l, n) } ] ]
   ;
   fix_decls:
     [ [ dcl = fix_decl -> { let (id,_,_,_,_) = dcl.CAst.v in (id,[dcl.CAst.v]) }

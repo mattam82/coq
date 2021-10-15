@@ -427,7 +427,7 @@ let declare_projections indsp univs ?(kind=Decls.StructureComponent) binder_name
   let (mib,mip) = Global.lookup_inductive indsp in
   let poly = Declareops.inductive_is_polymorphic mib in
   let uinstance = match fst univs with
-    | Polymorphic_entry uctx -> Univ.UContext.instance uctx
+    | Polymorphic_entry uctx -> Univ.UContext.abstract_instance uctx
     | Monomorphic_entry -> Univ.Instance.empty
   in
   let paramdecls = Inductive.inductive_paramdecls (mib, uinstance) in
@@ -631,7 +631,7 @@ let build_class_constant ~univs ~rdata ~primitive_proj field implfs params param
     | UState.Monomorphic_entry _, ubinders ->
       Univ.Instance.empty, (UState.Monomorphic_entry Univ.ContextSet.empty, ubinders)
     | UState.Polymorphic_entry uctx, _ ->
-      Univ.UContext.instance uctx, univs
+      Univ.UContext.abstract_instance uctx, univs
   in
   let cstu = (cst, inst) in
   let inst_type = appvectc (mkConstU cstu)
@@ -725,7 +725,7 @@ let declare_class def ~cumulative ~univs ~variances ~primitive_proj id idbuild p
     match fst univs with
     | UState.Polymorphic_entry uctx ->
       let usubst, auctx = Univ.abstract_universes uctx in
-      let usubst = Univ.make_instance_subst usubst in
+      let usubst = Univ.make_level_abstraction_subst usubst in
       let map c = Vars.subst_univs_level_constr usubst c in
       let fields = Context.Rel.map map fields in
       let params = Context.Rel.map map params in

@@ -286,6 +286,7 @@ module Constr =
     let ident = Entry.create "ident"
     let global = Entry.create "global"
     let universe_name = Entry.create "universe_name"
+    let universe_expr = Entry.create "universe_expr"
     let universe_level = Entry.create "universe_level"
     let sort = Entry.create "sort"
     let sort_family = Entry.create "sort_family"

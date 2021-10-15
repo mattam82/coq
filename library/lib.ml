@@ -442,7 +442,7 @@ let is_in_section ref = match sections () with
 
 let section_instance = let open GlobRef in function
   | VarRef id ->
-    if is_in_section (VarRef id) then (Univ.Instance.empty, [||])
+    if is_in_section (VarRef id) then (Univ.LevelAbstraction.empty, [||])
     else raise Not_found
   | ConstRef con ->
     let data = section_segment_of_constant con in
@@ -553,8 +553,8 @@ let discharge_proj_repr =
 
 let discharge_abstract_universe_context { Declarations.abstr_subst = subst; abstr_uctx = abs_ctx } auctx =
   let open Univ in
-  let ainst = make_abstract_instance auctx in
-  let subst = Instance.append subst ainst in
-  let subst = make_instance_subst subst in
+  let ainst = make_abstraction auctx in
+  let subst = LevelAbstraction.append subst ainst in
+  let subst = make_level_abstraction_subst subst in
   let auctx = Univ.subst_univs_level_abstract_universe_context subst auctx in
   subst, AbstractContext.union abs_ctx auctx

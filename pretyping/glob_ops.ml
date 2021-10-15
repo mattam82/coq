@@ -80,6 +80,9 @@ let glob_sort_eq u1 u2 =
 let glob_level_eq u1 u2 =
   glob_sort_gen_eq glob_sort_name_eq u1 u2
 
+let glob_level_expr_eq (u1, w) (u2, w') =
+  glob_level_eq u1 u2 && Int.equal w w'
+
 let binding_kind_eq bk1 bk2 = match bk1, bk2 with
   | Explicit, Explicit -> true
   | NonMaxImplicit, NonMaxImplicit -> true
@@ -138,7 +141,7 @@ let instance_eq f (x1,c1) (x2,c2) =
 let mk_glob_constr_eq f c1 c2 = match DAst.get c1, DAst.get c2 with
   | GRef (gr1, u1), GRef (gr2, u2) ->
     GlobRef.equal gr1 gr2 &&
-    Option.equal (List.equal glob_level_eq) u1 u2
+    Option.equal (List.equal glob_level_expr_eq) u1 u2
   | GVar id1, GVar id2 -> Id.equal id1 id2
   | GEvar (id1, arg1), GEvar (id2, arg2) ->
     Id.equal id1.CAst.v id2.CAst.v && List.equal (instance_eq f) arg1 arg2
@@ -173,13 +176,13 @@ let mk_glob_constr_eq f c1 c2 = match DAst.get c1, DAst.get c2 with
     f c1 c2 && cast_type_eq f t1 t2
   | GProj ((cst1, u1), args1, c1), GProj ((cst2, u2), args2, c2) ->
     GlobRef.(equal (ConstRef cst1) (ConstRef cst2)) &&
-    Option.equal (List.equal glob_level_eq) u1 u2 &&
+    Option.equal (List.equal glob_level_expr_eq) u1 u2 &&
     List.equal f args1 args2 && f c1 c2
   | GInt i1, GInt i2 -> Uint63.equal i1 i2
   | GFloat f1, GFloat f2 -> Float64.equal f1 f2
   | GArray (u1, t1, def1, ty1), GArray (u2, t2, def2, ty2) ->
     Array.equal f t1 t2 && f def1 def2 && f ty1 ty2 &&
-    Option.equal (List.equal glob_level_eq) u1 u2
+    Option.equal (List.equal glob_level_expr_eq) u1 u2
   | (GRef _ | GVar _ | GEvar _ | GPatVar _ | GApp _ | GLambda _ | GProd _ | GLetIn _ |
      GCases _ | GLetTuple _ | GIf _ | GRec _ | GSort _ | GHole _ | GCast _ | GProj _ |
      GInt _ | GFloat _ | GArray _), _ -> false

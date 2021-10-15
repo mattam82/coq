@@ -23,7 +23,7 @@ let name_instance inst =
            See univNames.ml for a similar hack. *)
         Names.Name (Names.Id.of_string_soft (Univ.Level.to_string lvl))
   in
-  Array.map map (Univ.Instance.to_array inst)
+  Array.map map (Univ.LevelAbstraction.to_array inst)
 
 let declare_universe_context ~poly ctx =
   if poly then

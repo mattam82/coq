@@ -397,9 +397,9 @@ let check_constraints c env =
 let add_universes ~lbound ~strict ctx g =
   let g = Array.fold_left
             (fun g v -> UGraph.add_universe ~lbound ~strict v g)
-            g (Univ.Instance.to_array (Univ.UContext.instance ctx))
+            g (Univ.LevelAbstraction.to_array (Univ.UContext.abstraction ctx))
   in
-    UGraph.merge_constraints (Univ.UContext.constraints ctx) g
+  UGraph.merge_constraints (Univ.UContext.constraints ctx) g
 
 let push_context ?(strict=false) ctx env =
   map_universes (add_universes ~lbound:(universes_lbound env) ~strict ctx) env

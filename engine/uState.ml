@@ -119,7 +119,7 @@ let compute_instance_binders rbinders inst =
     try Name (Option.get (Level.Map.find lvl rbinders).uname)
     with Option.IsNone | Not_found -> Anonymous
   in
-  Array.map map (Instance.to_array inst)
+  Array.map map (LevelAbstraction.to_array inst)
 
 let context uctx =
   let (_, rbinders) = uctx.names in
@@ -181,6 +181,23 @@ let instantiate_variable l b v =
 
 exception UniversesDiffer
 
+
+let id_of_level uctx l =
+  try Some (Option.get (Level.Map.find l (snd uctx.names)).uname)
+  with Not_found | Option.IsNone ->
+    None
+
+let qualid_of_level uctx l =
+  let map, map_rev = uctx.names in
+  try Some (Libnames.qualid_of_ident (Option.get (Level.Map.find l map_rev).uname))
+  with Not_found | Option.IsNone ->
+    UnivNames.qualid_of_level map l
+
+let pr_uctx_level uctx l =
+  match qualid_of_level uctx l with
+  | Some qid -> Libnames.pr_qualid qid
+  | None -> Level.pr l
+
 let drop_weak_constraints =
   Goptions.declare_bool_option_and_ref
     ~depr:false
@@ -194,9 +211,10 @@ let process_universe_constraints uctx cstrs =
   let vars = ref uctx.univ_variables in
   let weak = ref uctx.weak_constraints in
   let normalize u = normalize_univ_variable_opt_subst !vars u in
+  let normle le = LevelExpr.subst (level_subst_of normalize) le in
   let nf_constraint = function
-    | ULub (u, v) -> ULub (level_subst_of normalize u, level_subst_of normalize v)
-    | UWeak (u, v) -> UWeak (level_subst_of normalize u, level_subst_of normalize v)
+    | ULub (u, v) -> ULub (normle u, normle v)
+    | UWeak (u, v) -> UWeak (normle u, normle v)
     | UEq (u, v) -> UEq (subst_univs_universe normalize u, subst_univs_universe normalize v)
     | ULe (u, v) -> ULe (subst_univs_universe normalize u, subst_univs_universe normalize v)
   in
@@ -243,35 +261,38 @@ let process_universe_constraints uctx cstrs =
     let cst = nf_constraint cst in
       if UnivProblem.is_trivial cst then local
       else
-          match cst with
-          | ULe (l, r) ->
-            begin match Univ.Universe.level r with
-            | None ->
-              if UGraph.check_leq univs l r then local
-              else user_err Pp.(str "Algebraic universe on the right")
-            | Some r' ->
-              if Level.is_small r' then
-                  if not (Universe.is_levels l)
-                  then (* l contains a +1 and r=r' small so l <= r impossible *)
-                    raise (UniverseInconsistency (Le, l, r, None))
-                  else
-                    if UGraph.check_leq univs l r then match Univ.Universe.level l with
+        match cst with
+        | ULe (l, r) ->
+          begin match Univ.Universe.level_expr r with
+          | None ->
+            if UGraph.check_leq univs l r then local
+            else user_err Pp.(str "Algebraic universe on the right")
+          | Some r' ->
+              if LevelExpr.is_small r' then
+                if not (Universe.is_levels l)
+                then (* l contains a +1 and r=r' small so l <= r impossible *)
+                  raise (UniverseInconsistency (Le, l, r, None))
+                else
+                  if UGraph.check_leq univs l r then
+                    match Univ.Universe.level_expr l with
                     | Some l ->
-                      Univ.Constraints.add (l, Le, r') local
+                      Univ.Constraints.add (mk_constraint l Le r') local
                     | None -> local
-                    else
-                    let levels = Universe.levels l in
+                  else
+                    user_err Pp.(str "Cannot enforce constraint " ++
+                      UnivProblem.pr_with (pr_uctx_level uctx) cst)
+                    (*let levels = Universe.levels l in
                     let fold l' local =
                       let l = Universe.make l' in
                       if Level.is_small l' || is_local l' then
                         equalize_variables false l l' r r' local
                       else raise (UniverseInconsistency (Le, l, r, None))
                     in
-                    Level.Set.fold fold levels local
+                    Level.Set.fold fold levels local*)
               else
-                match Univ.Universe.level l with
+                match Univ.Universe.level_expr l with
                 | Some l ->
-                  Univ.Constraints.add (l, Le, r') local
+                  Univ.Constraints.add (mk_constraint l Le r') local
                 | None ->
                   (* We insert the constraint in the graph even if the graph
                      already contains it.  Indeed, checking the existance of the
@@ -284,7 +305,8 @@ let process_universe_constraints uctx cstrs =
                   enforce_leq l r local
               end
           | ULub (l, r) ->
-              equalize_variables true (Universe.make l) l (Universe.make r) r local
+            enforce_eq (Universe.tip l) (Universe.tip r) local
+              (* equalize_variables true (Universe.tip l) l (Universe.tip r) r local *)
           | UWeak (l, r) ->
             if not (drop_weak_constraints ()) then weak := UPairSet.add (l,r) !weak; local
           | UEq (l, r) -> equalize_universes l r local
@@ -300,12 +322,10 @@ let process_universe_constraints uctx cstrs =
 
 let add_constraints uctx cstrs =
   let univs, old_cstrs = uctx.local in
-  let cstrs' = Constraints.fold (fun (l,d,r) acc ->
-    let l = Universe.make l and r = Universe.make r in
+  let cstrs' = Constraints.fold (fun (l,d,w,r) acc ->
+    let l = Universe.make l and r = Universe.tip (LevelExpr.make ~weight:w r) in
     let cstr' = let open UnivProblem in
       match d with
-      | Lt ->
-        ULe (Universe.super l, r)
       | Le -> ULe (l, r)
       | Eq -> UEq (l, r)
     in UnivProblem.Set.add cstr' acc)
@@ -337,28 +357,12 @@ let constrain_variables diff uctx =
           | Some u ->
              (Level.Set.add l univs,
               Level.Map.remove l vars,
-              Constraints.add (l, Eq, Option.get (Universe.level u)) cstrs)
+              Constraints.add (l, Eq, 0, Option.get (Universe.level u)) cstrs)
           | None -> (univs, vars, cstrs)
         with Not_found | Option.IsNone -> (univs, vars, cstrs))
       diff (univs, uctx.univ_variables, local)
   in
   { uctx with local = (univs, local); univ_variables = vars }
-
-let id_of_level uctx l =
-  try Some (Option.get (Level.Map.find l (snd uctx.names)).uname)
-  with Not_found | Option.IsNone ->
-    None
-
-let qualid_of_level uctx l =
-  let map, map_rev = uctx.names in
-  try Some (Libnames.qualid_of_ident (Option.get (Level.Map.find l map_rev).uname))
-  with Not_found | Option.IsNone ->
-    UnivNames.qualid_of_level map l
-
-let pr_uctx_level uctx l =
-  match qualid_of_level uctx l with
-  | Some qid -> Libnames.pr_qualid qid
-  | None -> Level.pr l
 
 type ('a, 'b) gen_universe_decl = {
   univdecl_instance : 'a; (* Declared universes *)
@@ -406,7 +410,7 @@ let universe_context ~names ~extensible uctx =
   else
     let left = ContextSet.sort_levels (Array.of_list (Level.Set.elements left)) in
     let inst = Array.append (Array.of_list newinst) left in
-    let inst = Instance.of_array inst in
+    let inst = LevelAbstraction.of_array inst in
     (inst, ContextSet.constraints uctx.local)
 
 let check_universe_context_set ~names ~extensible uctx =
@@ -466,15 +470,15 @@ let restrict_universe_context ~lbound (univs, csts) keep =
   let removed = Level.Set.diff univs keep in
   if Level.Set.is_empty removed then univs, csts
   else
-  let allunivs = Constraints.fold (fun (u,_,v) all -> Level.Set.add u (Level.Set.add v all)) csts univs in
+  let allunivs = Constraints.fold (fun (u,_,_,v) all -> Level.Set.add u (Level.Set.add v all)) csts univs in
   let g = UGraph.initial_universes in
   let g = Level.Set.fold (fun v g -> if Level.is_small v then g else
                         UGraph.add_universe v ~lbound ~strict:false g) allunivs g in
   let g = UGraph.merge_constraints csts g in
   let allkept = Level.Set.union (UGraph.domain UGraph.initial_universes) (Level.Set.diff allunivs removed) in
   let csts = UGraph.constraints_for ~kept:allkept g in
-  let csts = Constraints.filter (fun (l,d,r) ->
-      not ((is_bound l lbound && d == Le) || (Level.is_prop l && d == Lt && Level.is_set r))) csts in
+  let csts = Constraints.filter (fun (l,d,w,r) ->
+      not ((is_bound l lbound && d == Le && Int.equal w 0) || (Level.is_prop l && d == Le && w = -1 && Level.is_set r))) csts in
   (Level.Set.inter univs keep, csts)
 
 let restrict uctx vars =
@@ -627,7 +631,7 @@ let make_flexible_variable uctx ~algebraic u =
   assert (try Level.Map.find u uvars == None with Not_found -> true);
   match UGraph.choose (fun v -> not (Level.equal u v) && (algebraic || not (Level.Set.mem v avars))) g u with
   | Some v ->
-    let uvars' = Level.Map.add u (Some (Universe.make v)) uvars in
+    let uvars' = Level.Map.add u (Some (Universe.tip v)) uvars in
     { uctx with univ_variables = uvars'; }
   | None ->
     let uvars' = Level.Map.add u None uvars in
@@ -639,7 +643,7 @@ let make_flexible_variable uctx ~algebraic u =
         in
         let has_upper_constraint () =
           Constraints.exists
-            (fun (l,d,r) -> d == Lt && Level.equal l u)
+            (fun (l,d,w,r) -> d == Le && Level.equal l u)
             (ContextSet.constraints cstrs)
         in
         if not (Level.Map.exists substu_not_alg uvars || has_upper_constraint ())
@@ -667,13 +671,13 @@ let is_sort_variable uctx s =
 let subst_univs_context_with_def def usubst (uctx, cst) =
   (Level.Set.diff uctx def, UnivSubst.subst_univs_constraints usubst cst)
 
-let is_trivial_leq (l,d,r) =
-  Level.is_prop l && (d == Le || d == Lt) && Level.is_set r
+let is_trivial_leq (l,d,w,r) =
+  Level.is_prop l && (d == Le) && (Int.equal w 0 || Int.equal w (-1)) && Level.is_set r
 
 (* Prop < i <-> Set+1 <= i <-> Set < i *)
-let translate_cstr (l,d,r as cstr) =
-  if Level.equal Level.prop l && d == Lt && not (Level.equal Level.set r) then
-    (Level.set, d, r)
+let translate_cstr (l,d,w,r as cstr) =
+  if Level.equal Level.prop l && d == Le && Int.equal w (-1) && not (Level.equal Level.set r) then
+    (Level.set, d, w, r)
   else cstr
 
 let refresh_constraints univs (ctx, cstrs) =
@@ -740,7 +744,8 @@ let minimize uctx =
 
 let pr_weak prl {weak_constraints=weak} =
   let open Pp in
-  prlist_with_sep fnl (fun (u,v) -> prl u ++ str " ~ " ++ prl v) (UPairSet.elements weak)
+  prlist_with_sep fnl (fun (u,v) -> LevelExpr.pr_with prl u ++ str " ~ " ++ LevelExpr.pr_with prl v)
+    (UPairSet.elements weak)
 
 let pr_universe_body = function
   | None -> mt ()

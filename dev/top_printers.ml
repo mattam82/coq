@@ -233,7 +233,7 @@ let ppuniverse_opt_subst l = pp (UState.pr_universe_opt_subst l)
 let ppuniverse_level_subst l = pp (Univ.pr_universe_level_subst l)
 let ppevar_universe_context l = pp (Termops.pr_evar_universe_context l)
 let ppconstraints c = pp (pr_constraints Level.pr c)
-let ppuniverseconstraints c = pp (UnivProblem.Set.pr c)
+let ppuniverseconstraints c = pp (UnivProblem.Set.pr Level.pr c)
 let ppuniverse_context_future c =
   let ctx = Future.force c in
     ppuniverse_context ctx
@@ -335,8 +335,8 @@ let constr_display csr =
   and univ_display u =
     incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ pr_uni u ++ fnl ())
 
-  and level_display u =
-    incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ Level.pr u ++ fnl ())
+  and level_expr_display u =
+    incr cnt; pp (str "with " ++ int !cnt ++ str" " ++ LevelExpr.pr u ++ fnl ())
 
   and sort_display = function
     | SProp -> "SProp"
@@ -346,7 +346,7 @@ let constr_display csr =
         "Type("^(string_of_int !cnt)^")"
 
   and universes_display l =
-    Array.fold_right (fun x i -> level_display x; (string_of_int !cnt)^(if not(i="")
+    Array.fold_right (fun x i -> level_expr_display x; (string_of_int !cnt)^(if not(i="")
         then (" "^i) else "")) (Instance.to_array l) ""
 
   and name_display x = match x.binder_name with
@@ -485,7 +485,7 @@ let print_pure_constr csr =
   and box_display c = open_hovbox 1; term_display c; close_box()
 
   and universes_display u =
-    Array.iter (fun u -> print_space (); pp (Level.pr u)) (Instance.to_array u)
+    Array.iter (fun u -> print_space (); pp (LevelExpr.pr u)) (Instance.to_array u)
 
   and sort_display = function
     | SProp -> print_string "SProp"

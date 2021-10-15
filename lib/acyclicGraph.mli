@@ -10,7 +10,7 @@
 
 (** Graphs representing strict orders *)
 
-type constraint_weight
+type constraint_weight = int
 val weight_le : constraint_weight (* 0 *)
 val weight_lt : constraint_weight (* -1 *)
 val weight_of_int : int -> constraint_weight
@@ -69,7 +69,7 @@ module Make (Point:Point) : sig
 
   val check : t -> Point.t -> constraint_weight -> Point.t -> bool
 
-  val enforce_shift : Point.t-> constraint_weight -> Point.t -> t -> t
+  val enforce_shift : Point.t -> constraint_weight -> Point.t -> t -> t
 
   val enforce : Point.t -> constraint_weight -> Point.t -> t -> t
 

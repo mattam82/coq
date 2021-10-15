@@ -482,14 +482,14 @@ let compare_cumulative_instances cv_pb nargs_ok variances u u' cstrs =
          match v with
          | Irrelevant -> Set.add (UWeak (u,u')) cstrs
          | Covariant ->
-           let u = Univ.Universe.make u in
-           let u' = Univ.Universe.make u' in
+           let u = Univ.Universe.tip u in
+           let u' = Univ.Universe.tip u' in
            (match cv_pb with
             | Reduction.CONV -> Set.add (UEq (u,u')) cstrs
             | Reduction.CUMUL -> Set.add (ULe (u,u')) cstrs)
          | Invariant ->
-           let u = Univ.Universe.make u in
-           let u' = Univ.Universe.make u' in
+           let u = Univ.Universe.tip u in
+           let u' = Univ.Universe.tip u' in
            Set.add (UEq (u,u')) cstrs)
       cstrs variances (Univ.Instance.to_array u) (Univ.Instance.to_array u')
 

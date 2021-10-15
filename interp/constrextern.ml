@@ -964,7 +964,7 @@ let extern_glob_sort uvars = function
 
 let extern_instance uvars = function
   | Some l when !print_universes ->
-    Some (List.map (map_glob_sort_gen (extern_glob_sort_name uvars)) l)
+    Some (List.map (fun (l, n) -> map_glob_sort_gen (extern_glob_sort_name uvars) l, n) l)
   | _ -> None
 
 let extern_ref (vars,uvars) ref us =

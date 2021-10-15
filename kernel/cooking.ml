@@ -73,7 +73,8 @@ let share cache r (cstl,knl) =
 
 let share_univs cache r u l =
   let (u', args) = share cache r l in
-    mkApp (instantiate_my_gr r (Instance.append u' u), args)
+  let inst = LevelAbstraction.to_instance u' in
+    mkApp (instantiate_my_gr r (Instance.append inst u), args)
 
 let is_empty_modlist (cm, mm) =
   Cmap.is_empty cm && Mindmap.is_empty mm
@@ -85,6 +86,7 @@ let expmod_constr cache modlist c =
       | Case (ci, u, pms, p, iv, t, br) ->
         begin match share cache (IndRef ci.ci_ind) modlist with
         | (u', prefix) ->
+          let u' = LevelAbstraction.to_instance u' in
           let u = Instance.append u' u in
           let pms = Array.append prefix pms in
           let ci = { ci with ci_npar = ci.ci_npar + Array.length prefix } in
@@ -166,7 +168,7 @@ type 'opaque result = {
 }
 
 let expmod_constr_subst cache modlist subst c =
-  let subst = Univ.make_instance_subst subst in
+  let subst = Univ.make_level_abstraction_subst subst in
   let c = expmod_constr cache modlist c in
     Vars.subst_univs_level_constr subst c
 
@@ -182,14 +184,14 @@ let discharge_abstract_universe_context subst abs_ctx auctx =
       together with the instance
       [u₀ ... uₙ₋₁ Var(0) ... Var (m - 1)].
   *)
-  if (Univ.Instance.is_empty subst) then
+  if (Univ.LevelAbstraction.is_empty subst) then
     (** Still need to take the union for the constraints between globals *)
     subst, (AbstractContext.union abs_ctx auctx)
   else
     let open Univ in
-    let ainst = make_abstract_instance auctx in
-    let subst = Instance.append subst ainst in
-    let substf = make_instance_subst subst in
+    let ainst = make_abstraction auctx in
+    let subst = LevelAbstraction.append subst ainst in
+    let substf = make_level_abstraction_subst subst in
     let auctx = Univ.subst_univs_level_abstract_universe_context substf auctx in
     subst, (AbstractContext.union abs_ctx auctx)
 
@@ -206,12 +208,12 @@ let cook_constr { modlist; abstract = {abstr_ctx; abstr_subst; abstr_uctx;}; } (
   let abstr_subst, priv = match priv with
   | Opaqueproof.PrivateMonomorphic () ->
     let () = assert (AbstractContext.is_empty abstr_uctx) in
-    let () = assert (Instance.is_empty abstr_subst) in
+    let () = assert (LevelAbstraction.is_empty abstr_subst) in
     abstr_subst, priv
   | Opaqueproof.PrivatePolymorphic (univs, ctx) ->
-    let ainst = Instance.of_array (Array.init univs Level.var) in
-    let abstr_subst = Instance.append abstr_subst ainst in
-    let ctx = on_snd (Univ.subst_univs_level_constraints (Univ.make_instance_subst abstr_subst)) ctx in
+    let ainst = LevelAbstraction.of_array (Array.init univs Level.var) in
+    let abstr_subst = LevelAbstraction.append abstr_subst ainst in
+    let ctx = on_snd (Univ.subst_univs_level_constraints (Univ.make_level_abstraction_subst abstr_subst)) ctx in
     let univs = univs + AbstractContext.size abstr_uctx in
     abstr_subst, Opaqueproof.PrivatePolymorphic (univs, ctx)
   in

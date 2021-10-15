@@ -59,9 +59,12 @@ let pr_red_expr =
     (pr_constr_expr, pr_lconstr_expr, pr_smart_global, pr_constr_expr)
     keyword
 
+let pr_sort_name_expr_incr (l, i) =
+  pr_sort_name_expr l ++ Univ.pr_increment i
+
 let pr_uconstraint (l, d, r) =
-  pr_sort_name_expr l ++ spc () ++ Univ.pr_constraint_type d ++ spc () ++
-  pr_sort_name_expr r
+  pr_sort_name_expr_incr l ++ spc () ++ Univ.pr_constraint_type d ++ spc () ++
+  pr_sort_name_expr_incr r
 
 let pr_univ_name_list = function
   | None -> mt ()

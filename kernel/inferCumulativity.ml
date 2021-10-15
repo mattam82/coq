@@ -93,11 +93,14 @@ end
 open Inf
 
 let infer_generic_instance_eq variances u =
-  Array.fold_left (fun variances u -> infer_level_eq u variances)
+  Array.fold_left (fun variances (u, n) ->
+    assert (Int.equal n 0);
+    infer_level_eq u variances)
     variances (Instance.to_array u)
 
 let infer_cumulative_ind_instance cv_pb mind_variance variances u =
-  Array.fold_left2 (fun variances varu u ->
+  Array.fold_left2 (fun variances varu (u, n) ->
+      assert (Int.equal n 0);
       match cv_pb, varu with
       | _, Irrelevant -> variances
       | _, Invariant | CONV, Covariant -> infer_level_eq u variances

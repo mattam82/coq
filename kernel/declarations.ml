@@ -102,14 +102,14 @@ type typing_flags = {
 
 }
 
-type work_list = (Univ.Instance.t * Id.t array) Cmap.t *
-  (Univ.Instance.t * Id.t array) Mindmap.t
+type work_list = (Univ.LevelAbstraction.t * Id.t array) Cmap.t *
+  (Univ.LevelAbstraction.t * Id.t array) Mindmap.t
 
 (** Data needed to abstract over the section variable and universe hypotheses *)
 type abstr_info = {
   abstr_ctx : Constr.named_context;
   (** Section variables of this prefix *)
-  abstr_subst : Univ.Instance.t;
+  abstr_subst : Univ.LevelAbstraction.t;
   (** Actual names of the abstracted variables *)
   abstr_uctx : Univ.AbstractContext.t;
   (** Universe quantification, same length as the substitution *)

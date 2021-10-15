@@ -196,7 +196,7 @@ let define_pure_evar_as_array env sigma evk =
   let s = destSort sigma concl in
   (* array@{u} ty : Type@{u} <= Type@{s} *)
   let sigma = Evd.set_leq_sort env sigma u (ESorts.kind sigma s) in
-  let u = Option.get (Univ.Universe.level (Sorts.univ_of_sort u)) in
+  let u = Option.get (Univ.Universe.level_expr (Sorts.univ_of_sort u)) in
   let ar = Typeops.type_of_array env (Univ.Instance.of_array [|u|]) in
   let sigma = Evd.define evk (mkApp (EConstr.of_constr ar, [| ty |])) sigma in
   sigma

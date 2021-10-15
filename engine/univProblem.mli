@@ -22,17 +22,19 @@ open Univ
 type t =
   | ULe of Universe.t * Universe.t
   | UEq of Universe.t * Universe.t
-  | ULub of Level.t * Level.t
-  | UWeak of Level.t * Level.t
+  | ULub of LevelExpr.t * LevelExpr.t
+  | UWeak of LevelExpr.t * LevelExpr.t
 
 val is_trivial : t -> bool
 
 val check : UGraph.t -> t -> bool
 
+val pr_with : (Level.t -> Pp.t) -> t -> Pp.t
+
 module Set : sig
   include Set.S with type elt = t
 
-  val pr : t -> Pp.t
+  val pr : (Level.t -> Pp.t) -> t -> Pp.t
 
   (** Replace ULub constraints by UEq *)
   val force : t -> t

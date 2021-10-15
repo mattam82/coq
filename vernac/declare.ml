@@ -1003,7 +1003,7 @@ let declare_obligation prg obl ~uctx ~types ~body =
     let body =
       match fst univs with
       | UState.Polymorphic_entry uctx ->
-        Some (DefinedObl (constant, Univ.UContext.instance uctx))
+        Some (DefinedObl (constant, Univ.UContext.abstract_instance uctx))
       | UState.Monomorphic_entry _ ->
         Some
           (TermObl
@@ -1354,7 +1354,7 @@ let obligation_admitted_terminator ~pm {name; num; auto} uctx' dref =
     else
       (* We get the right order somehow, but surely it could be enforced in a clearer way. *)
       let uctx = UState.context uctx' in
-      (Univ.UContext.instance uctx, uctx')
+      (Univ.UContext.abstract_instance uctx, uctx')
   in
   let obl = {obl with obl_body = Some (DefinedObl (cst, inst))} in
   let () = if transparent then add_hint true prg cst in
@@ -1854,7 +1854,7 @@ let declare_abstract ~name ~poly ~kind ~sign ~secsign ~opaque ~solve_tac sigma c
        should be enforced statically. *)
     let (_, body_uctx), _ = Future.force const.proof_entry_body in
     let () = assert (Univ.ContextSet.is_empty body_uctx) in
-    EConstr.EInstance.make (Univ.UContext.instance ctx)
+    EConstr.EInstance.make (Univ.UContext.abstract_instance ctx)
   in
   let args = List.map EConstr.of_constr args in
   let lem = EConstr.mkConstU (cst, inst) in

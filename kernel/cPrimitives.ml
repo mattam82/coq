@@ -291,7 +291,7 @@ let types =
   let array_ty =
     PITT_type
       (PT_array,
-       (Instance.of_array [|Level.var 0|],
+       (Instance.of_array [|LevelExpr.make (Level.var 0)|],
         PITT_param 1))
   in
   function

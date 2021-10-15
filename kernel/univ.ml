@@ -296,6 +296,16 @@ type universe_set = Level.Set.t
    maximum of two algebraic universes
 *)
 
+let string_of_increment n =
+  if Int.equal n 0 then ""
+  else if n < 0 then string_of_int n
+  else "+" ^ string_of_int n
+
+let pr_increment n =
+  if Int.equal n 0 then mt ()
+  else if n < 0 then int n
+  else str"+" ++ int n
+
 module LevelExpr =
 struct
   type t = Level.t * int
@@ -399,14 +409,12 @@ struct
         | _, _, _, _ -> SuperDiff cmp
 
   let to_string (v, n) =
-    if Int.equal n 0 then Level.to_string v
-    else Level.to_string v ^ "+" ^ string_of_int n
+    Level.to_string v ^ string_of_increment n
 
   let pr x = str(to_string x)
 
   let pr_with f (v, n) =
-    if Int.equal n 0 then f v
-    else f v ++ str"+" ++ int n
+    f v ++ pr_increment n
 
   let is_level = function
     | (_v, 0) -> true
@@ -613,9 +621,9 @@ let pr_constraint pr_level (l, d, w, r) =
     else if w = -1 then
       pr_level l, str " < ", pr_level r
     else if w < 0 then
-      pr_level l, pr_constraint_type d, pr_level r ++ str"+" ++ int (- w)
+      pr_level l ++ pr_increment (-w), pr_constraint_type d, pr_level r
     else
-      pr_level l ++ str"+" ++ int w, pr_constraint_type d, pr_level r
+      pr_level l, pr_constraint_type d, pr_level r ++ pr_increment w
   in
   l ++ op ++ r
 
@@ -627,9 +635,6 @@ let mk_level_le_constraint l i r =
 
 let mk_eq_constraint (l, w) (r, w') =
   (l, Eq, AcyclicGraph.weight_of_int (w' - w), r)
-
-let mk_le_constraint (l, w) (r, w') =
-  (l, Le, AcyclicGraph.weight_of_int (w' - w), r)
 
 let mk_constraint (l, w) d (r, w') =
   (l, d, AcyclicGraph.weight_of_int (w' - w), r)
@@ -770,6 +775,9 @@ let enforce_leq u v c =
 let enforce_leq_level u w v c =
   if Level.equal u v then c else Constraints.add (mk_level_le_constraint u w v) c
 
+let enforce_leq_level_expr u w v c =
+  if LevelExpr.equal u v then c else Constraints.add (mk_constraint u w v) c
+
 (* Miscellaneous functions to remove or test local univ assumed to
    occur in a universe *)
 
@@ -829,13 +837,13 @@ struct
   let leq_constraint csts variance u u' =
     match variance with
     | Irrelevant -> csts
-    | Covariant -> enforce_leq_level u 0 u' csts
-    | Invariant -> enforce_eq_level u u' csts
+    | Covariant -> enforce_leq_level_expr u Le u' csts
+    | Invariant -> enforce_eq_level_expr u u' csts
 
   let eq_constraint csts variance u u' =
     match variance with
     | Irrelevant -> csts
-    | Covariant | Invariant -> enforce_eq_level u u' csts
+    | Covariant | Invariant -> enforce_eq_level_expr u u' csts
 
   let leq_constraints variance u u' csts =
     let len = Array.length u in
@@ -1023,6 +1031,8 @@ module LevelAbstraction : sig
 
   val pr : (Level.t -> Pp.t) -> ?variance:Variance.t array -> t -> Pp.t
   val levels : t -> Level.Set.t
+
+  val to_instance : t -> Instance.t
 end =
 struct
   type t = Level.t array
@@ -1107,6 +1117,8 @@ struct
           (* Necessary as universe instances might come from different modules and
             unmarshalling doesn't preserve sharing *))
 
+  let to_instance a =
+    Array.map (LevelExpr.make ~weight:0) a
 end
 
 (** A context of universe levels with universe constraints,
@@ -1133,6 +1145,8 @@ struct
 
   let names (names, _) = names
   let abstraction (_, (univs, _cst)) = univs
+  let abstract_instance (_, (univs, _cst)) =
+    Array.map (LevelExpr.make ~weight:0) univs
   let constraints (_, (_univs, cst)) = cst
 
   let union (na, (univs, cst)) (na', (univs', cst')) =
@@ -1228,11 +1242,11 @@ struct
   let add_constraints cst' (univs, cst) =
     univs, Constraints.union cst cst'
 
-  let add_levels inst (univs, cst) =
+  (* let add_levels inst (univs, cst) =
     let v = LevelAbstraction.to_array inst in
     let fold accu u = Level.Set.add u accu in
     let univs = Array.fold_left fold univs v in
-    (univs, cst)
+    (univs, cst) *)
 
   let sort_levels a =
     Array.sort Level.compare a; a
@@ -1336,12 +1350,6 @@ let make_level_abstraction_subst i =
       Level.Map.add l (LevelExpr.make (Level.var i)) acc)
       Level.Map.empty arr
 
-let make_inverse_level_abstraction_subst i =
-  let arr = LevelAbstraction.to_array i in
-    Array.fold_left_i (fun i acc l ->
-      Level.Map.add (Level.var i) l acc)
-      Level.Map.empty arr
-
 let make_inverse_instance_subst i =
   let arr = Instance.to_array i in
     Array.fold_left_i (fun i acc l ->
@@ -1350,6 +1358,9 @@ let make_inverse_instance_subst i =
 
 let make_abstract_instance (ctx, _) =
   Array.init (Array.length ctx) (fun i -> LevelExpr.make (Level.var i))
+
+let make_abstraction (ctx, _) =
+  Array.init (Array.length ctx) (fun i -> Level.var i)
 
 let abstract_universes uctx =
   let nas = UContext.names uctx in

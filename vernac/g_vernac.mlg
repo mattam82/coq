@@ -288,8 +288,14 @@ GRAMMAR EXTEND Gram
       | -> { NoInline } ] ]
   ;
   univ_constraint:
-    [ [ l = universe_name; ord = [ "<" -> { Univ.Lt } | "=" -> { Univ.Eq } | "<=" -> { Univ.Le } ];
-        r = universe_name -> { (l, ord, r) } ] ]
+    [ [ l = universe_expr; ord = [ "<" -> { None } | "=" -> { Some Univ.Eq } | "<=" -> { Some Univ.Le } ];
+        r = universe_expr -> {
+        let l, ord = match ord with
+            | Some o -> l, o
+            | None -> let (l, n) = l in
+              (l, n + 1), Univ.Le
+        in
+        (l, ord, r) } ] ]
   ;
   univ_decl:
     [ [  "@{" ; l = LIST0 identref; ext = [ "+" -> { true } | -> { false } ];

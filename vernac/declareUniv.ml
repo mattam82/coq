@@ -135,10 +135,10 @@ let do_universe ~poly l =
 let do_constraint ~poly l =
   let open Univ in
   let evd = Evd.from_env (Global.env ()) in
-  let u_of_id x = Constrintern.interp_known_level evd x in
+  let u_of_id x = Constrintern.interp_known_level_expr evd x in
   let constraints = List.fold_left (fun acc (l, d, r) ->
       let lu = u_of_id l and ru = u_of_id r in
-      Constraints.add (lu, d, ru) acc)
+      Constraints.add (mk_constraint lu d ru) acc)
       Constraints.empty l
   in
   let uctx = ContextSet.add_constraints constraints ContextSet.empty in

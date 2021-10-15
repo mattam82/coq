@@ -442,10 +442,10 @@ let magically_constant_of_fixbody env sigma reference bd = function
                 let l, r = match cst with
                   | ULub (u, v) | UWeak (u, v) -> u, v
                   | UEq (u, v) | ULe (u, v) ->
-                    let get u = Option.get (Universe.level u) in
+                    let get u = Option.get (Universe.level_expr u) in
                     get u, get v
                 in
-                Univ.Level.Map.add l r acc)
+                Univ.Level.Map.add (Option.get (LevelExpr.level l)) r acc)
                 csts Univ.Level.Map.empty
             in
             let inst = Instance.subst_fn (fun u -> Univ.Level.Map.find u subst) u in

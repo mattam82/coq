@@ -13,24 +13,23 @@ open Util
 open Constr
 open Univ
 
-let enforce_univ_constraint (u,d,v) =
+let enforce_univ_constraint (u,d,w,v) =
   match d with
-  | Eq -> enforce_eq u v
-  | Le -> enforce_leq u v
-  | Lt -> enforce_leq (super u) v
+  | Eq -> enforce_eq u (Universe.addn w v)
+  | Le -> enforce_leq u (Universe.addn w v)
 
 let subst_univs_level fn l =
   try Some (fn l)
   with Not_found -> None
 
-let subst_univs_constraint fn (u,d,v as c) cstrs =
+let subst_univs_constraint fn (u,d,w,v as c) cstrs =
   let u' = subst_univs_level fn u in
   let v' = subst_univs_level fn v in
   match u', v' with
   | None, None -> Constraints.add c cstrs
-  | Some u, None -> enforce_univ_constraint (u,d,Universe.make v) cstrs
-  | None, Some v -> enforce_univ_constraint (Universe.make u,d,v) cstrs
-  | Some u, Some v -> enforce_univ_constraint (u,d,v) cstrs
+  | Some u, None -> enforce_univ_constraint (u,d,w,Universe.make v) cstrs
+  | None, Some v -> enforce_univ_constraint (Universe.make u,d,w,v) cstrs
+  | Some u, Some v -> enforce_univ_constraint (u,d,w,v) cstrs
 
 let subst_univs_constraints subst csts =
   Constraints.fold
@@ -40,10 +39,10 @@ let subst_univs_constraints subst csts =
 let level_subst_of f =
   fun l ->
     try let u = f l in
-          match Universe.level u with
-          | None -> l
+          match Universe.level_expr u with
+          | None -> LevelExpr.make l
           | Some l -> l
-    with Not_found -> l
+    with Not_found -> LevelExpr.make l
 
 let normalize_univ_variable ~find =
   let rec aux cur =

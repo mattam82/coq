@@ -77,7 +77,7 @@ let return_clause env sigma ind u params (nas, p) =
     let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
     let self =
       let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
-      let inst = Instance.of_array (Array.init (Instance.length u) Level.var) in
+      let inst = Instance.of_array (Array.init (Instance.length u) (fun x -> LevelExpr.make (Level.var x))) in
       mkApp (mkIndU (ind, inst), args)
     in
     let realdecls = LocalAssum (Context.anonR, self) :: realdecls in
@@ -739,15 +739,15 @@ type binder_kind = BProd | BLambda | BLetIn
 (**********************************************************************)
 (* Main detyping function                                             *)
 
-let detype_level sigma l =
-  UNamed (detype_level_name sigma l)
+let detype_level_expr sigma (l, i) =
+  (UNamed (detype_level_name sigma l), i)
 
 let detype_instance sigma l =
   if not !print_universes then None
   else
     let l = EInstance.kind sigma l in
     if Univ.Instance.is_empty l then None
-    else Some (List.map (detype_level sigma) (Array.to_list (Univ.Instance.to_array l)))
+    else Some (List.map (detype_level_expr sigma) (Array.to_list (Univ.Instance.to_array l)))
 
 let delay (type a) (d : a delay) (f : a delay -> _ -> _ -> _ -> _ -> _ -> a glob_constr_r) flags env avoid sigma t : a glob_constr_g =
   match d with

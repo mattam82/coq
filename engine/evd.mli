@@ -649,6 +649,7 @@ val set_leq_sort : env -> evar_map -> Sorts.t -> Sorts.t -> evar_map
 val set_eq_sort : env -> evar_map -> Sorts.t -> Sorts.t -> evar_map
 val set_eq_level : evar_map -> Univ.Level.t -> Univ.Level.t -> evar_map
 val set_leq_level : evar_map -> Univ.Level.t -> Univ.Level.t -> evar_map
+val set_leq_level_expr : evar_map -> Univ.LevelExpr.t -> Univ.LevelExpr.t -> evar_map
 val set_eq_instances : ?flex:bool ->
   evar_map -> Univ.Instance.t -> Univ.Instance.t -> evar_map
 

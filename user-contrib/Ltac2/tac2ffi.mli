@@ -181,7 +181,7 @@ val val_constructor : constructor Val.tag
 val val_projection : Projection.t Val.tag
 val val_case : Constr.case_info Val.tag
 val val_binder : (Name.t Context.binder_annot * types) Val.tag
-val val_univ : Univ.Level.t Val.tag
+val val_univ : Univ.LevelExpr.t Val.tag
 val val_free : Id.Set.t Val.tag
 val val_ltac1 : Geninterp.Val.t Val.tag
 val val_ind_data : (Names.Ind.t * Declarations.mutual_inductive_body) Val.tag

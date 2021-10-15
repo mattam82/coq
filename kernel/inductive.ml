@@ -398,7 +398,7 @@ let expand_case_specif mib (ci, u, params, p, iv, c, br) =
     let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
     let self =
       let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
-      let inst = Instance.of_array (Array.init (Instance.length u) Level.var) in
+      let inst = Instance.of_array (Array.init (Instance.length u) (fun x -> LevelExpr.make (Level.var x))) in
       mkApp (mkIndU (ci.ci_ind, inst), args)
     in
     let realdecls = LocalAssum (Context.anonR, self) :: realdecls in

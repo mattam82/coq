@@ -10,6 +10,10 @@
 
 open Univ
 
+let error_inconsistency u v d w p =
+  raise (UniverseInconsistency (d,Universe.make u,
+    (Universe.addn (AcyclicGraph.int_of_weight w) (Universe.make v)), p))
+
 module G = AcyclicGraph.Make(struct
     type t = Level.t
     module Set = Level.Set
@@ -19,10 +23,8 @@ module G = AcyclicGraph.Make(struct
     let equal = Level.equal
     let compare = Level.compare
 
-    type explanation = Univ.explanation
-    let error_inconsistency d u v p =
-      raise (UniverseInconsistency (d,Universe.make u, Universe.make v, p))
-
+    type explanation = (constraint_type * constraint_weight * Level.t) list
+    let error_inconsistency = error_inconsistency
     let pr = Level.pr
   end) [@@inlined] (* without inline, +1% ish on HoTT, compcert. See jenkins 594 vs 596 *)
 (* Do not include G to make it easier to control universe specific
@@ -48,17 +50,24 @@ let set_type_in_type b g = {g with type_in_type=b}
 
 let type_in_type g = g.type_in_type
 
-let check_smaller_expr g (u,n) (v,m) =
-  let diff = n - m in
-    match diff with
-    | 0 -> G.check_leq g.graph u v
-    | 1 -> G.check_lt g.graph u v
-    | x when x < 0 -> G.check_leq g.graph u v
-    | _ -> false
+let check_leq_level g u v =
+  type_in_type g ||
+  Level.equal u v || (g.sprop_cumulative && Level.is_sprop u) ||
+  (not (Level.is_sprop u) && not (Level.is_sprop v) &&
+    (Level.is_prop u || G.check g.graph u AcyclicGraph.weight_le v))
+
+
+let check_leq_expr g (u,n) (v,m) =
+  G.check g.graph u (AcyclicGraph.weight_of_int (m - n)) v
+
+let check_leq_level_expr g u v =
+  type_in_type g ||
+  LevelExpr.leq u v || (g.sprop_cumulative && LevelExpr.is_sprop u) ||
+  (not (LevelExpr.is_sprop u) && not (LevelExpr.is_sprop v) &&
+    (LevelExpr.is_prop u || check_leq_expr g u v))
 
 let exists_bigger g ul l =
-  Universe.exists (fun ul' ->
-    check_smaller_expr g ul ul') l
+  Universe.exists (fun ul' -> check_leq_expr g ul ul') l
 
 let real_check_leq g u v =
   Universe.for_all (fun ul -> exists_bigger g ul v) u
@@ -76,10 +85,21 @@ let check_eq g u v =
   (not (Universe.is_sprop u || Universe.is_sprop v) &&
    (real_check_leq g u v && real_check_leq g v u))
 
+let check_eq_expr graph (u, w) (v, w') =
+  G.check_shift graph u (AcyclicGraph.weight_of_int (w' - w)) v
+
+let check_eq_level_expr g u v =
+  u == v ||
+  type_in_type g ||
+  LevelExpr.equal u v ||
+  (not (LevelExpr.is_sprop u || LevelExpr.is_sprop v) &&
+  check_eq_expr g.graph u v)
+
 let check_eq_level g u v =
   u == v ||
   type_in_type g ||
-  (not (Level.is_sprop u || Level.is_sprop v) && G.check_eq g.graph u v)
+  (not (Level.is_sprop u || Level.is_sprop v) &&
+  G.check_shift g.graph u AcyclicGraph.weight_le v)
 
 let empty_universes = {graph=G.empty; sprop_cumulative=false; type_in_type=false}
 
@@ -88,22 +108,21 @@ let initial_universes =
   let g = G.empty in
   let g = G.add ~rank:big_rank Level.prop g in
   let g = G.add ~rank:big_rank Level.set g in
-  {empty_universes with graph=G.enforce_lt Level.prop Level.set g}
+  {empty_universes with graph = G.enforce Level.prop AcyclicGraph.weight_lt Level.set g}
 
 let initial_universes_with g = {g with graph=initial_universes.graph}
 
-let enforce_constraint (u,d,v) g =
+let enforce_constraint (u,d,w,v) g =
   match d with
-  | Le -> G.enforce_leq u v g
-  | Lt -> G.enforce_lt u v g
-  | Eq -> G.enforce_eq u v g
+  | AcyclicGraph.Le -> G.enforce u w v g
+  | AcyclicGraph.Eq -> G.enforce_shift u w v g
 
-let enforce_constraint (u,d,v as cst) g =
+let enforce_constraint (u,d,w,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> g_map (enforce_constraint cst) g
-  | true, (Eq|Le), true -> g
-  | true, Le, false when g.sprop_cumulative -> g
-  | _ ->  raise (UniverseInconsistency (d,Universe.make u, Universe.make v, None))
+  | true, (AcyclicGraph.Eq|AcyclicGraph.Le), true -> g
+  | true, AcyclicGraph.Le, false when g.sprop_cumulative -> g
+  | _ -> error_inconsistency u v d w None
 
 let enforce_constraint cst g =
   if not (type_in_type g) then enforce_constraint cst g
@@ -111,36 +130,28 @@ let enforce_constraint cst g =
 
 let merge_constraints csts g = Constraints.fold enforce_constraint csts g
 
-let check_constraint g (u,d,v) =
+let check_constraint g (u,d,w,v) =
   match d with
-  | Le -> G.check_leq g u v
-  | Lt -> G.check_lt g u v
-  | Eq -> G.check_eq g u v
+  | AcyclicGraph.Le -> G.check g u w v
+  | AcyclicGraph.Eq -> G.check_shift g u w v
 
-let check_constraint g (u,d,v as cst) =
+let check_constraint g (u,d,w,v as cst) =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> check_constraint g.graph cst
-  | true, (Eq|Le), true -> true
-  | true, Le, false -> g.sprop_cumulative || type_in_type g
+  | true, (AcyclicGraph.Eq|AcyclicGraph.Le), true -> w >= 0
+  | true, AcyclicGraph.Le, false -> g.sprop_cumulative || type_in_type g
   | _ -> type_in_type g
 
 let check_constraints csts g = Constraints.for_all (check_constraint g) csts
-
-let leq_expr (u,m) (v,n) =
-  let d = match m - n with
-    | 1 -> Lt
-    | diff -> assert (diff <= 0); Le
-  in
-  (u,d,v)
 
 let enforce_leq_alg u v g =
   let open Util in
   let enforce_one (u,v) = function
     | Inr _ as orig -> orig
     | Inl (cstrs,g) as orig ->
-      if check_smaller_expr g u v then orig
+      if check_leq_level_expr g u v then orig
       else
-        (let c = leq_expr u v in
+        (let c = mk_constraint u AcyclicGraph.Le v in
          match enforce_constraint c g with
          | g -> Inl (Constraints.add c cstrs,g)
          | exception (UniverseInconsistency _ as e) -> Inr e)
@@ -166,7 +177,7 @@ let enforce_leq_alg u v g =
   | false, false -> enforce_leq_alg u v g
   | left, _ ->
     if left && g.sprop_cumulative then Constraints.empty, g
-    else raise (UniverseInconsistency (Le, u, v, None))
+    else raise (UniverseInconsistency (AcyclicGraph.Le, u, v, None))
 
 (* sanity check wrapper *)
 let enforce_leq_alg u v g =
@@ -183,8 +194,9 @@ exception AlreadyDeclared = G.AlreadyDeclared
 let add_universe u ~lbound ~strict g =
   let lbound = match lbound with Bound.Prop -> Level.prop | Bound.Set -> Level.set in
   let graph = G.add u g.graph in
-  let d = if strict then Lt else Le in
-  enforce_constraint (lbound,d,u) {g with graph}
+  let d = AcyclicGraph.Le in
+  let w = if strict then AcyclicGraph.weight_lt else AcyclicGraph.weight_le in
+  enforce_constraint (lbound,d,w,u) {g with graph}
 
 let add_universe_unconstrained u g = {g with graph=G.add u g.graph}
 
@@ -199,11 +211,11 @@ let constraints_for ~kept g = G.constraints_for ~kept:(Level.Set.remove Level.sp
 let check_subtype ~lbound univs ctxT ctx =
   if AbstractContext.size ctxT == AbstractContext.size ctx then
     let uctx = AbstractContext.repr ctx in
-    let inst = UContext.instance uctx in
+    let inst = UContext.abstraction uctx in
     let cst = UContext.constraints uctx in
     let cstT = UContext.constraints (AbstractContext.repr ctxT) in
     let push accu v = add_universe v ~lbound ~strict:false accu in
-    let univs = Array.fold_left push univs (Instance.to_array inst) in
+    let univs = Array.fold_left push univs (LevelAbstraction.to_array inst) in
     let univs = merge_constraints cstT univs in
     check_constraints cst univs
   else false
@@ -216,13 +228,15 @@ let check_eq_instances g t1 t2 =
   t1 == t2 ||
     (Int.equal (Array.length t1) (Array.length t2) &&
         let rec aux i =
-          (Int.equal i (Array.length t1)) || (check_eq_level g t1.(i) t2.(i) && aux (i + 1))
+          (Int.equal i (Array.length t1)) || (check_eq_level_expr g t1.(i) t2.(i) && aux (i + 1))
         in aux 0)
 
 let domain g = Level.Set.add Level.sprop (G.domain g.graph)
 let choose p g u = if Level.is_sprop u
-  then if p u then Some u else None
-  else G.choose p g.graph u
+  then if p u then Some (LevelExpr.make u) else None
+  else
+    (G.choose p g.graph u) |>
+    Option.map (fun (w, l) -> LevelExpr.make ~weight:(AcyclicGraph.int_of_weight w) l)
 
 let check_universes_invariants g = G.check_invariants ~required_canonical:Level.is_small g.graph
 
@@ -239,16 +253,16 @@ let pr_arc prl = let open Pp in
     else
       prl u ++ str " " ++
       v 0
-        (pr_pmap spc (fun (v, strict) ->
-              (if strict then str "< " else str "<= ") ++ prl v)
+        (pr_pmap spc (fun (v, w) ->
+          str "<= " ++ prl v ++ int (AcyclicGraph.int_of_weight w))
             ltle) ++
       fnl ()
-  | u, G.Alias v ->
-    prl u  ++ str " = " ++ prl v ++ fnl ()
+  | u, G.Alias (w, v) ->
+    prl u  ++ str " = " ++ prl v ++ int (AcyclicGraph.int_of_weight w) ++ fnl ()
 
 type node = G.node =
-| Alias of Level.t
-| Node of bool Level.Map.t
+| Alias of AcyclicGraph.constraint_weight * Level.t
+| Node of AcyclicGraph.constraint_weight Level.Map.t
 
 let repr g = G.repr g.graph
 

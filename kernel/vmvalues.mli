@@ -39,7 +39,7 @@ type structured_constant =
   | Const_sort of Sorts.t
   | Const_ind of inductive
   | Const_b0 of tag
-  | Const_univ_level of Univ.Level.t
+  | Const_univ_level of Univ.LevelExpr.t
   | Const_val of structured_values
   | Const_uint of Uint63.t
   | Const_float of Float64.t
@@ -128,7 +128,7 @@ type whd =
   | Vfloat64 of float
   | Varray of values Parray.t
   | Vatom_stk of atom * stack
-  | Vuniv_level of Univ.Level.t
+  | Vuniv_level of Univ.LevelExpr.t
 
 (** For debugging purposes only *)
 
@@ -155,7 +155,7 @@ external val_of_proj_name : Projection.Repr.t -> values = "%identity"
 (** Destructors *)
 
 val whd_val : values -> whd
-val uni_lvl_val : values -> Univ.Level.t
+val uni_lvl_val : values -> Univ.LevelExpr.t
 
 (** Arguments *)
 
