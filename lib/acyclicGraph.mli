@@ -14,6 +14,10 @@ type constraint_weight
 val weight_le : constraint_weight (* 0 *)
 val weight_lt : constraint_weight (* -1 *)
 val weight_of_int : int -> constraint_weight
+val weight_ord : constraint_weight -> constraint_weight -> int
+
+(* For printing *)
+val int_of_weight : constraint_weight -> int
 
 type constraint_type = Eq | Le
 

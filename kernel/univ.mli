@@ -98,6 +98,60 @@ sig
   val pr : (Level.t -> Pp.t) -> t -> Pp.t
 end [@@ocaml.deprecated "Use Univ.Level.Set"]
 
+module LevelExpr :
+sig
+
+  type t
+  (** Type of universe level expressions. A universe level with an increment. *)
+
+  val set : t
+  val prop : t
+  val sprop : t
+  val type1 : t
+  (** The set, prop, sprop and type1 universe level expressions. *)
+
+  val is_small : t -> bool
+  (** Is the universe set, prop or sprop? *)
+
+  val is_prop : t -> bool
+  val is_sprop : t -> bool
+
+  val compare : t -> t -> int
+  (** Comparison function *)
+
+  val equal : t -> t -> bool
+  (** Equality function *)
+
+  val hash : t -> int
+
+  val make : ?weight:int -> Level.t -> t
+
+  val leq : t -> t -> bool
+
+  val successor : t -> t
+  (* The universe level exprssion just above *)
+
+  val addn : int -> t -> t
+
+  val pr : t -> Pp.t
+  (** Pretty-printing *)
+
+  val pr_with : (Level.t -> Pp.t) -> t -> Pp.t
+  (** Pretty-printing *)
+
+  val to_string : t -> string
+  (** Debug printing *)
+
+  val level : t -> Level.t option
+  (** Returns [Some l] if [t = l+0] only *)
+
+  val get_level : t -> Level.t
+
+  val map : (Level.t -> Level.t) -> t -> t
+
+  val subst : (Level.t -> t) -> t -> t
+end
+
 module Universe :
 sig
   type t
@@ -201,7 +255,7 @@ val univ_level_rem : Level.t -> Universe.t -> Universe.t -> Universe.t
 
 (** {6 Constraints. } *)
 
-type constraint_type = AcyclicGraph.constraint_type = Lt | Le | Eq
+type constraint_type = AcyclicGraph.constraint_type
 type univ_constraint = Level.t * constraint_type * Level.t
 
 module Constraints : sig
@@ -228,7 +282,7 @@ type 'a constraint_function = 'a -> 'a -> Constraints.t -> Constraints.t
 val enforce_eq : Universe.t constraint_function
 val enforce_leq : Universe.t constraint_function
 val enforce_eq_level : Level.t constraint_function
-val enforce_leq_level : Level.t constraint_function
+val enforce_leq_level : Level.t -> int -> Level.t -> Constraints.t -> Constraints.t
 
 (** Type explanation is used to decorate error messages to provide
   useful explanation why a given constraint is rejected. It is composed
@@ -263,7 +317,7 @@ type 'a universe_map = 'a Level.Map.t
 (** {6 Substitution} *)
 
 type universe_subst_fn = Level.t -> Universe.t
-type universe_level_subst_fn = Level.t -> Level.t
+type universe_level_subst_fn = Level.t -> LevelExpr.t
 
 (** A full substitution, might involve algebraic universes *)
 type universe_subst = Universe.t universe_map
@@ -342,6 +396,28 @@ val in_punivs : 'a -> 'a puniverses
 
 val eq_puniverses : ('a -> 'a -> bool) -> 'a puniverses -> 'a puniverses -> bool
 
+module LevelAbstraction : sig
+  type t = Level.t array
+
+  val empty : t
+  val is_empty : t -> bool
+
+  val of_array : Level.t array -> t
+  val to_array : t -> Level.t array
+
+  val append : t -> t -> t
+  val equal : t -> t -> bool
+  val length : t -> int
+
+  val hcons : t -> t
+  val hash : t -> int
+
+  val share : t -> t * int
+
+  val pr : (Level.t -> Pp.t) -> ?variance:Variance.t array -> t -> Pp.t
+  val levels : t -> Level.Set.t
+end
+
 (** A vector of universe levels with universe Constraints.t,
     representing local universe variables and associated Constraints.t;
     the names are user-facing names for printing *)
@@ -350,12 +426,12 @@ module UContext :
 sig
   type t
 
-  val make : Names.Name.t array -> Instance.t constrained -> t
+  val make : Names.Name.t array -> LevelAbstraction.t constrained -> t
 
   val empty : t
   val is_empty : t -> bool
 
-  val instance : t -> Instance.t
+  val abstraction : t -> LevelAbstraction.t
   val constraints : t -> Constraints.t
 
   val union : t -> t -> t
@@ -505,12 +581,13 @@ val subst_univs_universe : universe_subst_fn -> Universe.t -> Universe.t
 val subst_instance_instance : Instance.t -> Instance.t -> Instance.t
 val subst_instance_universe : Instance.t -> Universe.t -> Universe.t
 
-val make_instance_subst : Instance.t -> universe_level_subst
+val make_level_abstraction_subst : LevelAbstraction.t -> universe_level_subst
 (** Creates [u(0) ↦ 0; ...; u(n-1) ↦ n - 1] out of [u(0); ...; u(n - 1)] *)
 
+val make_inverse_level_abstraction_subst : LevelAbstraction.t -> universe_level_subst
 val make_inverse_instance_subst : Instance.t -> universe_level_subst
 
-val abstract_universes : UContext.t -> Instance.t * AbstractContext.t
+val abstract_universes : UContext.t -> LevelAbstraction.t * AbstractContext.t
 (** TODO: move universe abstraction out of the kernel *)
 
 val make_abstract_instance : AbstractContext.t -> Instance.t

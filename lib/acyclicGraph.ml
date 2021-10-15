@@ -23,6 +23,7 @@ sig
   val min : t -> t -> t
   val (<=) : t -> t -> bool
   val (=) : t -> t -> bool
+  val compare : t -> t -> int
 end =
 struct
   type t = int
@@ -49,12 +50,15 @@ struct
   let min (x : int) (y : int) = min x y
   let (<=) (x : int) (y : int) = x <= y
   let (=) = Int.equal
+  let compare = Int.compare
 end
 
 type constraint_weight = W.t
 let weight_le = W.zero
 let weight_lt = W.minus_one
 let weight_of_int = W.of_int
+let weight_ord = W.compare
+let int_of_weight = W.to_int
 
 type constraint_type = Eq | Le
 
