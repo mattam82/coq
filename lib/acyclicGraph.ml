@@ -206,10 +206,11 @@ module Make (Point:Point) = struct
       let off = ref 0 in
       cl |> List.iter (fun c ->
           let nc = Array.length c in
-          for i = 0 to nc do
+          for i = 0 to nc - 1 do
             Array.blit c.(i) 0 r.(!off+i) !off nc
           done;
           off := !off + nc);
+      assert (!off = n);
       r
 
     let add_constraint ?(rank : int -> int = (fun _ -> assert false)) i1 wi1i2 i2 c =
@@ -235,10 +236,10 @@ module Make (Point:Point) = struct
             let n = Array.length c in
             let shifts = Array.make n None in
             let maxrk = ref (rank i1) and imax = ref i1 and tie = ref false in
-            let n' = ref (n - 1) in
+            let n' = ref n in
             for i = 0 to n - 1 do
               if i <> i1 && W.(c.(i).(i1) + c.(i1).(i) = zero) then begin
-                (* If [i] is part of the 0-cycle (and [i != i1], which is
+                (* If [i] is part of the 0-cycle (and [i] is not [i1], which is
                    treated separately.) *)
                 let rk = rank i in
                 if rk <= !maxrk then begin
@@ -258,15 +259,17 @@ module Make (Point:Point) = struct
                 let d = Array.make !n' W.zero in
                 let jj = ref 0 in
                 for j = 0 to n - 1 do
-                  if shifts.(i) = None then begin
+                  if shifts.(j) = None then begin
                     d.(!jj) <- c.(i).(j);
                     incr jj
                   end
                 done;
+                assert (!jj = !n');
                 r.(!ii) <- d;
                 incr ii
               end else shifts.(i) <- Some c.(i).(!imax)
             done;
+            assert (!ii = !n');
             r, Some (shifts, !imax, !tie)
 
     let dist i j c = c.(i).(j)
@@ -276,22 +279,22 @@ module Make (Point:Point) = struct
     let check_invariants ~allow_inf c =
       let n = Array.length c in
       c |> Array.iter (fun d -> assert (Array.length d = n));
-      for i = 0 to n-1 do
+      for i = 0 to n - 1 do
         assert W.(c.(i).(i) = zero);
-        for j = 0 to n-1 do
-          for k = 0 to n-1 do
+        for j = 0 to n - 1 do
+          for k = 0 to n - 1 do
             assert W.(c.(i).(k) <= c.(i).(j) + c.(j).(k));
           done
         done
       done;
-      for i = 0 to n-1 do
-        for j = 0 to n-1 do
+      for i = 0 to n - 1 do
+        for j = 0 to n - 1 do
           assert (i = j || W.(c.(i).(j) + c.(j).(i) > zero))
         done
       done;
       if not allow_inf then
-        for i = 0 to n-1 do
-          for j = 0 to n-1 do
+        for i = 0 to n - 1 do
+          for j = 0 to n - 1 do
             assert W.(c.(i).(j) < W.inf)
           done
         done
@@ -332,10 +335,11 @@ module Make (Point:Point) = struct
   let key u = u.nodes.(0)
 
   (* Change data associated with a SCC head.
-     [key n] should already been inserted as a SCC head. *)
+     [key n] should already been inserted as a SCC head or with SccOf. *)
   let change_node g n =
     { g with entries = g.entries |> KMap.modify (key n) (fun _  -> function
-                           | SccHead (n', r) -> SccHead (n, r)
+                           | SccHead (_, r) -> SccHead (n, r)
+                           | SccOf (_, _, r) -> SccHead (n, r)
                            | _ -> assert false) }
 
   let enter_sccof g u v i =
@@ -423,9 +427,9 @@ module Make (Point:Point) = struct
                         KSet.exists (fun l -> u == fst (repr_scc g l)) v.bwd)));
           u.bwd |> KSet.iter (fun v ->
               let v, _ = repr_scc g v in
-              assert (v.klvl = u.klvl &&
-                  (Array.exists (KMap.mem (key u)) v.fwd ||
-                   Array.exists (KMap.exists (fun l _ -> u == fst (repr_scc g l))) v.fwd)));
+              assert (v.klvl = u.klvl);
+              assert (Array.exists (KMap.mem (key u)) v.fwd ||
+                      Array.exists (KMap.exists (fun l _ -> u == fst (repr_scc g l))) v.fwd));
           assert (Key.equal l (key u));
           assert (u.ilvl < 0 && u.ilvl > g.index);
           DistMat.check_invariants ~allow_inf:false u.dists;
@@ -484,10 +488,13 @@ module Make (Point:Point) = struct
       let nodes = Array.make n root and fwd = Array.make n KMap.empty in
       let ii = ref 0 in
       let g = ref g in
-      for i = 0 to Array.length shifts-1 do
+      for i = 0 to Array.length shifts - 1 do
         match shifts.(i) with
         | None ->
           nodes.(!ii) <- c.nodes.(i); fwd.(!ii) <- c.fwd.(i);
+          (* If the index of the node in [nodes] changes, then we need to update the corresponding
+             information in [g.entries]. *)
+          if !ii <> i && !ii <> 0 then g := enter_sccof !g nodes.(!ii) nodes.(0) !ii;
           incr ii
         | Some wi ->
           fwdroot := KMap.merge (fun _ wold w ->
@@ -499,6 +506,7 @@ module Make (Point:Point) = struct
           g := { !g with
                  entries = KMap.set c.nodes.(i) (Shift (wi, root)) !g.entries }
       done;
+      assert (!ii = n);
       fwd.(find_in_nodes nodes root) <- !fwdroot;
       let g = change_node !g { c with nodes; dists; fwd } in
       if tie then incr_rank g root else g
@@ -562,10 +570,10 @@ module Make (Point:Point) = struct
     let rec go from v =         (* [from] is SCC head. *)
       let c, _ = repr_scc !g v in
       if c.klvl < klvl then begin
-        let v = key c and from = Some v in
         let fwd = clean_fwd !g c.fwd in
         let bwd = match from with None -> KSet.empty | Some from -> KSet.singleton from in
         g := change_node !g { c with klvl; fwd; bwd };
+        let v = key c and from = Some v in
         Array.iter (KMap.iter (fun v' _  -> go from v')) fwd;
         f_traversed := v :: !f_traversed
       end else if c.klvl = klvl then match from with None -> () | Some from ->
@@ -993,16 +1001,16 @@ module Make (Point:Point) = struct
           let n = Array.length vcw in
           let dist a b = DistMat.dist a b vc.dists in
           let d = Array.make n W.inf in
-          for i = 0 to n-1 do
+          for i = 0 to n - 1 do
             if W.(vcw.(i) < inf) then
-              for j = 0 to n-1 do
+              for j = 0 to n - 1 do
                 d.(j) <- W.(min (vcw.(i) + dist i j) d.(j))
               done
           done;
-          for i = 0 to n-1 do
+          for i = 0 to n - 1 do
             let exception Implied in
             try
-              for j = 0 to n-1 do
+              for j = 0 to n - 1 do
                 if i <> j && not (Key.equal vc.nodes.(j) u) &&
                    W.(d.(j) + dist j i = d.(i)) && KMap.mem vc.nodes.(j) rmap
                 then raise Implied
@@ -1032,8 +1040,8 @@ module Make (Point:Point) = struct
     |> List.sort topo_compare
     |> List.iter (fun c ->
        let n = Array.length c.nodes in
-       for j = 0 to n-1 do
-         for i = 0 to n-1 do
+       for j = 0 to n - 1 do
+         for i = 0 to n - 1 do
            if i <> j then
              min_val c.nodes.(j)
                W.(KMap.find c.nodes.(i) !vals + DistMat.dist i j c.dists)
