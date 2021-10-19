@@ -892,13 +892,13 @@ module Make (Point:Point) = struct
     end
 
   (* Uncomment to debug the cycle detection algorithm. *)
-  (* let insert_edge u w v g =
-   *   let check_invariants = check_invariants ~required_canonical:(fun _ -> false) in
-   *   check_invariants g;
-   *   let g = insert_edge u w v g in
-   *   check_invariants g;
-   *   assert (search_path u w v g);
-   *   g *)
+  let insert_edge u w v g =
+     let check_invariants = check_invariants ~required_canonical:(fun _ -> false) in
+     check_invariants g;
+     let g = insert_edge u w v g in
+     check_invariants g;
+     assert (search_path u w v g);
+     g
 
   let check_shift g u w v =
     if Point.equal u v then W.(w = W.zero)

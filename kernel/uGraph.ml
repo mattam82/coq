@@ -112,10 +112,15 @@ let initial_universes =
 
 let initial_universes_with g = {g with graph=initial_universes.graph}
 
-let enforce_constraint (u,d,w,v) g =
+let enforce_constraint (u,d,w,v as cstr) g =
+  Feedback.msg_debug Pp.(str "Enforcing constraint: " ++ Univ.pr_constraint Level.pr cstr);
+  let g' =
   match d with
   | AcyclicGraph.Le -> G.enforce u w v g
   | AcyclicGraph.Eq -> G.enforce_shift u w v g
+  in
+  Feedback.msg_debug Pp.(str "Enforced constraint: " ++ Univ.pr_constraint Level.pr cstr);
+  g'
 
 let enforce_constraint (u,d,w,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
