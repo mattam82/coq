@@ -10,7 +10,7 @@
 
 open Univ
 
-let error_inconsistency u v d w p =
+let error_inconsistency u d w v p =
   raise (UniverseInconsistency (d,Universe.make u,
     (Universe.addn (AcyclicGraph.int_of_weight w) (Universe.make v)), p))
 
@@ -112,22 +112,24 @@ let initial_universes =
 
 let initial_universes_with g = {g with graph=initial_universes.graph}
 
+let _univs_flag, debug_univs = CDebug.create_full ~name:"universes" ()
+
 let enforce_constraint (u,d,w,v as cstr) g =
-  Feedback.msg_debug Pp.(str "Enforcing constraint: " ++ Univ.pr_constraint Level.pr cstr);
+  debug_univs (fun () -> Pp.(str "Enforcing constraint: " ++ Univ.pr_constraint Level.pr cstr));
   let g' =
   match d with
   | AcyclicGraph.Le -> G.enforce u w v g
   | AcyclicGraph.Eq -> G.enforce_shift u w v g
   in
-  Feedback.msg_debug Pp.(str "Enforced constraint: " ++ Univ.pr_constraint Level.pr cstr);
+  debug_univs (fun () -> Pp.(str "Enforced constraint: " ++ Univ.pr_constraint Level.pr cstr));
   g'
 
 let enforce_constraint (u,d,w,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
   | false, _, false -> g_map (enforce_constraint cst) g
-  | true, (AcyclicGraph.Eq|AcyclicGraph.Le), true -> g
+  | true, _, true when w >= 0 -> g
   | true, AcyclicGraph.Le, false when g.sprop_cumulative -> g
-  | _ -> error_inconsistency u v d w None
+  | _ -> error_inconsistency u d w v None
 
 let enforce_constraint cst g =
   if not (type_in_type g) then enforce_constraint cst g

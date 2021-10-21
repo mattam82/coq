@@ -121,3 +121,5 @@ val pr_universes : (Level.t -> Pp.t) -> node Level.Map.t -> Pp.t
 
 (** {6 Debugging} *)
 val check_universes_invariants : t -> unit
+
+val debug_univs : (unit -> Pp.t) -> unit

@@ -294,7 +294,10 @@ val enforce_eq : Universe.t constraint_function
 val enforce_leq : Universe.t constraint_function
 val enforce_eq_level : Level.t constraint_function
 val enforce_leq_level : Level.t -> int -> Level.t -> Constraints.t -> Constraints.t
+
+val mk_level_constraint : Level.t -> constraint_type -> int -> Level.t -> univ_constraint
 val mk_constraint : LevelExpr.t -> constraint_type -> LevelExpr.t -> univ_constraint
+
 (** Type explanation is used to decorate error messages to provide
   useful explanation why a given constraint is rejected. It is composed
   of a path of universes and relation kinds [(r1,u1);..;(rn,un)] means

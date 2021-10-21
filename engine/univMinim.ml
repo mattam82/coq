@@ -170,13 +170,13 @@ exception UpperBoundedAlg
    [lbound] algebraic. *)
 let enforce_uppers upper lbound cstrs =
   List.fold_left (fun cstrs (w, r) ->
-      if w == 0 then
-        enforce_leq lbound (Universe.make r) cstrs
-      else
-        match Universe.level_expr lbound with
-        | Some lev -> Constraints.add (mk_constraint lev Le (LevelExpr.make ~weight:w r)) cstrs
-        | None -> raise UpperBoundedAlg)
-    cstrs upper
+    if w == 0 then
+      enforce_leq lbound (Universe.make r) cstrs
+    else
+      match Universe.level_expr lbound with
+      | Some lev -> Constraints.add (mk_constraint lev Le (LevelExpr.make ~weight:w r)) cstrs
+      | None -> raise UpperBoundedAlg)
+  cstrs upper
 
 let minimize_univ_variables ctx us algs left right cstrs =
   let left, lbounds =
@@ -355,11 +355,11 @@ let normalize_context_set ~lbound g ctx us algs weak =
       else
         let ul = LevelExpr.get_level u in(* FIXME *)
         let vl = LevelExpr.get_level v in(* FIXME *)
-      if Level.Map.mem ul us
-      then set_to u v
-      else if Level.Map.mem vl us
-      then set_to v u
-      else acc)
+        if Level.Map.mem ul us
+        then set_to u v
+        else if Level.Map.mem vl us
+        then set_to v u
+        else acc)
       weak (ctx, us, g)  in
   (* Noneqs is now in canonical form w.r.t. equality constraints,
      and contains only inequality constraints. *)
@@ -371,6 +371,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
         else Constraints.add (mk_constraint u d (LevelExpr.addn w v)) noneqs)
       noneqs Constraints.empty
   in
+  UGraph.debug_univs (fun () -> Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr noneqs));
   (* Compute the left and right set of flexible variables, constraints
      mentioning other variables remain in noneqs. *)
   let noneqs, ucstrsl, ucstrsr =
@@ -380,7 +381,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
         if lus then add_list_map l (w, r) ucstrsl
         else ucstrsl
       and ucstrsr' =
-        add_list_map r (w, l) ucstrsr
+        add_list_map r (-w, l) ucstrsr
       in
       let noneqs =
         if lus || rus then noneq

@@ -332,9 +332,7 @@ struct
   let hcons =
     Hashcons.simple_hcons H.generate H.hcons Level.hcons
 
-  let make ?(weight=0) l =
-    assert (weight >= 0);
-    (l, weight)
+  let make ?(weight=0) l = (l, weight)
 
   let compare u v =
     if u == v then 0
@@ -629,6 +627,9 @@ let pr_constraint pr_level (l, d, w, r) =
 
 let mk_level_eq_constraint l r =
   (l, Eq, AcyclicGraph.weight_le, r)
+
+let mk_level_constraint l d i r =
+    (l, d, AcyclicGraph.weight_of_int i, r)
 
 let mk_level_le_constraint l i r =
   (l, Le, AcyclicGraph.weight_of_int i, r)
