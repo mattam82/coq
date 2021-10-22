@@ -958,7 +958,7 @@ module Make (Point:Point) = struct
         | SccOf _ -> ()
         | Shift (w, v) ->
           let w', v = repr_shift g v in
-          add_part u W.(w+w') v);
+          add_part u W.(-w-w') v);
     !csts, KHashtbl.fold (fun _ x acc -> x::acc) parts []
 
   (* domain g.entries = kept + removed *)
@@ -1089,7 +1089,7 @@ module Make (Point:Point) = struct
             let adj = ref Point.Map.empty in
             n.fwd.(i) |> KMap.iter (fun u w -> adj := add u w !adj);
             for j = 0 to Array.length n.nodes - 1 do
-              adj := add n.nodes.(j) (DistMat.dist i j n.dists) !adj
+              if i <> j then adj := add n.nodes.(j) (DistMat.dist i j n.dists) !adj
             done;
             r := add n.nodes.(i) (Node !adj) !r
           done
