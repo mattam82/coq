@@ -220,18 +220,18 @@ let process_universe_constraints uctx cstrs =
   in
   let is_local l = Level.Map.mem l !vars in
   let varinfo x =
-    match Universe.level x with
+    match Universe.level_expr x with
     | None -> Inl x
     | Some l -> Inr l
   in
-  let equalize_variables fo l l' r r' local =
-    (* Assumes l = [l',0] and r = [r',0] *)
+  let equalize_variables fo l (l', n as le) r (r', m as re) local =
+    UGraph.debug_univs (fun () -> Pp.(str"Enforcing " ++ LevelExpr.pr le ++ str " = " ++ LevelExpr.pr re));
     let () =
       if is_local l' then
-        instantiate_variable l' r vars
+        instantiate_variable l' (Universe.tip (r', m - n)) vars
       else if is_local r' then
-        instantiate_variable r' l vars
-      else if not (UGraph.check_eq_level univs l' r') then
+        instantiate_variable r' (Universe.tip (l', n - m)) vars
+      else if not (UGraph.check_eq_level_expr univs le re) then
         (* Two rigid/global levels, none of them being local,
             one of them being Prop/Set, disallow *)
         if Level.is_small l' || Level.is_small r' then
@@ -239,17 +239,18 @@ let process_universe_constraints uctx cstrs =
         else if fo then
           raise UniversesDiffer
     in
-    enforce_eq_level l' r' local
+    enforce_eq_level_expr le re local
   in
   let equalize_universes l r local = match varinfo l, varinfo r with
   | Inr l', Inr r' -> equalize_variables false l l' r r' local
-  | Inr l, Inl r | Inl r, Inr l ->
+  | Inr (l, wl), Inl r
+  | Inl r, Inr (l, wl) ->
     let alg = Level.Set.mem l uctx.univ_algebraic in
     let inst = univ_level_rem l r r in
       if alg && not (Level.Set.mem l (Universe.levels inst)) then
-        (instantiate_variable l inst vars; local)
+        (instantiate_variable l (Universe.addn (-wl) inst) vars; local)
       else
-        let lu = Universe.make l in
+        let lu = Universe.tip (l, wl) in
         if univ_level_mem l r then
           enforce_leq inst lu local
         else raise (UniverseInconsistency (Eq, lu, r, None))

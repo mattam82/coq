@@ -294,6 +294,7 @@ val enforce_eq : Universe.t constraint_function
 val enforce_leq : Universe.t constraint_function
 val enforce_eq_level : Level.t constraint_function
 val enforce_leq_level : Level.t -> int -> Level.t -> Constraints.t -> Constraints.t
+val enforce_eq_level_expr : LevelExpr.t -> LevelExpr.t -> Constraints.t -> Constraints.t
 
 val mk_level_constraint : Level.t -> constraint_type -> int -> Level.t -> univ_constraint
 val mk_constraint : LevelExpr.t -> constraint_type -> LevelExpr.t -> univ_constraint

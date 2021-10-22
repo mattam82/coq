@@ -180,7 +180,8 @@ let enforce_uppers upper lbound cstrs =
 
 let minimize_univ_variables ctx us algs left right cstrs =
   let left, lbounds =
-    Univ.Level.Map.fold (fun r lower (left, lbounds as acc)  ->
+    Univ.Level.Map.fold (fun r lower (left, lbounds as acc) ->
+      (* lower <= r *)
       if Univ.Level.Map.mem r us || not (Univ.Level.Set.mem r ctx) then acc
       else (* Fixed universe, just compute its glb for sharing *)
         let lbounds =
@@ -218,16 +219,16 @@ let minimize_univ_variables ctx us algs left right cstrs =
           let lower = Level.Set.fold Level.Map.remove (Universe.levels lbound) lower in
           instantiate_with_lbound u lbound lower ~alg:true ~enforce:false acc
         else (* u is non algebraic *)
-          match Universe.level lbound with
-          | Some l -> (* The lowerbound is directly a level *)
+          match Universe.level_expr lbound with
+          | Some l -> (* The lowerbound is directly a level expression *)
              (* u is not algebraic but has no upper bounds,
                 we instantiate it with its lower bound if it is a
                 different level, otherwise we keep it. *)
-             let lower = Level.Map.remove l lower in
-             if not (Level.equal l u) then
+             let lower = Level.Map.remove (LevelExpr.get_level l) lower in
+             if not (Level.equal (LevelExpr.get_level l) u) then
                (* Should check that u does not
                   have upper constraints that are not already in right *)
-               let acc = remove_alg l acc in
+               let acc = remove_alg (LevelExpr.get_level l) acc in
                  instantiate_with_lbound u lbound lower ~alg:false ~enforce:false acc
              else acc, {enforce=true; alg=false; lbound; lower}
           | None ->
@@ -246,6 +247,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       match Level.Map.find u right with
       | exception Not_found -> acc
       | upper ->
+        (* u <= upper *)
         let upper = List.filter (fun (d, r) -> not (Level.Map.mem r us)) upper in
         let cstrs = enforce_uppers upper b.lbound cstrs in
         (ctx, us, algs, insts, cstrs), b
@@ -285,6 +287,7 @@ let is_minimal ~lbound u =
 (* TODO check is_small/sprop *)
 let normalize_context_set ~lbound g ctx us algs weak =
   let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
+  Feedback.msg_debug Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr csts);
   (* Keep the Prop/Set <= i constraints separate for minimization *)
   let smallles, csts =
     Constraints.partition (fun (l,d,w,r) -> d == Le && is_minimal ~lbound l) csts
@@ -322,6 +325,12 @@ let normalize_context_set ~lbound g ctx us algs weak =
   in
   let noneqs = Constraints.union noneqs smallles in
   let flex x = Level.Map.mem x us in
+  let pr_component comp =
+    Pp.(prlist_with_sep (fun _ -> str " = ") LevelExpr.pr (Univ.Level.Map.bindings comp))
+  in
+  UGraph.debug_univs (fun () -> Pp.(str"partition: " ++
+    prlist_with_sep fnl pr_component partition));
+
   let ctx, us, eqs = List.fold_left (fun (ctx, us, cstrs) s ->
     let canon, (global, rigid, flexible) = choose_canonical ctx flex algs s in
     let canonl, wc = canon in
