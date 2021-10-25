@@ -70,7 +70,7 @@ let lower_add l c m =
   with Not_found -> Level.Map.add l c m
 
 let lower_of_list l =
-  List.fold_left (fun acc (d,l) -> Level.Map.add l d acc) Level.Map.empty l
+  List.fold_left (fun acc (l, w) -> lower_add l w acc) Level.Map.empty l
 
 type lbound = { enforce : bool; alg : bool; lbound: Universe.t; lower : lowermap }
 
@@ -110,11 +110,19 @@ let compute_lbound left =
     | None -> Some l
     | Some l' -> Some (Universe.sup l l')
   in
-    List.fold_left (fun lbound (w, l) ->
-      sup (Universe.addn w l) lbound)
+    List.fold_left (fun lbound l ->
+      sup l lbound)
       None left
 
+let pr_lower low =
+  Level.Map.pr (fun w -> pr_increment w) low
+
 let instantiate_with_lbound u lbound lower ~alg ~enforce (ctx, us, algs, insts, cstrs) =
+  UGraph.debug_univs Pp.(fun () -> str"Instantiating " ++ Level.pr u ++ spc () ++
+    str" with lbound " ++ Universe.pr lbound ++ spc () ++
+    str" lower universes " ++ pr_lower lower ++ spc () ++
+    str" algebraic? " ++ bool alg ++ spc () ++
+    str" enforce? " ++ bool enforce);
   if enforce then
     let inst = Universe.make u in
     let cstrs' = enforce_leq lbound inst cstrs in
@@ -139,45 +147,28 @@ let _pr_constraints_map (cmap:constraints_map) =
 let remove_alg l (ctx, us, algs, insts, cstrs) =
   (ctx, us, Level.Set.remove l algs, insts, cstrs)
 
-let not_lower lower (w,l) =
-  (* We're checking if (d,l) is already implied by the lower
-     constraints on some level u. If it represents l < u (d is Lt
-     or d is Le and i > 0, the i < 0 case is impossible due to
-     invariants of Univ), and the lower constraints only have l <=
-     u then it is not implied. *)
+let not_lower lower l =
+  (* We're checking if (w,l) <= u is already implied by the lower
+     constraints on some level u. *)
   Univ.Universe.exists
-    (fun (l,i) ->
-       let d =
-         if i == 0 then w
-         else w + 1
-         (* match d with
-           | Le -> Lt
-           | d -> d*)
-       in
-       try let d' = Level.Map.find l lower in
+    (fun (l,w) ->
+       try let w' = Level.Map.find l lower in
          (* If d is stronger than the already implied lower
           * constraints we must keep it. *)
-         d > d'
+         w > w'
        with Not_found ->
          (* No constraint existing on l *) true) l
 
-exception UpperBoundedAlg
-
 (** [enforce_uppers upper lbound cstrs] interprets [upper] as upper
-   constraints to [lbound], adding them to [cstrs].
-
-    @raise UpperBoundedAlg if any [upper] constraints are strict and
-   [lbound] algebraic. *)
+   constraints to [lbound], adding them to [cstrs]. *)
 let enforce_uppers upper lbound cstrs =
-  List.fold_left (fun cstrs (w, r) ->
-    if w == 0 then
-      enforce_leq lbound (Universe.make r) cstrs
-    else
-      match Universe.level_expr lbound with
-      | Some lev -> Constraints.add (mk_constraint lev Le (LevelExpr.make ~weight:w r)) cstrs
-      | None -> raise UpperBoundedAlg)
-  cstrs upper
+  List.fold_left (fun cstrs r ->
+    enforce_leq lbound (Universe.tip r) cstrs)
+    cstrs upper
 
+(** right : u -> u <= l + w
+    left: u -> l + w <= u
+*)
 let minimize_univ_variables ctx us algs left right cstrs =
   let left, lbounds =
     Univ.Level.Map.fold (fun r lower (left, lbounds as acc) ->
@@ -185,7 +176,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       if Univ.Level.Map.mem r us || not (Univ.Level.Set.mem r ctx) then acc
       else (* Fixed universe, just compute its glb for sharing *)
         let lbounds =
-          match compute_lbound (List.map (fun (d,l) -> d, Universe.make l) lower) with
+          match compute_lbound (List.map Universe.tip lower) with
           | None -> lbounds
           | Some lbound -> LBMap.add r {enforce=true; alg=false; lbound; lower=lower_of_list lower}
                                    lbounds
@@ -199,17 +190,21 @@ let minimize_univ_variables ctx us algs left right cstrs =
       | l ->
         let acc, left, newlow, lower =
           List.fold_left
-          (fun (acc, left, newlow, lower') (d, l) ->
-           let acc', {enforce=enf;alg;lbound=l';lower} = aux acc l in
-           let l' =
-             if enf then Universe.make l
-             else l'
-           in acc', (d, l') :: left,
-              lower_add l d newlow, lower_union lower lower')
+          (fun (acc, left, newlow, lower') (l, w) ->
+           if Level.equal u l then
+            (assert (w <= 0);
+             UGraph.debug_univs Pp.(fun () -> str"Found " ++ Level.pr l ++ spc () ++ int w ++ spc () ++ Level.pr u);
+             acc, left, newlow, lower')
+           else
+            let acc', {enforce=enf;alg;lbound=l';lower} = aux acc l in
+            let l' =
+              if enf then Universe.tip (l, w)
+              else Universe.addn w l'
+            in acc', l' :: left, lower_add l w newlow, lower_union lower lower')
           (acc, [], Level.Map.empty, Level.Map.empty) l
         in
         let left = CList.uniquize (List.filter (not_lower lower) left) in
-        (acc, left, Level.Map.lunion newlow lower)
+        (acc, left, lower_union newlow lower)
     in
     let instantiate_lbound lbound =
       let alg = Level.Set.mem u algs in
@@ -248,7 +243,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       | exception Not_found -> acc
       | upper ->
         (* u <= upper *)
-        let upper = List.filter (fun (d, r) -> not (Level.Map.mem r us)) upper in
+        let upper = List.filter (fun (r, d) -> not (Level.Map.mem r us)) upper in
         let cstrs = enforce_uppers upper b.lbound cstrs in
         (ctx, us, algs, insts, cstrs), b
     in
@@ -259,10 +254,7 @@ let minimize_univ_variables ctx us algs left right cstrs =
       match lbound with
       | None -> (* Nothing to do *)
         enforce_uppers (acc, {enforce=true;alg=false;lbound=Universe.make u; lower})
-      | Some lbound ->
-        try enforce_uppers (instantiate_lbound lbound)
-        with UpperBoundedAlg ->
-          enforce_uppers (acc, {enforce=true; alg=false; lbound=Universe.make u; lower})
+      | Some lbound -> enforce_uppers (instantiate_lbound lbound)
   and aux (ctx, us, algs, seen, cstrs as acc) u =
     try acc, Level.Map.find u seen.LBMap.lbmap
     with Not_found -> instance acc u
@@ -290,7 +282,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
   UGraph.debug_univs (fun () -> Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr csts));
   (* Keep the Prop/Set <= i constraints separate for minimization *)
   let smallles, csts =
-    Constraints.partition (fun (l,d,w,r) -> d == Le && is_minimal ~lbound l) csts
+    Constraints.partition (fun (l,d,w,r) -> d == Le && Int.equal w 0 && is_minimal ~lbound l) csts
   in
   let smallles = if get_set_minimization ()
     then Constraints.filter (fun (l,d,w,r) -> Level.Map.mem r us && not (Level.is_sprop l)) smallles
@@ -319,7 +311,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
   (* We ignore the trivial Prop/Set <= i constraints. *)
   let noneqs =
     Constraints.filter
-      (fun (l,d,w,r) -> not ((d == Le && is_bound l lbound) ||
+      (fun (l,d,w,r) -> not ((d == Le && Int.equal w 0 && is_bound l lbound) ||
                            (Level.is_prop l && d == Le && w < 0 && Level.is_set r)))
       csts
   in
@@ -354,16 +346,16 @@ let normalize_context_set ~lbound g ctx us algs weak =
   let ctx, us, g = UPairSet.fold (fun (u,v) (ctx, us, g as acc) ->
       let norm = LevelExpr.subst (level_subst_of (normalize_univ_variable_opt_subst us)) in
       let u = norm u and v = norm v in
-      let set_to a b =
-        (Level.Set.remove (LevelExpr.get_level a) ctx,
-         Level.Map.add (LevelExpr.get_level a) (Some (Universe.tip b)) us,
-         UGraph.enforce_constraint (mk_constraint a Eq b) g)
+      let set_to (a, w) b =
+        (Level.Set.remove a ctx,
+         Level.Map.add a (Some (Universe.addn (-w) (Universe.tip b))) us,
+         UGraph.enforce_constraint (mk_constraint (a, w) Eq b) g)
       in
       if UGraph.check_constraint g (mk_constraint u Le v) || UGraph.check_constraint g (mk_constraint v Le u)
       then acc
       else
-        let ul = LevelExpr.get_level u in(* FIXME *)
-        let vl = LevelExpr.get_level v in(* FIXME *)
+        let ul = LevelExpr.get_level u in
+        let vl = LevelExpr.get_level v in
         if Level.Map.mem ul us
         then set_to u v
         else if Level.Map.mem vl us
@@ -372,25 +364,27 @@ let normalize_context_set ~lbound g ctx us algs weak =
       weak (ctx, us, g)  in
   (* Noneqs is now in canonical form w.r.t. equality constraints,
      and contains only inequality constraints. *)
+    UGraph.debug_univs (fun () -> Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr noneqs));
   let noneqs =
     let norm = level_subst_of (normalize_univ_variable_opt_subst us) in
     Constraints.fold (fun (u,d,w,v) noneqs ->
         let u = norm u and v = norm v in
-        if w = 0 && LevelExpr.equal u v then noneqs
-        else Constraints.add (mk_constraint u d (LevelExpr.addn w v)) noneqs)
+        let v = LevelExpr.addn w v in
+        if LevelExpr.equal u v then noneqs
+        else Constraints.add (mk_constraint u d v) noneqs)
       noneqs Constraints.empty
   in
-  UGraph.debug_univs (fun () -> Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr noneqs));
+  UGraph.debug_univs (fun () -> Pp.(str"minimizing with constraints after trivial" ++ pr_constraints Level.pr noneqs));
   (* Compute the left and right set of flexible variables, constraints
      mentioning other variables remain in noneqs. *)
   let noneqs, ucstrsl, ucstrsr =
     Constraints.fold (fun (l,d,w,r as cstr) (noneq, ucstrsl, ucstrsr) ->
       let lus = Level.Map.mem l us and rus = Level.Map.mem r us in
       let ucstrsl' =
-        if lus then add_list_map l (w, r) ucstrsl
+        if lus then add_list_map l (r, w) ucstrsl
         else ucstrsl
       and ucstrsr' =
-        add_list_map r (-w, l) ucstrsr
+        add_list_map r (l, -w) ucstrsr
       in
       let noneqs =
         if lus || rus then noneq
@@ -402,5 +396,7 @@ let normalize_context_set ~lbound g ctx us algs weak =
   let ctx', us, algs, inst, noneqs =
     minimize_univ_variables ctx us algs ucstrsr ucstrsl noneqs
   in
+  let cstrs = Constraints.union noneqs eqs in
+  UGraph.debug_univs (fun () -> Pp.(str"Final constraints: " ++ pr_constraints Level.pr cstrs));
   let us = normalize_opt_subst us in
-    (us, algs), (ctx', Constraints.union noneqs eqs)
+    (us, algs), (ctx', cstrs)
