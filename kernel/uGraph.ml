@@ -123,9 +123,10 @@ let enforce_constraint (u,d,w,v as cstr) g =
   in
   g'
 
+(* Uncomment to profile enforce_constraint *)
+(*
 let enforce_constraint_key = CProfile.declare_profile "enforce_constraint"
-let enforce_constraint a b = CProfile.profile2 enforce_constraint_key enforce_constraint a b
-
+let enforce_constraint a b = CProfile.profile2 enforce_constraint_key enforce_constraint a b *)
 
 let enforce_constraint (u,d,w,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
