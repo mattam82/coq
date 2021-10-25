@@ -616,7 +616,7 @@ let pr_constraint pr_level (l, d, w, r) =
   let w = AcyclicGraph.int_of_weight w in
   let l, op, r =
     if w = 0 then pr_level l, pr_constraint_type d, pr_level r
-    else if w = -1 then
+    else if w = -1 && d == Le then
       pr_level l, str " < ", pr_level r
     else if w < 0 then
       pr_level l ++ pr_increment (-w), pr_constraint_type d, pr_level r

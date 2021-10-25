@@ -287,7 +287,7 @@ let is_minimal ~lbound u =
 (* TODO check is_small/sprop *)
 let normalize_context_set ~lbound g ctx us algs weak =
   let (ctx, csts) = ContextSet.levels ctx, ContextSet.constraints ctx in
-  Feedback.msg_debug Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr csts);
+  UGraph.debug_univs (fun () -> Pp.(str"minimizing with constraints " ++ pr_constraints Level.pr csts));
   (* Keep the Prop/Set <= i constraints separate for minimization *)
   let smallles, csts =
     Constraints.partition (fun (l,d,w,r) -> d == Le && is_minimal ~lbound l) csts

@@ -280,16 +280,14 @@ let process_universe_constraints uctx cstrs =
                       Univ.Constraints.add (mk_constraint l Le r') local
                     | None -> local
                   else
-                    user_err Pp.(str "Cannot enforce constraint " ++
-                      UnivProblem.pr_with (pr_uctx_level uctx) cst)
-                    (*let levels = Universe.levels l in
+                    let levels = Universe.repr l in
                     let fold l' local =
-                      let l = Universe.make l' in
-                      if Level.is_small l' || is_local l' then
+                      let l = Universe.tip l' in
+                      if LevelExpr.is_small l' || is_local (LevelExpr.get_level l') then
                         equalize_variables false l l' r r' local
                       else raise (UniverseInconsistency (Le, l, r, None))
                     in
-                    Level.Set.fold fold levels local*)
+                    List.fold_right fold levels local
               else
                 match Univ.Universe.level_expr l with
                 | Some l ->

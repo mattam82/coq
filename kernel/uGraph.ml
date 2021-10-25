@@ -121,8 +121,11 @@ let enforce_constraint (u,d,w,v as cstr) g =
   | AcyclicGraph.Le -> G.enforce u w v g
   | AcyclicGraph.Eq -> G.enforce_shift u w v g
   in
-  debug_univs (fun () -> Pp.(str "Enforced constraint: " ++ Univ.pr_constraint Level.pr cstr));
   g'
+
+let enforce_constraint_key = CProfile.declare_profile "enforce_constraint"
+let enforce_constraint a b = CProfile.profile2 enforce_constraint_key enforce_constraint a b
+
 
 let enforce_constraint (u,d,w,v as cst) g =
   match Level.is_sprop u, d, Level.is_sprop v with
@@ -259,13 +262,10 @@ let pr_arc prl = let open Pp in
     if Level.Map.is_empty ltle then mt ()
     else
       prl u ++ str " " ++
-      v 0
-        (pr_pmap spc (fun (v, w) ->
-          str "<= " ++ prl v ++ int (AcyclicGraph.int_of_weight w))
-            ltle) ++
+      v 0 (pr_pmap spc (fun (v, w) ->str "<= " ++ prl v ++ pr_increment w) ltle) ++
       fnl ()
   | u, G.Alias (w, v) ->
-    prl u  ++ str " = " ++ prl v ++ int (AcyclicGraph.int_of_weight w) ++ fnl ()
+    prl u  ++ str " = " ++ prl v ++ pr_increment w ++ fnl ()
 
 type node = G.node =
 | Alias of AcyclicGraph.constraint_weight * Level.t
