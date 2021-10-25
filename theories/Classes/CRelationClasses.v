@@ -36,21 +36,22 @@ Definition iffT (A B : Type) := ((A -> B) * (B -> A))%type.
 (** We allow to unfold the [crelation] definition while doing morphism search. *)
 
 Section Defs.
-  Context {A : Type}.
+  Universe u.
+  Context {A : Type@{u}}.
 
   (** We rebind crelational properties in separate classes to be able to overload each proof. *)
 
   Class Reflexive (R : crelation A) :=
     reflexivity : forall x : A, R x x.
 
-  Definition complement (R : crelation A) : crelation A := 
+  Definition complement@{ur} (R : crelation@{u ur} A) : crelation@{u ur} A :=
     fun x y => R x y -> False.
 
   (** Opaque for proof-search. *)
   Typeclasses Opaque complement iffT.
   
   (** These are convertible. *)
-  Lemma complement_inverse R : complement (flip R) = flip (complement R).
+  Lemma complement_inverse@{v} (R : crelation@{u v} A) : complement (flip@{u u v+1} R) = flip@{u u v+1} (complement R).
   Proof. reflexivity. Qed.
 
   Class Irreflexive (R : crelation A) :=
@@ -60,7 +61,7 @@ Section Defs.
     symmetry : forall {x y}, R x y -> R y x.
   
   Class Asymmetric (R : crelation A) :=
-    asymmetry : forall {x y}, R x y -> (complement R y x : Type).
+    asymmetry : forall {x y}, R x y -> complement R y x.
   
   Class Transitive (R : crelation A) :=
     transitivity : forall {x y z}, R x y -> R y z -> R x z.
@@ -112,56 +113,60 @@ Section Defs.
   
   (** Any symmetric crelation is equal to its inverse. *)
   
-  Lemma subrelation_symmetric R `(Symmetric R) : subrelation (flip R) R.
+  Lemma subrelation_symmetric@{ur} (R : crelation@{u ur} A) `(Symmetric R) : subrelation (flip R) R.
   Proof. hnf. intros x y H'. red in H'. apply symmetry. assumption. Qed.
 
   Section flip.
+    Universe ur.
+    Context {R : crelation@{u ur} A}.
   
-    Lemma flip_Reflexive `{Reflexive R} : Reflexive (flip R).
+    Lemma flip_Reflexive `{Reflexive@{ur} R} : Reflexive (flip@{u u ur+1} R).
     Proof. tauto. Qed.
     
-    Program Definition flip_Irreflexive `(Irreflexive R) : Irreflexive (flip R) :=
-      irreflexivity (R:=R).
+    Program Definition flip_Irreflexive@{} : Irreflexive@{ur} R ->
+      Irreflexive@{ur} (@flip@{u u ur+1} A A Type@{ur} R):=
+      fun irr => irreflexivity (R:=R).
     
-    Program Definition flip_Symmetric `(Symmetric R) : Symmetric (flip R) :=
-      fun x y H => symmetry (R:=R) H.
+    Program Definition flip_Symmetric@{} `(Symmetric R) : Symmetric (@flip@{u u ur+1} A A Type@{ur} R) :=
+      fun x y H => symmetry@{ur} (R:=R) H.
     
-    Program Definition flip_Asymmetric `(Asymmetric R) : Asymmetric (flip R) :=
+    Program Definition flip_Asymmetric@{} `(Asymmetric R) : Asymmetric (@flip@{u u ur+1} A A Type@{ur} R) :=
       fun x y H H' => asymmetry (R:=R) H H'.
     
-    Program Definition flip_Transitive `(Transitive R) : Transitive (flip R) :=
+    Program Definition flip_Transitive@{} `(Transitive R) : Transitive (@flip@{u u ur+1} A A Type@{ur} R) :=
       fun x y z H H' => transitivity (R:=R) H' H.
 
-    Program Definition flip_Antisymmetric `(Antisymmetric eqA R) :
-      Antisymmetric eqA (flip R).
+    Program Definition flip_Antisymmetric@{ueq} `(Antisymmetric eqA R) :
+      Antisymmetric@{ueq ur} eqA (@flip@{u u ur+1} A A Type@{ur} R).
     Proof. firstorder. Qed.
 
     (** Inversing the larger structures *)
 
-    Lemma flip_PreOrder `(PreOrder R) : PreOrder (flip R).
+    Lemma flip_PreOrder@{} `(PreOrder R) : PreOrder@{ur} (@flip@{u u ur+1} A A Type@{ur} R).
     Proof. firstorder. Qed.
 
-    Lemma flip_StrictOrder `(StrictOrder R) : StrictOrder (flip R).
+    Lemma flip_StrictOrder@{} `(StrictOrder R) : StrictOrder (@flip@{u u ur+1} A A Type@{ur} R).
     Proof. firstorder. Qed.
 
-    Lemma flip_PER `(PER R) : PER (flip R).
+    Lemma flip_PER@{} `(PER R) : PER (@flip@{u u ur+1} A A Type@{ur} R).
     Proof. firstorder. Qed.
 
-    Lemma flip_Equivalence `(Equivalence R) : Equivalence (flip R).
+    Lemma flip_Equivalence@{} `(Equivalence R) : Equivalence (@flip@{u u ur+1} A A Type@{ur} R).
     Proof. firstorder. Qed.
 
   End flip.
 
   Section complement.
+    Universe ur.
+    Context {R : crelation@{u ur} A}.
 
-    Definition complement_Irreflexive `(Reflexive R)
+    Definition complement_Irreflexive@{} `(Reflexive R)
       : Irreflexive (complement R).
     Proof. firstorder. Qed.
 
-    Definition complement_Symmetric `(Symmetric R) : Symmetric (complement R).
+    Definition complement_Symmetric@{} `(Symmetric R) : Symmetric (complement R).
     Proof. firstorder. Qed.
   End complement.
-
 
   (** Rewrite crelation on a given support: declares a crelation as a rewrite
    crelation for use by the generalized rewriting tactic.
@@ -181,26 +186,26 @@ Section Defs.
 
   (** Leibniz equality. *)
   Section Leibniz.
-    Global Instance eq_Reflexive : Reflexive (@eq A) := @eq_refl A.
-    Global Instance eq_Symmetric : Symmetric (@eq A) := @eq_sym A.
-    Global Instance eq_Transitive : Transitive (@eq A) := @eq_trans A.
+    Global Instance eq_Reflexive : Reflexive@{Set} (@eq A) := @eq_refl A.
+    Global Instance eq_Symmetric : Symmetric@{Set} (@eq A) := @eq_sym A.
+    Global Instance eq_Transitive : Transitive@{Set} (@eq A) := @eq_trans A.
     
     (** Leibinz equality [eq] is an equivalence crelation.
         The instance has low priority as it is always applicable
         if only the type is constrained. *)
     
-    Global Program Instance eq_equivalence : Equivalence (@eq A) | 10.
+    Global Program Instance eq_equivalence : Equivalence@{Set} (@eq A) | 10.
   End Leibniz.
   
 End Defs.
 
 (** Default rewrite crelations handled by [setoid_rewrite]. *)
 #[global]
-Instance: RewriteRelation impl.
+Instance impl_rewrite_relation : RewriteRelation impl.
 Defined.
 
 #[global]
-Instance: RewriteRelation iff.
+Instance iff_rewrite_relation : RewriteRelation iff.
 Defined.
 
 (** Hints to drive the typeclass resolution avoiding loops
@@ -287,29 +292,31 @@ Program Instance impl_Transitive : Transitive impl.
 (** Logical equivalence. *)
 
 #[global]
-Instance iff_Reflexive : Reflexive iff := iff_refl.
+Instance iff_Reflexive@{} : Reflexive@{Set+1 Set} iff := iff_refl.
 #[global]
-Instance iff_Symmetric : Symmetric iff := iff_sym.
+Instance iff_Symmetric : Symmetric@{Set+1 Set} iff := iff_sym.
 #[global]
-Instance iff_Transitive : Transitive iff := iff_trans.
+Instance iff_Transitive : Transitive@{Set+1 Set} iff := iff_trans.
 
 (** Logical equivalence [iff] is an equivalence crelation. *)
 
-#[global]
-Program Instance iff_equivalence : Equivalence iff. 
-#[global]
-Program Instance arrow_Reflexive : Reflexive arrow.
-#[global]
-Program Instance arrow_Transitive : Transitive arrow.
+(* Lemma iff_equivalence : Equivalence@{Set+1 Set} iff. *)
 
 #[global]
-Instance iffT_Reflexive : Reflexive iffT. 
+Program Instance iff_equivalence : Equivalence@{Set+1 Set} iff.
+#[global]
+Program Instance arrow_Reflexive@{u} : Reflexive@{u+1 u} arrow@{u u}.
+#[global]
+Program Instance arrow_Transitive@{u} : Transitive@{u+1 u} arrow@{u u}.
+
+#[global]
+Instance iffT_Reflexive@{u} : Reflexive@{u+1 u} iffT@{u u}.
 Proof. firstorder. Defined.
 #[global]
-Instance iffT_Symmetric : Symmetric iffT. 
+Instance iffT_Symmetric@{u} : Symmetric@{u+1 u} iffT@{u u}.
 Proof. firstorder. Defined. 
 #[global]
-Instance iffT_Transitive : Transitive iffT.
+Instance iffT_Transitive@{u} : Transitive@{u+1 u} iffT@{u u}.
 Proof. firstorder. Defined.
 
 (** We now develop a generalization of results on crelations for arbitrary predicates.
@@ -322,7 +329,8 @@ Local Open Scope list_scope.
 
 (** We define the various operations which define the algebra on binary crelations *)
 Section Binary.
-  Context {A : Type}.
+  Universe u.
+  Context {A : Type@{u}}.
 
   Definition relation_equivalence : crelation (crelation A) :=
     fun R R' => forall x y, iffT (R x y) (R' x y).
@@ -355,8 +363,10 @@ Section Binary.
    We give an equivalent definition, up-to an equivalence crelation
    on the carrier. *)
 
-  Class PartialOrder eqA `{equ : Equivalence A eqA} R `{preo : PreOrder A R} :=
-    partial_order_equivalence : relation_equivalence eqA (relation_conjunction R (flip R)).
+  Class PartialOrder@{ur ur'} (eqA : crelation@{u ur} A) `{equ : Equivalence A eqA}
+    (R : crelation@{u ur} A) `{preo : PreOrder A R} :=
+    partial_order_equivalence : relation_equivalence@{ur' ur' ur} eqA
+      (relation_conjunction@{ur ur ur} R (@flip@{u u ur+1} A A Type@{ur} R)).
   
   (** The equivalence proof is sufficient for proving that [R] must be a
    morphism for equivalence (see Morphisms).  It is also sufficient to
@@ -368,7 +378,8 @@ Section Binary.
     firstorder.
   Qed.
 
-  Lemma PartialOrder_inverse `(PartialOrder eqA R) : PartialOrder eqA (flip R).
+  Lemma PartialOrder_inverse@{ur ur'} (eqA : crelation@{u ur} A) (r : crelation@{u ur} A)
+     `(PartialOrder@{ur ur'} eqA R) : PartialOrder eqA (@flip@{u u ur+1} A A Type@{ur} R).
   Proof.
     firstorder.
   Qed.
