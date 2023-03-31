@@ -21,6 +21,7 @@ module G = Loop_checking
 type t = {
   graph: G.t;
   type_in_type : bool;
+  cumulative_prop : bool;
 }
 
 (* Universe inconsistency: error raised when trying to enforce a relation
@@ -43,6 +44,10 @@ let set_type_in_type b g = {g with type_in_type=b}
 
 let type_in_type g = g.type_in_type
 
+let set_cumulative_prop b g = {g with cumulative_prop=b}
+
+let cumulative_prop g = g.cumulative_prop
+
 let graph_check_leq g u v = G.check_leq g.graph u v
 let graph_check_eq g u v = G.check_eq g.graph u v
 
@@ -58,7 +63,7 @@ let check_leq g u u' =
 let check_eq g u v =
   type_in_type g || Universe.equal u v || graph_check_eq g u v
 
-let empty_universes = {graph=G.empty; type_in_type=false}
+let empty_universes = {graph=G.empty; type_in_type=false; cumulative_prop=false}
 
 let initial_universes =
   let big_rank = 1000000 in
@@ -99,7 +104,7 @@ let merge_constraints csts g =
     let g, equivs' = enforce_constraint cst g in
     g, equivs' @ equivs) csts (g, [])
 
-let check_constraint { graph = g; type_in_type } (u,d,v) =
+let check_constraint { graph = g; type_in_type; cumulative_prop=__; } (u,d,v) =
   type_in_type
   || match d with
   | Le -> G.check_leq g u v
@@ -126,6 +131,8 @@ let add_universe u ~lbound ~strict g = match lbound with
   let b = if strict then Universe.type1 else Universe.type0 in
   fst (enforce_constraint (b, Le, Universe.make u) { g with graph })
 | Bound.Prop ->
+  if not g.cumulative_prop
+  then CErrors.anomaly Pp.(str "add_universe lbound=Prop when not cumulative Prop");
   (* Do not actually add any constraint. This is a hack for template. *)
   { g with graph = G.add u g.graph }
 
@@ -212,7 +219,7 @@ let check_leq_sort ugraph s1 s2 = match s1, s2 with
 | (SProp, SProp) | (Prop, Prop) | (Set, Set) -> true
 | (SProp, _) -> type_in_type ugraph
 | (Prop, SProp) -> type_in_type ugraph
-| (Prop, (Set | Type _)) -> true
+| (Prop, (Set | Type _)) -> type_in_type ugraph || cumulative_prop ugraph
 | (Prop, QSort _) -> false
 | (_, (SProp | Prop)) -> type_in_type ugraph
 | (Type _ | Set), (Type _ | Set) ->
