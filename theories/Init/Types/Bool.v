@@ -18,6 +18,8 @@ Section BoolSortPoly.
     | true : bool
     | false : bool.
 
+  Scheme bool_poly := Induction for bool Sort Poly.
+
   Add Printing If bool.
 
   Declare Scope bool_scope.
