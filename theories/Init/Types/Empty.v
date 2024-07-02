@@ -9,13 +9,15 @@
 (************************************************************************)
 
 Require Import PreludeOptions.
-Require Import Notations.
 
-Notation "x -> y" := (forall (_ : x), y).
+Section EmptySortPoly.
+  Sort s.
 
-Definition id@{s|u|} {A : Type@{s|u}} (a : A) := a.
+  Inductive empty : Type@{s|Set} :=.
 
-Definition arrow@{s s'|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) := A -> B.
+  Scheme empty_poly := Induction for empty Sort Poly.
 
-Definition flip@{s s' s''|u v w|} {A : Type@{s|u}} {B : Type@{s'|v}} {C : Type@{s''|w}}
-  (f : A -> B -> C) := fun x y => f y x.
+  About empty_poly.
+
+  Definition not (A : Type@{s|Set}) := forall (_ : A), empty.
+End EmptySortPoly.
