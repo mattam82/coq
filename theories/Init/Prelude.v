@@ -8,6 +8,7 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
+Require Export Corelib.Init.PreludeOptions.
 Require Export Corelib.Init.Notations.
 Require Export Corelib.Init.Types.
 Require Export Corelib.Init.Tactics.Ltac.
