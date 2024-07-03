@@ -91,7 +91,7 @@ let check_required_library d =
 
 let logic_module_name = init_dir@["Logic"]
 
-let datatypes_module_name = init_dir@["Datatypes"]
+let datatypes_module_name = init_dir@["Types"]
 
 (** Identity *)
 

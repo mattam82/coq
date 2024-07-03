@@ -2805,9 +2805,8 @@ let next_obligation ~pm ?(final=false) name tac =
   solve_obligation ?check_final prg i tac
 
 let check_program_libraries () =
-  Rocqlib.check_required_library Rocqlib.datatypes_module_name;
-  Rocqlib.check_required_library ["Corelib";"Init";"Specif"]
-
+  Rocqlib.check_required_library Rocqlib.datatypes_module_name
+  
 let program_inference_hook env sigma ev =
   let tac = !default_tactic in
   let evi = Evd.find_undefined sigma ev in
