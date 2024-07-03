@@ -7,7 +7,7 @@ Section GroupoidOperations.
   Sort sa se.
   Universe a.
   Context {A : Type@{sa|a}}.
-  Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
+  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
 
   Definition inv {x y : A} : x = y -> y = x.
   Proof.
