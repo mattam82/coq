@@ -8,13 +8,27 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
+Require Import PreludeOptions.
+Require Import Notations.
+
+Section ListPoly.
+  Sort s.
+  Universe u.
+
+  Inductive list (A : Type@{s|u}) : Type@{s|u} :=
+   | nil : list A
+   | cons : A -> list A -> list A.
+
+  Arguments nil {A}.
+  Arguments cons {A} a l.
+End ListPoly.
+
+Declare Scope list_scope.
+Delimit Scope list_scope with list.
+Bind Scope list_scope with list.
+
+Infix "::" := cons (at level 60, right associativity) : list_scope.
+
+Register list as core.list.type.
+Register nil as core.list.nil.
+Register cons as core.list.cons.
