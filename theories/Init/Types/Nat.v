@@ -18,18 +18,6 @@ Section NatSortPoly.
     | O : nat
     | S (_ : nat) : nat.
 
-  Declare Scope hex_nat_scope.
-  Delimit Scope hex_nat_scope with xnat.
-
-  Declare Scope nat_scope.
-  Delimit Scope nat_scope with nat.
-  Bind Scope nat_scope with nat.
-  Arguments S _%_nat.
-
-  Register nat as num.nat.type.
-  Register O as num.nat.O.
-  Register S as num.nat.S.
-
   Fixpoint plus (a b : nat) : nat :=
     match a with
       | O => b
@@ -43,3 +31,17 @@ Section NatSortPoly.
     end.
 
 End NatSortPoly.
+
+Declare Scope hex_nat_scope.
+Delimit Scope hex_nat_scope with xnat.
+
+Declare Scope nat_scope.
+Delimit Scope nat_scope with nat.
+Bind Scope nat_scope with nat.
+Arguments S _%_nat.
+
+Register nat as num.nat.type.
+Register O as num.nat.O.
+Register S as num.nat.S.
+
+Local Open Scope nat_scope.

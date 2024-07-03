@@ -39,8 +39,9 @@ Arguments existR {_ _}.
 
 Scheme sigmaR_poly := Induction for sigma Sort Poly.
 
-Notation "A * B" := (sigmaR A (fun _ => B)).
-Notation "A /\ B" := (sigmaR A (fun _ => B)).
+Definition prod@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := sigmaR A (fun _ => B).
+Notation "A * B" := (prod A B).
+Notation "A /\ B" := (prod A B).
 
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{_ _ _|_ Set} A P.
 
@@ -94,7 +95,8 @@ Definition sig_rect@{u u'} := sigma_poly@{Type SProp Type | u Set u'}.
 Register sig as core.sig.type.
 
 Register sig_rect as core.sig.rect.
-
+Notation proj1_sig := fst.
+Notation proj2_sig := snd.
 
 
 
