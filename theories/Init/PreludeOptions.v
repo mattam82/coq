@@ -12,6 +12,6 @@
 #[export] Set Universe Polymorphism.
 #[export] Set Polymorphic Inductive Cumulativity.
 #[export] Unset Auto Template Polymorphism.
-#[export] Unset Universe Minimization ToSet.
+#[export] Set Universe Minimization ToSet.
 #[export] Set Primitive Projections.
 #[export] Set Printing Coercions.

@@ -43,7 +43,7 @@ Definition prod@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := sigmaR A (fun _ =>
 Notation "A * B" := (prod A B).
 Notation "A /\ B" := (prod A B).
 
-Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{_ _ _|_ Set} A P.
+Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma A P.
 
 Notation "'ex_intro'" := (existP@{_ _ _| _ Set}) (at level 50).
 
