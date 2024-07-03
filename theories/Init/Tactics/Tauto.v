@@ -12,15 +12,14 @@
 
 Require Import Notations.
 Require Import Ltac.
-Require Import Datatypes.
-Require Import Logic.
+Require Import Types.
 
 Declare ML Module "rocq-runtime.plugins.tauto".
 
 Local Ltac not_dep_intros :=
   repeat match goal with
   | |- (forall (_: ?X1), ?X2) => intro
-  | |- (Corelib.Init.Logic.not _) => unfold Corelib.Init.Logic.not at 1; intro
+  | |- (Corelib.Init.Types.Empty.not _) => unfold Corelib.Init.Types.Empty.not at 1; intro
   end.
 
 Local Ltac axioms flags :=
@@ -35,8 +34,8 @@ Local Ltac simplif flags :=
   repeat
      (match reverse goal with
       | id: ?X1 |- _ => is_conj flags X1; elim id; do 2 intro; clear id
-      | id: (Corelib.Init.Logic.iff _ _) |- _ => elim id; do 2 intro; clear id
-      | id: (Corelib.Init.Logic.not _) |- _ => red in id
+      | id: (Corelib.Init.Types.Functions.iff _ _) |- _ => elim id; do 2 intro; clear id
+      | id: (Corelib.Init.Types.Empty.not _) |- _ => red in id
       | id: ?X1 |- _ => is_disj flags X1; elim id; intro; clear id
       | _ =>
         (* behaves as matching [ id0: ?X1 -> ?X2, id1: ?X1 |- _ ] with
@@ -56,7 +55,7 @@ Local Ltac simplif flags :=
       | id: forall (_ : ?X1), ?X2|- _ =>
         flatten_contravariant_conj flags X1 X2 id
   (* moved from "id:(?A/\?B)->?X2|-" to "?A->?B->?X2|-" *)
-      | id: forall (_: Corelib.Init.Logic.iff ?X1 ?X2), ?X3|- _ =>
+      | id: forall (_: Corelib.Init.Types.Functions.iff ?X1 ?X2), ?X3|- _ =>
         assert (forall (_: forall _:X1, X2), forall (_: forall _: X2, X1), X3)
     by (do 2 intro; apply id; split; assumption);
           clear id
@@ -64,8 +63,8 @@ Local Ltac simplif flags :=
         flatten_contravariant_disj flags X1 X2 id
   (* moved from "id:(?A\/?B)->?X2|-" to "?A->?X2,?B->?X2|-" *)
       | |- ?X1 => is_conj flags X1; split
-      | |- (Corelib.Init.Logic.iff _ _) => split
-      | |- (Corelib.Init.Logic.not _) => red
+      | |- (Corelib.Init.Types.Functions.iff _ _) => split
+      | |- (Corelib.Init.Types.Empty.not _) => red
       end;
       not_dep_intros).
 
