@@ -142,45 +142,43 @@ Ltac f_equiv :=
  end.
 
 Section Relations.
+  Sort s.
   Universes a.
-  Context {A : Type@{a}}.
+  Context {A : Type@{s|a}}.
 
-  (** [forall_def] reifies the dependent product as a definition. *)
-
-  Definition forall_def (P : A -> Type) : Type := forall x : A, P x.
 
   (** Dependent pointwise lifting of a relation on the range. *)
 
-  Definition forall_relation (P : A -> Type)
+  Definition all_relation (P : A -> Type@{s|a})
              (sig : forall a, relation (P a)) : relation (forall x, P x) :=
     fun f g => forall a, sig a (f a) (g a).
 
   (** Non-dependent pointwise lifting *)
-  Definition pointwise_relation {B} (R : relation B) : relation (A -> B) :=
+  Definition pointwise_relation@{s'|b|} {B : Type@{s|a}} (R : relation@{s s'|a b} B) : relation (A -> B) :=
     fun f g => forall a, R (f a) (g a).
 
-  Lemma pointwise_pointwise {B} (R : relation B) :
+  Lemma pointwise_pointwise@{s'|b|} {B : Type@{s|a}} (R : relation@{s s'|a b} B) :
     relation_equivalence (pointwise_relation R) (@eq A ==> R).
   Proof.
     intros. split.
-    - simpl_relation.
+    - simpl_relation. destruct X0. eapply X.
     - firstorder.
   Qed.
 
 
   (** Subrelations induce a morphism on the identity. *)
 
-  Global Instance subrelation_id_proper `(subrelation A RA RA') : Proper (RA ==> RA') id.
+  Global Instance subrelation_id_proper@{s'|b|} `(subrelation@{s s'|a b} A RA RA') : Proper (RA ==> RA') id.
   Proof. firstorder. Qed.
 
   (** The subrelation property goes through products as usual. *)
 
-  Lemma subrelation_respectful@{b ra ra' rb rb'} {B : Type@{b}}
-    (RA : relation@{a ra} A) (RA' : relation@{a ra'} A)
-    (RB : relation@{b rb} B) (RB' : relation@{b rb'} B)
-    (subl : subrelation@{a ra' ra} RA' RA)
-    (subr : subrelation@{b rb rb'} RB RB') :
-    subrelation (RA ==> RB) (RA' ==> RB').
+  Lemma subrelation_respectful@{s' s2 s2' s3 s3'| b ra ra' rb rb'|?} {B : Type@{s2|b}}
+    (RA : relation@{s s'|a ra} A) (RA' : relation@{s s'|a ra'} A)
+    (RB : relation@{s2 s2'|b rb} B) (RB' : relation@{s2 s2'|b rb'} B)
+    (subl : subrelation@{s s'|ra' ra} RA' RA)
+    (subr : subrelation@{s2 s2'|rb rb'} RB RB') :
+    subrelation@{s2 s2'|_ _} (RA ==> RB) (RA' ==> RB').
   Proof. intros f g rfg x y rxy. apply subr. apply rfg. apply subl. exact rxy. Qed.
 
   (** And of course it is reflexive. *)
