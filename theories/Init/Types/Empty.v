@@ -9,15 +9,16 @@
 (************************************************************************)
 
 Require Import PreludeOptions.
+Require Import Notations.
 
 Section EmptySortPoly.
   Sort s.
 
-  Inductive empty : Type@{s|Set} :=.
+  Inductive Empty : Type@{s|Set} :=.
 
-  Scheme empty_poly := Induction for empty Sort Poly.
+  Scheme Empty_poly := Induction for Empty Sort Poly.
 
-  About empty_poly.
-
-  Definition not (A : Type@{s|Set}) := forall (_ : A), empty.
+  Definition not (A : Type@{s|Set}) := forall (_ : A), Empty.
 End EmptySortPoly.
+
+Notation "~ x" := (not x).
