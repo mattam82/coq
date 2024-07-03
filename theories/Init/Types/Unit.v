@@ -8,12 +8,16 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
+Require Import PreludeOptions.
+Require Import Notations.
+
+Section UnitPoly.
+  Sort s.
+  Inductive unit : Type@{s|Set} :=
+      tt : unit.
+
+  Scheme unit_poly := Induction for unit Sort Poly.
+End UnitPoly.
+
+Register unit as core.unit.type.
+Register tt as core.unit.tt.
