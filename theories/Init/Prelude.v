@@ -8,8 +8,10 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-
-Require Export Corelib.Init.Tactics.
+Require Export Corelib.Init.Notations.
+Require Export Corelib.Init.Types.
+Require Export Corelib.Init.Tactics.Ltac.
+Require Export Corelib.Init.Tactics.Tauto.
 
 Declare ML Module "rocq-runtime.plugins.cc_core".
 Declare ML Module "rocq-runtime.plugins.cc".

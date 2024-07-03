@@ -11,3 +11,4 @@
 Require Export Types.Nat.
 Require Export Types.Bool.
 Require Export Types.Empty.
+Require Export Types.Functions.
