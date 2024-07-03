@@ -7,14 +7,15 @@ Section GroupoidOperations.
   Sort sa se.
   Universe a.
   Context {A : Type@{sa|a}}.
+  #[warnings="-notation-overridden"]
   Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
 
-  Definition inv {x y : A} : x = y -> y = x.
+  Definition eq_sym {x y : A} : x = y -> y = x.
   Proof.
     intros e; induction e using eq_poly; reflexivity.
   Defined.
 
-  Definition concat {x y z : A} : x = y -> y = z -> x = z.
+  Definition eq_trans {x y z : A} : x = y -> y = z -> x = z.
   Proof.
     intros e; induction e using eq_poly; trivial.
   Defined.
@@ -34,11 +35,11 @@ Section GroupoidOperations.
 End GroupoidOperations.
 
 Module GroupoidNotations.
-Notation rfl := (ltac:(reflexivity)).
+Notation rfl := (ltac:(reflexivity)) (only parsing).
 
-Notation " e ▷ t " := (ltac:(exact (tr e t) + exact (tr (inv e) t))) (at level 70).
+Notation " e ▷ t " := (ltac:(exact (tr e t) + exact (tr (eq_sym e) t))) (at level 70, only parsing).
 
-Notation "e1 @ e2" := (concat e1 e2) (at level 65, right associativity).
+Notation "e1 @ e2" := (eq_trans e1 e2) (at level 65, right associativity).
 End GroupoidNotations.
 Import GroupoidNotations.
 
@@ -46,7 +47,8 @@ Section GroupoidLaws.
   Sort sa se.
   Universe a.
   Context {A : Type@{sa|a}}.
-  Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
+  #[warnings="-notation-overridden"]
+  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
 
   Definition lunit {x y : A} (e : x = y) : rfl @ e = e.
   Proof. reflexivity. Defined.
@@ -58,16 +60,16 @@ Section GroupoidLaws.
     e1 @ e2 @ e3 = (e1 @ e2) @ e3.
   Proof. induction e1 using eq_poly; reflexivity. Defined.
 
-  Definition inv_refl {x : A} : inv rfl = rfl :> (x = x).
+  Definition inv_refl {x : A} : eq_sym rfl = rfl :> (x = x).
   Proof. reflexivity. Defined.
 
   Definition inv_concat {x y z : A} (e : x = y) (e' : y = z) :
-    inv (e @ e') = inv e' @ inv e.
+    eq_sym (e @ e') = eq_sym e' @ eq_sym e.
   Proof.
     induction e using eq_poly; induction e' using eq_poly; reflexivity.
   Defined.
 
-  Definition inv_inv {x y : A} (e : x = y) : inv (inv e) = e.
+  Definition sym_sym {x y : A} (e : x = y) : eq_sym (eq_sym e) = e.
   Proof.
     induction e using eq_poly; reflexivity.
   Defined.
@@ -85,7 +87,7 @@ Section GroupoidLaws.
     induction e1 using eq_poly; reflexivity.
   Defined.
 
-  Definition ap_inv {x y : A} (e : x = y) : ap f (inv e) = inv (ap f e).
+  Definition ap_eq_sym {x y : A} (e : x = y) : ap f (eq_sym e) = eq_sym (ap f e).
   Proof.
     induction e using eq_poly; reflexivity.
   Defined.
