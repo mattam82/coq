@@ -21,61 +21,44 @@ Require Export Coq.Classes.Init.
 Require Import Coq.Program.Basics.
 Require Import Coq.Program.Tactics.
 
+Require Import Coq.Properties.GroupoidLaws.
+Require Export Coq.Properties.Functions.
+
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
-Set Universe Polymorphism.
-
-Definition crelation (A : Type) := A -> A -> Type.
-
-Definition arrow (A B : Type) := A -> B.
-
-Definition flip {A B C : Type} (f : A -> B -> C) := fun x y => f y x.
-
-Module Import TypeProduct.
-
-Cumulative Record prodT A B :=
- { fst : A; snd : B }.
-Arguments fst {A B}.
-Arguments snd {A B}.
-
-End TypeProduct.
-
-Definition iffT (A B : Type) := (prodT (A -> B) (B -> A))%type.
-
-Cumulative Inductive sumT A B :=
-| inlt : A -> sumT A B
-| inrt : B -> sumT A B.
-
-(** We allow to unfold the [crelation] definition while doing morphism search. *)
+(** We allow to unfold the [relation] definition while doing morphism search. *)
 
 Section Defs.
-  Context {A : Type}.
+  Sort s s'.
+  Universe u v.
+  Definition relation (A : Type@{s|u}) := A -> A -> Type@{s'|v}.
+  Context {A : Type@{s|u}}.
 
-  (** We rebind crelational properties in separate classes to be able to overload each proof. *)
+  (** We rebind relational properties in separate classes to be able to overload each proof. *)
 
-  Class Reflexive (R : crelation A) :=
+  Class Reflexive (R : relation A) :=
     reflexivity : forall x : A, R x x.
 
-  Definition complement (R : crelation A) : crelation A :=
-    fun x y => R x y -> False.
+  Definition complement (R : relation A) : relation A :=
+    fun x y => R x y -> Empty.
 
   (** Opaque for proof-search. *)
-  Typeclasses Opaque complement iffT.
+  Typeclasses Opaque complement iff.
 
   (** These are convertible. *)
   Lemma complement_inverse R : complement (flip R) = flip (complement R).
   Proof. reflexivity. Qed.
 
-  Class Irreflexive (R : crelation A) :=
+  Class Irreflexive (R : relation A) :=
     irreflexivity : Reflexive (complement R).
 
-  Class Symmetric (R : crelation A) :=
+  Class Symmetric (R : relation A) :=
     symmetry : forall {x y}, R x y -> R y x.
 
-  Class Asymmetric (R : crelation A) :=
-    asymmetry : forall {x y}, R x y -> (complement R y x : Type).
+  Class Asymmetric (R : relation A) :=
+    asymmetry : forall {x y}, R x y -> (complement R y x : Type@{s'|v}).
 
-  Class Transitive (R : crelation A) :=
+  Class Transitive (R : relation A) :=
     transitivity : forall {x y z}, R x y -> R y z -> R x z.
 
   Arguments transitivity {R Transitive x} y {z}.
@@ -84,13 +67,15 @@ Section Defs.
 
   (** A [PreOrder] is both Reflexive and Transitive. *)
 
-  Cumulative Class PreOrder (R : crelation A)  := {
+  #[projections(primitive=no)]
+  Class PreOrder (R : relation A)  := {
     #[global] PreOrder_Reflexive :: Reflexive R | 2 ;
     #[global] PreOrder_Transitive :: Transitive R | 2 }.
 
   (** A [StrictOrder] is both Irreflexive and Transitive. *)
 
-  Cumulative Class StrictOrder (R : crelation A)  := {
+  #[projections(primitive=no)]
+  Class StrictOrder (R : relation A)  := {
     #[global] StrictOrder_Irreflexive :: Irreflexive R ;
     #[global] StrictOrder_Transitive :: Transitive R }.
 
@@ -98,15 +83,17 @@ Section Defs.
   Global Instance StrictOrder_Asymmetric `(StrictOrder R) : Asymmetric R.
   Proof. firstorder. Qed.
 
-  (** A partial equivalence crelation is Symmetric and Transitive. *)
+  (** A partial equivalence relation is Symmetric and Transitive. *)
 
-  Cumulative Class PER (R : crelation A)  := {
+  #[projections(primitive=no)]
+  Class PER (R : relation A)  := {
     #[global] PER_Symmetric :: Symmetric R | 3 ;
     #[global] PER_Transitive :: Transitive R | 3 }.
 
-  (** Equivalence crelations. *)
+  (** Equivalence relations. *)
 
-  Cumulative Class Equivalence (R : crelation A)  := {
+  #[projections(primitive=no)]
+  Class Equivalence (R : relation A)  := {
     #[global] Equivalence_Reflexive :: Reflexive R ;
     #[global] Equivalence_Symmetric :: Symmetric R ;
     #[global] Equivalence_Transitive :: Transitive R }.
@@ -117,15 +104,15 @@ Section Defs.
     { PER_Symmetric := Equivalence_Symmetric ;
       PER_Transitive := Equivalence_Transitive }.
 
-  (** We can now define antisymmetry w.r.t. an equivalence crelation on the carrier. *)
+  (** We can now define antisymmetry w.r.t. an equivalence relation on the carrier. *)
 
-  Class Antisymmetric eqA `{equ : Equivalence eqA} (R : crelation A) :=
+  Class Antisymmetric eqA `{equ : Equivalence eqA} (R : relation A) :=
     antisymmetry : forall {x y}, R x y -> R y x -> eqA x y.
 
-  Class subrelation (R: crelation A) (R' : crelation A) :=
+  Class subrelation (R: relation A) (R' : relation A) :=
     is_subrelation : forall {x y}, R x y -> R' x y.
 
-  (** Any symmetric crelation is equal to its inverse. *)
+  (** Any symmetric relation is equal to its inverse. *)
 
   Lemma subrelation_symmetric R `(Symmetric R) : subrelation (flip R) R.
   Proof. hnf. intros x y H'. red in H'. apply symmetry. assumption. Qed.
@@ -178,20 +165,21 @@ Section Defs.
   End complement.
 
 
-  (** Rewrite crelation on a given support: declares a crelation as a rewrite
-   crelation for use by the generalized rewriting tactic.
+  (** Rewrite relation on a given support: declares a relation as a rewrite
+   relation for use by the generalized rewriting tactic.
    It helps choosing if a rewrite should be handled
    by the generalized or the regular rewriting tactic using leibniz equality.
    Users can declare an [RewriteRelation A RA] anywhere to declare default
-   crelations. This is also done automatically by the [Declare Relation A RA]
+   relations. This is also done automatically by the [Declare Relation A RA]
    commands. *)
 
-  Class RewriteRelation (RA : crelation A).
+  #[projections(primitive=no)]
+  Class RewriteRelation (RA : relation A).
 
   (** Any [Equivalence] declared in the context is automatically considered
-   a rewrite crelation. *)
+   a rewrite relation. *)
 
-  Global Instance equivalence_rewrite_crelation `(Equivalence eqA) : RewriteRelation eqA.
+  Global Instance equivalence_rewrite_relation `(Equivalence eqA) : RewriteRelation eqA.
   Defined.
 
   (** Leibniz equality. *)
@@ -200,7 +188,7 @@ Section Defs.
     Global Instance eq_Symmetric : Symmetric (@eq A) := @eq_sym A.
     Global Instance eq_Transitive : Transitive (@eq A) := @eq_trans A.
 
-    (** Leibinz equality [eq] is an equivalence crelation.
+    (** Leibinz equality [eq] is an equivalence relation.
         The instance has low priority as it is always applicable
         if only the type is constrained. *)
 
@@ -211,13 +199,14 @@ End Defs.
 
 Global Arguments transitivity {A R Transitive x} y {z}.
 
-(** Default rewrite crelations handled by [setoid_rewrite]. *)
+(** Default rewrite relations handled by [setoid_rewrite]. *)
 #[global]
-Instance: RewriteRelation impl.
+Instance rr_impl@{s|u|} : RewriteRelation impl@{s s|u u}.
 Defined.
 
+
 #[global]
-Instance: RewriteRelation iff.
+Instance rr_iff@{s|u|} : RewriteRelation iff@{s|u u}.
 Defined.
 
 (** Hints to drive the typeclass resolution avoiding loops
@@ -255,14 +244,14 @@ Hint Resolve irreflexivity : ord.
 
 Unset Implicit Arguments.
 
-Ltac solve_crelation :=
+Ltac solve_relation :=
   match goal with
   | [ |- ?R ?x ?x ] => reflexivity
   | [ H : ?R ?x ?y |- ?R ?y ?x ] => symmetry ; exact H
   end.
 
 #[global]
-Hint Extern 4 => solve_crelation : crelations.
+Hint Extern 4 => solve_relation : relations.
 
 (** We can already dualize all these properties. *)
 
@@ -288,80 +277,72 @@ Tactic Notation "apply" "*" constr(t) :=
   first [ refine t | refine (t _) | refine (t _ _) | refine (t _ _ _) | refine (t _ _ _ _) |
     refine (t _ _ _ _ _) | refine (t _ _ _ _ _ _) | refine (t _ _ _ _ _ _ _) ].
 
-Ltac simpl_crelation :=
+Ltac simpl_relation :=
   unfold flip, impl, arrow ; try reduce ; program_simpl ;
-    try ( solve [ dintuition auto with crelations ]).
+    try ( solve [ dintuition auto with relations ]).
 
-Local Obligation Tactic := simpl_crelation.
+Local Obligation Tactic := simpl_relation.
 
 (** Logical implication. *)
 
 #[global]
-Program Instance impl_Reflexive : Reflexive impl.
+Program Instance impl_Reflexive@{s|u|} : Reflexive impl@{s s|u u}.
 #[global]
-Program Instance impl_Transitive : Transitive impl.
+Program Instance impl_Transitive@{s|u|} : Transitive impl@{s s|u u}.
 
 (** Logical equivalence. *)
 
 #[global]
-Instance iff_Reflexive : Reflexive iff := iff_refl.
+Instance iff_Reflexive@{s|u|} : Reflexive iff@{s|u u} := iff_refl.
 #[global]
-Instance iff_Symmetric : Symmetric iff := iff_sym.
+Instance iff_Symmetric@{s|u|} : Symmetric iff@{s|u u} := iff_sym.
 #[global]
-Instance iff_Transitive : Transitive iff := iff_trans.
+Instance iff_Transitive@{s|u|} : Transitive iff@{s|u u} := iff_trans.
 
-(** Logical equivalence [iff] is an equivalence crelation. *)
-
-#[global]
-Program Instance iff_equivalence : Equivalence iff.
-#[global]
-Program Instance arrow_Reflexive : Reflexive arrow.
-#[global]
-Program Instance arrow_Transitive : Transitive arrow.
+(** Logical equivalence [iff] is an equivalence relation. *)
 
 #[global]
-Instance iffT_Reflexive : Reflexive iffT.
-Proof. firstorder. Defined.
+Program Instance iff_equivalence@{s|u|} : Equivalence iff@{s|u u}.
 #[global]
-Instance iffT_Symmetric : Symmetric iffT.
-Proof. firstorder. Defined.
+Program Instance arrow_Reflexive@{s|u|} : Reflexive arrow@{s s|u u}.
 #[global]
-Instance iffT_Transitive : Transitive iffT.
-Proof. firstorder. Defined.
+Program Instance arrow_Transitive@{s|u|} : Transitive arrow@{s s|u u}.
 
-(** We now develop a generalization of results on crelations for arbitrary predicates.
-   The resulting theory can be applied to homogeneous binary crelations but also to
+(** We now develop a generalization of results on relations for arbitrary predicates.
+   The resulting theory can be applied to homogeneous binary relations but also to
    arbitrary n-ary predicates. *)
 
 Local Open Scope list_scope.
 
 (** A compact representation of non-dependent arities, with the codomain singled-out. *)
 
-(** We define the various operations which define the algebra on binary crelations *)
+(** We define the various operations which define the algebra on binary relations *)
 Section Binary.
-  Context {A : Type}.
+  Sort s s'.
+  Universe u v.
+  Context {A : Type@{s|u}}.
 
-  Definition relation_equivalence : crelation (crelation A) :=
-    fun R R' => forall x y, iffT (R x y) (R' x y).
+  Definition relation_equivalence : relation@{Type s'|_ _} (relation@{s s'|u v} A)
+    := fun R R' => forall x y, iff (R x y) (R' x y).
 
   Global Instance: RewriteRelation relation_equivalence.
   Defined.
 
-  Definition relation_conjunction (R : crelation A) (R' : crelation A) : crelation A :=
-    fun x y => prodT (R x y) (R' x y).
+  Definition relation_conjunction (R : relation@{s s'|u v} A) (R' : relation@{s s'|u v} A) : relation A :=
+    fun x y => prod (R x y) (R' x y).
 
-  Definition relation_disjunction (R : crelation A) (R' : crelation A) : crelation A :=
-    fun x y => sumT (R x y) (R' x y).
+  Definition relation_disjunction (R : relation@{s s'|u v} A) (R' : relation@{s s'|u v} A) : relation A :=
+    fun x y => sum (R x y) (R' x y).
 
   (** Relation equivalence is an equivalence, and subrelation defines a partial order. *)
 
   Global Instance relation_equivalence_equivalence :
     Equivalence relation_equivalence.
   Proof.
-    split; red; unfold relation_equivalence, iffT.
-    - firstorder.
-    - firstorder.
-    - intros x y z X X0 x0 y0. specialize (X x0 y0). specialize (X0 x0 y0). firstorder.
+    split; red; unfold relation_equivalence, iff.
+    - intros **. split; intros ?; assumption.
+    - intros **. edestruct X. split; eassumption.
+    - intros x y z X X0 x0 y0. destruct (X x0 y0). destruct (X0 x0 y0). split; eauto.
   Qed.
 
   Global Instance relation_implication_preorder : PreOrder (@subrelation A).
@@ -369,7 +350,7 @@ Section Binary.
 
   (** *** Partial Order.
    A partial order is a preorder which is additionally antisymmetric.
-   We give an equivalent definition, up-to an equivalence crelation
+   We give an equivalent definition, up-to an equivalence relation
    on the carrier. *)
 
   Class PartialOrder eqA `{equ : Equivalence A eqA} R `{preo : PreOrder A R} :=
@@ -387,17 +368,28 @@ Section Binary.
 
   Lemma PartialOrder_inverse `(PartialOrder eqA R) : PartialOrder eqA (flip R).
   Proof.
-    firstorder.
+    split.
+    - intros X.
+      specialize (H x y).
+      destruct H as [H1 H2].
+      specialize (H1 X).
+      destruct H1.
+      split; eauto.
+    - intros X.
+      specialize (H x y).
+      destruct H as [H1 H2].
+      eapply H2.
+      destruct X. split; eauto.
   Qed.
 End Binary.
 
 #[global]
 Hint Extern 3 (PartialOrder (flip _)) => class_apply PartialOrder_inverse : typeclass_instances.
 
-(** The partial order defined by subrelation and crelation equivalence. *)
+(** The partial order defined by subrelation and relation equivalence. *)
 
 (* Program Instance subrelation_partial_order : *)
-(*   ! PartialOrder (crelation A) relation_equivalence subrelation. *)
+(*   ! PartialOrder (relation A) relation_equivalence subrelation. *)
 (* Obligation Tactic := idtac. *)
 
 (* Next Obligation. *)
@@ -411,7 +403,7 @@ Global Typeclasses Opaque relation_equivalence.
 
 Register arrow as rewrite.type.arrow.
 Register flip as rewrite.type.flip.
-Register crelation as rewrite.type.relation.
+Register relation as rewrite.type.relation.
 Register subrelation as rewrite.type.subrelation.
 Register Reflexive as rewrite.type.Reflexive.
 Register reflexivity as rewrite.type.reflexivity.

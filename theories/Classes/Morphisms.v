@@ -16,10 +16,10 @@
 
 Require Import Coq.Program.Basics.
 Require Import Coq.Program.Tactics.
-Require Export Coq.Classes.CRelationClasses.
+Require Export Coq.Classes.RelationClasses.
 
 Generalizable Variables A eqA B C D R RA RB RC m f x y.
-Local Obligation Tactic := try solve [ simpl_crelation ].
+Local Obligation Tactic := try solve [ simpl_relation ].
 
 Local Arguments transitivity {A R Transitive x} y {z}.
 
@@ -35,9 +35,11 @@ Set Universe Polymorphism.
    type for usual morphisms. *)
 
 Section Proper.
-  Context {A : Type}.
+  Sort s s'.
+  Universe u v.
+  Context {A : Type@{s|u}}.
 
-  Class Proper (R : crelation A) (m : A) :=
+  Class Proper (R : relation@{s s'|u v} A) (m : A) :=
     proper_prf : R m m.
 
   (** Every element in the carrier of a reflexive relation is a morphism
@@ -49,7 +51,7 @@ Section Proper.
    priorities in different hint bases and select a particular hint
    database for resolution of a type class constraint. *)
 
-  Class ProperProxy (R : crelation A) (m : A) :=
+  Class ProperProxy (R : relation@{s s'|u v} A) (m : A) :=
     proper_proxy : R m m.
 
   Lemma eq_proper_proxy (x : A) : ProperProxy (@eq A) x.
@@ -75,12 +77,12 @@ Section Proper.
 
   (** The non-dependent version is an instance where we forget dependencies. *)
 
-  Definition respectful {B} (R : crelation A) (R' : crelation B) : crelation (A -> B) :=
+  Definition respectful {B} (R : relation A) (R' : relation B) : relation (A -> B) :=
     fun f g => forall x y, R x y -> R' (f x) (g y).
 End Proper.
 
-(** We favor the use of Leibniz equality or a declared reflexive crelation
-  when resolving [ProperProxy], otherwise, if the crelation is given (not an evar),
+(** We favor the use of Leibniz equality or a declared reflexive relation
+  when resolving [ProperProxy], otherwise, if the relation is given (not an evar),
   we fall back to [Proper]. *)
 #[global]
 Hint Extern 1 (ProperProxy _ _) =>
@@ -139,7 +141,7 @@ Ltac f_equiv :=
   | |- ?R (?f ?x) (?f' _) =>
     let T := type of x in
     let Rx := fresh "R" in
-    evar (Rx : crelation T);
+    evar (Rx : relation T);
     let H := fresh in
     assert (H : (Rx==>R)%signatureT f f');
     unfold Rx in *; clear Rx; [ f_equiv | apply H; clear H; try reflexivity ]
@@ -156,26 +158,26 @@ Section Relations.
 
   Definition forall_def (P : A -> Type) : Type := forall x : A, P x.
 
-  (** Dependent pointwise lifting of a crelation on the range. *)
+  (** Dependent pointwise lifting of a relation on the range. *)
 
   Definition forall_relation (P : A -> Type)
-             (sig : forall a, crelation (P a)) : crelation (forall x, P x) :=
+             (sig : forall a, relation (P a)) : relation (forall x, P x) :=
     fun f g => forall a, sig a (f a) (g a).
 
   (** Non-dependent pointwise lifting *)
-  Definition pointwise_relation {B} (R : crelation B) : crelation (A -> B) :=
+  Definition pointwise_relation {B} (R : relation B) : relation (A -> B) :=
     fun f g => forall a, R (f a) (g a).
 
-  Lemma pointwise_pointwise {B} (R : crelation B) :
+  Lemma pointwise_pointwise {B} (R : relation B) :
     relation_equivalence (pointwise_relation R) (@eq A ==> R).
   Proof.
     intros. split.
-    - simpl_crelation.
+    - simpl_relation.
     - firstorder.
   Qed.
 
 
-  (** Subcrelations induce a morphism on the identity. *)
+  (** Subrelations induce a morphism on the identity. *)
 
   Global Instance subrelation_id_proper `(subrelation A RA RA') : Proper (RA ==> RA') id.
   Proof. firstorder. Qed.
@@ -183,8 +185,8 @@ Section Relations.
   (** The subrelation property goes through products as usual. *)
 
   Lemma subrelation_respectful@{b ra ra' rb rb'} {B : Type@{b}}
-    (RA : crelation@{a ra} A) (RA' : crelation@{a ra'} A)
-    (RB : crelation@{b rb} B) (RB' : crelation@{b rb'} B)
+    (RA : relation@{a ra} A) (RA' : relation@{a ra'} A)
+    (RB : relation@{b rb} B) (RB' : relation@{b rb'} B)
     (subl : subrelation@{a ra' ra} RA' RA)
     (subr : subrelation@{b rb rb'} RB RB') :
     subrelation (RA ==> RB) (RA' ==> RB').
@@ -193,14 +195,14 @@ Section Relations.
   (** And of course it is reflexive. *)
 
   Lemma subrelation_refl R : @subrelation A R R.
-  Proof. simpl_crelation. Qed.
+  Proof. simpl_relation. Qed.
 
   (** [Proper] is itself a covariant morphism for [subrelation].
    We use an unconvertible premise to avoid looping.
    *)
 
   Lemma subrelation_proper `(mor : Proper A R' m)
-        `(unc : Unconvertible (crelation A) R R')
+        `(unc : Unconvertible (relation A) R R')
         `(sub : subrelation A R' R) : Proper R m.
   Proof.
     intros. apply sub. apply mor.
@@ -215,7 +217,7 @@ Section Relations.
   Proof. reduce. unfold pointwise_relation in *. apply sub. auto. Qed.
 
   (** For dependent function types. *)
-  Lemma forall_subrelation (P : A -> Type) (R S : forall x : A, crelation (P x)) :
+  Lemma forall_subrelation (P : A -> Type) (R S : forall x : A, relation (P x)) :
     (forall a, subrelation (R a) (S a)) ->
     subrelation (forall_relation P R) (forall_relation P S).
   Proof. reduce. firstorder. Qed.
@@ -297,7 +299,7 @@ Section GenericInstances.
 
   Unset Strict Universe Declaration.
 
-  (** The complement of a crelation conserves its proper elements. *)
+  (** The complement of a relation conserves its proper elements. *)
 
   (** The [flip] too, actually the [flip] instance is a bit more general. *)
   Program Definition flip_proper
@@ -311,7 +313,7 @@ Section GenericInstances.
   Qed.
 
 
-  (** Every Transitive crelation gives rise to a binary morphism on [impl],
+  (** Every Transitive relation gives rise to a binary morphism on [impl],
    contravariant in the first argument, covariant in the second. *)
 
   Global Program
@@ -379,7 +381,7 @@ Section GenericInstances.
       apply symmetry...
   Qed.
 
-  (** Every Transitive crelation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
+  (** Every Transitive relation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
 
   Global Program
   Instance trans_co_eq_inv_arrow_morphism
@@ -391,7 +393,7 @@ Section GenericInstances.
     apply transitivity with y...
   Qed.
 
-  (** Every Symmetric and Transitive crelation gives rise to an equivariant morphism. *)
+  (** Every Symmetric and Transitive relation gives rise to an equivariant morphism. *)
 
   Global Program
   Instance PER_type_morphism `(PER A R) : Proper (R ==> R ==> iffT) R | 1.
@@ -415,7 +417,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof.
-    simpl_crelation.
+    simpl_relation.
     unfold compose. firstorder.
   Qed.
 
@@ -424,10 +426,10 @@ Section GenericInstances.
 
   Global Instance reflexive_eq_dom_reflexive `(Reflexive B R') {A} :
     Reflexive (@Logic.eq A ==> R').
-  Proof. simpl_crelation. Qed.
+  Proof. simpl_relation. Qed.
 
 
-    (** [respectful] is a morphism for crelation equivalence . *)
+    (** [respectful] is a morphism for relation equivalence . *)
   Global Instance respectful_morphism {A B} :
     Proper (relation_equivalence ++> relation_equivalence ++> relation_equivalence)
            (@respectful A B).
@@ -442,13 +444,13 @@ Section GenericInstances.
   (** [R] is Reflexive, hence we can build the needed proof. *)
 
   Lemma Reflexive_partial_app_morphism@{a b ra rb} {A : Type@{a}} {B : Type@{b}}
-    {R : crelation@{a ra} A} {R' : crelation@{b rb} B} {m : A -> B} (pm : Proper (R ==> R') m) {x} (pr : ProperProxy R x) :
+    {R : relation@{a ra} A} {R' : relation@{b rb} B} {m : A -> B} (pm : Proper (R ==> R') m) {x} (pr : ProperProxy R x) :
     Proper R' (m x).
-  Proof. simpl_crelation. Qed.
+  Proof. simpl_relation. Qed.
 
   Class Params {A} (of : A) (arity : nat).
 
-  Lemma flip_respectful {A B} (R : crelation A) (R' : crelation B) :
+  Lemma flip_respectful {A B} (R : relation A) (R' : relation B) :
     relation_equivalence (flip (R ==> R')) (flip R ==> flip R').
   Proof.
     intros.
@@ -469,13 +471,13 @@ Section GenericInstances.
   (** That's if and only if *)
 
   Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq A) R.
-  Proof. simpl_crelation. Qed.
+  Proof. simpl_relation. Qed.
 
   (** Once we have normalized, we will apply this instance to simplify the problem. *)
 
   Definition proper_flip_proper `(mor : Proper A R m) : Proper (flip R) m := mor.
 
-  (** Every reflexive crelation gives rise to a morphism,
+  (** Every reflexive relation gives rise to a morphism,
   only for immediately solving goals without variables. *)
 
   Lemma reflexive_proper `{Reflexive A R} (x : A) : Proper R x.
@@ -578,7 +580,7 @@ Hint Extern 7 (@Proper _ _ _) => proper_reflexive
 Section Normalize.
   Context (A : Type).
 
-  Class Normalizes (m : crelation A) (m' : crelation A) :=
+  Class Normalizes (m : relation A) (m' : relation A) :=
     normalizes : relation_equivalence m m'.
 
   (** Current strategy: add [flip] everywhere and reduce using [subrelation]
@@ -624,8 +626,8 @@ Hint Extern 1 (Normalizes _ _ _) => normalizes : typeclass_instances.
 Hint Extern 6 (@Proper _ _ _) => proper_normalization
   : typeclass_instances.
 
-(** When the crelation on the domain is symmetric, we can
-flip the crelation on the codomain. Same for binary functions. *)
+(** When the relation on the domain is symmetric, we can
+flip the relation on the codomain. Same for binary functions. *)
 
 Lemma proper_sym_flip :
 forall `(Symmetric A R1)`(Proper (A->B) (R1==>R2) f),
@@ -643,9 +645,9 @@ intros A R1 Sym1 B R2 Sym2 C R3 f Hf.
 intros x x' Hxx' y y' Hyy'. apply Hf; auto.
 Qed.
 
-(** When the crelation on the domain is symmetric, a predicate is
+(** When the relation on the domain is symmetric, a predicate is
     compatible with [iff] as soon as it is compatible with [impl].
-    Same with a binary crelation. *)
+    Same with a binary relation. *)
 
 Lemma proper_sym_impl_iff : forall `(Symmetric A R)`(Proper _ (R==>impl) f),
 Proper (R==>iff) f.
