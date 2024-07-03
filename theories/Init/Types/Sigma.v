@@ -40,6 +40,7 @@ Arguments existR {_ _}.
 Scheme sigmaR_poly := Induction for sigma Sort Poly.
 
 Notation "A * B" := (sigmaR A (fun _ => B)).
+Notation "A /\ B" := (sigmaR A (fun _ => B)).
 
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{_ _ _|_ Set} A P.
 

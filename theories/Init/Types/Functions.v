@@ -20,3 +20,5 @@ Definition flip@{s s' s''|u v w|} {A : Type@{s|u}} {B : Type@{s'|v}} {C : Type@{
   (f : A -> B -> C) := fun x y => f y x.
 
 Definition iff@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := (A -> B) * (B -> A).
+
+Notation "x <-> y" := (iff x y).
