@@ -149,7 +149,7 @@ Ltac clear_except hyp :=
 
 Ltac subst_no_fail :=
   repeat (match goal with
-            [ H : ?X = ?Y |- _ ] => subst X || subst Y
+            [ H : ?X = ?Y |- _ ] => destruct H || (symmetry in H; destruct H)
           end).
 
 Tactic Notation "subst" "*" := subst_no_fail.

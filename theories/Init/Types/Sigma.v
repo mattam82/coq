@@ -35,6 +35,8 @@ Scheme sigma_poly := Induction for sigma Sort Poly.
 Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)} := existR
   { fst : A ; snd : P fst }.
 
+Arguments fst {_ _}.
+Arguments snd {_ _}.
 Arguments existR {_ _}.
 
 Scheme sigmaR_poly := Induction for sigma Sort Poly.
