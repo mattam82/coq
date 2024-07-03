@@ -8,10 +8,16 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
+Require Import PreludeOptions.
+Require Import Notations.
+
+Inductive sum@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) : Type@{s''|max(u,v)} :=
+  | left : A -> sum A B
+  | right : B -> sum A B.
+
+Arguments left {_}.
+Arguments right _ {_}.
+
+Scheme sum_poly := Induction for sum Sort Poly.
+
+Notation "{ A } + { B }" := (sum A B).
