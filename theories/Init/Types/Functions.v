@@ -32,6 +32,9 @@ Register flip as core.flip.
 Definition apply@{s s'|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) (x : A) := f x.
 
 Definition iff@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := (A -> B) * (B -> A).
+Register iff as core.iff.type.
+Register fst as core.iff.proj1.
+Register snd as core.iff.proj2.
 
 Definition const@{s s'|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (a : A) := fun _ : B => a.
 
