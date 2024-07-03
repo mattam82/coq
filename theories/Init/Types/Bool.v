@@ -18,13 +18,7 @@ Section BoolSortPoly.
     | true : bool
     | false : bool.
 
-  Scheme bool_poly := Induction for bool Sort Poly.
-
   Add Printing If bool.
-
-  Declare Scope bool_scope.
-  Delimit Scope bool_scope with bool.
-  Bind Scope bool_scope with bool.
 
   Register bool as core.bool.type.
   Register true as core.bool.true.
@@ -57,9 +51,6 @@ Section BoolSortPoly.
       | false => b
     end.
 
-  Infix "||" := orb : bool_scope.
-  Infix "&&" := andb : bool_scope.
-
   Register andb as core.bool.andb.
   Register orb as core.bool.orb.
   Register implb as core.bool.implb.
@@ -67,3 +58,11 @@ Section BoolSortPoly.
   Register negb as core.bool.negb.
 
 End BoolSortPoly.
+
+Declare Scope bool_scope.
+Delimit Scope bool_scope with bool.
+Bind Scope bool_scope with bool.
+
+
+Infix "||" := orb : bool_scope.
+Infix "&&" := andb : bool_scope.
