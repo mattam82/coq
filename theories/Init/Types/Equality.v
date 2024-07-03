@@ -53,8 +53,34 @@ Notation "x <> y" := (~ (x = y)) : type_scope.
 #[global]
 Hint Resolve eq_refl: core.
 
+Section GroupoidOperations.
+  Sort sa se.
+  Universe a.
+  Context {A : Type@{sa|a}}.
+  #[warnings="-notation-overridden"]
+  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
+
+  Definition eq_sym {x y : A} (e : x = y) : y = x :=
+    match e with | eq_refl _ => eq_refl _ end.
+
+  Definition eq_trans {x y z : A} (e1 : x = y) : y = z -> x = z :=
+    match e1 with | eq_refl _ => fun x => x end.
+
+  Definition tr@{b|} {B : Type@{sa|b}} (e : @eq@{_ sa|max(a+1,b+1)} Type@{sa|max(a,b)} A B) : A -> B :=
+    match e in @eq _ _ B return A -> B with | eq_refl _ => fun x => x end.
+
+  Sort sb.
+  Definition ap@{b|} {B : Type@{sb|b}} (f : A -> B) {x y : A} (e : x = y) : f x = f y :=
+    match e with | eq_refl _ => eq_refl _ end.
+
+End GroupoidOperations.
+Notation congr := ap.
+
 Register eq as core.eq.type.
 Register eq_refl as core.eq.refl.
 Register eq_ind as core.eq.ind.
 Register eq_rect as core.eq.rect.
 Register eq_poly as core.eq.rect.
+Register eq_sym as core.eq.sym.
+Register eq_trans as core.eq.trans.
+Register congr as core.eq.congr.

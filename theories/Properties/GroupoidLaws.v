@@ -3,37 +3,6 @@ From Coq Require Import Types.
 
 Set Printing Universes.
 
-Section GroupoidOperations.
-  Sort sa se.
-  Universe a.
-  Context {A : Type@{sa|a}}.
-  #[warnings="-notation-overridden"]
-  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
-
-  Definition eq_sym {x y : A} : x = y -> y = x.
-  Proof.
-    intros e; induction e using eq_poly; reflexivity.
-  Defined.
-
-  Definition eq_trans {x y z : A} : x = y -> y = z -> x = z.
-  Proof.
-    intros e; induction e using eq_poly; trivial.
-  Defined.
-
-  Definition tr@{b|} {B : Type@{sa|b}} (e : @eq@{_ sa|_} Type@{sa|max(a,b)} A B) : A -> B.
-  Proof.
-    induction e using eq_poly@{_ sa|max(a+1,b+1) max(a,b)}; trivial.
-  Defined.
-
-  Sort sb.
-  Definition ap@{b|} {B : Type@{sb|b}} (f : A -> B) {x y : A} :
-    x = y -> f x = f y.
-  Proof.
-    intros e ; induction e using eq_poly; reflexivity.
-  Defined.
-
-End GroupoidOperations.
-
 Module GroupoidNotations.
 Notation rfl := (ltac:(reflexivity)) (only parsing).
 
