@@ -381,19 +381,26 @@ let name_and_process_scheme env = function
 
 let do_mutual_induction_scheme ?(force_mutual=false) env ?(isrec=true) l =
   let sigma, inst, indsort =
+    let open EConstr in
     let _,_,ind,_ = match l with | x::_ -> x | [] -> assert false in
     let _, ctx = Typeops.type_of_global_in_context env (Names.GlobRef.IndRef ind) in
     let u, ctx = UnivGen.fresh_instance_from ctx None in
-    let u = EConstr.EInstance.make u in
+    let u = EInstance.make u in
     let sigma = Evd.from_ctx (UState.of_context_set env ctx) in
-    let _, s = EConstr.destArity sigma (Retyping.get_type_of env sigma (EConstr.mkIndU (ind, u))) in
+    let _, s = destArity sigma (Retyping.get_type_of env sigma (mkIndU (ind, u))) in
     sigma, u, s
   in
   let sigma, lrecspec =
     List.fold_left_map (fun sigma (_,dep,ind,sort) ->
       let sigma, sort =
         match sort with
-        | InQSort -> sigma, indsort
+        | InQSort ->
+          let open EConstr in
+          (match ESorts.kind sigma indsort with
+          | Sorts.QSort (q, l) ->
+            let sigma, l' = Evd.new_univ_variable UnivRigid sigma in
+            sigma, ESorts.make (Sorts.qsort q l')
+          | _ -> sigma, indsort)
         | _ -> Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort
       in
       (sigma, ((ind,inst),dep,sort)))
