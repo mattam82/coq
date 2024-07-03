@@ -10,8 +10,7 @@
 
 Require Import PreludeOptions.
 Require Import Notations.
-
-Notation "x -> y" := (forall (_ : x), y).
+Require Import Sigma.
 
 Definition id@{s|u|} {A : Type@{s|u}} (a : A) := a.
 
@@ -19,3 +18,5 @@ Definition arrow@{s s'|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) := A -> B.
 
 Definition flip@{s s' s''|u v w|} {A : Type@{s|u}} {B : Type@{s'|v}} {C : Type@{s''|w}}
   (f : A -> B -> C) := fun x y => f y x.
+
+Definition iff@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := (A -> B) * (B -> A).
