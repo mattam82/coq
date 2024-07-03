@@ -45,7 +45,7 @@ Notation "A /\ B" := (prod A B).
 
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma A P.
 
-Notation "'ex_intro'" := (existP@{_ _ _| _ Set}) (at level 50).
+Notation "'ex_intro'" := (existP@{_ Prop Prop| _ Set}) (at level 50).
 
 Register ex as core.ex.type.
 Register existP as core.ex.intro.

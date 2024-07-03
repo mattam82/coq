@@ -35,7 +35,7 @@ Definition eq_rect@{u v|} [A:Type@{u}] [x:A]
 
 Definition eq_rec@{u|} [A:Type@{u}] [x:A]
   (P : forall a : A, Set) :
-  P x -> forall [a : A] (e : x = a :> A), P a := @eq_singleton@{_ _| _ Set} A x (fun a _ => P a).
+  P x -> forall [a : A] (e : x = a :> A), P a := @eq_singleton A x (fun a _ => P a).
 
 Definition eq_sind [A:Set] [x:A]
   (P : forall a : A, SProp) :
