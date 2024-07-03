@@ -15,3 +15,4 @@ Require Export Types.Functions.
 Require Export Types.Sigma.
 Require Export Types.Equality.
 Require Export Types.Sum.
+Require Export Types.Wf.
