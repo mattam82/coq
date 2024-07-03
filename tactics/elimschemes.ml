@@ -27,7 +27,16 @@ let build_induction_scheme_in_type env dep sort ind =
   let sigma = Evd.from_env env in
   let sigma, pind = Evd.fresh_inductive_instance ~rigid:UState.univ_rigid env sigma ind in
   let pind = Util.on_snd EConstr.EInstance.make pind in
-  let sigma, sort = Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort in
+  let sigma, sort =
+    match sort with
+    | InQSort ->
+      let sigma, l = Evd.new_univ_variable UnivRigid sigma in
+      let _, s = EConstr.destArity sigma (Retyping.get_type_of env sigma (EConstr.mkIndU pind)) in
+      (match EConstr.ESorts.kind sigma s with
+      | QSort (q, _) -> sigma, EConstr.ESorts.make (Sorts.qsort q l)
+      | _ -> Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort)
+    | _ -> Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort
+  in
   let sigma, c = build_induction_scheme env sigma pind dep sort in
   EConstr.to_constr sigma c, Evd.ustate sigma
 

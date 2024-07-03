@@ -223,7 +223,12 @@ let declare_one_induction_scheme ?loc ind =
   let kind = Indrec.pseudo_sort_family_for_elim ind mip in
   let from_prop = kind == InProp in
   let depelim = Inductiveops.has_dependent_elim specif in
-  let kelim = Inductiveops.sorts_below (Inductiveops.elim_sort (mib,mip)) in
+  let kelim =
+    let s = Inductiveops.elim_sort (mib,mip) in
+    match s with
+    | InQSort -> [InQSort]
+    | _ -> Inductiveops.sorts_below s
+  in
   let kelim = if Global.sprop_allowed () then kelim
     else List.filter (fun s -> s <> InSProp) kelim
   in
@@ -231,7 +236,7 @@ let declare_one_induction_scheme ?loc ind =
     List.filter (fun (sort,_) -> List.mem_f Sorts.family_equal sort kelim)
       (* NB: the order is important, it makes it so that _rec is
          defined using _rect but _ind is not. *)
-      [(InQSort, "indp");
+      [(InQSort, "elim");
        (InType, "rect");
        (InProp, "ind");
        (InSet, "rec");
@@ -433,7 +438,8 @@ let do_mutual_induction_scheme ?(force_mutual=false) env ?(isrec=true) l =
       else match sort with
         | InType -> Some (if dep then case_dep else case_nodep)
         | InProp -> Some (if dep then casep_dep else casep_nodep)
-        | InSProp | InSet | InQSort ->
+        | InQSort -> Some (if dep then case_poly_dep else case_poly_nodep)
+        | InSProp | InSet ->
           (* currently we don't have standard scheme kinds for this *)
           None
     in
