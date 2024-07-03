@@ -65,19 +65,10 @@ Section Proper.
 
   (** Respectful morphisms. *)
 
-  (** The fully dependent version, not used yet. *)
-
-  Definition respectful_hetero
-  (A B : Type)
-  (C : A -> Type) (D : B -> Type)
-  (R : A -> B -> Type)
-  (R' : forall (x : A) (y : B), C x -> D y -> Type) :
-    (forall x : A, C x) -> (forall x : B, D x) -> Type :=
-    fun f g => forall x y, R x y -> R' x y (f x) (g y).
-
   (** The non-dependent version is an instance where we forget dependencies. *)
-
-  Definition respectful {B} (R : relation A) (R' : relation B) : relation (A -> B) :=
+  Sort s'' s'''.
+  Universe w x.
+  Definition respectful {B} (R : relation@{s s'|u v} A) (R' : relation@{s'' s'''|w x} B) : relation (A -> B) :=
     fun f g => forall x y, R x y -> R' (f x) (g y).
 End Proper.
 
