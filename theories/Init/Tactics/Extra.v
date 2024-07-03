@@ -191,6 +191,8 @@ Ltac now_show c := change c.
 
 Set Implicit Arguments.
 
+Definition Empty_ind := Empty_poly.
+
 Lemma decide_left : forall (C:Prop) (decide:{C}+{~C}),
   C -> forall P:{C}+{~C}->Prop, (forall H:C, P (left _ H)) -> P decide.
 Proof.
@@ -246,79 +248,6 @@ Tactic Notation "dependent" "induction" ident(H) :=
 
 Tactic Notation "dependent" "destruction" ident(H) :=
   fail "To use dependent destruction, first [Require Import Coq.Program.Equality.]".
-
-(** *** [inversion_sigma] *)
-(** The built-in [inversion] will frequently leave equalities of
-    dependent pairs.  When the first type in the pair is an hProp or
-    otherwise simplifies, [inversion_sigma] is useful; it will replace
-    the equality of pairs with a pair of equalities, one involving a
-    term casted along the other.  This might also prove useful for
-    writing a version of [inversion] / [dependent destruction] which
-    does not lose information, i.e., does not turn a goal which is
-    provable into one which requires axiom K / UIP.  *)
-
-Ltac lookup_inversion_sigma_rect H :=
-  lazymatch type of H with
-  | ex_intro _ _ _ = ex_intro _ _ _
-    => uconstr:(eq_ex_rect_ex_intro)
-  | exist _ _ _ = exist _ _ _
-    => uconstr:(eq_sig_rect_exist)
-  | existT _ _ _ = existT _ _ _
-    => uconstr:(eq_sigT_rect_existT)
-  | _ = ex_intro _ _ _
-    => uconstr:(eq_ex_rect_ex_intro_r)
-  | _ = exist _ _ _
-    => uconstr:(eq_sig_rect_exist_r)
-  | _ = existT _ _ _
-    => uconstr:(eq_sigT_rect_existT_r)
-  | ex_intro _ _ _ = _
-    => uconstr:(eq_ex_rect_ex_intro_l)
-  | exist _ _ _ = _
-    => uconstr:(eq_sig_rect_exist_l)
-  | existT _ _ _ = _
-    => uconstr:(eq_sigT_rect_existT_l)
-  | ex_intro2 _ _ _ _ _ = ex_intro2 _ _ _ _ _
-    => uconstr:(eq_ex2_rect_ex_intro2)
-  | exist2 _ _ _ _ _ = exist2 _ _ _ _ _
-    => uconstr:(eq_sig2_rect_exist2)
-  | existT2 _ _ _ _ _ = existT2 _ _ _ _ _
-    => uconstr:(eq_sigT2_rect_existT2)
-  | _ = ex_intro2 _ _ _ _ _
-    => uconstr:(eq_ex2_rect_ex_intro2_r)
-  | _ = exist2 _ _ _ _ _
-    => uconstr:(eq_sig2_rect_exist2_r)
-  | _ = existT2 _ _ _ _ _
-    => uconstr:(eq_sigT2_rect_existT2_r)
-  | ex_intro2 _ _ _ _ _ = _
-    => uconstr:(eq_ex2_rect_ex_intro2_l)
-  | exist2 _ _ _ _ _ = _
-    => uconstr:(eq_sig2_rect_exist2_l)
-  | existT2 _ _ _ _ _ = _
-    => uconstr:(eq_sigT2_rect_existT2_l)
-  | _ = _ :> ?T
-    => let sig := uconstr:(@sig) in
-       let sig2 := uconstr:(@sig2) in
-       let sigT := uconstr:(@sigT) in
-       let sigT2 := uconstr:(@sigT2) in
-       let ex := uconstr:(@ex) in
-       let ex2 := uconstr:(@ex2) in
-       fail 0 "Type" "of" H "is" "not" "an" "equality" "of" "recognized" "Σ" "types:" "expected" "one" "of" sig sig2 sigT sigT2 ex "or" ex2 "but" "got" T
-  | _
-    => fail 0 H "is" "not" "an" "equality" "of" "Σ" "types"
-  end.
-Ltac inversion_sigma_on_as H ip :=
-  let rect := lookup_inversion_sigma_rect H in
-  induction H as ip using rect.
-Ltac inversion_sigma_on H := inversion_sigma_on_as H ipattern:([]).
-Ltac inversion_sigma_step :=
-  match goal with
-  | [ H : _ |- _ ] => inversion_sigma_on H
-  end.
-Ltac inversion_sigma := repeat inversion_sigma_step.
-
-Tactic Notation "inversion_sigma" := inversion_sigma.
-Tactic Notation "inversion_sigma" hyp(H) := inversion_sigma_on H.
-Tactic Notation "inversion_sigma" hyp(H) "as" simple_intropattern(ip) := inversion_sigma_on_as H ip.
 
 (** A version of [time] that works for constrs *)
 
