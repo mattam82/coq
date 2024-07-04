@@ -68,7 +68,8 @@ Section Proper.
   (** The non-dependent version is an instance where we forget dependencies. *)
   Sort s'' s'''.
   Universe w x.
-  Definition respectful {B} (R : relation@{s s'|u v} A) (R' : relation@{s'' s'''|w x} B) : relation (A -> B) :=
+  Definition respectful {B} (R : relation@{s s'|u v} A) (R' : relation@{s'' s'''|w x} B)
+    : relation@{s'' s'''|_ _} (A -> B) :=
     fun f g => forall x y, R x y -> R' (f x) (g y).
 End Proper.
 
@@ -83,28 +84,28 @@ Hint Extern 1 (ProperProxy _ _) =>
 Hint Extern 2 (ProperProxy ?R _) =>
   not_evar R; class_apply @proper_proper_proxy : typeclass_instances.
 
-Declare Scope signatureT_scope.
-Delimit Scope signatureT_scope with signatureT.
+Declare Scope signature_scope.
+Delimit Scope signature_scope with signature.
 
 Module ProperNotations.
 
-  Notation " R ++> R' " := (@respectful _ _ (R%signatureT) (R'%signatureT))
-    (right associativity, at level 55) : signatureT_scope.
+  Notation " R ++> R' " := (@respectful _ _ (R%signature) (R'%signature))
+    (right associativity, at level 55) : signature_scope.
 
-  Notation " R ==> R' " := (@respectful _ _ (R%signatureT) (R'%signatureT))
-    (right associativity, at level 55) : signatureT_scope.
+  Notation " R ==> R' " := (@respectful _ _ (R%signature) (R'%signature))
+    (right associativity, at level 55) : signature_scope.
 
-  Notation " R --> R' " := (@respectful _ _ (flip (R%signatureT)) (R'%signatureT))
-    (right associativity, at level 55) : signatureT_scope.
+  Notation " R --> R' " := (@respectful _ _ (flip (R%signature)) (R'%signature))
+    (right associativity, at level 55) : signature_scope.
 
 End ProperNotations.
 
-Arguments Proper {A}%_type R%_signatureT m.
-Arguments respectful {A B}%_type (R R')%_signatureT _ _.
+Arguments Proper {A}%_type R%_signature m.
+Arguments respectful {A B}%_type (R R')%_signature _ _.
 
 Export ProperNotations.
 
-Local Open Scope signatureT_scope.
+Local Open Scope signature_scope.
 
 (** [solve_proper] try to solve the goal [Proper (?==> ... ==>?) f]
     by repeated introductions and setoid rewrites. It should work
@@ -134,7 +135,7 @@ Ltac f_equiv :=
     let Rx := fresh "R" in
     evar (Rx : relation T);
     let H := fresh in
-    assert (H : (Rx==>R)%signatureT f f');
+    assert (H : (Rx==>R)%signature f f');
     unfold Rx in *; clear Rx; [ f_equiv | apply H; clear H; try reflexivity ]
   | |- ?R ?f ?f' =>
     solve [change (Proper R f); eauto with typeclass_instances | reflexivity ]
@@ -211,8 +212,8 @@ Section Relations.
   Proof. reduce. firstorder. Qed.
 End Relations.
 Global Typeclasses Opaque respectful pointwise_relation all_relation.
-Arguments all_relation {A P}%_type sig%_signatureT _ _.
-Arguments pointwise_relation A%_type {B}%_type R%_signatureT _ _.
+Arguments all_relation {A P}%_type sig%_signature _ _.
+Arguments pointwise_relation A%_type {B}%_type R%_signature _ _.
 
 #[global]
 Hint Unfold Reflexive : core.
@@ -575,7 +576,7 @@ Section Normalize.
 End Normalize.
 
 Lemma flip_arrow `(NA : Normalizes A R (flip R'''), NB : Normalizes B R' (flip R'')) :
-  Normalizes (A -> B) (R ==> R') (flip (R''' ==> R'')%signatureT).
+  Normalizes (A -> B) (R ==> R') (flip (R''' ==> R'')%signature).
 Proof.
   unfold Normalizes in *. intros.
   eapply transitivity; [|eapply symmetry, flip_respectful].
@@ -648,7 +649,7 @@ Instance PartialOrder_proper_type `(PartialOrder A eqA R) :
     Proper (eqA==>eqA==>iff) R.
 Proof.
 intros.
-apply proper_sym_arrow_iffT_2. 1-2: typeclasses eauto.
+apply proper_sym_arrow_iff_2. 1-2: typeclasses eauto.
 intros x x' Hx y y' Hy Hr.
 apply transitivity with x.
 - apply H, symmetry, Hx.
