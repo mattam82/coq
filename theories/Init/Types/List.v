@@ -10,6 +10,7 @@
 
 Require Import PreludeOptions.
 Require Import Notations.
+Require Import Types.Nat.
 
 Inductive list@{s|u|} (A : Type@{s|u}) : Type@{s|u} :=
 | nil : list A
