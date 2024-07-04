@@ -32,11 +32,11 @@ Register cons as core.list.cons.
 Section ListPolyDefinitions.
   Sort s.
   Universe u.
+  Context {A : Type@{s|u}}.
 
-  Local Open Scope list_scope.
+  #[local] Open Scope list_scope.
 
-  Definition length (A : Type@{s|u}) : list A -> nat@{s|} :=
-    fix length l :=
+  Fixpoint length (l : list A) : nat@{s|} :=
     match l with
     | nil => O
     | _ :: l' => S (length l')
@@ -44,15 +44,73 @@ Section ListPolyDefinitions.
 
 (** Concatenation of two lists *)
 
-  Definition app (A : Type@{s|u}) : list A -> list A -> list A :=
-    fix app l m :=
-    match l with
-    | nil => m
-    | a :: l1 => a :: app l1 m
+  Fixpoint app (l1 l2 : list A) : list A :=
+    match l1 with
+    | nil => l2
+    | a :: l1' => a :: app l1' l2
     end.
 
-End ListPolyDefinitions.
+  Section Map.
+    Universe u'.
+    Context (B : Type@{s|u'})
+            (f : A -> B).
 
-Arguments app {A} l m.
+    Fixpoint map (l : list A) : list B :=
+      match l with
+        | nil => nil
+        | a :: t => (f a) :: (map t)
+      end.
+
+  End Map.
+
+  (** [seq] computes the sequence of [len] contiguous integers
+      that starts at [start]. For instance, [seq 2 3] is [2::3::4::nil]. *)
+
+  Fixpoint seq (start len : nat@{s|}) : list nat :=
+    match len with
+      | O => nil
+      | S len => start :: seq (S start) len
+    end.
+
+  Fixpoint repeat (x : A) (n: nat@{s|}) :=
+    match n with
+      | O => nil
+      | S k => x :: repeat x k
+    end.
+
+  (*****************************)
+  (** ** Nth element of a list *)
+  (*****************************)
+
+  Fixpoint nth (n : nat@{s|}) (l : list A) (default : A) {struct l} : A :=
+    match n, l with
+      | _, nil => default
+      | O, x :: l' => x
+      | S m, x :: t => nth m t default
+    end.
+
+  Fixpoint firstn (n : nat@{s|}) (l : list A) : list A :=
+    match n with
+      | O => nil
+      | S n => match l with
+                  | nil => nil
+                  | a :: l => a :: (firstn n l)
+                end
+    end.
+
+  Fixpoint skipn (n : nat@{s|}) (l : list A) : list A :=
+    match n with
+      | O => l
+      | S n => match l with
+                  | nil => nil
+                  | a :: l => skipn n l
+                end
+    end.
+
+  Inductive Forall (P : A -> Prop) : list A -> Prop :=
+  | Forall_nil : Forall P nil
+  | Forall_cons : forall x l, P x -> Forall P l -> Forall P (x :: l).
+
+End ListPolyDefinitions.
 
 Infix "++" := app (right associativity, at level 60) : list_scope.
