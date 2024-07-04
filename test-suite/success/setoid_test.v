@@ -1,5 +1,6 @@
 Require Import TestSuite.admit.
 Require Import Setoid.
+Import Morphisms.
 
 Parameter A : Set.
 
@@ -26,27 +27,28 @@ Qed.
 
 Add Setoid set same setoid_set as setsetoid.
 
-Add Morphism In with signature (eq ==> same ==> iff) as In_ext.
+Set Debug "backtrace".
+
+Instance In_ext : Proper (eq ==> same ==> iff) In.
 Proof.
   unfold same.
-  intros a s t H.
-  destruct (H a).
+  intros x y a s t H.
+  destruct a.
+  destruct (H x).
   tauto.
-  Show Proof.
-
 Qed.
 
 Lemma add_aux :
  forall s t : set,
  same s t -> forall a b : A, In a (Add b s) -> In a (Add b t).
-unfold same; simple induction 2; intros.
-rewrite H1.
+unfold same; destruct 2; intros.
+rewrite e.
 simpl; left; reflexivity.
 
 elim (H a).
 intros.
 simpl; right.
-apply (H2 H1).
+apply (fst i).
 Qed.
 
 Add Morphism Add with signature (eq ==> same ==> same) as Add_ext.
