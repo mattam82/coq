@@ -24,7 +24,6 @@ Section BoolSortPoly.
   Register true as core.bool.true.
   Register false as core.bool.false.
 
-
   Definition negb (a : bool) : bool :=
     match a with
       | true => false

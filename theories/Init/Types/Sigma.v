@@ -30,8 +30,6 @@ Inductive sigma@{s s' s''|u v| } (A:Type@{s|u}) (P:A -> Type@{s'|v}) :
 
 Arguments existP {_ _}.
 
-Scheme sigma_poly := Induction for sigma Sort Poly.
-
 Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)} := existR
   { fst : A ; snd : P fst }.
 
@@ -39,7 +37,7 @@ Arguments fst {_ _}.
 Arguments snd {_ _}.
 Arguments existR {_ _}.
 
-Scheme sigmaR_poly := Induction for sigma Sort Poly.
+Scheme sigmaR_elim := Induction for sigmaR Sort Poly.
 
 Definition prod@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := sigmaR A (fun _ => B).
 Notation "A * B" := (prod A B).
@@ -92,7 +90,7 @@ Notation "'exists' x .. y , p" := (ex (fun x => .. (ex (fun y => p)) ..))
 Definition sig@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Type@{s|u} := sigma@{s Prop s| u Set} A P.
  
 Notation exist := existP.
-Definition sig_rect@{u u'} := sigma_poly@{Type SProp Type | u Set u'}.
+Definition sig_rect@{u u'} := sigma_elim@{Type SProp Type | u Set u'}.
 
 Register sig as core.sig.type.
 
@@ -111,7 +109,7 @@ Notation existT := @existR.
 Register sigmaR as core.sigT.type.
 Register existR as core.sigT.intro.
 
-Definition sigT_rect@{| u u' u''|} := sigmaR_poly@{Type Type Type|u u' u''}.
+Definition sigT_rect@{| u u' u''|} := sigmaR_elim@{Type|u u' u''}.
 
 Register sigT_rect as core.sigT.rect.
 

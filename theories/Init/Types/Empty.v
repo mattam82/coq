@@ -16,8 +16,6 @@ Section EmptySortPoly.
 
   Inductive Empty : Type@{s|Set} :=.
 
-  Scheme Empty_poly := Induction for Empty Sort Poly.
-
   Definition not (A : Type@{s|Set}) := forall (_ : A), Empty.
 End EmptySortPoly.
 

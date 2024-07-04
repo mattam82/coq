@@ -14,11 +14,10 @@ Require Import Empty.
 
 Inductive eq@{s s'|l|} {A:Type@{s|l}} (x:A) : A -> Type@{s'|l} :=
     eq_refl : eq x x.
-
-Notation "x = y :> A" := (@eq A x y) : type_scope.
-
 Arguments eq {A} x _.
 Arguments eq_refl {A x} , [A] x.
+
+Notation "x = y :> A" := (@eq A x y) : type_scope.
 
 (* Specialization of equality to a single sort *)
 Definition eqdiag@{s|l|} {A : Type@{s|l}} := eq@{s s| l} (A:=A).
@@ -26,10 +25,7 @@ Definition eqdiag@{s|l|} {A : Type@{s|l}} := eq@{s s| l} (A:=A).
 Notation "x ≡ y" := (eqdiag x y) (at level 60) : type_scope.
 Notation "x ≡ y :> A" := (@eqdiag A x y) (at level 60) : type_scope.
 
-
-Scheme eq_poly := Induction for eq Sort Poly.
-
-Definition eq_ind@{s | u|} [A] [x] P := @eq_poly@{s Prop|u Set} A x (fun a _ => P a).
+Definition eq_ind@{s | u|} [A] [x] P := @eq_elim@{s Prop|u Set} A x (fun a _ => P a).
 
 Definition eq_singleton@{s s' | u v|} [A:Type@{s|u}] [x:A]
   (P : forall a : A, (eq@{s Prop|u} x a) -> Type@{s'|v}) :
@@ -86,13 +82,13 @@ Register eq as core.eq.type.
 Register eq_refl as core.eq.refl.
 Register eq_ind as core.eq.ind.
 Register eq_rect as core.eq.rect.
-Register eq_poly as core.eq.rect.
+Register eq_elim as core.eq.rect.
 Register eq_sym as core.eq.sym.
 Register eq_trans as core.eq.trans.
 Register congr as core.eq.congr.
 
 (* TODO: Register ! *)
-Definition eq_poly_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+Definition eq_elim_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, y = x :> A -> P y :=
   fun px y e =>
     match e in _ = x return P x -> P y with

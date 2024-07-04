@@ -16,7 +16,6 @@ Section UnitPoly.
   Inductive unit : Type@{s|Set} :=
       tt : unit.
 
-  Scheme unit_poly := Induction for unit Sort Poly.
 End UnitPoly.
 
 Register unit as core.unit.type.

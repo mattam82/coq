@@ -18,6 +18,4 @@ Inductive sum@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) : Type@{s''|max
 Arguments left {_}.
 Arguments right _ {_}.
 
-Scheme sum_poly := Induction for sum Sort Poly.
-
 Notation "{ A } + { B }" := (sum A B).

@@ -23,11 +23,11 @@ Section GroupoidLaws.
   Proof. reflexivity. Defined.
 
   Definition runit {x y : A} (e : x = y) : e @ rfl = e.
-  Proof. induction e using eq_poly ; reflexivity. Defined.
+  Proof. induction e using eq_elim ; reflexivity. Defined.
 
   Definition assoc {x y z w : A} (e1 : x = y) (e2 : y = z) (e3 : z = w) :
     e1 @ e2 @ e3 = (e1 @ e2) @ e3.
-  Proof. induction e1 using eq_poly; reflexivity. Defined.
+  Proof. induction e1 using eq_elim; reflexivity. Defined.
 
   Definition inv_refl {x : A} : eq_sym rfl = rfl :> (x = x).
   Proof. reflexivity. Defined.
@@ -35,12 +35,12 @@ Section GroupoidLaws.
   Definition inv_concat {x y z : A} (e : x = y) (e' : y = z) :
     eq_sym (e @ e') = eq_sym e' @ eq_sym e.
   Proof.
-    induction e using eq_poly; induction e' using eq_poly; reflexivity.
+    induction e using eq_elim; induction e' using eq_elim; reflexivity.
   Defined.
 
   Definition sym_sym {x y : A} (e : x = y) : eq_sym (eq_sym e) = e.
   Proof.
-    induction e using eq_poly; reflexivity.
+    induction e using eq_elim; reflexivity.
   Defined.
 
   Sort sb.
@@ -53,12 +53,12 @@ Section GroupoidLaws.
   Definition ap_concat {x y z : A} (e1 : x = y) (e2 : y = z) :
     ap f (e1 @ e2) = ap f e1 @ ap f e2.
   Proof.
-    induction e1 using eq_poly; reflexivity.
+    induction e1 using eq_elim; reflexivity.
   Defined.
 
   Definition ap_eq_sym {x y : A} (e : x = y) : ap f (eq_sym e) = eq_sym (ap f e).
   Proof.
-    induction e using eq_poly; reflexivity.
+    induction e using eq_elim; reflexivity.
   Defined.
 
 End GroupoidLaws.
