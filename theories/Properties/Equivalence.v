@@ -27,6 +27,7 @@ Import GroupoidNotations.
 Definition equiv_refl@{sa|a|} (A : Type@{sa|a}) : equiv A A :=
   {| map := id ; map_is_equiv := {| sect := id ; retr := id ; sect_eq := rfl ; retr_eq := rfl |} |}.
 
+
 Definition equiv_trans@{sa sb sc|a b c|} (A : Type@{sa|a}) (B : Type@{sb|b}) (C : Type@{sc|c}) (AB : equiv A B) (BC : equiv B C) : equiv A C.
 Proof.
   refine {| map := BC ∘ AB |}.
