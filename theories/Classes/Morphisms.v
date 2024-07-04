@@ -246,10 +246,6 @@ Hint Extern 5 (@Proper _ ?H _) => proper_subrelation : typeclass_instances.
 Instance iff_arrow_subrelation@{s | u |} : subrelation iff@{s|u u} arrow@{s s|u u} | 2.
 Proof. firstorder. Qed.
 
-#[global]
-Instance iff_flip_impl_subrelation@{s | u |} : subrelation iff@{s|u u} (flip arrow@{s s|u u}) | 2.
-Proof. firstorder. Qed.
-
 (** We use an extern hint to help unification. *)
 
 #[global]
@@ -289,7 +285,7 @@ Section GenericInstances.
   Qed.
 
 
-  (** Every Transitive relation gives rise to a binary morphism on [impl],
+  (** Every Transitive relation gives rise to a binary morphism on [arrow],
    contravariant in the first argument, covariant in the second. *)
 
   Global Program
@@ -306,7 +302,7 @@ Section GenericInstances.
   (** Proper declarations for partial applications. *)
 
   Global Program
-  Instance trans_contra_inv_impl_type_morphism
+  Instance trans_contra_inv_arrow_type_morphism
   `(Transitive A R) {x} : Proper (R --> flip arrow) (R x) | 3.
 
   Next Obligation.
@@ -316,7 +312,7 @@ Section GenericInstances.
   Qed.
 
   Global Program
-  Instance trans_co_impl_type_morphism
+  Instance trans_co_arrow_type_morphism
     `(Transitive A R) {x} : Proper (R ++> arrow) (R x) | 3.
 
   Next Obligation.
@@ -326,7 +322,7 @@ Section GenericInstances.
   Qed.
 
   Global Program
-  Instance trans_sym_co_inv_impl_type_morphism
+  Instance trans_sym_co_inv_arrow_type_morphism
     `(PER A R) {x} : Proper (R ++> flip arrow) (R x) | 3.
 
   Next Obligation.
@@ -627,30 +623,16 @@ intros x x' Hxx' y y' Hyy'. apply Hf; auto.
 Qed.
 
 (** When the relation on the domain is symmetric, a predicate is
-    compatible with [iff] as soon as it is compatible with [impl].
+    compatible with [iff] as soon as it is compatible with [arrow].
     Same with a binary relation. *)
 
-Lemma proper_sym_impl_iff : forall `(Symmetric A R)`(Proper _ (R==>impl) f),
+Lemma proper_sym_arrow_iff : forall `(Symmetric A R)`(Proper _ (R==>arrow) f),
 Proper (R==>iff) f.
 Proof.
 intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
 
-Lemma proper_sym_arrow_iffT : forall `(Symmetric A R)`(Proper _ (R==>arrow) f),
-Proper (R==>iff) f.
-Proof.
-intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
-Qed.
-
-Lemma proper_sym_impl_iff_2 :
-forall `(Symmetric A R)`(Symmetric B R')`(Proper _ (R==>R'==>impl) f),
-Proper (R==>R'==>iff) f.
-Proof.
-intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
-repeat red in Hf. split; eauto.
-Qed.
-
-Lemma proper_sym_arrow_iffT_2 :
+Lemma proper_sym_arrow_iff_2 :
 forall `(Symmetric A R)`(Symmetric B R')`(Proper _ (R==>R'==>arrow) f),
 Proper (R==>R'==>iff) f.
 Proof.
