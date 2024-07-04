@@ -87,17 +87,17 @@ Register eq_sym as core.eq.sym.
 Register eq_trans as core.eq.trans.
 Register congr as core.eq.congr.
 
-(* TODO: Register ! *)
 Definition eq_elim_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, y = x :> A -> P y :=
+  P x -> forall y:A, eq@{_ β | _} y x -> P y :=
   fun px y e =>
     match e in _ = x return P x -> P y with
     | eq_refl => fun py => py
     end px.
 
+Register eq_elim_r as core.eq.poly_r.
 
-Definition eq_rect_r@{α|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{v}) :
-  P x -> forall y:A, y = x -> P y :=
+Definition eq_rect_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{α Type|_} y x -> P y :=
   fun px y e =>
   match e in _ = x return P x -> P y with
   | eq_refl => fun py => py
@@ -105,16 +105,7 @@ Definition eq_rect_r@{α|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{v}) :
 
 Register eq_rect_r as core.eq.rect_r.
 
-Definition eq_rec_r@{α|u|} (A:Type@{α|u}) (x:A) (P:A -> Set) :
-  P x -> forall y:A, y = x -> P y :=
-  fun px y e =>
-  match e in _ = x return P x -> P y with
-  | eq_refl => fun py => py
-  end px.
-
-Register eq_rec_r as core.eq.rec_r.
-
-Definition eq_ind_r@{α|u|} (A:Type@{α|u}) (x:A) (P:A -> Prop) :
+Definition eq_ind_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, y = x -> P y :=
   fun px y e =>
     match e in _ = x return P x -> P y with
@@ -123,11 +114,39 @@ Definition eq_ind_r@{α|u|} (A:Type@{α|u}) (x:A) (P:A -> Prop) :
 
 Register eq_ind_r as core.eq.ind_r.
 
-Definition eq_sind_r@{α|u|} (A:Type@{α|u}) (x:A) (P:A -> SProp) :
+Definition eq_elim_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{_ β | _} x y -> P y :=
+  fun px y e =>
+    match e in _ = y return P x -> P y with
+    | eq_refl => fun px => px
+    end px.
+
+Register eq_elim_d as core.eq.poly.
+
+Definition eq_rect_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{α Type|_} x y -> P y :=
+  fun px y e =>
+  match e in _ = y return P x -> P y with
+  | eq_refl => fun py => py
+  end px.
+
+Register eq_rect_r as core.eq.rect.
+
+Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, y = x -> P y :=
+  fun px y e =>
+    match e in _ = x return P x -> P y with
+    | eq_refl => fun py => py
+    end px.
+
+Register eq_ind_d as core.eq.ind.
+
+
+(* Definition eq_sind_r@{α|u|} (A:Type@{α|u}) (x:A) (P:A -> SProp) :
   P x -> forall y:A, y = x -> P y :=
   fun px y e =>
   match e in _ = x return P x -> P y with
   | eq_refl => fun py => py
   end px.
 
-Register eq_sind_r as core.eq.sind_r.
+Register eq_sind_r as core.eq.sind_r. *)

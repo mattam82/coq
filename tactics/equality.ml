@@ -322,17 +322,18 @@ let jmeq_same_dom env sigma (rels, eq, args) =
     | _ -> false
 
 let eq_elimination_ref l2r sort =
+  let open Sorts.Quality in
   let name =
     if l2r then
       match sort with
-      | InProp -> "core.eq.ind_r"
-      | InSProp -> "core.eq.sind_r"
-      | InSet | InType | InQSort -> "core.eq.rect_r"
+      | QConstant QProp -> "core.eq.ind_r"
+      | QConstant QType -> "core.eq.rect_r"
+      | _ -> "core.eq.poly_r"
     else
       match sort with
-      | InProp -> "core.eq.ind"
-      | InSProp -> "core.eq.sind"
-      | InSet | InType | InQSort -> "core.eq.rect"
+      | QConstant QProp -> "core.eq.ind"
+      | QConstant QType -> "core.eq.rect"
+      | _ -> "core.eq.poly"
   in
   Rocqlib.lib_ref_opt name
 
@@ -356,10 +357,16 @@ let find_elim lft2rgt dep cls ((_, hdcncl, _) as t) =
     let c =
       match EConstr.kind sigma hdcncl with
       | Ind (ind_sp,u) ->
+        let dispatch l2r = 
+            let qs = fst (UVars.Instance.to_array (EInstance.kind sigma u)) in
+            if is_eq && Int.equal (Array.length qs) 2  
+            then eq_elimination_ref l2r qs.(1)
+            else None 
+        in
         begin match lft2rgt, cls with
         | Some true, None
         | Some false, Some _ ->
-          begin match if is_eq then eq_elimination_ref true sort else None with
+          begin match dispatch true with
           | Some r -> destConstRef r
           | None ->
             let c1 = destConstRef (lookup_eliminator env ind_sp sort) in
@@ -372,7 +379,7 @@ let find_elim lft2rgt dep cls ((_, hdcncl, _) as t) =
             c1'
           end
         | _ ->
-          begin match if is_eq then eq_elimination_ref false sort else None with
+          begin match dispatch false with
           | Some r -> destConstRef r
           | None -> destConstRef (lookup_eliminator env ind_sp sort)
           end

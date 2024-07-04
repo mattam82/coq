@@ -389,8 +389,8 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_
   let beta = Reductionops.clos_norm_flags RedFlags.beta env sigma in
   let sigma, new_rdx = map_redex env sigma ~before:rdx ~after:new_rdx in
   let sigma, elim =
-    let sort = Tacticals.elimination_sort_of_goal gl in
-    match Equality.eq_elimination_ref (dir = L2R) sort with
+    let _sort = Tacticals.elimination_sort_of_goal gl in
+    match Equality.eq_elimination_ref (dir = L2R) (* TODO FIXME *) Sorts.Quality.qtype with
     | Some r -> Evd.fresh_global env sigma r
     | None ->
       let ((kn, i) as ind, _) = Tacred.eval_to_quantified_ind env sigma c_ty in
