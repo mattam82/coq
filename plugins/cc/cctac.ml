@@ -429,7 +429,7 @@ let discriminate_tac cstru p =
 let cc_tactic depth additional_terms b =
   Proofview.Goal.enter begin fun gl ->
     let sigma = Tacmach.project gl in
-    Rocqlib.(check_required_library logic_module_name);
+    Rocqlib.(check_required_library (datatypes_module_name@["Equality"]));
     let _ = debug_congruence (fun () -> Pp.str "Reading goal ...") in
     let state = make_prb gl depth additional_terms b in
     let _ = debug_congruence (fun () -> Pp.str "Problem built, solving ...") in
