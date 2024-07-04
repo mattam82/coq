@@ -11,31 +11,29 @@ Inductive set : Set :=
 
 Fixpoint In (a : A) (s : set) {struct s} : Prop :=
   match s with
-  | Empty => False
-  | Add b s' => a = b \/ In a s'
+  | Empty => Empty.Empty
+  | Add b s' => {a = b} + {In a s'}
   end.
 
 Definition same (s t : set) : Prop := forall a : A, iff (In a s) (In a t).
 
 Lemma setoid_set : Setoid_Theory set same.
-
-unfold same; split ; red.
-red; auto.
-
-red.
-intros.
-elim (H a); auto.
-
-intros.
-elim (H a); elim (H0 a).
-split; auto.
+unfold same; split; red.
+- tauto.
+- intros. destruct (H a); split; auto.
+- intros. destruct (H a); destruct (H0 a); split; auto.
 Qed.
 
 Add Setoid set same setoid_set as setsetoid.
 
 Add Morphism In with signature (eq ==> same ==> iff) as In_ext.
 Proof.
-unfold same; intros a s t H; elim (H a); auto.
+  unfold same.
+  intros a s t H.
+  destruct (H a).
+  tauto.
+  Show Proof.
+
 Qed.
 
 Lemma add_aux :
