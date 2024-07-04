@@ -201,7 +201,7 @@ Global Arguments transitivity {A R Transitive x} y {z}.
 
 (** Default rewrite relations handled by [setoid_rewrite]. *)
 #[global]
-Instance rr_impl@{s|u|} : RewriteRelation impl@{s s|u u}.
+Instance rr_impl@{s|u|} : RewriteRelation arrow@{s s|u u}.
 Defined.
 
 
@@ -278,7 +278,7 @@ Tactic Notation "apply" "*" constr(t) :=
     refine (t _ _ _ _ _) | refine (t _ _ _ _ _ _) | refine (t _ _ _ _ _ _ _) ].
 
 Ltac simpl_relation :=
-  unfold flip, impl, arrow ; try reduce ; program_simpl ;
+  unfold flip, arrow ; try reduce ; program_simpl ;
     try ( solve [ dintuition auto with relations ]).
 
 Local Obligation Tactic := simpl_relation.
@@ -286,9 +286,9 @@ Local Obligation Tactic := simpl_relation.
 (** Logical implication. *)
 
 #[global]
-Program Instance impl_Reflexive@{s|u|} : Reflexive impl@{s s|u u}.
+Program Instance impl_Reflexive@{s|u|} : Reflexive arrow@{s s|u u}.
 #[global]
-Program Instance impl_Transitive@{s|u|} : Transitive impl@{s s|u u}.
+Program Instance impl_Transitive@{s|u|} : Transitive arrow@{s s|u u}.
 
 (** Logical equivalence. *)
 
@@ -332,8 +332,8 @@ Section Binary.
     fun x y => prod (R x y) (R' x y).
 
   Definition relation_disjunction (R : relation@{s s'|u v} A) (R' : relation@{s s'|u v} A) : relation A :=
-    fun x y => sum (R x y) (R' x y).
 
+    fun x y => sum (R x y) (R' x y).
   (** Relation equivalence is an equivalence, and subrelation defines a partial order. *)
 
   Global Instance relation_equivalence_equivalence :

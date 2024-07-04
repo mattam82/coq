@@ -425,6 +425,7 @@ Section GenericInstances.
     Proper@{s s' | b rb} R' (m x).
   Proof. simpl_relation. Qed.
 
+  #[projections(primitive=no)]
   Class Params {A} (of : A) (arity : nat) := {}.
 
   Lemma flip_respectful {A B} (R : relation A) (R' : relation B) :
@@ -467,6 +468,7 @@ End GenericInstances.
 
 Set Printing Universes.
 
+#[projections(primitive=no)]
 Class PartialApplication.
 
 CoInductive normalization_done : Prop := did_normalization.

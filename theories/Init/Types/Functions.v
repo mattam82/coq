@@ -18,8 +18,7 @@ Definition arrow@{s s'|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) := A -> B.
 Register arrow as core.arrow.
 Register arrow as core.impl.
 
-(* FIXME not allowed? Notation impl := arrow@{Prop Prop|Set Set}. *)
-Notation impl := arrow (only parsing).
+Notation impl := arrow@{Prop Prop|_ _}.
 
 Definition compose@{s s' s''|u v w|}
   {A : Type@{s|u}} {B : Type@{s'|v}} {C : Type@{s''|w}}

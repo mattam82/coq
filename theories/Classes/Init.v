@@ -19,7 +19,7 @@
 
 Require Import Coq.Program.Basics.
 
-Global Typeclasses Opaque id const flip compose arrow impl iff not all.
+Global Typeclasses Opaque id const flip compose arrow iff not all.
 
 (** Apply using the same opacity information as typeclass proof search. *)
 
