@@ -18,14 +18,12 @@ Fixpoint In (a : A) (s : set) {struct s} : Prop :=
 
 Definition same (s t : set) : Prop := forall a : A, iff (In a s) (In a t).
 
-Lemma setoid_set : Equivalence@{Type Prop|_ _} same.
+Instance setoid_set : Equivalence@{Type Prop|_ _} same.
 unfold same; split; red.
 - tauto.
 - intros. destruct (H a); split; auto.
 - intros. destruct (H a); destruct (H0 a); split; auto.
 Qed.
-
-Add Setoid set same setoid_set as setsetoid.
 
 Instance In_ext : Proper (eq ==> same ==> iff) In.
 Proof.
@@ -49,20 +47,11 @@ simpl; right.
 apply (fst i).
 Qed.
 
-Print Instances Proper.
-
-About Morphisms.trans_sym_co_inv_arrow_type_morphism.
-
-Instance Add_ext : Proper (eq ==> same ==> same) Add.
+Instance Add_ext : Proper@{Type Prop|_ _} (eq ==> same ==> same) Add.
 intros x ? <- a b r.
 split; apply add_aux.
 assumption.
-assert (T : Proper@{_ Prop|_ _} (same ==> flip arrow) (same b)).
-apply Morphisms.trans_sym_co_inv_arrow_type_morphism.
-typeclasses eauto.
-rewrite (T a b).
-- reflexivity.
-- assumption.
+rewrite r. reflexivity.
 Qed.
 
 Fixpoint remove (a : A) (s : set) {struct s} : set :=
