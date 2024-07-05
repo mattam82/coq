@@ -18,7 +18,7 @@ Fixpoint In (a : A) (s : set) {struct s} : Prop :=
 
 Definition same (s t : set) : Prop := forall a : A, iff (In a s) (In a t).
 
-Lemma setoid_set : Setoid_Theory set same.
+Lemma setoid_set : Equivalence@{Type Prop|_ _} same.
 unfold same; split; red.
 - tauto.
 - intros. destruct (H a); split; auto.
@@ -26,8 +26,6 @@ unfold same; split; red.
 Qed.
 
 Add Setoid set same setoid_set as setsetoid.
-
-Set Debug "backtrace".
 
 Instance In_ext : Proper (eq ==> same ==> iff) In.
 Proof.
@@ -51,11 +49,20 @@ simpl; right.
 apply (fst i).
 Qed.
 
-Add Morphism Add with signature (eq ==> same ==> same) as Add_ext.
+Print Instances Proper.
+
+About Morphisms.trans_sym_co_inv_arrow_type_morphism.
+
+Instance Add_ext : Proper (eq ==> same ==> same) Add.
+intros x ? <- a b r.
 split; apply add_aux.
 assumption.
-rewrite H.
-reflexivity.
+assert (T : Proper@{_ Prop|_ _} (same ==> flip arrow) (same b)).
+apply Morphisms.trans_sym_co_inv_arrow_type_morphism.
+typeclasses eauto.
+rewrite (T a b).
+- reflexivity.
+- assumption.
 Qed.
 
 Fixpoint remove (a : A) (s : set) {struct s} : set :=
@@ -63,15 +70,18 @@ Fixpoint remove (a : A) (s : set) {struct s} : set :=
   | Empty => Empty
   | Add b t =>
       match eq_dec a b with
-      | left _ => remove a t
-      | right _ => Add b (remove a t)
+      | left _ _ => remove a t
+      | right _ _ => Add b (remove a t)
       end
   end.
 
 Lemma in_rem_not : forall (a : A) (s : set), ~ In a (remove a (Add a Empty)).
 
 intros.
-setoid_replace (remove a (Add a Empty)) with Empty.
+let Heq := fresh "Heq" in
+    cut(default_relation (remove a (Add a Empty)) Empty); unfold default_relation. intro Heq. setoid_rewrite Heq.
+
+setoid_rewrite (default_relation (remove a (Add a Empty))).
 
 auto.
 

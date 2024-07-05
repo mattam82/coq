@@ -355,8 +355,6 @@ Section GenericInstances.
       apply symmetry...
   Qed.
 
-  Set Debug "univMinim".
-
   Lemma symmetric_equiv_flip@{} (HS : Symmetric R) :
     relation_equivalence R (flip (C:=Type@{sra | _}) R).
   Proof. red. unfold flip. intros x y; split; apply symmetry. Qed.
