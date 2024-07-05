@@ -90,6 +90,7 @@ Instance Acc_pt_morphism {A:Type}(E R : A->A->Prop)
  `(Equivalence _ E) `(Proper _ (E==>E==>iff) R) :
  Proper (E==>iff) (Acc R).
 Proof.
+  Set Printing Universes.
   apply proper_sym_arrow_iff.
   - auto with relations.
   - intros x y EQ WF. apply Acc_intro; intros z Hz. assert (R z x). specialize (H0 z z (reflexivity _) _ _ EQ). destruct H0. eauto.
@@ -119,5 +120,9 @@ Instance well_founded_morphism {A : Type} :
  Proper@{Type Prop|_ _} (relation_equivalence ==> iff) (@well_founded A).
 Proof.
  unfold well_founded. intros x y r.
- constructor; intros H a. rewrite <- r. hnf. solve_proper.
+ constructor; intros H a.
+ symmetry in r.
+ Set Typeclasses Debug. rewrite r.
+ apply (@Acc_rel_morphism A _ _ r a _ eq_refl), H.
+ apply (@Acc_rel_morphism A _ _ r a _ eq_refl), H.
 Qed.

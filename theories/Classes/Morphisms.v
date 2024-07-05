@@ -643,10 +643,13 @@ Qed.
     compatible with [iff] as soon as it is compatible with [arrow].
     Same with a binary relation. *)
 
-Lemma proper_sym_arrow_iff : forall `(Symmetric A R)`(Proper _ (R==>arrow) f),
-Proper (R==>iff) f.
+Lemma proper_sym_arrow_iff@{sa sra sf|a ra f|}
+   {A : Type@{sa|a}} {R : relation@{sa sra|a ra} A}
+   {f : A -> Type@{sf|f}} :
+   (Symmetric R) -> (Proper (R==>arrow) f) ->
+  Proper (R==>iff) f.
 Proof.
-intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
+intros Sym Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
 
 Lemma proper_sym_arrow_iff_2@{sa sra sb srb sf|a ra b rb f|} :
