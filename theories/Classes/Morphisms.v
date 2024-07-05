@@ -67,8 +67,8 @@ Section Proper.
 
   (** The non-dependent version is an instance where we forget dependencies. *)
   Sort s'' s'''.
-  Universe w x.
-  Definition respectful {B} (R : relation@{s s'|u v} A) (R' : relation@{s'' s'''|w x} B)
+  Universe b rb.
+  Definition respectful {B : Type@{s'' | b}} (R : relation@{s s'|u v} A) (R' : relation@{s'' s'''|b rb} B)
     : relation@{s'' s'''|_ _} (A -> B) :=
     fun f g => forall x y, R x y -> R' (f x) (g y).
 End Proper.
@@ -255,36 +255,9 @@ Hint Extern 4 (subrelation (@all_relation ?A ?B ?R) (@all_relation _ _ ?S)) =>
 
 Section GenericInstances.
   (* Share universes *)
-  Implicit Types A B C : Type.
-
-  (** We can build a PER on the Coq function space if we have PERs on the domain and
-   codomain. *)
-
-  Program Instance respectful_per `(PER A R, PER B R') : PER (R ==> R').
-
-  Next Obligation.
-  Proof with auto.
-    intros A R H B R' H0 x y z X X0 x0 y0 X1.
-    assert(R x0 x0).
-    - eapply transitivity with y0... apply symmetry. exact X1.
-    - eapply transitivity with (y x0)...
-  Qed.
-
-  Unset Strict Universe Declaration.
-
-  (** The complement of a relation conserves its proper elements. *)
-
-  (** The [flip] too, actually the [flip] instance is a bit more general. *)
-  Program Definition flip_proper
-          `(mor : Proper (A -> B -> C) (RA ==> RB ==> RC) f) :
-    Proper (RB ==> RA ==> RC) (flip f) := _.
-
-  Next Obligation.
-  Proof.
-    intros A B C RA RB RC f mor x y X x0 y0 X0.
-    apply mor ; auto.
-  Qed.
-
+  Sort sa sra.
+  Universe a ra.
+  Context (A : Type@{sa | a}) (R : relation@{sa sra | a ra} A).
 
   (** Every Transitive relation gives rise to a binary morphism on [arrow],
    contravariant in the first argument, covariant in the second. *)
@@ -295,7 +268,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x y X x0 y0 X0 X1.
+    intros H x y X x0 y0 X0 X1.
     apply transitivity with x...
     apply transitivity with x0...
   Qed.
@@ -308,7 +281,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x x0 y X X0.
+    intros H x x0 y X X0.
     apply transitivity with y...
   Qed.
 
@@ -318,7 +291,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x x0 y X X0.
+    intros H x x0 y X X0.
     apply transitivity with x0...
   Qed.
 
@@ -328,7 +301,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x x0 y X X0.
+    intros H x x0 y X X0.
     apply transitivity with y... apply symmetry...
   Qed.
 
@@ -337,7 +310,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x x0 y X X0.
+    intros H x x0 y X X0.
     apply transitivity with x0... apply symmetry...
   Qed.
 
@@ -346,7 +319,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x x0 y X.
+    intros H x x0 y X.
     split.
     - intros ; apply transitivity with x0...
     - intros.
@@ -362,7 +335,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x y X y0 y1 e X0; destruct e.
+    intros H x y X y0 y1 e X0; destruct e.
     apply transitivity with y...
   Qed.
 
@@ -373,7 +346,7 @@ Section GenericInstances.
 
   Next Obligation.
   Proof with auto.
-    intros A R H x y X x0 y0 X0.
+    intros H x y X x0 y0 X0.
     split ; intros.
     - apply transitivity with x0...
       apply transitivity with x... apply symmetry...
@@ -382,32 +355,74 @@ Section GenericInstances.
       apply symmetry...
   Qed.
 
-  Lemma symmetric_equiv_flip@{s s' | u v|} {A : Type@{s | u}} (R : relation@{s s'| u v} A) (HS : Symmetric R) : relation_equivalence R (flip R).
+  Set Debug "univMinim".
+
+  Lemma symmetric_equiv_flip@{} (HS : Symmetric R) :
+    relation_equivalence R (flip (C:=Type@{sra | _}) R).
   Proof. red. unfold flip. intros x y; split; apply symmetry. Qed.
 
-  Global Program Instance compose_proper A B C RA RB RC :
-    Proper ((RB ==> RC) ==> (RA ==> RB) ==> (RA ==> RC)) (@compose A B C).
+  (** We can build a PER on the Coq function space if we have PERs on the domain and
+   codomain. *)
+
+  Program Instance respectful_per@{sb srb | b rb |} (pera : PER R) {B} {R' : relation@{sb srb | b rb} B}
+   (perb : PER R') : PER (R ==> R').
+
+  Next Obligation.
+  Proof with auto.
+    intros pera B R' perb x y z X X0 x0 y0 X1.
+    assert(R x0 x0).
+    - eapply transitivity with y0... apply symmetry. exact X1.
+    - eapply transitivity with (y x0)...
+  Qed.
+
+ Unset Strict Universe Declaration.
+
+ (** The complement of a relation conserves its proper elements. *)
+
+ (** The [flip] too, actually the [flip] instance is a bit more general. *)
+ Program Definition flip_proper@{sb srb sc src | b rb c rc |}
+  {B} {RB : relation@{sb srb | b rb} B}
+  {C} {RC : relation@{sc src | c rc} C}
+  (f : A -> B -> C)
+  (mor : Proper (R ==> RB ==> RC) f) :
+   Proper (RB ==> R ==> RC) (flip f) := _.
+
+ Next Obligation.
+ Proof.
+   intros B RB C RC f mor x y X x0 y0 X0.
+   apply mor ; auto.
+ Qed.
+
+
+
+  Global Program Instance compose_proper@{sb srb sc src | b rb c rc |}
+  {B} {RB : relation@{sb srb | b rb} B}
+  {C} {RC : relation@{sc src | c rc} C} :
+  Proper ((RB ==> RC) ==> ((R ==> RB) ==> (R ==> RC))) (@compose A B C).
 
   Next Obligation.
   Proof.
     simpl_relation.
-    unfold compose. firstorder.
+    unfold compose. apply X, X0, X1.
   Qed.
 
   (** Coq functions are morphisms for Leibniz equality,
      applied only if really needed. *)
 
-  Global Instance reflexive_eq_dom_reflexive `(Reflexive B R') {A} :
-    Reflexive (@eq A ==> R').
+  Global Instance reflexive_eq_dom_reflexive@{sb srb | b rb |}
+    {B} {RB : relation@{sb srb | b rb} B}
+    (hr : Reflexive RB) :
+    Reflexive (@eq A ==> RB).
   Proof. simpl_relation. Qed.
 
 
     (** [respectful] is a morphism for relation equivalence . *)
-  Global Instance respectful_morphism {A B} :
-    Proper (relation_equivalence ++> relation_equivalence ++> relation_equivalence)
+  Global Instance respectful_morphism@{sb srb | b rb |} {B : Type@{sb | b}} :
+    Proper (relation_equivalence@{sa sra | a ra} ++>
+            relation_equivalence@{sb srb | b rb} ++> relation_equivalence)
            (@respectful A B).
   Proof.
-    intros R R' HRR' S S' HSS' f g.
+    intros R0 R0' HRR' S S' HSS' f g.
     unfold respectful , relation_equivalence in *; simpl in *.
     split ; intros H x y Hxy.
     - apply (fst (HSS' _ _)), H, (snd (HRR' _ _)), Hxy.
@@ -416,17 +431,20 @@ Section GenericInstances.
 
   (** [R] is Reflexive, hence we can build the needed proof. *)
 
-  Lemma Reflexive_partial_app_morphism@{s s' | a b ra rb |} {A : Type@{s|a}} {B : Type@{s|b}}
-    {R : relation@{s s' | a ra} A} {R' : relation@{s s' | b rb} B} {m : A -> B}
-    (pm : Proper (R ==> R') m) {x} (pr : ProperProxy R x) :
-    Proper@{s s' | b rb} R' (m x).
+  Lemma Reflexive_partial_app_morphism@{sb srb | b rb |}
+    {B} {RB : relation@{sb srb | b rb} B}
+    {m : A -> B}
+    (pm : Proper (R ==> RB) m) {x} (pr : ProperProxy R x) :
+    Proper@{sb srb | b rb} RB (m x).
   Proof. simpl_relation. Qed.
 
   #[projections(primitive=no)]
   Class Params {A} (of : A) (arity : nat) := {}.
 
-  Lemma flip_respectful {A B} (R : relation A) (R' : relation B) :
-    relation_equivalence (flip (R ==> R')) (flip R ==> flip R').
+  Lemma flip_respectful@{sb srb | b rb| ?}
+    {B} {RB : relation@{sb srb | b rb} B} :
+    relation_equivalence@{sb srb | max(a,b) max(a, ra, rb)}
+    (flip (C:=Type@{srb | max(a, ra, rb)}) (R ==> RB)) (flip (C:=Type@{sra | ra}) R ==> flip (C:=Type@{srb | rb}) RB).
   Proof.
     intros.
     unfold flip, respectful.
@@ -437,15 +455,15 @@ Section GenericInstances.
   (** Treating flip: can't make them direct instances as we
    need at least a [flip] present in the goal. *)
 
-  Lemma flip1 `(subrelation A R' R) : subrelation (flip (flip R')) R.
+  Lemma flip1 `(subrelation A R' R) : subrelation (flip (C:=Type@{sra | ra}) (flip (C:=Type@{sra | ra}) R')) R.
   Proof. firstorder. Qed.
 
-  Lemma flip2 `(subrelation A R R') : subrelation R (flip (flip R')).
+  Lemma flip2 `(subrelation A R R') : subrelation R (flip (C:=Type@{sra | ra}) (flip (C:=Type@{sra | ra}) R')).
   Proof. firstorder. Qed.
 
   (** That's if and only if *)
 
-  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq A) R.
+  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq@{sa sra | a} A) R.
   Proof. simpl_relation. Qed.
 
   (** Once we have normalized, we will apply this instance to simplify the problem. *)
@@ -458,10 +476,10 @@ Section GenericInstances.
   Lemma reflexive_proper `{Reflexive A R} (x : A) : Proper R x.
   Proof. firstorder. Qed.
 
-  Lemma proper_eq {A} (x : A) : Proper (@eq A) x.
-  Proof. intros. apply reflexive_proper. Qed.
-
 End GenericInstances.
+
+Lemma proper_eq@{s | a |} {A : Type@{s | a}} (x : A) : Proper (@eq A) x.
+Proof. intros. apply reflexive_proper. apply eq_Reflexive. Qed.
 
 Set Printing Universes.
 
