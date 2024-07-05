@@ -154,7 +154,7 @@ Section Relations.
     fun f g => forall a, sig a (f a) (g a).
 
   (** Non-dependent pointwise lifting *)
-  Definition pointwise_relation@{s'|b|} {B : Type@{s|a}} (R : relation@{s s'|a b} B) : relation (A -> B) :=
+  Definition pointwise_relation@{sb srb|b rb|} {B : Type@{sb|b}} (R : relation@{sb srb|b rb} B) : relation (A -> B) :=
     fun f g => forall a, R (f a) (g a).
 
   Lemma pointwise_pointwise@{s'|b|} {B : Type@{s|a}} (R : relation@{s s'|a b} B) :
@@ -649,8 +649,8 @@ Proof.
 intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
 
-Lemma proper_sym_arrow_iff_2 :
-forall `(Symmetric A R)`(Symmetric B R')`(Proper _ (R==>R'==>arrow) f),
+Lemma proper_sym_arrow_iff_2@{sa sra sb srb sf|a ra b rb f|} :
+forall {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sa sra|a ra} A} {R' : relation@{sb srb|b rb} B} {f : A -> B -> Type@{sf|f}}, (Symmetric R) -> (Symmetric R') -> (Proper (R==>R'==>arrow) f) ->
 Proper (R==>R'==>iff) f.
 Proof.
 intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
@@ -735,7 +735,7 @@ Hint Extern 4 (PartialOrder _ (relation_disjunction _ _)) =>
 
 (* Register bindings for the generalized rewriting tactic *)
 
-Register all_relation as rewrite.type.all_relation.
+Register all_relation as rewrite.type.forall_relation.
 Register pointwise_relation as rewrite.type.pointwise_relation.
 Register respectful as rewrite.type.respectful.
 Register all as rewrite.type.forall_def.

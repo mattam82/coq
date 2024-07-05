@@ -25,7 +25,7 @@ unfold same; split; red.
 - intros. destruct (H a); destruct (H0 a); split; auto.
 Qed.
 
-Instance In_ext : Proper (eq ==> same ==> iff) In.
+Instance In_ext : Proper@{Type Prop|_ _} (eq ==> same ==> iff) In.
 Proof.
   unfold same.
   intros x y a s t H.
@@ -64,11 +64,12 @@ Fixpoint remove (a : A) (s : set) {struct s} : set :=
       end
   end.
 
-Lemma in_rem_not : forall (a : A) (s : set), ~ In a (remove a (Add a Empty)).
+Lemma in_rem_not : forall (a : A) (s : set), not@{Prop|} (In a (remove a (Add a Empty))).
 
 intros.
 let Heq := fresh "Heq" in
-    cut(default_relation (remove a (Add a Empty)) Empty); unfold default_relation. intro Heq. setoid_rewrite Heq.
+    cut(default_relation (remove a (Add a Empty)) Empty); unfold default_relation. intro Heq.
+setoid_rewrite Heq.
 
 setoid_rewrite (default_relation (remove a (Add a Empty))).
 

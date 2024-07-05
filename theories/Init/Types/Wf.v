@@ -19,7 +19,6 @@ Require Import Notations.
 (** Well-founded induction principle on [Prop] *)
 
 Section Well_founded.
-
  Variable A : Type.
  Variable R : A -> A -> Prop.
 
@@ -44,3 +43,5 @@ Section Well_founded.
 
  (** Well-founded induction on [Set] and [Prop] *)
 End Well_founded.
+
+Arguments Acc {A}.
