@@ -133,20 +133,29 @@ Definition eq_rect_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 Register eq_rect_r as core.eq.rect.
 
 Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, y = x -> P y :=
+  P x -> forall y:A, x = y -> P y :=
   fun px y e =>
-    match e in _ = x return P x -> P y with
+    match e in _ = y return P x -> P y with
     | eq_refl => fun py => py
     end px.
 
 Register eq_ind_d as core.eq.ind.
 
 
-(* Definition eq_sind_r@{α|u|} (A:Type@{α|u}) (x:A) (P:A -> SProp) :
-  P x -> forall y:A, y = x -> P y :=
-  fun px y e =>
-  match e in _ = x return P x -> P y with
-  | eq_refl => fun py => py
-  end px.
+Definition f_equal@{s s' e|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) {x y} : eq@{_ e| _} x y -> eq@{_ e| _} (f x) (f y) :=
+  fun e => match e with | eq_refl => eq_refl end.
 
-Register eq_sind_r as core.eq.sind_r. *)
+Register f_equal as core.eq.congr.
+
+Definition f_equal2@{s1 s2 s' e|u1 u2 v|}
+  {A1 : Type@{s1|u1}}
+  {A2 : Type@{s2|u2}}
+  {B : Type@{s'|v}}
+  (f:A1 -> A2 -> B)
+  {x1 y1:A1} {x2 y2:A2} :
+  eq@{_ e|_} x1 y1 ->
+  eq@{_ e|_} x2 y2 ->
+  eq@{_ e|_} (f x1 x2) (f y1 y2) :=
+  fun e1 => match e1 with | eq_refl => fun e2 => match e2 with | eq_refl => eq_refl end end.
+
+Register f_equal2 as core.eq.congr2.

@@ -314,6 +314,7 @@ type tpattern = {
   up_t : EConstr.t;                      (* equation proof term or matched term *)
   up_dir : ssrdir;                    (* direction of the rule *)
   up_ok : EConstr.t -> evar_map -> bool; (* progress test for rewrite *)
+  up_q : Sorts.Quality.t ;               (* Sort of the equality when the pattern corresponds to the lhs of a rewrite *)
   }
 
 type tpatterns = {
@@ -384,7 +385,7 @@ let evars_for_FO ~hack ~rigid env (ise0:evar_map) c0 =
 
 (* Compile a match pattern from a term; t is the term to fill. *)
 (* p_origin can be passed to obtain a better error message     *)
-let mk_tpattern ?p_origin ?(hack=false) ?(ok = all_ok) ~rigid env t dir p { tpat_sigma = ise; tpat_pats = pats } =
+let mk_tpattern ?p_origin ?(hack=false) ?(ok = all_ok)  ?(up_q=Sorts.Quality.qprop) ~rigid env t dir p { tpat_sigma = ise; tpat_pats = pats } =
   let open EConstr in
   let k, f, a =
     let f, a = Reductionops.whd_betaiota_stack env ise p in
@@ -408,7 +409,7 @@ let mk_tpattern ?p_origin ?(hack=false) ?(ok = all_ok) ~rigid env t dir p { tpat
     | _ -> KpatRigid, f, a in
   let aa = Array.of_list a in
   let p' = evars_for_FO ~hack ~rigid env ise (mkApp (f, aa)) in
-  let pat = { up_k = k; up_FO = p'; up_f = f; up_a = aa; up_ok = ok; up_dir = dir; up_t = t} in
+  let pat = { up_k = k; up_FO = p'; up_f = f; up_a = aa; up_ok = ok; up_dir = dir; up_t = t ; up_q} in
   { tpat_sigma = ise; tpat_pats = pats @ [pat] }
 
 (* Specialize a pattern after a successful match: assign a precise head *)
@@ -661,7 +662,7 @@ type find_P =
   k:subst ->
      EConstr.t
 type conclude = unit ->
-  EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t)
+  EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * Sorts.Quality.t
 
 let rec uniquize = function
   | [] -> []
@@ -831,7 +832,7 @@ let conclude_tpattern ~raise_NoMatch ~upat_that_matched ~upats_origin ~upats { m
     | Some (env,_,x) -> env,List.hd x | None when raise_NoMatch -> raise NoMatch
     | None -> CErrors.anomaly (str"companion function never called.") in
   let p' = EConstr.mkApp (pf, pa) in
-  if max_occ <= !nocc then p', u.up_dir, (c, sigma, uc, u.up_t)
+  if max_occ <= !nocc then p', u.up_dir, (c, sigma, uc, u.up_t), u.up_q
   else ssrfail env sigma upats_origin upats (SsrOccMissing (!nocc, max_occ, p'))
 
 (* upats_origin makes a better error message only            *)
@@ -1227,7 +1228,7 @@ let eval_pattern ?raise_NoMatch env0 sigma0 concl0 pattern occ (do_subst : subst
     let rp = mk_upat_for ~rigid (ise, rp) in
     let find_T, end_T = mk_tpattern_matcher ?raise_NoMatch sigma0 occ rp in
     let concl = find_T env0 concl0 1 ~k:do_subst in
-    let _, _, (_, _, us, _) = end_T () in
+    let _, _, (_, _, us, _), _ = end_T () in
     concl, us
   | Some { pat_sigma = sigma; pat_pat = (X_In_T (hole, p) | In_X_In_T (hole, p)) } ->
     let p = fs sigma p in
@@ -1244,7 +1245,7 @@ let eval_pattern ?raise_NoMatch env0 sigma0 concl0 pattern occ (do_subst : subst
       let sigma, e_body = pop_evar p_sigma ex p in
       fs p_sigma (find_X env (fs sigma p) h
         ~k:(fun env _ -> do_subst env e_body))) in
-    let _ = end_X () in let _, _, (_, _, us, _) = end_T () in
+    let _ = end_X () in let _, _, (_, _, us, _), _ = end_T () in
     concl, us
   | Some { pat_sigma = sigma; pat_pat = E_In_X_In_T (e, hole, p) } ->
     let p, e = fs sigma p, fs sigma e in
@@ -1261,7 +1262,7 @@ let eval_pattern ?raise_NoMatch env0 sigma0 concl0 pattern occ (do_subst : subst
       let sigma, e_body = pop_evar p_sigma ex p in
       fs p_sigma (find_X env (fs sigma p) h ~k:(fun env c _ h ->
         find_E env e_body h ~k:do_subst))) in
-    let _, _, (_, _, us, _) = end_E () in
+    let _, _, (_, _, us, _), _ = end_E () in
     let _ = end_X () in let _ = end_T () in
     concl, us
   | Some { pat_sigma = sigma; pat_pat = E_As_X_In_T (e, hole, p) } ->
@@ -1282,7 +1283,7 @@ let eval_pattern ?raise_NoMatch env0 sigma0 concl0 pattern occ (do_subst : subst
         let e_sigma = unify_HO env sigma e_body e in
         let e_body = fs e_sigma e in
         do_subst env e_body e_body h))) in
-    let _ = end_X () in let _, _ , (_, _, us, _) = end_TE () in
+    let _ = end_X () in let _, _ , (_, _, us, _), _ = end_TE () in
     concl, us
 
 let redex_of_pattern { pat_sigma = sigma; pat_pat = p } = match p with
@@ -1330,7 +1331,7 @@ let pf_fill_occ env concl occ sigma0 p (sigma, t) h =
  let u = mk_tpattern ~rigid env t L2R p (empty_tpatterns (create_evar_defs sigma)) in
  let find_U, end_U = mk_tpattern_matcher ~raise_NoMatch:true sigma0 occ u in
  let concl = find_U env concl h ~k:(fun _ _ _ n -> EConstr.mkRel n) in
- let rdx, _, (c, sigma, uc, p) = end_U () in
+ let rdx, _, (c, sigma, uc, p), _ = end_U () in
  c, sigma, uc, p, concl, rdx
 
 let fill_occ_term env sigma0 cl occ (sigma, t) =

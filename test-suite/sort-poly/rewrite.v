@@ -1,5 +1,3 @@
-From Coq.Properties Require Import GroupoidLaws.
-
 Definition foo1@{s| |} (A B :Type@{s|Set}) (e : eq@{Type s|_} A B) : A -> B.
 Proof.
   rewrite e; trivial.

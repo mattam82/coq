@@ -8,14 +8,24 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
-Require Export Types.Option.
+Require Import PreludeOptions.
+Require Import Notations.
+
+(** [option A] is the extension of [A] with an extra element [None] *)
+
+Inductive option@{s s'|u|} (A:Type@{s|u}) : Type@{s'|u} :=
+  | Some : A -> option A
+  | None : option A.
+
+Arguments Some {A} a.
+Arguments None {A}.
+
+Register option as core.option.type.
+Register Some as core.option.Some.
+Register None as core.option.None.
+
+Definition option_map@{s s'|u v|} {A : Type@{s|u}} {B:Type@{s|v}} (f:A->B) (o : option@{_ s'|_} A) : option@{_ s'|_} B :=
+  match o with
+    | Some a => @Some B (f a)
+    | None => @None B
+  end.

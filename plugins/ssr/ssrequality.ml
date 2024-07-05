@@ -380,7 +380,7 @@ let id_map_redex _ sigma ~before:_ ~after = sigma, after
     ⊢ c : c_ty
     ⊢ c_ty ≡ EQN rdx_ty rdx new_rdx
 *)
-let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_rdx dir (sigma, c) c_ty =
+let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_rdx dir (sigma, c) c_ty q =
   let open Tacmach in
   let open Tacticals in
   Proofview.Goal.enter begin fun gl ->
@@ -390,7 +390,7 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_
   let sigma, new_rdx = map_redex env sigma ~before:rdx ~after:new_rdx in
   let sigma, elim =
     let _sort = Tacticals.elimination_sort_of_goal gl in
-    match Equality.eq_elimination_ref (dir = L2R) (* TODO FIXME *) Sorts.Quality.qtype with
+    match Equality.eq_elimination_ref (dir = L2R) q with
     | Some r -> Evd.fresh_global env sigma r
     | None ->
       let ((kn, i) as ind, _) = Tacred.eval_to_quantified_ind env sigma c_ty in
@@ -468,7 +468,7 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_
 let pf_merge_uc_of s sigma =
   Evd.merge_universe_context sigma (Evd.ustate s)
 
-let rwcltac ?under ?map_redex cl rdx dir (sigma, r) =
+let rwcltac ?under ?map_redex cl rdx dir (sigma, r) q =
   let open Proofview.Notations in
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
@@ -490,7 +490,7 @@ let rwcltac ?under ?map_redex cl rdx dir (sigma, r) =
       match kind_of_type sigma (Reductionops.whd_all env sigma c_ty) with
       | AtomicType(e, a) when Ssrcommon.is_ind_ref env sigma e c_eq ->
           let new_rdx = if dir = L2R then a.(2) else a.(1) in
-          pirrel_rewrite ?under ?map_redex cl rdx a.(0) new_rdx dir (sigma, r) c_ty, Tacticals.tclIDTAC, sigma0
+          pirrel_rewrite ?under ?map_redex cl rdx a.(0) new_rdx dir (sigma, r) c_ty q, Tacticals.tclIDTAC, sigma0
       | _ ->
           let cl' = EConstr.mkApp (EConstr.mkNamedLambda sigma (make_annot pattern_id ERelevance.relevant) rdxt cl, [|rdx|]) in
           let sigma, _ = Typing.type_of env sigma cl' in
@@ -598,6 +598,10 @@ let rwprocess_rule env dir rule =
          loop d sigma pL a.(0) rs2 0
       | App (r_eq, a) when Hipattern.match_with_equality_type env sigma t != None ->
         let (ind, u) = EConstr.destInd sigma r_eq and rhs = Array.last a in
+        let q = 
+            let qs = fst (UVars.Instance.to_array (EConstr.EInstance.kind sigma u)) in
+            if Int.equal (Array.length qs) 2 then qs.(1) else Sorts.Quality.qtype 
+        in
         let np = Inductiveops.inductive_nparamdecls env ind in
         let indu = (ind, u) in
         let ind_ct = Inductiveops.type_of_constructors env indu in
@@ -608,7 +612,7 @@ let rwprocess_rule env dir rule =
           let lhs, rhs = if d = L2R then lhs, rhs else rhs, lhs in
 (* msgnl (str "RW: " ++ pr_rwdir d ++ str " " ++ pr_constr_pat r ++ str " : "
             ++ pr_constr_pat lhs ++ str " ~> " ++ pr_constr_pat rhs); *)
-          d, r, lhs, rhs
+          d, r, lhs, rhs, q
 (*
           let l_i, r_i = if d = L2R then i, 1 - ndep else 1 - ndep, i in
           let lhs = a.(np - l_i) and rhs = a.(np - r_i) in
@@ -620,14 +624,14 @@ let rwprocess_rule env dir rule =
           let lhs = EConstr.Vars.substl (array_list_of_tl (Array.sub a 0 np)) lhs0 in
           let lhs, rhs = if d = R2L then lhs, rhs else rhs, lhs in
           let d' = if Array.length a = 1 then d else converse_dir d in
-          d', r, lhs, rhs in
+          d', r, lhs, rhs, q in
         sigma, rdesc :: rs
       | App (s_eq, a) when is_setoid sigma s_eq a ->
         let np = Array.length a and i = 3 - dir_org d in
         let lhs = a.(np - i) and rhs = a.(np + i - 3) in
         let a' = Array.copy a in let _ = a'.(np - i) <- EConstr.mkVar pattern_id in
         let r' = EConstr.mkCast (r, DEFAULTcast, EConstr.mkApp (s_eq, a')) in
-        sigma, (d, r', lhs, rhs) :: rs
+        sigma, (d, r', lhs, rhs, Sorts.Quality.qprop) :: rs
       | _ ->
         if red = 0 then loop d sigma r t rs 1
         else errorstrm Pp.(str "not a rewritable relation: " ++ pr_econstr_pat env sigma t
@@ -650,11 +654,11 @@ let rwrxtac ?under ?map_redex occ rdx_pat dir rule =
         errorstrm Pp.(str "pattern " ++ pr_econstr_pat env sigma0 rdx ++
                    str " does not match " ++ pr_dir_side dir ++
                    str " of " ++ pr_econstr_pat env sigma0 (snd rule))
-      | (d, r, lhs, rhs) :: rs ->
+      | (d, r, lhs, rhs, q) :: rs ->
         try
           let ise = unify_HO env (Evd.create_evar_defs r_sigma) lhs rdx in
           if not (rw_progress rhs rdx ise) then raise NoMatch else
-          d, (ise, Evd.ustate ise, Reductionops.nf_evar ise r)
+          d, (ise, Evd.evar_universe_context ise, Reductionops.nf_evar ise r), q
         with e when CErrors.noncritical e -> rwtac rs in
      rwtac rules in
   let env0 = env in
@@ -663,7 +667,7 @@ let rwrxtac ?under ?map_redex occ rdx_pat dir rule =
   let find_R, conclude = match classify_pattern rdx_pat with
   | None ->
       let upats_origin = dir, (snd rule) in
-      let rpat pats (d, r, lhs, rhs) =
+      let rpat pats (d, r, lhs, rhs, q) =
         let r = Reductionops.nf_evar r_sigma r in
         let lhs = Reductionops.nf_evar r_sigma lhs in
         mk_tpattern ~ok:(rw_progress rhs) ~rigid env0 r d lhs pats
@@ -671,17 +675,17 @@ let rwrxtac ?under ?map_redex occ rdx_pat dir rule =
       let rpats = List.fold_left rpat (empty_tpatterns r_sigma) rules in
       let find_R, end_R = mk_tpattern_matcher sigma0 occ ~upats_origin rpats in
       (fun e c _ i -> find_R ~k:(fun _ _ _ h -> EConstr.mkRel h) e c i),
-      fun cl -> let rdx,d,r = end_R () in closed0_check env0 sigma0 cl rdx; (d,r),rdx
+      fun cl -> let rdx,d,r,q = end_R () in closed0_check env0 sigma0 cl rdx; (q,d,r),rdx
   | Some (_, e) ->
       let r = ref None in
       (fun env c _ h -> do_once r (fun () -> find_rule c, c); EConstr.mkRel h),
       (fun concl -> closed0_check env0 sigma0 concl e;
-        let (d,(ev,ctx,c)) , x = assert_done r in (d,(true, ev,ctx, Reductionops.nf_evar ev c)) , x) in
+        let (d,(ev,ctx,c), q) , x = assert_done r in (q, d,(true, ev,ctx, Reductionops.nf_evar ev c)) , x) in
   let concl0 = Reductionops.nf_evar sigma0 concl0 in
   let concl = eval_pattern env0 sigma0 concl0 rdx_pat occ find_R in
-  let (d, (_, sigma, uc, t)), rdx = conclude concl in
+  let (q, d, (_, sigma, uc, t)), rdx = conclude concl in
   let r = Evd.merge_universe_context sigma uc, t in
-  rwcltac ?under ?map_redex concl rdx d r
+  rwcltac ?under ?map_redex concl rdx d r q
   end
 
 let ssrinstancesofrule ist dir arg =
@@ -694,7 +698,7 @@ let ssrinstancesofrule ist dir arg =
   let r_sigma, rules = rwprocess_rule env0 dir rule in
   let find, conclude =
     let upats_origin = dir, (snd rule) in
-    let rpat pats (d, r, lhs, rhs) =
+    let rpat pats (d, r, lhs, rhs, q) =
       let r = Reductionops.nf_evar r_sigma r in
       let lhs = Reductionops.nf_evar r_sigma lhs in
       mk_tpattern ~ok:(rw_progress rhs) ~rigid env0 r d lhs pats

@@ -8,8 +8,6 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** Basic specifications : sets that may contain logical information *)
-
 Require Import PreludeOptions.
 Require Import Notations.
 
@@ -30,18 +28,10 @@ Inductive sigma@{s s' s''|u v| } (A:Type@{s|u}) (P:A -> Type@{s'|v}) :
 
 Arguments existP {_ _}.
 
-Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)} := existR
-  { fst : A ; snd : P fst }.
+(* Register ? *)
+Definition projT1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ s|_ _} A P) : A := match p with existP a _ => a end.
 
-Arguments fst {_ _}.
-Arguments snd {_ _}.
-Arguments existR {_ _}.
-
-Scheme sigmaR_elim := Induction for sigmaR Sort Poly.
-
-Definition prod@{s|u v|} (A : Type@{s|u}) (B : Type@{s|v}) := sigmaR A (fun _ => B).
-Notation "A * B" := (prod A B).
-Notation "A /\ B" := (prod A B).
+Definition projT2@{s|u v|} {A:Type@{s|u}} {P:A -> Type@{s|v}} (p : sigma@{_ _ s|_ _} A P) : P (projT1 p) := match p with existP _ b => b end.
 
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma A P.
 
@@ -50,7 +40,7 @@ Notation "'ex_intro'" := (existP@{_ Prop Prop| _ Set}) (at level 50).
 Register ex as core.ex.type.
 Register existP as core.ex.intro.
 
-Section Projections.
+Section ProjectionsProp.
 
   Context {A:Prop} {P:A->Prop}.
 
@@ -63,7 +53,7 @@ Section Projections.
   Register ex_proj1 as core.ex.proj1.
   Register ex_proj2 as core.ex.proj2.
 
-End Projections.
+End ProjectionsProp.
 
 Notation "'Σ' x .. y , B" := (sigma _ (fun x => .. (sigma _ (fun y => B)) ..))
   (at level 200, x binder, right associativity,
@@ -95,8 +85,47 @@ Definition sig_rect@{u u'} := sigma_elim@{Type SProp Type | u Set u'}.
 Register sig as core.sig.type.
 
 Register sig_rect as core.sig.rect.
-Notation proj1_sig := fst.
-Notation proj2_sig := snd.
+Notation proj1_sig := projT1.
+Notation proj2_sig := projT2.
+
+
+Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)} := existR
+  { fst : A ; snd : P fst }.
+
+Arguments fst {_ _}.
+Arguments snd {_ _}.
+Arguments existR {_ _}.
+
+Scheme sigmaR_elim := Induction for sigmaR Sort Poly.
+
+(** [prod A B], written [A * B], is the product of [A] and [B];
+    the pair [pair A B a b] of [a] and [b] is abbreviated [(a,b)] *)
+
+Section Prod.
+  Sort s.
+  Universe u v.
+  Context {A : Type@{s|u}} {B : Type@{s|v}}.
+  Definition prod := sigmaR A (fun _ => B).
+  Definition pair (a : A) (b : B) : prod := {| fst := a ; snd := b |}.
+  Definition prod_rect@{o} (P : prod -> Type@{s|o}) (h : forall a b, P (pair a b)) : forall p, P p := fun p => h p.(fst) p.(snd).
+End Prod.
+
+Arguments prod : clear implicits.
+Notation "A * B" := (prod A B).
+Notation "A /\ B" := (prod A B).
+Notation proj1 := fst.
+Notation proj2 := snd.
+
+Register prod as core.prod.type.
+Register pair as core.prod.intro.
+Register prod_rect as core.prod.rect.
+
+Register fst as core.prod.proj1.
+Register snd as core.prod.proj2.
+
+#[global]
+Hint Resolve pair : core.
+
 
 
 
@@ -127,12 +156,12 @@ Arguments sigmaR (A P)%_type.
 Notation "{ x | P }" := (sig (fun x => P)) : type_scope.
 Notation "{ x : A | P }" := (sig (A:=A) (fun x => P)) : type_scope.
 Notation "{ x & P }" := (sigT (fun x => P)) : type_scope.
-Notation "{ x : A & P }" := (@sigT A (fun x => P)) : type_scope.
+Notation "{ x : A & P }" := (@sigmaR A (fun x => P)) : type_scope.
 
 Notation "{ ' pat | P }" := (sig (fun pat => P)) : type_scope.
 Notation "{ ' pat : A | P }" := (sig (A:=A) (fun pat => P)) : type_scope.
 Notation "{ ' pat & P }" := (sigT (fun pat => P)) : type_scope.
-Notation "{ ' pat : A & P }" := (@sigT A (fun pat => P)) : type_scope.
+Notation "{ ' pat : A & P }" := (@sigmaR A (fun pat => P)) : type_scope.
 
 Add Printing Let sigma.
 
