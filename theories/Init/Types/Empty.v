@@ -16,7 +16,7 @@ Section EmptySortPoly.
 
   Inductive Empty : Type@{s|Set} :=.
 
-  Definition not (A : Type@{s|Set}) := forall (_ : A), Empty.
+  Definition not@{u} (A : Type@{s|u}) := forall (_ : A), Empty.
 End EmptySortPoly.
 
 Definition False_rect@{s|u|} (P : Empty@{Prop|} -> Type@{s|u}) u : P u := match u with end.
