@@ -198,14 +198,14 @@ Lemma decide_left : forall (C:Prop) (decide:{C}+{~C}),
 Proof.
   intros C decide H P H0; destruct decide.
   - apply H0.
-  - contradiction.
+  - destruct (n H).
 Qed.
 
 Lemma decide_right : forall (C:Prop) (decide:{C}+{~C}),
   ~C -> forall P:{C}+{~C}->Prop, (forall H:~C, P (right _ H)) -> P decide.
 Proof.
   intros C decide H P H0; destruct decide.
-  - contradiction.
+  - destruct (H c).
   - apply H0.
 Qed.
 

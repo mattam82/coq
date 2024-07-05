@@ -11,6 +11,8 @@
 Require Import PreludeOptions.
 Require Import Notations.
 
+(* Set Cumulative Prop. *)
+
 (** [ex P], or simply [exists x, P x], or also [exists x:A, P x],
     expresses the existence of an [x] of some type [A] in [Set] which
     satisfies the predicate [P].  This is existential quantification.
@@ -33,7 +35,7 @@ Definition projT1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ 
 
 Definition projT2@{s|u v|} {A:Type@{s|u}} {P:A -> Type@{s|v}} (p : sigma@{_ _ s|_ _} A P) : P (projT1 p) := match p with existP _ b => b end.
 
-Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma A P.
+Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{s Prop Prop|u Set} A P.
 
 Notation "'ex_intro'" := (existP@{_ Prop Prop| _ Set}) (at level 50).
 
