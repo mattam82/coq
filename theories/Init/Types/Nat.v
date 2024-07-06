@@ -32,6 +32,15 @@ Section NatSortPoly.
 
 End NatSortPoly.
 
+Definition nat_rect@{s | u|} : forall P : nat@{Type|} -> Type@{s | u},
+P O -> (forall n : nat@{Type|}, P n -> P (S n)) -> forall n : nat@{Type|}, P n :=
+fun P f f0 =>
+fix F (n : nat) : P n :=
+  match n as n0 return (P n0) with
+  | O => f
+  | S n0 => f0 n0 (F n0)
+  end.
+
 Declare Scope hex_nat_scope.
 Delimit Scope hex_nat_scope with xnat.
 

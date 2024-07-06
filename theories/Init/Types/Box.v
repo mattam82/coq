@@ -8,15 +8,16 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Box.
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
-Require Export Types.Option.
+Require Import PreludeOptions.
+Require Import Notations.
+
+Section BoxSortPoly.
+
+  Sort s s'.
+
+  Universe u.
+
+  Inductive Box (A:Type@{s|u}) : Type@{s'|u} :=
+    box : A -> Box A.
+
+End BoxSortPoly.

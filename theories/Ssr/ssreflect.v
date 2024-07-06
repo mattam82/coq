@@ -396,7 +396,7 @@ Lemma lock A x : x = locked x :> A. Proof. unlock; reflexivity. Qed.
 Lemma not_locked_false_eq_true : locked false <> true.
 Proof.
   unlock; intros e.
-  apply (eq_ind_d _ false (fun b => if b then Empty@{Type|} else unit) tt _ e).
+  apply (eq_ind_d _ false (fun b => if b then Empty@{Prop|} else unit) tt _ e).
 Qed.
 
 (**  The basic closing tactic "done".  **)
@@ -481,7 +481,7 @@ Lemma nary_congruence (n : nat@{Type|}) (k := fun B e => forall y : B, (e y y : 
   nary_congruence_statement n k.
 Proof.
 have: k _ _ := _; rewrite {1}/k.
-elim/nat_elim: n k  => [|n IHn] k k_P /= A; first exact: k_P.
+elim/nat_rect: n k  => [|n IHn] k k_P /= A; first exact: k_P.
 by apply: IHn => B e He; apply: k_P => f x1 x2 <-.
 Qed.
 
@@ -630,7 +630,7 @@ Definition maybeProp (T : Type) := tt.
 Definition call T := Call (maybeProp T) false T.
 
 Structure test_of (result : bool) := Test {condition :> unit}.
-Definition test_Prop (P : Prop) := Test true (maybeProp P).
+Definition test_Prop (P : Prop) := Test true (maybeProp (Box P)).
 Definition test_negative := Test false tt.
 
 Structure type :=
