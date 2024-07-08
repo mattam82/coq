@@ -35,6 +35,11 @@ Definition projT1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ 
 
 Definition projT2@{s|u v|} {A:Type@{s|u}} {P:A -> Type@{s|v}} (p : sigma@{_ _ s|_ _} A P) : P (projT1 p) := match p with existP _ b => b end.
 
+Definition π1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ Type|_ _} A P) : A :=
+  match p return A with existP a _ => a end.
+
+Definition π2@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ Type|_ _} A P) : P (π1 p) := match p with existP _ b => b end.
+
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{s Prop Prop|u Set} A P.
 
 Notation "'ex_intro'" := (existP@{_ Prop Prop| _ Set}) (at level 50).
