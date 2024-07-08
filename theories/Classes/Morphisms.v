@@ -57,16 +57,13 @@ Section Proper.
   Class ReflexiveProxy (R : relation@{s s'|u v} A) :=
     reflexive_proxy : forall x, R x x.
 
-  Lemma eq_proper_proxy (x : A) : ProperProxy (@eq@{s s'|u v} A) x.
-  Proof. firstorder. Qed.
-
   (** Every reflexive relation gives rise to a morphism.
     If the relation is not determined (is an evar),
     then we restrict the solutions to predefined ones (equality, or iff on Prop),
     using ground instances. If the relation is determined then
     [ReflexiveProxy] calls back to [Reflexive]. *)
 
-  Lemma reflexive_proper `{ReflexiveProxy R} (x : A) : Proper R x.
+  Lemma reflexive_proper `{ReflexiveProxy@{} R} (x : A) : Proper R x.
   Proof. firstorder. Qed.
 
   Lemma reflexive_proper_proxy `(ReflexiveProxy R) (x : A) : ProperProxy R x.
@@ -78,6 +75,14 @@ Section Proper.
   Lemma reflexive_reflexive_proxy `(Reflexive A R) : ReflexiveProxy R.
   Proof. firstorder. Qed.
 End Proper.
+
+Section Proper2.
+  Sort s s'.
+  Universe u.
+  Context {A : Type@{s|u}}.
+  Lemma eq_proper_proxy (x : A) : ProperProxy (@eq@{s s'|u} A) x.
+  Proof. firstorder. Qed.
+End Proper2.
 
 
 (** Respectful morphisms. *)
@@ -98,8 +103,8 @@ Definition respectful@{sa sb sra srb|a b ra rb|} {A : Type@{sa|a}} {B : Type@{sb
   : relation@{sb srb|_ _} (A -> B) :=
   fun f g => forall x y, R x y -> R' (f x) (g y).
 
-Lemma rewrite_relation_eq_dom@{sa sb sr se|a b r e|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R}:
-  RewriteRelation@{sb sr|max(a,b) max(a,r,e)} (respectful (@eq@{sa se|a e} A) R).
+Lemma rewrite_relation_eq_dom@{sa sb sr se|a b r|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R}:
+  RewriteRelation@{sb sr|max(a,b) max(a,r)} (respectful (@eq@{sa se|a} A) R).
 Proof. split. Qed.
 
 (** Pointwise reflexive *)
@@ -116,7 +121,7 @@ Ltac rewrite_relation_fun :=
 Global Hint Extern 2 (@RewriteRelation (_ -> _) _) =>
   rewrite_relation_fun : typeclass_instances.
 
-Lemma eq_rewrite_relation@{sa se|a e|} {A : Type@{sa|a}} : RewriteRelation (@eq@{sa se|a e} A).
+Lemma eq_rewrite_relation@{sa se|a|} {A : Type@{sa|a}} : RewriteRelation (@eq@{sa se|a} A).
 Proof. split. Qed.
 
 Ltac eq_rewrite_relation A :=
@@ -232,9 +237,9 @@ Section Relations.
              (sig : forall a, relation@{s sr|a r} (P a)) : relation@{s sr|a max(a,r)} (forall x, P x) :=
     fun f g => forall a, sig a (f a) (g a).
 
-  Lemma pointwise_pointwise@{s' sb|r b e|e <= max(a,r)} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
-    relation_equivalence@{sb s'|max(a,b) max(a,e,r)} (pointwise_relation@{_ _ _|a b r} R)
-    (respectful@{_ _ _ _|a b e r} (@eq@{_ s'|a e} A) R).
+  Lemma pointwise_pointwise@{s' sb|r b|} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
+    relation_equivalence@{sb s'|max(a,b) max(a,r)} (pointwise_relation@{_ _ _|a b r} R)
+    (respectful@{_ _ _ _|a b a r} (@eq@{_ s'|a} A) R).
   Proof.
     intros. split.
     - intros X a b []. apply X.
@@ -243,7 +248,7 @@ Section Relations.
 
   Lemma pointwise_pointwise_prop@{s' sb|r b|} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
     relation_equivalence@{sb s'|max(a,b) max(a,r)} (pointwise_relation@{_ _ _|a b r} R)
-    (respectful@{_ _ _ _|a b Set r} (@eq@{_ Prop|a Set} A) R).
+    (respectful@{_ _ _ _|a b Set r} (@eq@{_ Prop|a} A) R).
   Proof.
     intros. split.
     - intros X a b []. apply X.
@@ -419,8 +424,8 @@ Section GenericInstances.
   (** Every Transitive relation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
 
   Global Program
-  Instance trans_co_eq_inv_arrow_morphism@{|e|}
-  (_ : Transitive R) : Proper (R ==> (@eq@{sa sra|a e} A) ==> flip (C := Type@{sra|ra}) arrow) R | 2.
+  Instance trans_co_eq_inv_arrow_morphism@{| |}
+  (_ : Transitive R) : Proper (R ==> (@eq@{sa sra|a} A) ==> flip (C := Type@{sra|ra}) arrow) R | 2.
 
   Next Obligation.
   Proof with auto.
@@ -543,7 +548,7 @@ Section GenericInstances.
 
   (** That's if and only if *)
 
-  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq@{sa sra | a ra} A) R.
+  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq@{sa sra | a} A) R.
   Proof. simpl_relation. Qed.
 
   (** Once we have normalized, we will apply this instance to simplify the problem. *)
@@ -556,10 +561,10 @@ End GenericInstances.
 Global Instance reflexive_eq_dom_reflexive@{sa sb sr | a b r |}
   {A : Type@{sa|a}} {B : Type@{sb|b}} {RB : relation@{sb sr | b r} B}
   (hr : Reflexive RB) :
-  Reflexive (@eq@{_ sr|a r} A ==> RB).
+  Reflexive (@eq@{_ sr|a} A ==> RB).
 Proof. simpl_relation. Qed.
 
-Lemma proper_eq@{s | a l |} {A : Type@{s | a}} (x : A) : Proper (@eq@{_ _|a l} A) x.
+Lemma proper_eq@{s | a |} {A : Type@{s | a}} (x : A) : Proper (@eq@{_ _|a} A) x.
 Proof. intros. apply reflexive_proper. Qed.
 
 #[projections(primitive=no)]

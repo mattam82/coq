@@ -28,7 +28,7 @@ unfold same; split; red.
 - intros. destruct (H a); destruct (H0 a); split; auto.
 Qed.
 
-Instance In_ext : Proper@{Type Prop|Set+1 Set} (eq@{Type Prop|_ Set} ==> same ==> iff@{Prop | Set Set}) In.
+Instance In_ext : Proper@{Type Prop|Set+1 Set} (eq@{Type Prop|_} ==> same ==> iff@{Prop | Set Set}) In.
 Proof.
   unfold same.
   intros x y a s t H.

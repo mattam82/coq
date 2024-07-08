@@ -14,10 +14,10 @@ Import GroupoidNotations.
 
 Section GroupoidLaws.
   Sort sa se.
-  Universe a l.
+  Universe a.
   Context {A : Type@{sa|a}}.
   #[warnings="-notation-overridden"]
-  Local Notation "x = y" := (eq@{_ se|_ l} x y) : type_scope.
+  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
 
   Definition lunit {x y : A} (e : x = y) : rfl @ e = e.
   Proof. reflexivity. Defined.

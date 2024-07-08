@@ -12,7 +12,7 @@ Require Import PreludeOptions.
 Require Import Notations.
 Require Import Empty.
 
-Inductive eq@{s s'|l l'|} {A:Type@{s|l}} (x:A) : A -> Type@{s'|l'} :=
+Inductive eq@{s s'|l|} {A:Type@{s|l}} (x:A) : A -> Type@{s'|l} :=
     eq_refl : eq x x.
 Arguments eq {A} x _.
 Arguments eq_refl {A x} , [A] x.
@@ -20,15 +20,15 @@ Arguments eq_refl {A x} , [A] x.
 Notation "x = y :> A" := (@eq A x y) : type_scope.
 
 (* Specialization of equality to a single sort *)
-Definition eqdiag@{s|l|} {A : Type@{s|l}} := eq@{s s| l l} (A:=A).
+Definition eqdiag@{s|l|} {A : Type@{s|l}} := eq@{s s| l} (A:=A).
 
 Notation "x ≡ y" := (eqdiag x y) (at level 60) : type_scope.
 Notation "x ≡ y :> A" := (@eqdiag A x y) (at level 60) : type_scope.
 
-Definition eq_ind@{s | u v|} [A] [x] P := @eq_elim@{s Prop|u v Set} A x (fun a _ => P a).
+Definition eq_ind@{s | u|} [A] [x] P := @eq_elim@{s Prop|u Set} A x (fun a _ => P a).
 
 Definition eq_singleton@{s s' | u v|} [A:Type@{s|u}] [x:A]
-  (P : forall a : A, (eq@{s Prop|u Set} x a) -> Type@{s'|v}) :
+  (P : forall a : A, (eq@{s Prop|u} x a) -> Type@{s'|v}) :
   P x (eq_refl x) -> forall [a : A] (e : x = a :> A), P a e :=
   fun t _ e => match e with eq_refl => t end.
 
@@ -49,7 +49,7 @@ Arguments eq_sind [A] x P _ y _ : rename.
 Arguments eq_rec [A] x P _ y _ : rename.
 Arguments eq_rect [A] x P _ y _ : rename.
 
-Notation "x = y" := (eq@{_ Prop|_ Set} x y) : type_scope.
+Notation "x = y" := (eq@{_ Prop|_} x y) : type_scope.
 Notation "x <> y  :> T" := (~ x = y :>T) : type_scope.
 Notation "x <> y" := (~ (x = y)) : type_scope.
 
@@ -58,10 +58,10 @@ Hint Resolve eq_refl: core.
 
 Section GroupoidOperations.
   Sort sa se.
-  Universe a l.
+  Universe a.
   Context {A : Type@{sa|a}}.
   #[warnings="-notation-overridden"]
-  Local Notation "x = y" := (eq@{_ se|_ l} x y) : type_scope.
+  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
 
   Definition eq_sym {x y : A} (e : x = y) : y = x :=
     match e with | eq_refl _ => eq_refl _ end.
@@ -69,7 +69,7 @@ Section GroupoidOperations.
   Definition eq_trans {x y z : A} (e1 : x = y) : y = z -> x = z :=
     match e1 with | eq_refl _ => fun x => x end.
 
-  Definition tr@{b|} {B : Type@{sa|b}} (e : @eq@{_ sa|max(a+1,b+1) l} Type@{sa|max(a,b)} A B) : A -> B :=
+  Definition tr@{b|} {B : Type@{sa|b}} (e : @eq@{_ sa|max(a+1,b+1)} Type@{sa|max(a,b)} A B) : A -> B :=
     match e in @eq _ _ B return A -> B with | eq_refl _ => fun x => x end.
 
   Definition ap@{sb|b|} {B : Type@{sb|b}} (f : A -> B) {x y : A} (e : x = y) : f x = f y :=
@@ -87,8 +87,8 @@ Register eq_sym as core.eq.sym.
 Register eq_trans as core.eq.trans.
 Register congr as core.eq.congr.
 
-Definition eq_elim_r@{α β|u v l|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{_ β | _ l} y x -> P y :=
+Definition eq_elim_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{_ β | _} y x -> P y :=
   fun px y e =>
     match e in _ = x return P x -> P y with
     | eq_refl => fun py => py
@@ -96,8 +96,8 @@ Definition eq_elim_r@{α β|u v l|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 
 Register eq_elim_r as core.eq.poly_r.
 
-Definition eq_rect_r@{α β|u v l|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{α Type|_ l} y x -> P y :=
+Definition eq_rect_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{α Type|_} y x -> P y :=
   fun px y e =>
   match e in _ = x return P x -> P y with
   | eq_refl => fun py => py
@@ -114,8 +114,8 @@ Definition eq_ind_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 
 Register eq_ind_r as core.eq.ind_r.
 
-Definition eq_elim_d@{α β|u v l|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{_ β |_ l} x y -> P y :=
+Definition eq_elim_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{_ β |_} x y -> P y :=
   fun px y e =>
     match e in _ = y return P x -> P y with
     | eq_refl => fun px => px
@@ -123,8 +123,8 @@ Definition eq_elim_d@{α β|u v l|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 
 Register eq_elim_d as core.eq.poly.
 
-Definition eq_rect_d@{α β|u v l|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{α Type|_ l} x y -> P y :=
+Definition eq_rect_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, eq@{α Type|_} x y -> P y :=
   fun px y e =>
   match e in _ = y return P x -> P y with
   | eq_refl => fun py => py
@@ -142,20 +142,20 @@ Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 Register eq_ind_d as core.eq.ind.
 
 
-Definition f_equal@{s s' e|u v l l'|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) {x y} : eq@{_ e| _ l} x y -> eq@{_ e| _ l'} (f x) (f y) :=
+Definition f_equal@{s s' e|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) {x y} : eq@{_ e| _} x y -> eq@{_ e| _} (f x) (f y) :=
   fun e => match e with | eq_refl => eq_refl end.
 
 Register f_equal as core.eq.congr.
 
-Definition f_equal2@{s1 s2 s' e|u1 u2 v l l' l''|}
+Definition f_equal2@{s1 s2 s' e|u1 u2 v|}
   {A1 : Type@{s1|u1}}
   {A2 : Type@{s2|u2}}
   {B : Type@{s'|v}}
   (f:A1 -> A2 -> B)
   {x1 y1:A1} {x2 y2:A2} :
-  eq@{_ e|_ l} x1 y1 ->
-  eq@{_ e|_ l'} x2 y2 ->
-  eq@{_ e|_ l''} (f x1 x2) (f y1 y2) :=
+  eq@{_ e|_} x1 y1 ->
+  eq@{_ e|_} x2 y2 ->
+  eq@{_ e|_} (f x1 x2) (f y1 y2) :=
   fun e1 => match e1 with | eq_refl => fun e2 => match e2 with | eq_refl => eq_refl end end.
 
 Register f_equal2 as core.eq.congr2.
