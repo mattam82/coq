@@ -18,5 +18,7 @@ Section UnitPoly.
 
 End UnitPoly.
 
+Notation True := unit@{Prop|}.
+
 Register unit as core.unit.type.
 Register tt as core.unit.tt.

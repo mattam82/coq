@@ -24,3 +24,4 @@ Definition False_rect@{s|u|} (P : Empty@{Prop|} -> Type@{s|u}) u : P u := match 
 Notation "~ x" := (not x).
 
 Register not as core.not.type.
+Register Empty as core.False.type.
