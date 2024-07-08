@@ -43,6 +43,9 @@ Program Instance and_impl_morphism@{s|?|} :
 #[global]
 Program Instance and_iff_morphism@{s|?|} :
   Proper (iff ==> iff ==> iff) prod@{s|_ _}.
+Next Obligation.
+  intros ? ? [? ?] ? ? [? ?]; split; intros [? ?]; split; eauto.
+Qed.
 
 (** Logical implication [impl] is a morphism for logical equivalence. *)
 
@@ -56,11 +59,7 @@ About pointwise_relation.
 #[global]
 Program Instance ex_iff_morphism@{s s' s''|?|} {A : Type@{s|_}} : Proper (pointwise_relation@{s Type s'|_ _ _} A iff@{s'|_ _} ==> iff) (@sigma@{s s' s''|_ _} A).
 Next Obligation.
-hnf.
-intros x y [] ? ? ?.
-constructor.
-- firstorder.
-- firstorder. exact (snd fst0).
+compute. intros. firstorder. intros [? ?]; eexists; eauto. edestruct X; eauto.
 Qed.
 
 #[global]
@@ -90,7 +89,6 @@ Instance Acc_pt_morphism {A:Type}(E R : A->A->Prop)
  `(Equivalence _ E) `(Proper _ (E==>E==>iff) R) :
  Proper (E==>iff) (Acc R).
 Proof.
-  Set Printing Universes.
   apply proper_sym_arrow_iff.
   - auto with relations.
   - intros x y EQ WF. apply Acc_intro; intros z Hz. assert (R z x). specialize (H0 z z (reflexivity _) _ _ EQ). destruct H0. eauto.
@@ -122,7 +120,6 @@ Proof.
  unfold well_founded. intros x y r.
  constructor; intros H a.
  symmetry in r.
- Set Typeclasses Debug. rewrite r.
  apply (@Acc_rel_morphism A _ _ r a _ eq_refl), H.
  apply (@Acc_rel_morphism A _ _ r a _ eq_refl), H.
 Qed.
