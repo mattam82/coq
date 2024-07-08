@@ -11,7 +11,7 @@ Hint Resolve andb_prop: bool.
 
 Register andb_prop as core.bool.andb_prop.
 
-Lemma andb_prop_poly@{s| |} (a b:bool@{s|}) : eq@{s s|_} (andb a b) true -> (eq@{s s|_} a true) * (eq@{s s|_} b true).
+Lemma andb_prop_poly@{s| |} (a b:bool@{s|}) : andb a b ≡ true -> (a ≡ true) * (b ≡ true).
 Proof.
   destruct a, b; repeat split; assumption.
 Qed.
@@ -31,7 +31,7 @@ Hint Resolve andb_true_intro: bool.
 Register andb_true_intro as core.bool.andb_true_intro.
 
 Lemma andb_true_intro_poly@{s| |} (b1 b2 : bool@{s|}) :
-  (eq@{s s|_} b1 true) * (eq@{s s|_} b2 true) -> (eq@{s s|_} (andb b1 b2) true).
+  (b1 ≡ true) * (b2 ≡ true) -> (andb b1 b2 ≡ true).
 Proof.
   destruct b1; destruct b2; simpl; intros [? ?]; assumption.
 Qed.
@@ -53,7 +53,7 @@ Register eq_true as core.eq_true.type.
 
 Definition is_true b := b = true.
 
-Definition is_true_poly@{s| |} (b : bool@{s|}) := eq@{s s|_} b true.
+Definition is_true_poly@{s| |} (b : bool@{s|}) := b ≡ true.
 
 (** [is_true] can be activated as a coercion by
    ([Local]) [Coercion is_true : bool >-> Sortclass].
