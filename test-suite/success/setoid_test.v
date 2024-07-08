@@ -1,6 +1,9 @@
 Require Import TestSuite.admit.
 Require Import Setoid.
 Import Morphisms.
+Require Import Coq.Classes.Morphisms_Prop.
+
+Unset Universe Polymorphism.
 
 Parameter A : Set.
 
@@ -25,7 +28,7 @@ unfold same; split; red.
 - intros. destruct (H a); destruct (H0 a); split; auto.
 Qed.
 
-Instance In_ext : Proper@{Type Prop|_ _} (eq ==> same ==> iff) In.
+Instance In_ext : Proper@{Type Prop|Set+1 Set} (eq@{Type Prop|_ Set} ==> same ==> iff@{Prop | Set Set}) In.
 Proof.
   unfold same.
   intros x y a s t H.
@@ -64,34 +67,38 @@ Fixpoint remove (a : A) (s : set) {struct s} : set :=
       end
   end.
 
-Lemma in_rem_not : forall (a : A) (s : set), not@{Prop|} (In a (remove a (Add a Empty))).
+Goal exists A, (@Proper@{Type Prop | Set+1 Set}
+           (Prop -> Prop) A not@{Prop | Set}).
+econstructor.
+set (foo := do_subrelation).
+(* apply (not_iff_morphism). *)
+typeclasses eauto.
+Show Proof.
+Qed.
+
+Lemma in_rem_not : forall (a : A) (s : set), not@{Prop|Set} (In a (remove a (Add a Empty))).
 
 intros.
-let Heq := fresh "Heq" in
-    cut(default_relation (remove a (Add a Empty)) Empty); unfold default_relation. intro Heq.
-setoid_rewrite Heq.
 
-setoid_rewrite (default_relation (remove a (Add a Empty))).
-
-auto.
-
-unfold same.
+setoid_replace (remove a (Add a Empty)) with Empty.
+- intros [].
+- unfold same.
 split.
 simpl.
 case (eq_dec a a).
-intros e ff; elim ff.
+intros e ff; destruct ff.
 
-intros; absurd (a = a); trivial.
+intros. apply n. reflexivity.
 
 simpl.
-intro H; elim H.
+intros [].
 Qed.
 
 Parameter P : set -> Prop.
 Parameter P_ext : forall s t : set, same s t -> P s -> P t.
 
-Add Morphism P with signature (same ==> iff) as P_extt.
-intros; split; apply P_ext; (assumption || apply (Seq_sym _ _ setoid_set); assumption).
+Instance P_extt : Proper (same ==> iff) P.
+intros; split; apply P_ext; (assumption || apply symmetry; assumption).
 Qed.
 
 Lemma test_rewrite :
@@ -108,14 +115,17 @@ Qed.
 (* Unifying the domain up to delta-conversion (example from emakarov) *)
 
 Definition id: Set -> Set := fun A => A.
-Definition rel : forall A : Set, relation (id A) := @eq.
+Definition rel : forall A : Set, relation@{Type Prop|_ Set} (id A) := @eq.
 Definition f: forall A : Set, A -> A := fun A x => x.
+(*
+Instance eq_rel_relation {A : Set} : @RewriteRelation@{Type Prop | Set Set} (id A)
+  (@eq@{Type Prop | Set Set} A).
+Qed. *)
 
-Add Relation (id A) (rel A) as eq_rel.
-
-Add Morphism (@f A) with signature (eq ==> eq) as f_morph.
+Instance f_morph : Proper (eq ==> eq) (@f A).
 Proof.
-unfold rel, f. trivial.
+intros ? ? ?.
+trivial.
 Qed.
 
 (* Submitted by Nicolas Tabareau *)
@@ -138,10 +148,9 @@ Qed.
 Section mult.
   Context (fold : forall {A} {B}, (A -> B) -> A -> B).
   Context (add : forall A, A -> A).
-  Context (fold_lemma : forall {A B f} {eqA : relation B} x, eqA (fold A B f (add A x)) (fold _ _ f x)).
+  Context (fold_lemma : forall {A B f} {eqA : relation@{Type Prop|Set Set} B} x, eqA (fold A B f (add A x)) (fold _ _ f x)).
   Context (ab : forall B, A -> B).
   Context (anat : forall A, nat -> A).
-
 Goal forall x, (fold _ _ (fun x => ab A x) (add A x) = anat _ (fold _ _ (ab nat) (add _ x))). 
 Proof. intros.
   setoid_rewrite fold_lemma. 
@@ -160,11 +169,11 @@ Class Foo (A : Type) := {foo_neg : A -> A ; foo_prf : forall x : A, x = foo_neg 
 #[export] Instance: Foo nat. admit. Defined.
 #[export] Instance: Foo bool. admit. Defined.
 
-Goal forall (x : nat) (y : bool), beq_nat (foo_neg x) 0 = foo_neg y.
-Proof. intros. setoid_rewrite <- foo_prf. change (beq_nat x 0 = y). Abort.
+Goal forall (x : nat) (y : bool), beq_nat (foo_neg x) O = foo_neg y.
+Proof. intros. setoid_rewrite <- foo_prf. change (beq_nat x O = y). Abort.
 
-Goal forall (x : nat) (y : bool), beq_nat (foo_neg x) 0 = foo_neg y.
-Proof. intros. setoid_rewrite <- @foo_prf at 1. change (beq_nat x 0 = foo_neg y). Abort.
+Goal forall (x : nat) (y : bool), beq_nat (foo_neg x) O = foo_neg y.
+Proof. intros. setoid_rewrite <- @foo_prf at 1. change (beq_nat x O = foo_neg y). Abort.
 
 (* This should not raise an anomaly as it did for some time in early 2016 *)
 
@@ -174,14 +183,13 @@ Definition h (a b : t) := forall n, a n = b n.
 #[export] Instance subrelh : subrelation h (Morphisms.pointwise_relation nat eq).
 Proof. intros x y H; assumption. Qed.
 
-Goal forall a b, h a b -> a 0 = b 0.
+Goal forall a b, h a b -> a O = b O.
 intros.
 setoid_rewrite H. (* Fallback on ordinary rewrite without anomaly *)
 reflexivity.
 Qed.
 
 Module InType.
-Require Import CRelationClasses CMorphisms.
 
 Inductive All {A : Type} (P : A -> Type) : list A -> Type :=
 | All_nil : All P nil
@@ -192,17 +200,17 @@ Proof.
   intros HP. induction 1; constructor; eauto.
 Qed.
 
-Axiom add_0_r_peq : forall x : nat, eq (x + 0)%nat x.
+Axiom add_0_r_peq : forall x : nat, eq (plus x O)%nat x.
 
 #[export] Instance All_proper {A} :
-  CMorphisms.Proper ((pointwise_relation A iffT) ==> eq ==> iffT) All.
+  Morphisms.Proper ((pointwise_relation A iff) ==> eq ==> iff) All.
 Proof.
   intros f g Hfg x y e. destruct e. split; apply All_impl, Hfg.
 Qed.
 
 Lemma rewrite_all {l : list nat} (Q : nat -> Type) :
   All (fun x => Q x) l ->
-  All (fun x => Q (x + 0)) l.
+  All (fun x => Q (plus x O)) l.
 Proof.
   intros a.
   setoid_rewrite add_0_r_peq.
@@ -210,7 +218,7 @@ Proof.
 Qed.
 
 Lemma rewrite_all_in {l : list nat} (Q : nat -> Type) :
-  All (fun x => Q (x + 0)) l ->
+  All (fun x => Q (plus x O)) l ->
   All (fun x => Q x) l.
 Proof.
   intros a.
@@ -219,7 +227,7 @@ Proof.
 Qed.
 
 Lemma rewrite_all_in2 {l : list nat} (Q : nat -> Type) (R : nat -> Type) :
-  All (fun x => prod (Q (x + 0)%nat) (R x))%type l ->
+  All (fun x => prod (Q (plus x O)%nat) (R x))%type l ->
   All (fun x => prod (Q x) (R x))%type l.
 Proof.
   intros a.
@@ -229,110 +237,59 @@ Qed.
 End InType.
 
 Module Polymorphism.
-Require Import CRelationClasses CMorphisms.
-Set Universe Polymorphism.
-#[universes(polymorphic, cumulative)]
-Inductive plist@{i} (A : Type@{i}) : Type@{i} :=
-| pnil : plist A
-| pcons : A -> plist A -> plist A.
-Arguments pnil {A}.
-Arguments pcons {A}.
-#[universes(polymorphic, cumulative)]
-Record pprod@{i j} (A : Type@{i}) (B : Type@{j}) : Type@{max(i, j)} :=
-  { pfst : A;
-    psnd : B }.
-Arguments pfst {A B}.
-Arguments psnd {A B}.
 
-Notation "x :: xs" := (pcons x xs).
+Notation "x :: xs" := (cons x xs).
 
-(* #[universes(polymorphic)]
-Fixpoint All@{i j} {A : Type@{i}} (P : A -> Type@{j}) (l : plist A) : Type@{j} :=
+#[universes(polymorphic)]
+Fixpoint All@{i j} {A : Type@{i}} (P : A -> Type@{j}) (l : list A) : Type@{j} :=
  match l with
- | pnil => unit
- | x :: xs => pprod (P x) (All P xs)
- end. *)
-
-#[universes(polymorphic, cumulative)]
-Inductive All {A : Type} (P : A -> Type) : plist A -> Type :=
-| All_nil : All P pnil
-| All_cons x (px : P x) xs (pxs : All P xs) : All P (x :: xs).
+ | nil => unit
+ | x :: xs => prod (P x) (All P xs)
+ end.
 
 #[universes(polymorphic)]
 Lemma All_impl {A} (P Q : A -> Type) l : (forall x, P x -> Q x) -> All P l -> All Q l.
 Proof.
   intros HP.
-  induction 1; constructor; auto.
-  (* induction l; [intros|intros []]; constructor; eauto. *)
+  induction l using list_elim; [intros|intros []]; constructor; eauto.
 Qed.
 Check pointwise_relation.
 
-#[universes(polymorphic, cumulative)]
-Inductive peq@{i} (A : Type@{i}) (a : A) : A -> Type@{i} :=
-  peq_refl : peq A a a.
-
-Arguments peq {A}.
-Arguments peq_refl {A a}.
-
 #[universes(polymorphic)]
-Axiom add_0_r_peq : forall x : nat, peq (x + 0)%nat x.
+Axiom add_0_r_eq : forall x : nat, eq (plus x O)%nat x.
 
 #[universes(polymorphic), export]
-Instance peq_left {A : Type} {B : Type} {R : crelation B} (f : A -> B) `{Reflexive B R} : Proper (peq ==> R) f.
-Admitted.
-
-#[universes(polymorphic), export]
-Instance reflexive_eq_dom_reflexive@{i j jr ?}
- {A : Type@{i}} {B : Type@{j}} (R : crelation@{j jr} B) :
-  Reflexive@{j jr} R ->
-  Reflexive (respectful (@peq A) R)%signatureT.
-Proof.
-  intros hr x ? ? e. destruct e. apply hr.
-  Show Proof.
-Qed.
-Unset Strict Universe Declaration.
-#[universes(polymorphic), export]
-Instance All_proper {A : Type@{a}} : (* FIXME: removing @{a} does the wrong minimization *)
-  CMorphisms.Proper ((pointwise_relation A iffT) ==> peq ==> iffT) All.
+Instance All_proper {A} :
+  Morphisms.Proper ((pointwise_relation A iff) ==> eq ==> iff) All.
 Proof.
   intros f g Hfg x y e. destruct e. split; apply All_impl, Hfg.
 Qed.
 
-#[universes(polymorphic), export]
-Instance eq_proper_proxy@{i} {A : Type@{i}} (x : A) : ProperProxy@{i i} peq x.
-Proof. red. exact peq_refl. Defined.
-
-#[universes(polymorphic), export]
-Instance peq_equiv {A} : Equivalence (@peq A).
-Proof.
-  split.
-Admitted.
-
-Lemma rewrite_all {l : plist nat} (Q : nat -> Type) :
+Lemma rewrite_all {l : list nat} (Q : nat -> Type) :
   All (fun x => Q x) l ->
-  All (fun x => Q (x + 0)) l.
+  All (fun x => Q (plus x O)) l.
 Proof.
   intros a.
-  setoid_rewrite add_0_r_peq.
+  setoid_rewrite add_0_r_eq.
   exact a.
 Qed.
 
-Lemma rewrite_all_in {l : plist nat} (Q : nat -> Type) :
-  All (fun x => Q (x + 0)) l ->
+Lemma rewrite_all_in {l : list nat} (Q : nat -> Type) :
+  All (fun x => Q (plus x O)) l ->
   All (fun x => Q x) l.
 Proof.
-  intros a.
-  setoid_rewrite add_0_r_peq in a.
+  intros a.  Show Universes.
+  setoid_rewrite add_0_r_eq in a.
   exact a.
 Qed.
 Check rewrite_all_in@{Set}.
 
-Lemma rewrite_all_in2 {l : plist nat} (Q : nat -> Type) (R : nat -> Type) :
-  All (fun x => pprod (Q (x + 0)%nat) (R x))%type l ->
-  All (fun x => pprod (Q x) (R x))%type l.
+Lemma rewrite_all_in2 {l : list nat} (Q : nat -> Type) (R : nat -> Type) :
+  All (fun x => prod (Q (plus x O)%nat) (R x))%type l ->
+  All (fun x => prod (Q x) (R x))%type l.
 Proof.
   intros a.
-  setoid_rewrite add_0_r_peq in a.
+  setoid_rewrite add_0_r_eq in a.
   exact a.
 Qed.
 Check rewrite_all_in2@{0 0}.

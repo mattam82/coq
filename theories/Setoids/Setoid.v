@@ -14,8 +14,8 @@ Export Morphisms.ProperNotations.
 
 (** For backward compatibility *)
 
-Definition Setoid_Theory := @Equivalence.
-Definition Build_Setoid_Theory := @Build_Equivalence.
+Definition Setoid_Theory@{s s'|u v|} := @Equivalence@{s s'|u v}.
+Definition Build_Setoid_Theory@{s s'|u v|} := @Build_Equivalence@{s s'|u v}.
 
 Register Build_Setoid_Theory as plugins.ring.Build_Setoid_Theory.
 

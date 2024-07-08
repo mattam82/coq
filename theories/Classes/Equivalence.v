@@ -146,20 +146,20 @@ End Respecting.
 *)
 
 (** The default equivalence on function spaces, with higher-priority than [eq]. *)
-Set Printing Universes.
+
 #[global]
-Instance pointwise_reflexive@{s s' s''|u v w|} {A : Type@{s | u}} `(reflb : Reflexive@{s' s'' | v w} B eqB) :
+Instance pointwise_reflexive@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(reflb : Reflexive@{sb srb | b rb} B eqB) :
   Reflexive (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
 #[global]
-Instance pointwise_symmetric@{s s' s'' | u v w|} {A : Type@{s | u}} `(symb : Symmetric@{s' s'' | v w} B eqB) :
+Instance pointwise_symmetric@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(symb : Symmetric@{sb srb | b rb} B eqB) :
   Symmetric (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
 #[global]
-Instance pointwise_transitive@{s s' s'' | u v w|} {A : Type@{s | u}} `(transb : Transitive@{s' s'' | v w} B eqB) :
+Instance pointwise_transitive@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(transb : Transitive@{sb srb | b rb} B eqB) :
   Transitive (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
 #[global]
-Instance pointwise_equivalence@{s s' s'' | u v w|} {A : Type@{s|u}} `(eqb : Equivalence@{s' s'' | v w} B eqB) :
+Instance pointwise_equivalence@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(eqb : Equivalence@{sb srb | b rb} B eqB) :
   Equivalence (pointwise_relation A eqB) | 9.
 Proof. split; apply _. Qed.

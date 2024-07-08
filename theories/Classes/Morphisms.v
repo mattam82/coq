@@ -54,24 +54,76 @@ Section Proper.
   Class ProperProxy (R : relation@{s s'|u v} A) (m : A) :=
     proper_proxy : R m m.
 
-  Lemma eq_proper_proxy (x : A) : ProperProxy (@eq A) x.
+  Class ReflexiveProxy (R : relation@{s s'|u v} A) :=
+    reflexive_proxy : forall x, R x x.
+
+  Lemma eq_proper_proxy (x : A) : ProperProxy (@eq@{s s'|u v} A) x.
   Proof. firstorder. Qed.
 
-  Lemma reflexive_proper_proxy `(Reflexive A R) (x : A) : ProperProxy R x.
+  (** Every reflexive relation gives rise to a morphism.
+    If the relation is not determined (is an evar),
+    then we restrict the solutions to predefined ones (equality, or iff on Prop),
+    using ground instances. If the relation is determined then
+    [ReflexiveProxy] calls back to [Reflexive]. *)
+
+  Lemma reflexive_proper `{ReflexiveProxy R} (x : A) : Proper R x.
+  Proof. firstorder. Qed.
+
+  Lemma reflexive_proper_proxy `(ReflexiveProxy R) (x : A) : ProperProxy R x.
   Proof. firstorder. Qed.
 
   Lemma proper_proper_proxy x `(Proper R x) : ProperProxy R x.
   Proof. firstorder. Qed.
 
-  (** Respectful morphisms. *)
-
-  (** The non-dependent version is an instance where we forget dependencies. *)
-  Sort s'' s'''.
-  Universe b rb.
-  Definition respectful {B : Type@{s'' | b}} (R : relation@{s s'|u v} A) (R' : relation@{s'' s'''|b rb} B)
-    : relation@{s'' s'''|_ _} (A -> B) :=
-    fun f g => forall x y, R x y -> R' (f x) (g y).
+  Lemma reflexive_reflexive_proxy `(Reflexive A R) : ReflexiveProxy R.
+  Proof. firstorder. Qed.
 End Proper.
+
+
+(** Respectful morphisms. *)
+(** Non-dependent pointwise lifting *)
+Definition pointwise_relation@{sa sb srb|a b rb|} {A : Type@{sa|a}} {B : Type@{sb|b}}
+  (R : relation@{sb srb|b rb} B) : relation (A -> B) :=
+  fun f g => forall a, R (f a) (g a).
+
+(** We let Coq infer these relations when a default relation should
+  be found on the function space. *)
+Lemma rewrite_relation_pointwise@{sa sb srb|a b rb|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb srb|b rb} B} `{RewriteRelation B R}:
+  RewriteRelation (@pointwise_relation A B R).
+Proof. split. Qed.
+
+(** The non-dependent version is an instance where we forget dependencies. *)
+Definition respectful@{sa sb sra srb|a b ra rb|} {A : Type@{sa|a}} {B : Type@{sb|b}}
+  (R : relation@{sa sra|a ra} A) (R' : relation@{sb srb|b rb} B)
+  : relation@{sb srb|_ _} (A -> B) :=
+  fun f g => forall x y, R x y -> R' (f x) (g y).
+
+Lemma rewrite_relation_eq_dom@{sa sb sr se|a b r e|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R}:
+  RewriteRelation@{sb sr|max(a,b) max(a,r,e)} (respectful (@eq@{sa se|a e} A) R).
+Proof. split. Qed.
+
+(** Pointwise reflexive *)
+
+Ltac rewrite_relation_fun :=
+  (* If we're looking for a default rewrite relation on a
+    function type, we favor pointwise equality *)
+  class_apply @rewrite_relation_pointwise ||
+  (* The relation might be already determined to be (eq ==> _) instead of a
+    pointwise equality, but we want to treat them the same. No point in
+    backtracking on the previous instance though *)
+  class_apply @rewrite_relation_eq_dom.
+
+Global Hint Extern 2 (@RewriteRelation (_ -> _) _) =>
+  rewrite_relation_fun : typeclass_instances.
+
+Lemma eq_rewrite_relation@{sa se|a e|} {A : Type@{sa|a}} : RewriteRelation (@eq@{sa se|a e} A).
+Proof. split. Qed.
+
+Ltac eq_rewrite_relation A :=
+  solve [unshelve class_apply @eq_rewrite_relation].
+
+Global Hint Extern 100 (@RewriteRelation ?A _) => eq_rewrite_relation A : typeclass_instances.
+
 
 (** We favor the use of Leibniz equality or a declared reflexive relation
   when resolving [ProperProxy], otherwise, if the relation is given (not an evar),
@@ -83,6 +135,33 @@ Hint Extern 1 (ProperProxy _ _) =>
 #[global]
 Hint Extern 2 (ProperProxy ?R _) =>
   not_evar R; class_apply @proper_proper_proxy : typeclass_instances.
+
+(* This tactics takes a type and (partially defined) relation and tries
+   to find all instances matching it which completely determine the relation,
+   feeding them to kont. *)
+Ltac find_rewrite_relation A R kont :=
+  assert (@RewriteRelation A R); [solve [unshelve typeclasses eauto]|]; kont R.
+
+(** This hint helps infer "generic" reflexive relations, based only on the type of the
+    carrier, when the relation is only partially defined (contains evars). *)
+
+Ltac reflexive_proxy_tac A R :=
+  tryif has_evar R then
+    (* If the user declared a specific rewrite relation on the type, we favor it.
+      By default, [iff] and and [impl] are favored for Prop,
+      pointwise equality for function types and finally leibniz equality. *)
+    find_rewrite_relation A R ltac:(fun RA =>
+      class_apply (@reflexive_reflexive_proxy A RA))
+      (* The [Reflexive] subgoal produced here will need no backtracking,
+          being a Prop goal without existential variables,
+          but we don't have `cut` to explicitely say it. *)
+  else
+    (* If the relation is determined then we look for a relexivity proof on it *)
+    class_apply @reflexive_reflexive_proxy.
+
+#[global]
+Hint Extern 1 (@ReflexiveProxy ?A ?R) => reflexive_proxy_tac A R : typeclass_instances.
+
 
 Declare Scope signature_scope.
 Delimit Scope signature_scope with signature.
@@ -149,22 +228,27 @@ Section Relations.
 
   (** Dependent pointwise lifting of a relation on the range. *)
 
-  Definition all_relation (P : A -> Type@{s|a})
-             (sig : forall a, relation (P a)) : relation (forall x, P x) :=
+  Definition all_relation@{sr|r|} (P : A -> Type@{s|a})
+             (sig : forall a, relation@{s sr|a r} (P a)) : relation@{s sr|a max(a,r)} (forall x, P x) :=
     fun f g => forall a, sig a (f a) (g a).
 
-  (** Non-dependent pointwise lifting *)
-  Definition pointwise_relation@{sb srb|b rb|} {B : Type@{sb|b}} (R : relation@{sb srb|b rb} B) : relation (A -> B) :=
-    fun f g => forall a, R (f a) (g a).
-
-  Lemma pointwise_pointwise@{s'|b|} {B : Type@{s|a}} (R : relation@{s s'|a b} B) :
-    relation_equivalence (pointwise_relation R) (@eq A ==> R).
+  Lemma pointwise_pointwise@{s' sb|r b e|e <= max(a,r)} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
+    relation_equivalence@{sb s'|max(a,b) max(a,e,r)} (pointwise_relation@{_ _ _|a b r} R)
+    (respectful@{_ _ _ _|a b e r} (@eq@{_ s'|a e} A) R).
   Proof.
     intros. split.
-    - simpl_relation.
+    - intros X a b []. apply X.
     - firstorder.
   Qed.
 
+  Lemma pointwise_pointwise_prop@{s' sb|r b|} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
+    relation_equivalence@{sb s'|max(a,b) max(a,r)} (pointwise_relation@{_ _ _|a b r} R)
+    (respectful@{_ _ _ _|a b Set r} (@eq@{_ Prop|a Set} A) R).
+  Proof.
+    intros. split.
+    - intros X a b []. apply X.
+    - firstorder.
+  Qed.
 
   (** Subrelations induce a morphism on the identity. *)
 
@@ -173,24 +257,24 @@ Section Relations.
 
   (** The subrelation property goes through products as usual. *)
 
-  Lemma subrelation_respectful@{s' s2 s2' s3 s3'| b ra ra' rb rb'|?} {B : Type@{s2|b}}
-    (RA : relation@{s s'|a ra} A) (RA' : relation@{s s'|a ra'} A)
-    (RB : relation@{s2 s2'|b rb} B) (RB' : relation@{s2 s2'|b rb'} B)
-    (subl : subrelation@{s s'|ra' ra} RA' RA)
-    (subr : subrelation@{s2 s2'|rb rb'} RB RB') :
-    subrelation@{s2 s2'|_ _} (RA ==> RB) (RA' ==> RB').
+  Lemma subrelation_respectful@{s' s2 s2' s3 s3'| b ra rb|?} {B : Type@{s2|b}}
+    (RA : relation@{s s'|a ra} A) (RA' : relation@{s s'|a ra} A)
+    (RB : relation@{s2 s2'|b rb} B) (RB' : relation@{s2 s2'|b rb} B)
+    (subl : subrelation@{s s'|a ra} RA' RA)
+    (subr : subrelation@{s2 s2'|b rb} RB RB') :
+    subrelation@{s2 s2'|max(a,b) max(a,ra,rb)} (RA ==> RB) (RA' ==> RB').
   Proof. intros f g rfg x y rxy. apply subr, rfg, subl, rxy. Qed.
 
   (** And of course it is reflexive. *)
 
-  Lemma subrelation_refl R : @subrelation A R R.
+  Lemma subrelation_refl@{sr|r|} R : @subrelation@{s sr|a r} A R R.
   Proof. simpl_relation. Qed.
 
   (** [Proper] is itself a covariant morphism for [subrelation].
    We use an unconvertible premise to avoid looping.
    *)
 
-  Lemma subrelation_proper `(mor : Proper A R' m)
+  Lemma subrelation_proper@{sr'|r'|} (R' : relation@{s sr'|a r'} A) (m : A) (mor : Proper R' m)
         `(unc : Unconvertible (relation A) R R')
         `(sub : subrelation A R' R) : Proper R m.
   Proof.
@@ -201,12 +285,12 @@ Section Relations.
     Proper (subrelation ++> eq ==> arrow) (@Proper A).
   Proof. reduce. destruct X0. firstorder. Qed.
 
-  Global Instance pointwise_subrelation `(sub : subrelation B R R') :
-    subrelation (pointwise_relation R) (pointwise_relation R') | 4.
+  Global Instance pointwise_subrelation@{sb sr'|b r'|} {B : Type@{sb|b}} (R R' : relation@{sb sr'|b r'} B) (sub : subrelation R R') :
+    subrelation@{_ _|max(a,b) max(a,r')} (@pointwise_relation A B R) (pointwise_relation R') | 4.
   Proof. reduce. unfold pointwise_relation in *. apply sub. auto. Qed.
 
   (** For dependent function types. *)
-  Lemma all_subrelation (P : A -> Type@{s | a}) (R S : forall x : A, relation (P x)) :
+  Lemma all_subrelation@{sr|r|} (P : A -> Type@{s | a}) (R : forall x : A, relation@{s sr|a r} (P x)) (S : forall x : A, relation@{s sr|a r} (P x)) :
     (forall a, subrelation (R a) (S a)) ->
     subrelation (all_relation P R) (all_relation P S).
   Proof. reduce. firstorder. Qed.
@@ -244,8 +328,13 @@ Hint Extern 5 (@Proper _ ?H _) => proper_subrelation : typeclass_instances.
 (** Essential subrelation instances for [iff], [arrow] and [pointwise_relation]. *)
 
 #[global]
-Instance iff_arrow_subrelation@{s | u |} : subrelation iff@{s|u u} arrow@{s s|u u} | 2.
+Instance iff_arrow_subrelation@{s | u|} : subrelation iff@{s|u u} arrow@{s s|u u} | 2.
+Proof. Show Universes. firstorder.  Qed.
+
+#[global]
+Instance iff_flip_arrow_subrelation@{s | u|} : subrelation iff@{s|u u} (flip arrow@{s s|u u}) | 2.
 Proof. firstorder. Qed.
+
 
 (** We use an extern hint to help unification. *)
 
@@ -330,8 +419,8 @@ Section GenericInstances.
   (** Every Transitive relation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
 
   Global Program
-  Instance trans_co_eq_inv_arrow_morphism
-  `(Transitive A R) : Proper (R ==> (@eq A) ==> flip arrow) R | 2.
+  Instance trans_co_eq_inv_arrow_morphism@{|e|}
+  (_ : Transitive R) : Proper (R ==> (@eq@{sa sra|a e} A) ==> flip (C := Type@{sra|ra}) arrow) R | 2.
 
   Next Obligation.
   Proof with auto.
@@ -407,13 +496,6 @@ Section GenericInstances.
   (** Coq functions are morphisms for Leibniz equality,
      applied only if really needed. *)
 
-  Global Instance reflexive_eq_dom_reflexive@{sb srb | b rb |}
-    {B} {RB : relation@{sb srb | b rb} B}
-    (hr : Reflexive RB) :
-    Reflexive (@eq A ==> RB).
-  Proof. simpl_relation. Qed.
-
-
     (** [respectful] is a morphism for relation equivalence . *)
   Global Instance respectful_morphism@{sb srb | b rb |} {B : Type@{sb | b}} :
     Proper (relation_equivalence@{sa sra | a ra} ++>
@@ -461,25 +543,24 @@ Section GenericInstances.
 
   (** That's if and only if *)
 
-  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq@{sa sra | a} A) R.
+  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq@{sa sra | a ra} A) R.
   Proof. simpl_relation. Qed.
 
   (** Once we have normalized, we will apply this instance to simplify the problem. *)
 
   Definition proper_flip_proper `(mor : Proper A R m) : Proper (flip R) m := mor.
 
-  (** Every reflexive relation gives rise to a morphism,
-  only for immediately solving goals without variables. *)
-
-  Lemma reflexive_proper `{Reflexive A R} (x : A) : Proper R x.
-  Proof. firstorder. Qed.
-
 End GenericInstances.
 
-Lemma proper_eq@{s | a |} {A : Type@{s | a}} (x : A) : Proper (@eq A) x.
-Proof. intros. apply reflexive_proper. apply eq_Reflexive. Qed.
 
-Set Printing Universes.
+Global Instance reflexive_eq_dom_reflexive@{sa sb sr | a b r |}
+  {A : Type@{sa|a}} {B : Type@{sb|b}} {RB : relation@{sb sr | b r} B}
+  (hr : Reflexive RB) :
+  Reflexive (@eq@{_ sr|a r} A ==> RB).
+Proof. simpl_relation. Qed.
+
+Lemma proper_eq@{s | a l |} {A : Type@{s | a}} (x : A) : Proper (@eq@{_ _|a l} A) x.
+Proof. intros. apply reflexive_proper. Qed.
 
 #[projections(primitive=no)]
 Class PartialApplication.
@@ -643,13 +724,11 @@ Qed.
     compatible with [iff] as soon as it is compatible with [arrow].
     Same with a binary relation. *)
 
-Lemma proper_sym_arrow_iff@{sa sra sf|a ra f|}
-   {A : Type@{sa|a}} {R : relation@{sa sra|a ra} A}
-   {f : A -> Type@{sf|f}} :
-   (Symmetric R) -> (Proper (R==>arrow) f) ->
+Lemma proper_sym_arrow_iff@{sa sra sf|a ra f|} : forall {A : Type@{sa|a}} {R : relation@{sa sra|a ra} A} {f : A -> Type@{sf|f}},
+  Symmetric R -> Proper (R==>arrow) f ->
   Proper (R==>iff) f.
 Proof.
-intros Sym Hf x x' Hxx'. repeat red in Hf. split; eauto.
+intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
 
 Lemma proper_sym_arrow_iff_2@{sa sra sb srb sf|a ra b rb f|} :
@@ -664,15 +743,16 @@ Qed.
 (* Require Import Relation_Definitions. *)
 
 #[global]
-Instance PartialOrder_proper_type `(PartialOrder A eqA R) :
+Instance PartialOrder_proper_type@{s s'|u v|} {A : Type@{s | u}} (eqA : relation@{s s' | u v} A) {isEq : Equivalence eqA}
+  (R : relation@{s s' | u v} A) {isPreOrder : PreOrder R} (_ : PartialOrder eqA R) :
     Proper (eqA==>eqA==>iff) R.
 Proof.
 intros.
 apply proper_sym_arrow_iff_2. 1-2: typeclasses eauto.
 intros x x' Hx y y' Hy Hr.
 apply transitivity with x.
-- apply H, symmetry, Hx.
-- apply transitivity with y; auto. apply H, Hy.
+- apply X, symmetry, Hx.
+- apply transitivity with y; auto. apply X, Hy.
 Qed.
 
 (** From a [PartialOrder] to the corresponding [StrictOrder]:
