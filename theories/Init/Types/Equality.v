@@ -105,12 +105,14 @@ Definition eq_rect_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 
 Register eq_rect_r as core.eq.rect_r.
 
-Definition eq_ind_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+Definition eq_singleton_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, y = x -> P y :=
   fun px y e =>
     match e in _ = x return P x -> P y with
     | eq_refl => fun py => py
     end px.
+
+Definition eq_ind_r@{α|u|} := eq_singleton_r@{α Prop | u Set}.
 
 Register eq_ind_r as core.eq.ind_r.
 
@@ -133,14 +135,9 @@ Definition eq_rect_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 Register eq_rect_r as core.eq.rect.
 
 Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, x = y -> P y :=
-  fun px y e =>
-    match e in _ = y return P x -> P y with
-    | eq_refl => fun py => py
-    end px.
+  P x -> forall y:A, x = y -> P y := eq_singleton (fun y _ => P y).
 
 Register eq_ind_d as core.eq.ind.
-
 
 Definition f_equal@{s s' e|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) {x y} : eq@{_ e| _} x y -> eq@{_ e| _} (f x) (f y) :=
   fun e => match e with | eq_refl => eq_refl end.
