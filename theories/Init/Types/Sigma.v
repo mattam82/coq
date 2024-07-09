@@ -103,6 +103,8 @@ Arguments fst {_ _}.
 Arguments snd {_ _}.
 Arguments existR {_ _}.
 
+Notation "( x ; .. ; y ; z )" := (existR x .. (existR y z) ..).
+
 Scheme sigmaR_elim := Induction for sigmaR Sort Poly.
 
 (** [prod A B], written [A * B], is the product of [A] and [B];
@@ -119,7 +121,7 @@ End Prod.
 
 Arguments prod : clear implicits.
 Notation "A * B" := (prod A B).
-Notation "A /\ B" := (prod A B).
+Notation "A /\ B" := (prod@{Prop|_ _} A B).
 Notation proj1 := fst.
 Notation proj2 := snd.
 
