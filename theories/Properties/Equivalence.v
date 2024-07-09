@@ -9,6 +9,7 @@ Section Equivalence.
   Universes a b.
   Context (A : Type@{sa|a}) (B: Type@{sb|b}).
 
+  #[projections(primitive=no)]
   Record isEquiv (f : A -> B) := {
       sect : B -> A ;
       retr : B -> A ;
