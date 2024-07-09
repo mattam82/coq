@@ -11,12 +11,10 @@
 Require Import PreludeOptions.
 Require Import Notations.
 
-Section UnitPoly.
-  Sort s.
-  Inductive unit : Type@{s|Set} :=
-      tt : unit.
-
-End UnitPoly.
+(** listings: unit **)
+Inductive unit@{s| |} : Type@{s|Set} :=
+    tt : unit.
+(** listings: end **)
 
 Notation True := unit@{Prop|}.
 

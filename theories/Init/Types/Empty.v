@@ -11,13 +11,11 @@
 Require Import PreludeOptions.
 Require Import Notations.
 
-Section EmptySortPoly.
-  Sort s.
+(** listings: empty **)
+Inductive Empty@{s| |} : Type@{s|Set} :=.
+(** listings: end **)
 
-  Inductive Empty : Type@{s|Set} :=.
-
-  Definition not@{u} (A : Type@{s|u}) := forall (_ : A), Empty.
-End EmptySortPoly.
+Definition not@{s|u|} (A : Type@{s|u}) := forall (_ : A), Empty@{s|}.
 
 Definition False_rect@{s|u|} (P : Empty@{Prop|} -> Type@{s|u}) u : P u := match u with end.
 

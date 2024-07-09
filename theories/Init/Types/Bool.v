@@ -11,52 +11,49 @@
 Require Import PreludeOptions.
 Require Import Notations.
 
-Section BoolSortPoly.
-  Sort s.
+(** listings: bool **)
+Inductive bool@{s| |} : Type@{s|Set} :=
+  | true : bool
+  | false : bool.
+(** listings: end **)
 
-  Inductive bool : Type@{s|Set} :=
-    | true : bool
-    | false : bool.
+Add Printing If bool.
 
-  Add Printing If bool.
+Register bool as core.bool.type.
+Register true as core.bool.true.
+Register false as core.bool.false.
 
-  Register bool as core.bool.type.
-  Register true as core.bool.true.
-  Register false as core.bool.false.
+Definition negb@{s| |} (a : bool@{s|}) : bool@{s|} :=
+  match a with
+    | true => false
+    | false => true
+  end.
 
-  Definition negb (a : bool) : bool :=
-    match a with
-      | true => false
-      | false => true
-    end.
+Definition andb@{s| |} (a b : bool@{s|}) : bool@{s|} :=
+  match a with
+    | true => b
+    | false => false
+  end.
 
-  Definition andb (a b : bool) : bool :=
-    match a with
-      | true => b
-      | false => false
-    end.
+Definition orb@{s| |} (a b : bool@{s|}) : bool@{s|} :=
+  match a with
+    | true => true
+    | false => b
+  end.
 
-  Definition orb (a b : bool) : bool :=
-    match a with
-      | true => true
-      | false => b
-    end.
+Definition implb@{s| |} (a b : bool@{s|}) := orb (negb a) b.
 
-  Definition implb (a b : bool) := orb (negb a) b.
+Definition xorb@{s| |} (a b : bool@{s|}) :=
+  match a with
+    | true => negb b
+    | false => b
+  end.
 
-  Definition xorb (a b : bool) :=
-    match a with
-      | true => negb b
-      | false => b
-    end.
-
-  Register andb as core.bool.andb.
-  Register orb as core.bool.orb.
-  Register implb as core.bool.implb.
-  Register xorb as core.bool.xorb.
-  Register negb as core.bool.negb.
-
-End BoolSortPoly.
+Register andb as core.bool.andb.
+Register orb as core.bool.orb.
+Register implb as core.bool.implb.
+Register xorb as core.bool.xorb.
+Register negb as core.bool.negb.
 
 Declare Scope bool_scope.
 Delimit Scope bool_scope with bool.

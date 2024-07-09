@@ -12,7 +12,9 @@ Require Import PreludeOptions.
 Require Import Notations.
 Require Import Sigma.
 
+(** listings: id **)
 Definition id@{s|u|} {A : Type@{s|u}} (a : A) := a.
+(** listings: end **)
 
 Definition arrow@{s s'|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) := A -> B.
 Register arrow as core.arrow.

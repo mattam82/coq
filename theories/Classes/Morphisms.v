@@ -334,7 +334,7 @@ Hint Extern 5 (@Proper _ ?H _) => proper_subrelation : typeclass_instances.
 
 #[global]
 Instance iff_arrow_subrelation@{s | u|} : subrelation iff@{s|u u} arrow@{s s|u u} | 2.
-Proof. Show Universes. firstorder.  Qed.
+Proof. firstorder.  Qed.
 
 #[global]
 Instance iff_flip_arrow_subrelation@{s | u|} : subrelation iff@{s|u u} (flip arrow@{s s|u u}) | 2.

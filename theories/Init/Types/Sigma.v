@@ -22,7 +22,7 @@ Require Import Notations.
     type [A] which satisfies both predicates [P] and [Q].
 *)
 
-(** listings: sigma def **)
+(** listings: sigma **)
 Inductive sigma@{s s' s''|u v| } (A:Type@{s|u}) (P:A -> Type@{s'|v}) :
   Type@{s''|max(u,v)} :=
     existP : forall x:A, P x -> sigma A P.

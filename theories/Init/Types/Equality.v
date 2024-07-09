@@ -12,8 +12,10 @@ Require Import PreludeOptions.
 Require Import Notations.
 Require Import Empty.
 
+(** listings: eq **)
 Inductive eq@{s s'|l|} {A:Type@{s|l}} (x:A) : A -> Type@{s'|l} :=
     eq_refl : eq x x.
+(** listings: end **)
 Arguments eq {A} x _.
 Arguments eq_refl {A x} , [A] x.
 
