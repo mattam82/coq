@@ -132,7 +132,7 @@ Definition eq_rect_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   | eq_refl => fun py => py
   end px.
 
-Register eq_rect_r as core.eq.rect.
+Register eq_rect_d as core.eq.rect.
 
 Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, x = y -> P y := eq_singleton (fun y _ => P y).
