@@ -4,7 +4,7 @@ From Corelib Require Import Types.
 Set Printing Universes.
 
 Module GroupoidNotations.
-Notation rfl := (ltac:(reflexivity)) (only parsing).
+Notation rfl := (ltac:(cbn; reflexivity)) (only parsing).
 
 Notation " e ▷ t " := (ltac:(exact (tr e t) + exact (tr (eq_sym e) t))) (at level 70, only parsing).
 
