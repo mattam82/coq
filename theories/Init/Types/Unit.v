@@ -12,7 +12,7 @@ Require Import PreludeOptions.
 Require Import Notations.
 
 (** listings: unit **)
-Inductive unit@{s| |} : Type@{s|Set} :=
+Inductive unit@{s| |} : Type@{s|0} :=
     tt : unit.
 (** listings: end **)
 

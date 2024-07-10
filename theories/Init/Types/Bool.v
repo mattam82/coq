@@ -12,7 +12,7 @@ Require Import PreludeOptions.
 Require Import Notations.
 
 (** listings: bool **)
-Inductive bool@{s| |} : Type@{s|Set} :=
+Inductive bool@{s| |} : Type@{s|0} :=
   | true : bool
   | false : bool.
 (** listings: end **)

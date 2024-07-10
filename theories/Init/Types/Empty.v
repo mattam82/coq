@@ -12,7 +12,7 @@ Require Import PreludeOptions.
 Require Import Notations.
 
 (** listings: empty **)
-Inductive Empty@{s| |} : Type@{s|Set} :=.
+Inductive Empty@{s| |} : Type@{s|0} :=.
 (** listings: end **)
 
 Definition not@{s|u|} (A : Type@{s|u}) := forall (_ : A), Empty@{s|}.
