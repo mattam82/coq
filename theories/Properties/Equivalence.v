@@ -6,11 +6,12 @@ Notation "f == g" := (forall x, f x = g x :> _) (at level 55).
 
 #[projections(primitive=no)]
 (** listings: isEquiv **)
-Record isEquiv@{sa sb se | a b|} (A : Type@{sa|a}) (B: Type@{sb|b}) (f : A -> B) :=  {
+Record isEquiv@{sa sb se | a b|} (A : Type@{sa|a}) (B: Type@{sb|b}) (f : A -> B) := {
     sect : B -> A ;
     retr : B -> A ;
     sect_eq : f ∘ sect == id : Type@{se|_};
-    retr_eq : retr ∘ f == id : Type@{se|_}}.
+    retr_eq : retr ∘ f == id : Type@{se|_};
+}.
 (** listings: end **)
 
 Section Equivalence.
