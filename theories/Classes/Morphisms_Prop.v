@@ -40,11 +40,11 @@ Program Instance not_iff_morphism'@{| |} :
 
 #[global]
 Program Instance and_impl_morphism@{s|u v|} :
-  Proper (arrow ==> arrow ==> arrow) prod@{s|u v} | 1.
+  Proper (arrow ++> arrow ++> arrow) prod@{s|u v} | 1.
 
 #[global]
 Program Instance and_iff_morphism@{s|u v|} :
-  Proper (iff ==> iff ==> iff) prod@{s|u v}.
+  Proper (iff ++> iff ++> iff) prod@{s|u v}.
 Next Obligation.
   intros ? ? [? ?] ? ? [? ?]; split; intros [? ?]; split; eauto.
 Qed.
@@ -52,23 +52,23 @@ Qed.
 (** Logical implication [impl] is a morphism for logical equivalence. *)
 
 #[global]
-Program Instance iff_iff_iff_impl_morphism@{s s'|?|} : Proper (iff ==> iff ==> iff) arrow@{s s'|_ _}.
+Program Instance iff_iff_iff_impl_morphism@{s s'|?|} : Proper (iff ++> iff ++> iff) arrow@{s s'|_ _}.
 
 (** Morphisms for quantifiers *)
 
 #[global]
-Program Instance ex_iff_morphism@{s s' s''|u?|} {A : Type@{s|_}} : Proper (pointwise_relation@{s Type s'|_ _ _} A iff@{s'|u u} ==> iff) (@sigma@{s s' s''|_ _} A).
+Program Instance ex_iff_morphism@{s s' s''|u?|} {A : Type@{s|_}} : Proper (pointwise_relation@{s Type s'|_ _ _} A iff@{s'|u u} ++> iff) (@sigma@{s s' s''|_ _} A).
 Next Obligation.
 compute. intros. firstorder. intros [? ?]; eexists; eauto. edestruct X; eauto.
 Qed.
 
 #[global]
 Program Instance ex_flip_impl_morphism@{s|?|?} {A : Type@{s|_}} :
-  Proper (pointwise_relation A (flip arrow) ==> flip arrow) (@sigmaR@{s|_ _} A) | 1.
+  Proper (pointwise_relation A (flip arrow) ++> flip arrow) (@sigmaR@{s|_ _} A) | 1.
 
 #[global]
 Program Instance all_iff_morphism@{s s'|?|} {A : Type@{s|_}} :
-  Proper (pointwise_relation A iff ==> iff) (@all@{s s'|_ _} A).
+  Proper (pointwise_relation A iff ++> iff) (@all@{s s'|_ _} A).
 Next Obligation.
 intros A x y r.
 constructor; intros H a;  apply r, H.
@@ -76,18 +76,18 @@ Qed.
 
 #[global]
 Program Instance all_impl_morphism {A : Type} :
-  Proper (pointwise_relation A impl ==> impl) (@all A) | 1.
+  Proper (pointwise_relation A impl ++> impl) (@all A) | 1.
 
 #[global]
 Program Instance all_flip_impl_morphism {A : Type} :
-  Proper (pointwise_relation A (flip impl) ==> flip impl) (@all A) | 1.
+  Proper (pointwise_relation A (flip impl) ++> flip impl) (@all A) | 1.
 
 (** Equivalent points are simultaneously accessible or not *)
 
 #[global]
 Instance Acc_pt_morphism {A:Type}(E R : A->A->Prop)
- `(Equivalence _ E) `(Proper _ (E==>E==>iff) R) :
- Proper (E==>iff) (Acc R).
+ `(Equivalence _ E) `(Proper _ (E++>E++>iff) R) :
+ Proper (E++>iff) (Acc R).
 Proof.
   apply proper_sym_arrow_iff.
   - auto with relations.
@@ -99,7 +99,7 @@ Qed.
 
 #[global]
 Instance Acc_rel_morphism {A:Type} :
- @Proper@{Type Prop|_ _} ((A -> A -> Prop) -> A -> Prop) (relation_equivalence ==> eq ==> iff@{Prop|_ _}) (@Acc A).
+ @Proper@{Type Prop|_ _} ((A -> A -> Prop) -> A -> Prop) (relation_equivalence ++> eq ++> iff@{Prop|_ _}) (@Acc A).
 Proof.
   apply proper_sym_arrow_iff_2.
   - red. symmetry. assumption.

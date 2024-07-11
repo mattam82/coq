@@ -6,7 +6,7 @@ Notation "f == g" := (forall x, f x = g x :> _) (at level 55).
 
 #[projections(primitive=no)]
 (** listings: isEquiv **)
-Record isEquiv@{sa sb se | a b} (A : Type@{sa|a}) (B: Type@{sb|b}) (f : A -> B) :=  {
+Record isEquiv@{sa sb se | a b|} (A : Type@{sa|a}) (B: Type@{sb|b}) (f : A -> B) :=  {
     sect : B -> A ;
     retr : B -> A ;
     sect_eq : f ∘ sect == id : Type@{se|_};
@@ -18,7 +18,7 @@ Section Equivalence.
   Universes a b.
   Context (A : Type@{sa|a}) (B: Type@{sb|b}).
 
-  Record equiv := { map :> A -> B ; map_is_equiv :> isEquiv map }.
+  Record equiv := { map :> A -> B ; map_is_equiv :> isEquiv@{sa sb se|a b} _ _ map }.
 
 End Equivalence.
 

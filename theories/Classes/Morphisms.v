@@ -98,10 +98,11 @@ Lemma rewrite_relation_pointwise@{sa sb srb|a b rb|} {A : Type@{sa|a}} {B : Type
 Proof. split. Qed.
 
 (** The non-dependent version is an instance where we forget dependencies. *)
+(** listings: respectful **)
 Definition respectful@{sa sb sra srb|a b ra rb|} {A : Type@{sa|a}} {B : Type@{sb|b}}
   (R : relation@{sa sra|a ra} A) (R' : relation@{sb srb|b rb} B)
-  : relation@{sb srb|_ _} (A -> B) :=
-  fun f g => forall x y, R x y -> R' (f x) (g y).
+  : relation@{sb srb|_ _} (A -> B) := fun f g => forall x y, R x y -> R' (f x) (g y).
+(** listings: end **)
 
 Lemma rewrite_relation_eq_dom@{sa sb sr se|a b r|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R}:
   RewriteRelation@{sb sr|max(a,b) max(a,r)} (respectful (@eq@{sa se|a} A) R).
@@ -113,7 +114,7 @@ Ltac rewrite_relation_fun :=
   (* If we're looking for a default rewrite relation on a
     function type, we favor pointwise equality *)
   class_apply @rewrite_relation_pointwise ||
-  (* The relation might be already determined to be (eq ==> _) instead of a
+  (* The relation might be already determined to be (eq ++> _) instead of a
     pointwise equality, but we want to treat them the same. No point in
     backtracking on the previous instance though *)
   class_apply @rewrite_relation_eq_dom.
@@ -173,11 +174,10 @@ Delimit Scope signature_scope with signature.
 
 Module ProperNotations.
 
-  Notation " R ++> R' " := (@respectful _ _ (R%signature) (R'%signature))
-    (right associativity, at level 55) : signature_scope.
-
-  Notation " R ==> R' " := (@respectful _ _ (R%signature) (R'%signature))
-    (right associativity, at level 55) : signature_scope.
+(** listings: respectfulNot **)
+Notation " R ++> R' " := (@respectful _ _ (R%signature) (R'%signature))
+  (right associativity, at level 55) : signature_scope.
+(** listings: end **)
 
   Notation " R --> R' " := (@respectful _ _ (flip (R%signature)) (R'%signature))
     (right associativity, at level 55) : signature_scope.
@@ -191,7 +191,7 @@ Export ProperNotations.
 
 Local Open Scope signature_scope.
 
-(** [solve_proper] try to solve the goal [Proper (?==> ... ==>?) f]
+(** [solve_proper] try to solve the goal [Proper (?++> ... ++>?) f]
     by repeated introductions and setoid rewrites. It should work
     fine when [f] is a combination of already known morphisms and
     quantifiers. *)
@@ -207,7 +207,7 @@ Ltac solve_respectful t :=
 Ltac solve_proper := unfold Proper; solve_respectful ltac:(idtac).
 
 (** [f_equiv] is a clone of [f_equal] that handles setoid equivalences.
-    For example, if we know that [f] is a morphism for [E1==>E2==>E],
+    For example, if we know that [f] is a morphism for [E1++>E2++>E],
     then the goal [E (f x y) (f x' y')] will be transformed by [f_equiv]
     into the subgoals [E1 x x'] and [E2 y y'].
 *)
@@ -219,7 +219,7 @@ Ltac f_equiv :=
     let Rx := fresh "R" in
     evar (Rx : relation T);
     let H := fresh in
-    assert (H : (Rx==>R)%signature f f');
+    assert (H : (Rx++>R)%signature f f');
     unfold Rx in *; clear Rx; [ f_equiv | apply H; clear H; try reflexivity ]
   | |- ?R ?f ?f' =>
     solve [change (Proper R f); eauto with typeclass_instances | reflexivity ]
@@ -257,7 +257,7 @@ Section Relations.
 
   (** Subrelations induce a morphism on the identity. *)
 
-  Global Instance subrelation_id_proper@{s'|b|} `(subrelation@{s s'|a b} A RA RA') : Proper (RA ==> RA') id.
+  Global Instance subrelation_id_proper@{s'|b|} `(subrelation@{s s'|a b} A RA RA') : Proper (RA ++> RA') id.
   Proof. firstorder. Qed.
 
   (** The subrelation property goes through products as usual. *)
@@ -267,7 +267,7 @@ Section Relations.
     (RB : relation@{s2 s2'|b rb} B) (RB' : relation@{s2 s2'|b rb} B)
     (subl : subrelation@{s s'|a ra} RA' RA)
     (subr : subrelation@{s2 s2'|b rb} RB RB') :
-    subrelation@{s2 s2'|max(a,b) max(a,ra,rb)} (RA ==> RB) (RA' ==> RB').
+    subrelation@{s2 s2'|max(a,b) max(a,ra,rb)} (RA ++> RB) (RA' ++> RB').
   Proof. intros f g rfg x y rxy. apply subr, rfg, subl, rxy. Qed.
 
   (** And of course it is reflexive. *)
@@ -287,7 +287,7 @@ Section Relations.
   Qed.
 
   Global Instance proper_subrelation_proper_arrow :
-    Proper (subrelation ++> eq ==> arrow) (@Proper A).
+    Proper (subrelation ++> eq ++> arrow) (@Proper A).
   Proof. reduce. destruct X0. firstorder. Qed.
 
   Global Instance pointwise_subrelation@{sb sr'|b r'|} {B : Type@{sb|b}} (R R' : relation@{sb sr'|b r'} B) (sub : subrelation R R') :
@@ -409,7 +409,7 @@ Section GenericInstances.
   Qed.
 
   Global Program Instance per_partial_app_type_morphism
-  `(PER A R) {x} : Proper (R ==> iff) (R x) | 2.
+  `(PER A R) {x} : Proper (R ++> iff) (R x) | 2.
 
   Next Obligation.
   Proof with auto.
@@ -425,7 +425,7 @@ Section GenericInstances.
 
   Global Program
   Instance trans_co_eq_inv_arrow_morphism@{| |}
-  (_ : Transitive R) : Proper (R ==> (@eq@{sa sra|a} A) ==> flip (C := Type@{sra|ra}) arrow) R | 2.
+  (_ : Transitive R) : Proper (R ++> (@eq@{sa sra|a} A) ++> flip (C := Type@{sra|ra}) arrow) R | 2.
 
   Next Obligation.
   Proof with auto.
@@ -436,7 +436,7 @@ Section GenericInstances.
   (** Every Symmetric and Transitive relation gives rise to an equivariant morphism. *)
 
   Global Program
-  Instance PER_type_morphism `(PER A R) : Proper (R ==> R ==> iff) R | 1.
+  Instance PER_type_morphism `(PER A R) : Proper (R ++> R ++> iff) R | 1.
 
   Next Obligation.
   Proof with auto.
@@ -452,20 +452,31 @@ Section GenericInstances.
   Lemma symmetric_equiv_flip@{} (HS : Symmetric R) :
     relation_equivalence R (flip (C:=Type@{sra | _}) R).
   Proof. red. unfold flip. intros x y; split; apply symmetry. Qed.
+  End GenericInstances.
 
   (** We can build a PER on the Coq function space if we have PERs on the domain and
    codomain. *)
 
-  Program Instance respectful_per@{sb srb | b rb |} (pera : PER R) {B} {R' : relation@{sb srb | b rb} B}
-   (perb : PER R') : PER (R ==> R').
+  Program
+(** listings: respectful_per **)
+Instance respectful_per@{sa sra sb srb | a ra b rb |}
+  {A} (R : relation@{sa sra | a ra} A) (pera : PER R)
+  {B} {R' : relation@{sb srb | b rb} B} (perb : PER R') : PER (R ++> R').
+(** listings: end **)
 
   Next Obligation.
   Proof with auto.
-    intros pera B R' perb x y z X X0 x0 y0 X1.
+    intros ? ? pera B R' perb x y z X X0 x0 y0 X1.
     assert(R x0 x0).
     - eapply transitivity with y0... apply symmetry. exact X1.
     - eapply transitivity with (y x0)...
   Qed.
+
+  Section GenericInstances.
+  (* Share universes *)
+  Sort sa sra.
+  Universe a ra.
+  Context (A : Type@{sa | a}) (R : relation@{sa sra | a ra} A).
 
  Unset Strict Universe Declaration.
 
@@ -476,8 +487,8 @@ Section GenericInstances.
   {B} {RB : relation@{sb srb | b rb} B}
   {C} {RC : relation@{sc src | c rc} C}
   (f : A -> B -> C)
-  (mor : Proper (R ==> RB ==> RC) f) :
-   Proper (RB ==> R ==> RC) (flip f) := _.
+  (mor : Proper (R ++> RB ++> RC) f) :
+   Proper (RB ++> R ++> RC) (flip f) := _.
 
  Next Obligation.
  Proof.
@@ -490,7 +501,7 @@ Section GenericInstances.
   Global Program Instance compose_proper@{sb srb sc src | b rb c rc |}
   {B} {RB : relation@{sb srb | b rb} B}
   {C} {RC : relation@{sc src | c rc} C} :
-  Proper ((RB ==> RC) ==> ((R ==> RB) ==> (R ==> RC))) (@compose A B C).
+  Proper ((RB ++> RC) ++> ((R ++> RB) ++> (R ++> RC))) (@compose A B C).
 
   Next Obligation.
   Proof.
@@ -519,7 +530,7 @@ Section GenericInstances.
   Lemma Reflexive_partial_app_morphism@{sb srb | b rb |}
     {B} {RB : relation@{sb srb | b rb} B}
     {m : A -> B}
-    (pm : Proper (R ==> RB) m) {x} (pr : ProperProxy R x) :
+    (pm : Proper (R ++> RB) m) {x} (pr : ProperProxy R x) :
     Proper@{sb srb | b rb} RB (m x).
   Proof. simpl_relation. Qed.
 
@@ -529,7 +540,7 @@ Section GenericInstances.
   Lemma flip_respectful@{sb srb | b rb| ?}
     {B} {RB : relation@{sb srb | b rb} B} :
     relation_equivalence@{sb srb | max(a,b) max(a, ra, rb)}
-    (flip (C:=Type@{srb | max(a, ra, rb)}) (R ==> RB)) (flip (C:=Type@{sra | ra}) R ==> flip (C:=Type@{srb | rb}) RB).
+    (flip (C:=Type@{srb | max(a, ra, rb)}) (R ++> RB)) (flip (C:=Type@{sra | ra}) R ++> flip (C:=Type@{srb | rb}) RB).
   Proof.
     intros.
     unfold flip, respectful.
@@ -561,7 +572,7 @@ End GenericInstances.
 Global Instance reflexive_eq_dom_reflexive@{sa sb sr | a b r |}
   {A : Type@{sa|a}} {B : Type@{sb|b}} {RB : relation@{sb sr | b r} B}
   (hr : Reflexive RB) :
-  Reflexive (@eq@{_ sr|a} A ==> RB).
+  Reflexive (@eq@{_ sr|a} A ++> RB).
 Proof. simpl_relation. Qed.
 
 Lemma proper_eq@{s | a |} {A : Type@{s | a}} (x : A) : Proper (@eq@{_ _|a} A) x.
@@ -618,7 +629,7 @@ Ltac partial_application_tactic :=
 (** Bootstrap !!! *)
 
 #[global]
-Instance proper_proper {A} : Proper (relation_equivalence ==> eq ==> iff) (@Proper A).
+Instance proper_proper {A} : Proper (relation_equivalence ++> eq ++> iff) (@Proper A).
 Proof.
   intros R R' HRR' x y eq; destruct eq. red in HRR'.
   split ; red ; intros X.
@@ -678,7 +689,7 @@ Section Normalize.
 End Normalize.
 
 Lemma flip_arrow `(NA : Normalizes A R (flip R'''), NB : Normalizes B R' (flip R'')) :
-  Normalizes (A -> B) (R ==> R') (flip (R''' ==> R'')%signature).
+  Normalizes (A -> B) (R ++> R') (flip (R''' ++> R'')%signature).
 Proof.
   unfold Normalizes in *. intros.
   eapply transitivity; [|eapply symmetry, flip_respectful].
@@ -710,16 +721,16 @@ Hint Extern 6 (@Proper _ _ _) => proper_normalization
 flip the relation on the codomain. Same for binary functions. *)
 
 Lemma proper_sym_flip :
-forall `(Symmetric A R1)`(Proper (A->B) (R1==>R2) f),
-Proper (R1==>flip R2) f.
+forall `(Symmetric A R1)`(Proper (A->B) (R1++>R2) f),
+Proper (R1++>flip R2) f.
 Proof.
 intros A R1 Sym B R2 f Hf.
 intros x x' Hxx'. apply Hf, Sym, Hxx'.
 Qed.
 
 Lemma proper_sym_flip_2 :
-forall `(Symmetric A R1)`(Symmetric B R2)`(Proper (A->B->C) (R1==>R2==>R3) f),
-Proper (R1==>R2==>flip R3) f.
+forall `(Symmetric A R1)`(Symmetric B R2)`(Proper (A->B->C) (R1++>R2++>R3) f),
+Proper (R1++>R2++>flip R3) f.
 Proof.
 intros A R1 Sym1 B R2 Sym2 C R3 f Hf.
 intros x x' Hxx' y y' Hyy'. apply Hf; auto.
@@ -730,15 +741,15 @@ Qed.
     Same with a binary relation. *)
 
 Lemma proper_sym_arrow_iff@{sa sra sf|a ra f|} : forall {A : Type@{sa|a}} {R : relation@{sa sra|a ra} A} {f : A -> Type@{sf|f}},
-  Symmetric R -> Proper (R==>arrow) f ->
-  Proper (R==>iff) f.
+  Symmetric R -> Proper (R++>arrow) f ->
+  Proper (R++>iff) f.
 Proof.
 intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
 
 Lemma proper_sym_arrow_iff_2@{sa sra sb srb sf|a ra b rb f|} :
-forall {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sa sra|a ra} A} {R' : relation@{sb srb|b rb} B} {f : A -> B -> Type@{sf|f}}, (Symmetric R) -> (Symmetric R') -> (Proper (R==>R'==>arrow) f) ->
-Proper (R==>R'==>iff) f.
+forall {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sa sra|a ra} A} {R' : relation@{sb srb|b rb} B} {f : A -> B -> Type@{sf|f}}, (Symmetric R) -> (Symmetric R') -> (Proper (R++>R'++>arrow) f) ->
+Proper (R++>R'++>iff) f.
 Proof.
 intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
 repeat red in Hf. split; eauto.
@@ -750,7 +761,7 @@ Qed.
 #[global]
 Instance PartialOrder_proper_type@{s s'|u v|} {A : Type@{s | u}} (eqA : relation@{s s' | u v} A) {isEq : Equivalence eqA}
   (R : relation@{s s' | u v} A) {isPreOrder : PreOrder R} (_ : PartialOrder eqA R) :
-    Proper (eqA==>eqA==>iff) R.
+    Proper (eqA++>eqA++>iff) R.
 Proof.
 intros.
 apply proper_sym_arrow_iff_2. 1-2: typeclasses eauto.
@@ -783,7 +794,7 @@ Qed.
     If the order is total, we could also say [ge = ~lt]. *)
 
 Lemma StrictOrder_PreOrder
-  `(Equivalence A eqA, StrictOrder A R,Proper _ (eqA==>eqA==>iff) R) :
+  `(Equivalence A eqA, StrictOrder A R,Proper _ (eqA++>eqA++>iff) R) :
   PreOrder (relation_disjunction R eqA).
 Proof.
 split.
@@ -800,7 +811,7 @@ Hint Extern 4 (PreOrder (relation_disjunction _ _)) =>
     class_apply StrictOrder_PreOrder : typeclass_instances.
 
 Lemma StrictOrder_PartialOrder
-    `(Equivalence A eqA, StrictOrder A R, H1 : Proper _ (eqA==>eqA==>iff) R) :
+    `(Equivalence A eqA, StrictOrder A R, H1 : Proper _ (eqA++>eqA++>iff) R) :
     @PartialOrder _ eqA _ (relation_disjunction R eqA) (StrictOrder_PreOrder _ _ H1).
 Proof.
 intros. intros x y. split.

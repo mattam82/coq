@@ -159,8 +159,8 @@ Local Open Scope signature_scope.
 
 Ltac red_subst_eq_morphism concl :=
   match concl with
-    | @eq ?A ==> ?R' => red ; intros ; subst ; red_subst_eq_morphism R'
-    | ?R ==> ?R' => red ; intros ; red_subst_eq_morphism R'
+    | @eq ?A ++> ?R' => red ; intros ; subst ; red_subst_eq_morphism R'
+    | ?R ++> ?R' => red ; intros ; red_subst_eq_morphism R'
     | _ => idtac
   end.
 
@@ -171,8 +171,8 @@ Ltac destruct_proper :=
 
 Ltac reverse_arrows x :=
   match x with
-    | @eq ?A ==> ?R' => revert_last ; reverse_arrows R'
-    | ?R ==> ?R' => do 3 revert_last ; reverse_arrows R'
+    | @eq ?A ++> ?R' => revert_last ; reverse_arrows R'
+    | ?R ++> ?R' => do 3 revert_last ; reverse_arrows R'
     | _ => idtac
   end.
 
@@ -180,7 +180,7 @@ Ltac default_add_morphism_tactic :=
   unfold flip ; intros ;
   (try destruct_proper) ;
   match goal with
-    | [ |- (?x ==> ?y) _ _ ] => red_subst_eq_morphism (x ==> y) ; reverse_arrows (x ==> y)
+    | [ |- (?x ++> ?y) _ _ ] => red_subst_eq_morphism (x ++> y) ; reverse_arrows (x ++> y)
   end.
 
 Ltac add_morphism_tactic := default_add_morphism_tactic.
