@@ -23,29 +23,32 @@ Require Import Notations.
 *)
 
 (** listings: sigma **)
-Inductive sigma@{s s' s''|u v| } (A:Type@{s|u}) (P:A -> Type@{s'|v}) :
-  Type@{s''|max(u,v)} :=
-    existP : forall x:A, P x -> sigma A P.
+Inductive sigma@{s s' s''|u v| } (A:Type@{s|u}) (P:A -> Type@{s'|v}) : Type@{s''|max(u,v)}
+  :=  exist : forall x:A, P x -> sigma A P.
 (** listings: end **)
 
-Arguments existP {_ _}.
+Arguments exist {_ _}.
 
 (* Register ? *)
-Definition projT1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ s|_ _} A P) : A := match p with existP a _ => a end.
 
-Definition projT2@{s|u v|} {A:Type@{s|u}} {P:A -> Type@{s|v}} (p : sigma@{_ _ s|_ _} A P) : P (projT1 p) := match p with existP _ b => b end.
+(** listings: proj1 **)
+Definition proj1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}}
+  (p : sigma@{s s' s|_ _} A P) : A := match p with exist a _ => a end.
+(** listings: end **)
+
+Definition proj2@{s|u v|} {A:Type@{s|u}} {P:A -> Type@{s|v}} (p : sigma@{_ _ s|_ _} A P) : P (proj1 p) := match p with exist _ b => b end.
 
 Definition π1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ Type|_ _} A P) : A :=
-  match p return A with existP a _ => a end.
+  match p return A with exist a _ => a end.
 
-Definition π2@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ Type|_ _} A P) : P (π1 p) := match p with existP _ b => b end.
+Definition π2@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ Type|_ _} A P) : P (π1 p) := match p with exist _ b => b end.
 
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{s Prop Prop|u Set} A P.
 
-Notation "'ex_intro'" := (existP@{_ Prop Prop| _ Set}) (at level 50).
+Notation "'ex_intro'" := (exist@{_ Prop Prop| _ Set}) (at level 50).
 
 Register ex as core.ex.type.
-Register existP as core.ex.intro.
+Register exist as core.ex.intro.
 
 Section ProjectionsProp.
 
@@ -67,7 +70,7 @@ Notation "'Σ' x .. y , B" := (sigma _ (fun x => .. (sigma _ (fun y => B)) ..))
    format "'[' 'Σ'  '/  ' x  ..  y ,  '/  ' B ']'")
   : type_scope.
 
-Notation "( x , .. , y , z )" := (existP x .. (existP y z) ..).
+Notation "( x , .. , y , z )" := (exist x .. (exist y z) ..).
 
 (* Rule order is important to give printing priority to fully typed exists *)
 
@@ -86,18 +89,18 @@ Notation "'exists' x .. y , p" := (ex (fun x => .. (ex (fun y => p)) ..))
 
 Definition sig@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Type@{s|u} := sigma@{s Prop s| u Set} A P.
  
-Notation exist := existP.
 Definition sig_rect@{u u'} := sigma_elim@{Type SProp Type | u Set u'}.
 
 Register sig as core.sig.type.
 
 Register sig_rect as core.sig.rect.
-Notation proj1_sig := projT1.
-Notation proj2_sig := projT2.
+Notation proj1_sig := proj1.
+Notation proj2_sig := proj2.
 
-
-Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)} := existR
-  { fst : A ; snd : P fst }.
+(** listings: sigmaR **)
+Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)}
+  := existR { fst : A ; snd : P fst }.
+(** listings: end **)
 
 Arguments fst {_ _}.
 Arguments snd {_ _}.
@@ -122,8 +125,6 @@ End Prod.
 Arguments prod : clear implicits.
 Notation "A * B" := (prod A B).
 Notation "A /\ B" := (prod@{Prop|_ _} A B).
-Notation proj1 := fst.
-Notation proj2 := snd.
 
 Register prod as core.prod.type.
 Register pair as core.prod.intro.
@@ -191,8 +192,8 @@ Register snd as core.sig.proj2.
 
     An element [x] of a sigma-type [{y:A & P y}] is a dependent pair
     made of an [a] of type [A] and an [h] of type [P a].  Then,
-    [(projT1 x)] is the first projection and [(projT2 x)] is the
-    second projection, the type of which depends on the [projT1]. *)
+    [(proj1 x)] is the first projection and [(projT2 x)] is the
+    second projection, the type of which depends on the [proj1]. *)
 
 Register fst as core.sigT.proj1.
 Register snd as core.sigT.proj2.

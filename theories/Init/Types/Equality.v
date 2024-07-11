@@ -68,8 +68,10 @@ Section GroupoidOperations.
   Definition eq_sym {x y : A} (e : x = y) : y = x :=
     match e with | eq_refl _ => eq_refl _ end.
 
-  Definition eq_trans {x y z : A} (e1 : x = y) : y = z -> x = z :=
+(** listings: eqtrans **)
+Definition eq_trans {x y z : A} (e1 : x = y) : y = z -> x = z :=
     match e1 with | eq_refl _ => fun x => x end.
+(** listings: end **)
 
   Definition tr@{b|} {B : Type@{sa|b}} (e : @eq@{_ sa|max(a+1,b+1)} Type@{sa|max(a,b)} A B) : A -> B :=
     match e in @eq _ _ B return A -> B with | eq_refl _ => fun x => x end.

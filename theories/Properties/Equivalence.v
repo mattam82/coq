@@ -4,18 +4,19 @@ Notation "f ∘ g" := (fun x => f (g x)) (at level 55).
 
 Notation "f == g" := (forall x, f x = g x :> _) (at level 55).
 
+#[projections(primitive=no)]
+(** listings: isEquiv **)
+Record isEquiv@{sa sb se | a b} (A : Type@{sa|a}) (B: Type@{sb|b}) (f : A -> B) :=  {
+    sect : B -> A ;
+    retr : B -> A ;
+    sect_eq : f ∘ sect == id : Type@{se|_};
+    retr_eq : retr ∘ f == id : Type@{se|_}}.
+(** listings: end **)
+
 Section Equivalence.
   Sorts sa sb se.
   Universes a b.
   Context (A : Type@{sa|a}) (B: Type@{sb|b}).
-
-  #[projections(primitive=no)]
-  Record isEquiv (f : A -> B) := {
-      sect : B -> A ;
-      retr : B -> A ;
-      sect_eq : f ∘ sect == id : Type@{se|_};
-      retr_eq : retr ∘ f == id : Type@{se|_};
-    }.
 
   Record equiv := { map :> A -> B ; map_is_equiv :> isEquiv map }.
 
@@ -71,7 +72,7 @@ Section SigmaAssocHom.
 
   (* All Sigma types in sort s *)
   Let T1 := sigma@{s s s|_ _} A (fun a => sigma@{s s s|_ _} (B a) (C a)).
-  Let T2 := sigma@{s s s|_ _} (sigma@{s s s|_ _} A B) (fun p => C (projT1 p) (projT2 p)).
+  Let T2 := sigma@{s s s|_ _} (sigma@{s s s|_ _} A B) (fun p => C (proj1 p) (proj2 p)).
 
   Definition f12 (t : T1) : T2 := let '(a, b, c) := t in ((a, b), c).
   Definition f21 (t : T2) : T1 := let '((a,b), c) := t in (a, b, c).

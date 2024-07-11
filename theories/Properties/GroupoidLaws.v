@@ -25,9 +25,11 @@ Section GroupoidLaws.
   Definition runit {x y : A} (e : x = y) : e @ rfl = e.
   Proof. induction e using eq_elim ; reflexivity. Defined.
 
-  Definition assoc {x y z w : A} (e1 : x = y) (e2 : y = z) (e3 : z = w) :
+(** listings: eqassoc **)
+Definition assoc {x y z w : A} (e1 : x = y) (e2 : y = z) (e3 : z = w) :
     e1 @ e2 @ e3 = (e1 @ e2) @ e3.
-  Proof. induction e1 using eq_elim; reflexivity. Defined.
+(** listings: end **)
+Proof. induction e1 using eq_elim; reflexivity. Defined.
 
   Definition inv_refl {x : A} : eq_sym rfl = rfl :> (x = x).
   Proof. reflexivity. Defined.

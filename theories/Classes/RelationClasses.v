@@ -28,16 +28,16 @@ Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
 (** We allow to unfold the [relation] definition while doing morphism search. *)
 
+(** listings: relation **)
 Section Defs.
   Sort s s'.
   Universe u v.
   Definition relation (A : Type@{s|u}) := A -> A -> Type@{s'|v}.
   Context {A : Type@{s|u}}.
 
-  (** We rebind relational properties in separate classes to be able to overload each proof. *)
-
   Class Reflexive (R : relation A) :=
     reflexivity : forall x : A, R x x.
+(** listings: end **)
 
   Definition complement (R : relation A) : relation A :=
     fun x y => R x y -> Empty.
