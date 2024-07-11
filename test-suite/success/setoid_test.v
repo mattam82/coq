@@ -85,7 +85,7 @@ Inductive set : Set :=
 
 Fixpoint In (a : A) (s : set) {struct s} : Prop :=
   match s with
-  | Empty => Empty.Empty
+  | Empty => empty
   | Add b s' => {a = b} + {In a s'}
   end.
 
