@@ -40,7 +40,7 @@ Section Defs.
 (** listings: end **)
 
   Definition complement (R : relation A) : relation A :=
-    fun x y => R x y -> Empty.
+    fun x y => R x y -> empty.
 
   (** Opaque for proof-search. *)
   Typeclasses Opaque complement iff.

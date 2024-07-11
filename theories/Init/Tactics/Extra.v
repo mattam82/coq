@@ -14,8 +14,8 @@ Require Import Types.
 
 (** * Useful tactics *)
 
-(** Ex falso quodlibet : a tactic for proving Empty instead of the current goal.
-    This is just a nicer name for tactics such as [cut Empty]. *)
+(** Ex falso quodlibet : a tactic for proving empty instead of the current goal.
+    This is just a nicer name for tactics such as [cut empty]. *)
 
 Ltac exfalso := Stdlib.Init.Tactics.Ltac.exfalso.
 
@@ -24,7 +24,7 @@ Ltac exfalso := Stdlib.Init.Tactics.Ltac.exfalso.
     -   H:~A |- ~B    gives  H: B |-  A
     -   H: A |-  B    gives       |- ~A
     -   H: A |- ~B    gives  H: B |- ~A
-    -   H:Empty leads to a resolved subgoal.
+    -   H:empty leads to a resolved subgoal.
    Moreover, negations may be in unfolded forms,
    and A or B may live in Type *)
 
@@ -42,17 +42,17 @@ Ltac contradict H :=
   in
   let neg H := match goal with
    | |- (~_) => negneg H
-   | |- (_->Empty) => negneg H
+   | |- (_->empty) => negneg H
    | |- _ => negpos H
   end in
   let pos H := match goal with
    | |- (~_) => posneg H
-   | |- (_->Empty) => posneg H
+   | |- (_->empty) => posneg H
    | |- _ => pospos H
   end in
   match type of H with
    | (~_) => neg H
-   | (_->Empty) => neg H
+   | (_->empty) => neg H
    | _ => (elim H;fail) || pos H
   end.
 
@@ -191,7 +191,7 @@ Ltac now_show c := change c.
 
 Set Implicit Arguments.
 
-Definition Empty_ind := Empty_elim.
+Definition empty_ind := empty_elim.
 
 Lemma decide_left : forall (C:Prop) (decide:({C}+{not@{Prop|Set} C} : Prop)),
   C -> forall P:({C}+{not@{Prop|Set} C} : Prop)->Prop, (forall H:C, P (left _ H)) -> P decide.
@@ -216,7 +216,7 @@ Tactic Notation "decide" constr(lemma) "with" constr(H) :=
      (let H' := fresh in intro H'; try clear H') in
   match type of H with
   | ~ ?C => apply (decide_right lemma H); try_to_merge_hyps H
-  | ?C -> Empty => apply (decide_right lemma H); try_to_merge_hyps H
+  | ?C -> empty => apply (decide_right lemma H); try_to_merge_hyps H
   | _ => apply (decide_left lemma H); try_to_merge_hyps H
   end.
 

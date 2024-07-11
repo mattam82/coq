@@ -12,14 +12,17 @@ Require Import PreludeOptions.
 Require Import Notations.
 
 (** listings: empty **)
-Inductive Empty@{s| |} : Type@{s|0} :=.
+Inductive empty@{s| |} : Type@{s|0} :=.
 (** listings: end **)
 
-Definition not@{s|u|} (A : Type@{s|u}) := forall (_ : A), Empty@{s|}.
+Notation False := empty@{Prop|}.
+Notation SFalse := empty@{SProp|}.
 
-Definition False_rect@{s|u|} (P : Empty@{Prop|} -> Type@{s|u}) u : P u := match u with end.
+Definition not@{s|u|} (A : Type@{s|u}) := forall (_ : A), empty@{s|}.
+
+Definition False_rect@{s|u|} (P : False -> Type@{s|u}) u : P u := match u with end.
 
 Notation "~ x" := (not x).
 
 Register not as core.not.type.
-Register Empty as core.False.type.
+Register empty as core.False.type.

@@ -39,8 +39,9 @@ Section Proper.
   Universe u v.
   Context {A : Type@{s|u}}.
 
-  Class Proper (R : relation@{s s'|u v} A) (m : A) :=
-    proper_prf : R m m.
+(** listings: proper **)
+Class Proper (R : relation@{s s'|u v} A) (m : A) := proper_prf : R m m.
+(** listings: end **)
 
   (** Every element in the carrier of a reflexive relation is a morphism
    for this relation.  We use a proxy class for this case which is used

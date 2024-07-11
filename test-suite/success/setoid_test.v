@@ -1,10 +1,79 @@
-Require Import TestSuite.admit.
+(*Require Import TestSuite.admit.*)
+
+Axiom proof_admitted : empty.
+Ltac admit := case proof_admitted.
 
 Require Import Setoid.
 Import Morphisms.
 Require Import Coq.Classes.Morphisms_Prop.
 
 Unset Universe Polymorphism.
+
+Module TestSProp.
+
+(** listings: same **)
+Parameter A : Type.
+
+Inductive set : Type :=
+| Empty : set
+| Add : A -> set -> set.
+
+Fixpoint In (a : A) (s : set) {struct s} : SProp :=
+  match s with
+  | Empty => empty
+  | Add b s' => {a = b} + {In a s'}
+  end.
+
+Definition same (s t : set) : SProp := forall a : A, In a s <-> In a t.
+(** listings: end **)
+
+  Instance same_Symmetric : Symmetric same.
+  Proof.
+    red; unfold same; intros. symmetry. eauto.
+  Qed.
+
+  Instance same_Refl : Reflexive same.
+  Proof.
+    red; unfold same; intros; reflexivity.
+  Qed.
+
+  Lemma add_aux :
+ forall s t : set,
+ same s t -> forall a b : A, In a (Add b s) -> In a (Add b t).
+unfold same; destruct 2; intros.
+destruct e.
+simpl; left; reflexivity.
+
+elim (H a).
+intros.
+simpl; right.
+apply (fst i).
+Qed.
+
+(** listings: add_ext **)
+Instance Add_ext : Proper (eq ++> same ++> same) Add.
+(** listings: end **)
+  intros x ? <- a b r.
+  split; apply add_aux.
+  assumption. symmetry; trivial.
+  Qed.
+
+(** listings: P_ext **)
+Parameter P : set -> SProp.
+Parameter P_ext : forall s t : set, same s t -> P s -> P t.
+Instance P_extt : Proper (same ++> iff) P.
+(** listings: end **)
+intros; split; apply P_ext; [assumption | apply symmetry; assumption].
+  Qed.
+
+(** listings: test_rewrite **)
+Lemma test_rewrite: forall (a : A) (s t : set), same s t -> P (Add a s) -> P (Add a t).
+Proof.
+  intros. setoid_rewrite <- H. trivial.
+Qed.
+(** listings: end **)
+
+End TestSProp.
 
 Parameter A : Set.
 
