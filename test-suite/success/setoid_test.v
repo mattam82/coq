@@ -1,4 +1,5 @@
 Require Import TestSuite.admit.
+
 Require Import Setoid.
 Import Morphisms.
 Require Import Coq.Classes.Morphisms_Prop.
@@ -28,7 +29,7 @@ unfold same; split; red.
 - intros. destruct (H a); destruct (H0 a); split; auto.
 Qed.
 
-Instance In_ext : Proper@{Type Prop|Set+1 Set} (eq@{Type Prop|_} ==> same ==> iff@{Prop | Set Set}) In.
+Instance In_ext : Proper@{Type Prop|Set+1 Set} (eq@{Type Prop|_} ++> same ++> iff@{Prop | Set Set}) In.
 Proof.
   unfold same.
   intros x y a s t H.
@@ -50,7 +51,7 @@ simpl; right.
 apply (fst i).
 Qed.
 
-Instance Add_ext : Proper@{Type Prop|_ _} (eq ==> same ==> same) Add.
+Instance Add_ext : Proper@{Type Prop|_ _} (eq ++> same ++> same) Add.
 intros x ? <- a b r.
 split; apply add_aux.
 assumption.
@@ -97,7 +98,7 @@ Qed.
 Parameter P : set -> Prop.
 Parameter P_ext : forall s t : set, same s t -> P s -> P t.
 
-Instance P_extt : Proper (same ==> iff) P.
+Instance P_extt : Proper (same ++> iff) P.
 intros; split; apply P_ext; (assumption || apply symmetry; assumption).
 Qed.
 
@@ -122,7 +123,7 @@ Instance eq_rel_relation {A : Set} : @RewriteRelation@{Type Prop | Set Set} (id 
   (@eq@{Type Prop | Set Set} A).
 Qed. *)
 
-Instance f_morph : Proper (eq ==> eq) (@f A).
+Instance f_morph : Proper (eq ++> eq) (@f A).
 Proof.
 intros ? ? ?.
 trivial.
@@ -203,7 +204,7 @@ Qed.
 Axiom add_0_r_peq : forall x : nat, eq (plus x O)%nat x.
 
 #[export] Instance All_proper {A} :
-  Morphisms.Proper ((pointwise_relation A iff) ==> eq ==> iff) All.
+  Morphisms.Proper ((pointwise_relation A iff) ++> eq ++> iff) All.
 Proof.
   intros f g Hfg x y e. destruct e. split; apply All_impl, Hfg.
 Qed.
@@ -260,7 +261,7 @@ Axiom add_0_r_eq : forall x : nat, eq (plus x O)%nat x.
 
 #[universes(polymorphic), export]
 Instance All_proper {A} :
-  Morphisms.Proper ((pointwise_relation A iff) ==> eq ==> iff) All.
+  Morphisms.Proper ((pointwise_relation A iff) ++> eq ++> iff) All.
 Proof.
   intros f g Hfg x y e. destruct e. split; apply All_impl, Hfg.
 Qed.
