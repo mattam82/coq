@@ -1,17 +1,6 @@
 Installing From Sources
 =======================
 
-To install and use Coq, we recommend relying on [the Coq
-platform](https://github.com/coq/platform/) or on a package manager
-(e.g. opam or Nix).
-
-See https://coq.inria.fr/download and
-https://github.com/coq/coq/wiki#coq-installation to learn more.
-
-If you need to build Coq from sources manually (e.g. to
-contribute to Coq or to write a Coq package), the remainder of this
-file explains how to do so.
-
 Build Requirements
 ------------------
 
