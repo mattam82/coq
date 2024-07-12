@@ -30,13 +30,10 @@ Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
 (** listings: relation **)
 Section Defs.
-  Sort s s'.
-  Universe u v.
+  Sort s s'. Universe u v.
   Definition relation (A : Type@{s|u}) := A -> A -> Type@{s'|v}.
   Context {A : Type@{s|u}}.
-
-  Class Reflexive (R : relation A) :=
-    reflexivity : forall x : A, R x x.
+  Class Reflexive (R : relation A) := reflexivity : forall x : A, R x x.
 (** listings: end **)
 
   Definition complement (R : relation A) : relation A :=

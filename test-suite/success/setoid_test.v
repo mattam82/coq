@@ -17,7 +17,6 @@ Parameter A : Type.
 Inductive set : Type :=
 | Empty : set
 | Add : A -> set -> set.
-
 Fixpoint In (a : A) (s : set) {struct s} : SProp :=
   match s with
   | Empty => empty
