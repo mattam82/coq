@@ -63,9 +63,9 @@ intros; split; apply P_ext; [assumption | apply symmetry; assumption].
   Qed.
 
 (** listings: test_rewrite **)
-Lemma test_rewrite: forall (a : A) (s t : set), same s t -> P (Add a s) -> P (Add a t).
+Lemma test_rewrite (a : A) (s t : set) : same s t -> P (Add a s) -> P (Add a t).
 Proof.
-  intros. setoid_rewrite <- H. trivial.
+  intros H pas. setoid_rewrite <- H. assumption.
 Qed.
 (** listings: end **)
 
