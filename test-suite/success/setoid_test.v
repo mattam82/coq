@@ -11,9 +11,9 @@ Unset Universe Polymorphism.
 
 Module TestSProp.
 
-(** listings: same **)
 Parameter A : Type.
 
+(** listings: same **)
 Inductive set : Type :=
 | Empty : set
 | Add : A -> set -> set.
@@ -27,15 +27,12 @@ Fixpoint In (a : A) (s : set) {struct s} : SProp :=
 Definition same (s t : set) : SProp := forall a : A, In a s <-> In a t.
 (** listings: end **)
 
-  Instance same_Symmetric : Symmetric same.
-  Proof.
-    red; unfold same; intros. symmetry. eauto.
-  Qed.
-
-  Instance same_Refl : Reflexive same.
-  Proof.
-    red; unfold same; intros; reflexivity.
-  Qed.
+Instance setoid_set : Equivalence@{Type SProp|_ _} same.
+unfold same; split; red.
+- tauto.
+- intros. destruct (H a); split; auto.
+- intros. destruct (H a); destruct (H0 a); split; auto.
+Qed.
 
   Lemma add_aux :
  forall s t : set,
