@@ -679,7 +679,11 @@ let sort_of env sigma c =
 (* Try to solve the existential variables by typing *)
 
 let type_of ?(refresh=false) env sigma c =
-  let sigma, j = execute env sigma c in sigma, j.uj_type
+  let sigma, j = execute env sigma c in
+  (* side-effect on evdref *)
+    if refresh then
+      Evarsolve.refresh_universes ~status:Evd.UnivFlexible ~onlyalg:true (Some false) env sigma j.uj_type
+    else sigma, j.uj_type
 
 let solve_evars env sigma c =
   let sigma, j = execute env sigma c in
