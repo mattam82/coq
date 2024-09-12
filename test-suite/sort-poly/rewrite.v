@@ -20,3 +20,15 @@ Proof.
   rewrite e.
   trivial.
 Defined.
+
+Definition foo5 (A B : Type@{0}) (e : A = B) : A -> B.
+Proof.
+  rewrite e.
+  trivial.
+Defined.
+
+Definition foo6 (A B : Type@{0}) (e : A = B :> _ : SProp) : A -> B.
+Proof.
+  rewrite e.
+  trivial.
+Defined.

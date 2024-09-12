@@ -328,11 +328,13 @@ let eq_elimination_ref l2r sort =
       match sort with
       | QConstant QProp -> "core.eq.ind_r"
       | QConstant QType -> "core.eq.rect_r"
+      | QConstant QSProp -> "core.eq.sind_r"
       | _ -> "core.eq.poly_r"
     else
       match sort with
       | QConstant QProp -> "core.eq.ind"
       | QConstant QType -> "core.eq.rect"
+      | QConstant QSProp -> "core.eq.sind"
       | _ -> "core.eq.poly"
   in
   Rocqlib.lib_ref_opt name
@@ -822,7 +824,7 @@ let find_positions env sigma ~keep_proofs ~no_discr t1 t2 =
             project env sorts posn t1_0 t2_0
   in
   try
-    let sorts = if keep_proofs then [InSet;InType;InProp] else [InSet;InType] in
+    let sorts = if keep_proofs then [InSet;InType;InProp;InSProp] else [InSet;InType;InSProp] in
     Inr (findrec sorts [] t1 t2)
   with DiscrFound (path,c1,c2) ->
     Inl (path,c1,c2)

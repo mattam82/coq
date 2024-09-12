@@ -117,7 +117,7 @@ Definition eq_singleton_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}
 
 Definition eq_ind_r@{α|u|} := eq_singleton_r@{α Prop | u Set}.
 
-Register eq_ind_r as core.eq.ind_r.
+Register eq_singleton_r as core.eq.ind_r.
 
 Definition eq_elim_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, eq@{_ β |_} x y -> P y :=
@@ -159,3 +159,16 @@ Definition f_equal2@{s1 s2 s' e|u1 u2 v|}
   fun e1 => match e1 with | eq_refl => fun e2 => match e2 with | eq_refl => eq_refl end end.
 
 Register f_equal2 as core.eq.congr2.
+
+Axiom cast@{α|u| } : forall (A B:Type@{α|u}) (e: A = B :> _ : SProp), A -> B.
+
+Definition eq_cast@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, (x = y :> _ : SProp) -> P y :=
+  fun px y e => cast (P x) (P y) (f_equal P e) px.
+
+Definition eq_cast_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
+  P x -> forall y:A, (y = x :> _ : SProp) -> P y :=
+  fun px y e => eq_cast _ x P px y (eq_sym e).
+
+Register eq_cast_r as core.eq.sind_r.
+Register eq_cast as core.eq.sind.
