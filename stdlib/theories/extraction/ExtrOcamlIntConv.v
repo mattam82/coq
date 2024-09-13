@@ -12,7 +12,7 @@
 
     Nota: no check that [int] values aren't generating overflows *)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 
 Require Import Arith ZArith.
 

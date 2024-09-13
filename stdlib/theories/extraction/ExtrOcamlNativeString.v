@@ -11,7 +11,7 @@
 (* Extraction to Ocaml : extract ascii to OCaml's char type
    and string to OCaml's string type. *)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 
 Require Import Ascii String Stdlib.Strings.Byte.
 Require Export ExtrOcamlChar.

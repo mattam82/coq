@@ -14,10 +14,10 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
-Require Coq.Classes.RelationClasses.
-Require Import Coq.Classes.Morphisms.
-Require Export Coq.Classes.RelationClasses.
-Require Import Coq.Program.Basics.
+Require Stdlib.Classes.RelationClasses.
+Require Import Corelib.Classes.Morphisms.
+Require Export Stdlib.Classes.RelationClasses.
+Require Import Corelib.Program.Basics.
 
 Generalizable Variables A R.
 
@@ -153,7 +153,7 @@ Tactic Notation "setoid_replace" constr(x) "with" constr(y)
    [respectful] calls and substitute leibniz equalities. One can
    redefine it using [Ltac add_morphism_tactic ::= t]. *)
 
-Require Import Coq.Program.Tactics.
+Require Import Corelib.Program.Tactics.
 
 Local Open Scope signature_scope.
 

@@ -5,7 +5,7 @@ Ltac admit := case proof_admitted.
 
 Require Import Setoid.
 Import Morphisms.
-Require Import Coq.Classes.Morphisms_Prop.
+Require Import Corelib.Classes.Morphisms_Prop.
 
 Unset Universe Polymorphism.
 

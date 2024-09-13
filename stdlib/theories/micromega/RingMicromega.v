@@ -22,7 +22,7 @@ Require Import List.
 Require Import Bool.
 Require Import OrderedRing.
 Require Import Refl.
-Require Stdlib.micromega.Tauto.
+Require Corelib.micromega.Tauto.
 
 Set Implicit Arguments.
 

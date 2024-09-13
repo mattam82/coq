@@ -244,10 +244,10 @@ Tactic Notation "revert" "dependent" hyp(h) :=
     shadow this notation with the actual tactics. *)
 
 Tactic Notation "dependent" "induction" ident(H) :=
-  fail "To use dependent induction, first [Require Import Coq.Program.Equality.]".
+  fail "To use dependent induction, first [Require Import Stdlib.Program.Equality.]".
 
 Tactic Notation "dependent" "destruction" ident(H) :=
-  fail "To use dependent destruction, first [Require Import Coq.Program.Equality.]".
+  fail "To use dependent destruction, first [Require Import Stdlib.Program.Equality.]".
 
 (** A version of [time] that works for constrs *)
 

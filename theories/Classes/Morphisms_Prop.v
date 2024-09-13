@@ -14,9 +14,9 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
-Require Import Coq.Classes.Morphisms.
-Require Import Coq.Program.Basics.
-Require Import Coq.Program.Tactics.
+Require Import Corelib.Classes.Morphisms.
+Require Import Corelib.Program.Basics.
+Require Import Corelib.Program.Tactics.
 
 Local Obligation Tactic := try solve [simpl_relation | firstorder auto].
 

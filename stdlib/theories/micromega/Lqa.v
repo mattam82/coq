@@ -19,7 +19,7 @@ Require Import QArith.
 Require Import RingMicromega.
 Require Import VarMap.
 Require Import DeclConstant.
-Require Stdlib.micromega.Tauto.
+Require Corelib.micromega.Tauto.
 Declare ML Module "rocq-runtime.plugins.micromega_core".
 Declare ML Module "rocq-runtime.plugins.micromega".
 

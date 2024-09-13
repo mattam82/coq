@@ -1,5 +1,5 @@
 Axiom proof_admitted : False.
-Require Export Coq.Classes.CMorphisms.
+Require Export Stdlib.Classes.CMorphisms.
 Import Datatypes.
 Tactic Notation "admit" := abstract case proof_admitted.
 Require Corelib.Program.Basics Corelib.Program.Tactics.

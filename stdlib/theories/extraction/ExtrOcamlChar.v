@@ -10,7 +10,7 @@
 
 (* Extraction to Ocaml : extract ascii to OCaml's char type *)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 
 Require Import Ascii String Stdlib.Strings.Byte.
 Require Export ExtrOcamlBasic.

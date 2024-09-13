@@ -2,7 +2,7 @@
  * Special handling of ascii and strings for extraction to Haskell.
  *)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 
 Require Import Ascii.
 Require Import String.

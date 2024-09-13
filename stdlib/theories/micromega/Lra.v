@@ -19,7 +19,7 @@ Require Import QMicromega.
 Require Import Rdefinitions.
 Require Import RingMicromega.
 Require Import VarMap.
-Require Stdlib.micromega.Tauto.
+Require Corelib.micromega.Tauto.
 Require Import Rregisternames.
 
 Declare ML Module "rocq-runtime.plugins.micromega".

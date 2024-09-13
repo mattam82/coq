@@ -8,5 +8,5 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 Declare ML Module "rocq-runtime.plugins.funind".

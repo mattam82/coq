@@ -8,7 +8,7 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Coq.Classes.ProperTactics.
+Require Export Stdlib.Classes.ProperTactics.
 
 Export Morphisms.ProperNotations.
 

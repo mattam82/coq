@@ -1,6 +1,6 @@
 (** Extraction of [nat] into Haskell's [Int] *)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 
 Require Import Arith.
 Require Import ExtrHaskellNatNum.

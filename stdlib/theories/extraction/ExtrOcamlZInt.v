@@ -10,7 +10,7 @@
 
 (** Extraction of [positive], [N] and [Z] into Ocaml's [int] *)
 
-Require Stdlib.extraction.Extraction.
+Require Corelib.extraction.Extraction.
 
 Require Import ZArith NArith.
 Require Import ExtrOcamlBasic.
