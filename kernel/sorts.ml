@@ -521,6 +521,11 @@ let debug_print = function
   | QSort (q, u) -> Pp.(str "QSort(" ++ QVar.raw_pr q ++ str ","
                         ++ spc() ++ Univ.Universe.raw_pr u ++ str ")")
 
+let debug_print_relevance = function
+  | Irrelevant -> Pp.(str "Irrelevant")
+  | Relevant -> Pp.(str "Relevant")
+  | RelevanceVar qv -> Pp.(str "RelevanceVar(" ++ QVar.raw_pr qv ++ str")")
+
 let pr_sort_family = function
   | InSProp -> Pp.(str "SProp")
   | InProp -> Pp.(str "Prop")

@@ -32,6 +32,8 @@ open Context.Rel.Declaration
 
 module NamedDecl = Context.Named.Declaration
 
+let _debug_environ, debug = CDebug.create_full ~name:"environ" ()
+
 (* The type of environments. *)
 
 (* The key attached to each constant is used by the VM to retrieve previous *)
@@ -266,6 +268,9 @@ let lookup_mind kn env =
     while replacing names using [nas] (order reversed)
 *)
 let instantiate_context u subst nas ctx =
+  (* debug Pp.(fun () -> str"Instantiating context " ++
+    UVars.Instance.pr Sorts.QVar.raw_pr Univ.Universe.raw_pr u ++ spc () ++
+    debug_print (Term.it_mkProd_or_LetIn Constr.mkSProp ctx) ); *)
   let open Context.Rel.Declaration in
   let get_binder i na =
     Context.
@@ -463,8 +468,6 @@ let add_constraints c env =
 
 let check_constraints c env =
   UGraph.check_constraints c env.env_universes
-
-let _debug_environ, debug = CDebug.create_full ~name:"environ" ()
 
 let add_universes ~lbound ~strict ctx g =
   let _qs, us = UVars.LevelInstance.to_array (UVars.UContext.instance ctx) in

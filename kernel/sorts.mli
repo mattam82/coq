@@ -205,6 +205,7 @@ val relevance_of_sort : t -> relevance
 val relevance_of_sort_family : family -> relevance
 
 val debug_print : t -> Pp.t
+val debug_print_relevance : relevance -> Pp.t
 
 val pr_sort_family : family -> Pp.t
 

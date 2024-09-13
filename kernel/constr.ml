@@ -1560,18 +1560,20 @@ let rec debug_print c =
   | Cast (c,_, t) -> hov 1
       (str"(" ++ debug_print c ++ cut() ++
        str":" ++ debug_print t ++ str")")
-  | Prod ({binder_name=Name id;_},t,c) -> hov 1
-      (str"forall " ++ Id.print id ++ str":" ++ debug_print t ++ str"," ++
+  | Prod ({binder_name=Name id;binder_relevance=rel},t,c) -> hov 1
+      (str"forall " ++ Id.print id ++ str":" ++ debug_print t ++ str"(" ++ Sorts.debug_print_relevance rel ++ str")" ++ str"," ++
        spc() ++ debug_print c)
-  | Prod ({binder_name=Anonymous;_},t,c) -> hov 0
-      (str"(" ++ debug_print t ++ str " ->" ++ spc() ++
+  | Prod ({binder_name=Anonymous;binder_relevance=rel},t,c) -> hov 0
+      (str"(" ++ debug_print t ++ str"(" ++ Sorts.debug_print_relevance rel ++ str")" ++ str " ->" ++ spc() ++
        debug_print c ++ str")")
   | Lambda (na,t,c) -> hov 1
       (str"fun " ++ Name.print na.binder_name ++ str":" ++
-       debug_print t ++ str" =>" ++ spc() ++ debug_print c)
+       debug_print t ++ str"(" ++ Sorts.debug_print_relevance na.binder_relevance ++ str")"
+       ++ str" =>" ++ spc() ++ debug_print c)
   | LetIn (na,b,t,c) -> hov 0
       (str"let " ++ Name.print na.binder_name ++ str":=" ++ debug_print b ++
-       str":" ++ brk(1,2) ++ debug_print t ++ cut() ++
+       str":" ++ brk(1,2) ++ debug_print t ++  str"(" ++ Sorts.debug_print_relevance na.binder_relevance ++ str")" ++
+       cut() ++
        debug_print c)
   | App (c,l) ->  hov 1
       (str"(" ++ debug_print c ++ spc() ++
@@ -1587,13 +1589,15 @@ let rec debug_print c =
       str"Constr(" ++ pr_puniverses (MutInd.print sp ++ str"," ++ int i ++ str"," ++ int j) u ++ str")"
   | Proj (p,_r,c) ->
     str"Proj(" ++ Projection.debug_print p ++ str"," ++ debug_print c ++ str")"
-  | Case (_ci,_u,pms,(p,_),iv,c,bl) ->
+  | Case (_ci,u,pms,(p,_),iv,c,bl) ->
     let pr_ctx (nas, c) =
       hov 2 (hov 0 (prvect (fun na -> Name.print na.binder_name ++ spc ()) nas ++ str "|-") ++ spc () ++
         debug_print c)
     in
     v 0 (hv 0 (str"Case" ++ brk (1,1) ++
-             debug_print c ++ spc () ++ str "params" ++ brk (1,1) ++ prvect (fun x -> spc () ++ debug_print x) pms ++
+             debug_print c ++
+             spc () ++ str "params" ++ brk (1,1) ++ prvect (fun x -> spc () ++ debug_print x) pms ++
+             spc () ++ str "univs" ++ brk (1,1) ++ UVars.Instance.pr Sorts.QVar.raw_pr Univ.Universe.raw_pr u ++
              spc () ++ str"return"++ brk (1,1) ++ pr_ctx p ++ debug_invert iv ++ spc () ++ str"with") ++
        prvect (fun b -> spc () ++ pr_ctx b) bl ++
        spc () ++ str"end")
