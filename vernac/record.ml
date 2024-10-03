@@ -177,6 +177,7 @@ module DefClassEntry = struct
 
 type t = {
   univs : UState.named_universes_entry;
+  variances : Entries.variance_entry;
   name : lident;
   projname : lident;
   params : Constr.rel_context;
@@ -381,6 +382,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
     in
     DefclassEntry {
       univs;
+      variances;
       name;
       projname;
       params;
@@ -891,10 +893,14 @@ let declare_structure (decl:Record_decl.t) =
   let inds = List.mapi map data in
   Declared.Record kn, inds
 
+let fix_variances v =
+  if Array.for_all Option.is_empty v then None
+  else Some (Array.map (function None -> UVars.Variance.Invariant | Some v -> v) v)
+
 (* declare definitional class (typeclasses that are not record) *)
 (* [data.is_coercion] must be [NoCoercion] and [data.proj_flags] must have exactly 1 element. *)
 let declare_class_constant entry (data:Data.t) =
-  let { DefClassEntry.univs; name; projname; params; sort; typ; projtyp;
+  let { DefClassEntry.univs; variances; name; projname; params; sort; typ; projtyp;
         inhabitant_id; impls; projimpls; }
     = entry
   in
@@ -911,8 +917,9 @@ let declare_class_constant entry (data:Data.t) =
   in
   let class_body = it_mkLambda_or_LetIn projtyp params in
   let class_type = it_mkProd_or_LetIn typ params in
+  let variances = fix_variances variances in
   let class_entry =
-    Declare.definition_entry ~types:class_type ~univs class_body in
+    Declare.definition_entry ~types:class_type ~univs ?variances class_body in
   let cst = Declare.declare_constant ?loc:name.loc ~name:name.v
       (Declare.DefinitionEntry class_entry) ~kind:Decls.(IsDefinition Definition)
   in
