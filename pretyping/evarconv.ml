@@ -462,7 +462,7 @@ let compare_heads pbty env evd ~nargs term term' =
     else
       let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
       let cst = lookup_constant c env in
-      (match cst.const_variance with
+      (match Declareops.universes_variances cst.const_universes with
       | Some variance ->
         let prc = Termops.Internal.print_constr_env env evd in
         Feedback.msg_debug Pp.(str"Comparing instances cumulativity " ++  prc term ++ if pbty == CONV then str"=" else str"≤" ++ prc term');
@@ -475,7 +475,7 @@ let compare_heads pbty env evd ~nargs term term' =
       let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
       let mind = Environ.lookup_mind mi env in
       let open Declarations in
-      begin match mind.mind_variance with
+      begin match Declareops.universes_variances mind.mind_universes with
         | None -> check_strict evd u u'
         | Some variances ->
           let needed = UCompare.inductive_cumulativity_arguments (mind,i) in
@@ -492,7 +492,7 @@ let compare_heads pbty env evd ~nargs term term' =
       let u = EInstance.kind evd u and u' = EInstance.kind evd u' in
       let mind = Environ.lookup_mind mi env in
       let open Declarations in
-      begin match mind.mind_variance with
+      begin match Declareops.universes_variances mind.mind_universes with
         | None -> check_strict evd u u'
         | Some variances ->
           let needed = UCompare.constructor_cumulativity_arguments (mind,ind,ctor) in
