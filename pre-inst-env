@@ -1,0 +1,7 @@
+#!/usr/bin/env -S bash
+
+export PATH="$(pwd)/_build/install/default/bin/:$PATH"
+export OCAMLPATH="$(pwd)/_build/install/default/lib/:$OCAMLPATH"
+export PS1="(coq) $PS1"
+
+exec "$@"
