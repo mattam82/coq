@@ -234,8 +234,8 @@ Section Relations.
 
   (** Dependent pointwise lifting of a relation on the range. *)
 
-  Definition all_relation@{sr|r|} (P : A -> Type@{s|a})
-             (sig : forall a, relation@{s sr|a r} (P a)) : relation@{s sr|a max(a,r)} (forall x, P x) :=
+  Definition all_relation@{sb sr|b r|} (B : A -> Type@{sb|b})
+             (sig : forall a, relation@{sb sr|b r} (B a)) : relation (forall x, B x) :=
     fun f g => forall a, sig a (f a) (g a).
 
   Lemma pointwise_pointwise@{s' sb|r b|} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
@@ -302,7 +302,7 @@ Section Relations.
   Proof. reduce. firstorder. Qed.
 End Relations.
 Global Typeclasses Opaque respectful pointwise_relation all_relation.
-Arguments all_relation {A P}%_type sig%_signature _ _.
+Arguments all_relation {A B}%_type sig%_signature _ _.
 Arguments pointwise_relation A%_type {B}%_type R%_signature _ _.
 
 #[global]
