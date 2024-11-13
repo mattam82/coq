@@ -91,7 +91,7 @@ Definition sig@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Type@{s|u} := sigma@{s Prop
  
 Definition sig_rect@{u u'} := sigma_elim@{Type SProp Type | u Set u'}.
 
-Register sig as core.sig.type.
+Register sigma as core.sig.type.
 
 Register sig_rect as core.sig.rect.
 Notation proj1_sig := proj1.
