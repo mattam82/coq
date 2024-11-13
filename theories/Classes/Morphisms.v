@@ -102,7 +102,7 @@ Proof. split. Qed.
 (** listings: respectful **)
 Definition respectful@{sa sb sra srb|a b ra rb|} {A : Type@{sa|a}} {B : Type@{sb|b}}
   (R : relation@{sa sra|a ra} A) (R' : relation@{sb srb|b rb} B)
-  : relation@{sb srb|_ _} (A -> B) := fun f g => forall x y, R x y -> R' (f x) (g y).
+  : relation (A -> B) := fun f g => forall x y, R x y -> R' (f x) (g y).
 (** listings: end **)
 
 Lemma rewrite_relation_eq_dom@{sa sb sr se|a b r|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R}:
