@@ -8,16 +8,25 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Box.
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
-Require Export Types.Option.
-Require Export Types.Ascii.
+Require Import PreludeOptions.
+Require Import Notations.
+Require Import Types.Ascii Types.Bool.
+
+Inductive string@{s| |} : Type@{s|0} :=
+| EmptyString : string
+| String : ascii@{s|} -> string -> string.
+
+Fixpoint eqb@{s| |} (s1 s2 : string@{s|}) : bool@{s|} :=
+    match s1, s2 with
+    | EmptyString, EmptyString => true
+    | String c1 s1', String c2 s2' => Ascii.eqb c1 c2 && eqb s1' s2'
+    | _,_ => false
+    end.
+
+Declare Scope string_scope.
+Delimit Scope string_scope with string.
+Bind Scope string_scope with string.
+
+Register string as core.string.type.
+Register EmptyString as core.string.empty.
+Register String as core.string.string.

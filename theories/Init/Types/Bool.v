@@ -23,6 +23,14 @@ Register bool as core.bool.type.
 Register true as core.bool.true.
 Register false as core.bool.false.
 
+Definition eqb@{s| |} (b1 b2 : bool@{s|}) : bool@{s|} :=
+  match b1, b2 with
+    | true, true => true
+    | true, false => false
+    | false, true => false
+    | false, false => true
+  end.
+
 Definition negb@{s| |} (a : bool@{s|}) : bool@{s|} :=
   match a with
     | true => false
@@ -49,6 +57,7 @@ Definition xorb@{s| |} (a b : bool@{s|}) :=
     | false => b
   end.
 
+Register eqb as core.bool.eqb.
 Register andb as core.bool.andb.
 Register orb as core.bool.orb.
 Register implb as core.bool.implb.
