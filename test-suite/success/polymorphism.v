@@ -392,7 +392,7 @@ Module Anonymous.
     anonalg@{k j}.
   (* i <= j < k *)
   Definition collapsethemiddle := inthemiddle@{i _ j}.
-  Check collapsethemiddle@{_ _ _}.
+  Check collapsethemiddle@{_ _}.
 
 End Anonymous.
 
