@@ -609,6 +609,7 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
         (* Abstract universes *)
         let (inst, auctx) = UVars.abstract_universes uctx in
         let inst = UVars.make_instance_subst inst in
+        let variance = Option.map (UVars.subst_sort_level_variances inst) variance in
         (inst, Polymorphic (auctx, variance))
 
   in
