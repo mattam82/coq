@@ -19,3 +19,5 @@ Arguments left {_}.
 Arguments right _ {_}.
 
 Notation "{ A } + { B }" := (sum A B).
+
+Notation "A \/ B" := (sum@{Prop Prop Prop|_ _} A B).
