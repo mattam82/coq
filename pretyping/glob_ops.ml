@@ -97,7 +97,7 @@ let glob_sort_quality s =
     | GSProp -> UnivGen.QualityOrSet.sprop
     | GProp -> UnivGen.QualityOrSet.prop
     | GSet -> UnivGen.QualityOrSet.set
-    | GUniv _ | GLocalUniv _ | GRawUniv _ -> raise ComplexSort
+    | GUniv _ | GLocalUniv _ | GRawUniv _ -> UnivGen.QualityOrSet.qtype
     end
   | _ -> raise ComplexSort
 
