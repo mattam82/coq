@@ -1215,13 +1215,13 @@ let collapse_sort_variables ?except evd =
   let universes = UState.collapse_sort_variables ?except evd.universes in
   { evd with universes }
 
-let minimize_universes ?(collapse_sort_variables=true) ?variances evd =
+let minimize_universes ?(collapse_sort_variables=true) ?variances ?(partial=false) evd =
   let uctx' = if collapse_sort_variables
     then UState.collapse_sort_variables evd.universes
     else evd.universes
   in
   let uctx' = UState.normalize_variables uctx' in
-  let uctx' = UState.minimize ?variances uctx' in
+  let uctx' = UState.minimize ?variances ~partial uctx' in
   {evd with universes = uctx'}
 
 let universe_of_name evd s = UState.universe_of_name evd.universes s

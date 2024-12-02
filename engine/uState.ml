@@ -1312,10 +1312,12 @@ let collapse_above_prop_sort_variables ~to_prop uctx =
 let collapse_sort_variables ?except uctx =
   { uctx with sort_variables = QState.collapse ?except uctx.sort_variables }
 
-let minimize ?(variances = Univ.Level.Map.empty) uctx =
+let minimize
+  ?(variances = Univ.Level.Map.empty)
+  ~partial uctx =
   let open UnivMinim in
   let (vars', us') =
-    normalize_context_set ~variances uctx.universes uctx.local uctx.univ_variables
+    normalize_context_set ~variances ~partial uctx.universes uctx.local uctx.univ_variables
       ~binders:(fst uctx.names)
       uctx.minim_extra
   in
@@ -1384,8 +1386,9 @@ let check_uctx_impl ~fail uctx uctx' =
 
 let disable_minim, _ = CDebug.create_full ~name:"minimization" ()
 
-let minimize ?lbound ?variances uctx =
-  if CDebug.get_flag disable_minim then uctx else minimize ?variances uctx
+let minimize ?variances ~partial uctx =
+  if CDebug.get_flag disable_minim then uctx
+  else minimize ?variances ~partial uctx
 
 (* XXX print above_prop too *)
 let pr_weak prl {minim_extra={UnivMinim.weak_constraints=weak; above_prop}} =
