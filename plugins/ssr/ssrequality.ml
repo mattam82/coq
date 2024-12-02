@@ -658,7 +658,7 @@ let rwrxtac ?under ?map_redex occ rdx_pat dir rule =
         try
           let ise = unify_HO env (Evd.create_evar_defs r_sigma) lhs rdx in
           if not (rw_progress rhs rdx ise) then raise NoMatch else
-          d, (ise, Evd.evar_universe_context ise, Reductionops.nf_evar ise r), q
+          d, (ise, Evd.ustate ise, Reductionops.nf_evar ise r), q
         with e when CErrors.noncritical e -> rwtac rs in
      rwtac rules in
   let env0 = env in
