@@ -387,10 +387,18 @@ let univ_entry ~poly uctx =
     else Monomorphic_entry (context_set uctx) in
   entry, binders
 
+let merge_graph_context (us, csts) g =
+  let g = Level.Set.fold (fun v g -> if Level.is_set v then g else
+    UGraph.add_universe v ~strict:false g) us g in
+  UGraph.merge_constraints csts g
+
 let of_context_set ((qs,us),csts) =
   let sort_variables = QState.of_set qs in
+  let universes = UGraph.initial_universes in
+  let universes = merge_graph_context (us, csts) universes in
   { empty with
     local = (us,csts);
+    universes;
     sort_variables;}
 
 type universe_opt_subst = UnivFlex.t
@@ -1072,10 +1080,7 @@ let restrict_universe_context (univs, csts) keep =
   let allunivs = Constraints.fold (fun (u,_,v) all ->
     Level.Set.union (Level.Set.union (Universe.levels u) (Universe.levels v)) all) csts univs in
   let g = UGraph.initial_universes in
-  let g = Level.Set.fold (fun v g ->
-      if Level.is_set v then g else
-        UGraph.add_universe v ~strict:false g) allunivs g in
-  let g = UGraph.merge_constraints csts g in
+  let g = merge_graph_context (allunivs, csts) g in
   let allkept = Level.Set.union (UGraph.domain UGraph.initial_universes) (Level.Set.diff allunivs removed) in
   let csts = UGraph.constraints_for ~kept:allkept g in
   let csts = Constraints.filter (fun (l,d,r) -> not (Universe.is_type0 l && d == Le)) csts in
