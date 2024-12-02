@@ -778,7 +778,7 @@ let resolve_morphism env m args args' (b,cstr) evars =
     in
       (* Actual signature found *)
     let cl_args = [| appmtype' ; signature ; appm |] in
-    let evars, app = app_poly_sort b env (evars', snd evars) (TypeGlobal.proper_type)
+    let evars, app = app_poly_sort b env evars (TypeGlobal.proper_type)
       cl_args in
     let dosub, appsub =
       TypeGlobal.do_subrelation, TypeGlobal.apply_subrelation
