@@ -622,9 +622,9 @@ val fix_undefined_variables : evar_map -> evar_map
 (** Universe minimization *)
 val minimize_universes : ?collapse_sort_variables:bool -> ?variances:InferCumulativity.level_variances -> 
   ?partial:bool ->
-    (* Only partial information about universes is recorded in the evar_map,
-       so no irreversible minimization should be performed. *)
-  evar_map -> evar_map
+  (* Only partial information about universes is recorded in the evar_map,
+     so no irreversible minimization should be performed. *)
+  evar_map -> evar_map * InferCumulativity.level_variances
 
 (** Lift [UState.update_sigma_univs] *)
 val update_sigma_univs : UGraph.t -> evar_map -> evar_map

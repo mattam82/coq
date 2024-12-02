@@ -877,7 +877,7 @@ let extract_inductive indl =
   List.map (fun ({CAst.v=indname},_,ar,lc) -> {
     ind_name = indname;
     ind_arity_explicit = Option.has_some ar;
-    ind_arity = Option.default (CAst.make @@ CSort Constrexpr_ops.expr_Type_sort) ar;
+    ind_arity = Option.default (CAst.make @@ CSort (Constrexpr_ops.expr_Type_sort UState.univ_flexible)) ar;
     ind_lc = List.map (fun (_,({CAst.v=id},t)) -> (id,t)) lc
   }) indl
 

@@ -216,7 +216,7 @@ val fix_undefined_variables : t -> t
 val minimize : 
   ?variances:InferCumulativity.level_variances ->
   partial:bool ->
-  t -> t
+  t -> t * InferCumulativity.level_variances
 
 val collapse_above_prop_sort_variables : to_prop:bool -> t -> t
 

@@ -1221,8 +1221,8 @@ let minimize_universes ?(collapse_sort_variables=true) ?variances ?(partial=fals
     else evd.universes
   in
   let uctx' = UState.normalize_variables uctx' in
-  let uctx' = UState.minimize ?variances ~partial uctx' in
-  {evd with universes = uctx'}
+  let uctx', variances = UState.minimize ?variances ~partial uctx' in
+  {evd with universes = uctx'}, variances
 
 let universe_of_name evd s = UState.universe_of_name evd.universes s
 

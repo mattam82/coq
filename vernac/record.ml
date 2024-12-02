@@ -92,7 +92,7 @@ let interp_fields_evars env sigma ~ninds ~nparams impls_env nots l =
 
 let check_anonymous_type ind =
   match ind with
-  | { CAst.v = CSort s } -> Constrexpr_ops.(sort_expr_eq expr_Type_sort s)
+  | { CAst.v = CSort s } -> Constrexpr_ops.(sort_expr_eq (expr_Type_sort UState.univ_flexible) s)
   | _ -> false
 
 let error_parameters_must_be_named bk {CAst.loc; v=name} =
@@ -155,7 +155,7 @@ let build_type_telescope ~unconstrained_sorts newps env0 sigma { DataI.arity; _ 
   | None ->
     let sigma, s = Evd.new_sort_variable Evd.univ_flexible sigma in
     sigma, (EConstr.mkSort s, s)
-  | Some { CAst.v = CSort s; loc } when Constrexpr_ops.(sort_expr_eq expr_Type_sort s) ->
+  | Some { CAst.v = CSort s; loc } when Constrexpr_ops.(sort_expr_eq (expr_Type_sort UState.univ_flexible) s) ->
     (* special case: the user wrote ": Type". We want to allow it to become algebraic
        (and Prop but that may change in the future) *)
     let sigma, s = Evd.new_sort_variable ?loc UState.univ_flexible sigma in
