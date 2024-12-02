@@ -1,5 +1,5 @@
 (************************************************************************)
-(*         *      The Rocq Prover / The Rocq Development Team           *)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
 (*  v      *         Copyright INRIA, CNRS and contributors             *)
 (* <O___,, * (see version control and CREDITS file for authors & dates) *)
 (*   \VV/  **************************************************************)
@@ -8,5 +8,10 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Arith_base.
-Require Export ArithRing.
+#[export] Set Typeclasses Unique Instances.
+#[export] Set Universe Polymorphism.
+#[export] Set Polymorphic Inductive Cumulativity.
+#[export] Unset Auto Template Polymorphism.
+#[export] Unset Universe Minimization ToSet.
+#[export] Set Primitive Projections.
+#[export] Set Printing Coercions.

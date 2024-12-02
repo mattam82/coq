@@ -1,5 +1,5 @@
 (************************************************************************)
-(*         *      The Rocq Prover / The Rocq Development Team           *)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
 (*  v      *         Copyright INRIA, CNRS and contributors             *)
 (* <O___,, * (see version control and CREDITS file for authors & dates) *)
 (*   \VV/  **************************************************************)
@@ -8,8 +8,8 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** Compatibility file for making Coq act similar to Coq v8.19 *)
+Require Import PreludeOptions.
 
-Require Export Corelib.Compat.Coq820.
-
-#[export] Set Warnings "-deprecated-since-8.20".
+Inductive bool@{s| |} : Type@{s|Set} :=
+  | true : bool
+  | false : bool.
