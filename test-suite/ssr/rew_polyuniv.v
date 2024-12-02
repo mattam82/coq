@@ -4,14 +4,14 @@ Set Default Proof Using "Type".
 Local Set Universe Polymorphism.
 
 (** Telescopes *)
-Inductive tele : Type :=
+#[universes(cumulative)] Inductive tele : Type :=
   | TeleO : tele
   | TeleS {X} (binder : X -> tele) : tele.
 
 Arguments TeleS {_} _.
 
 (** The telescope version of Coq's function type *)
-Fixpoint tele_fun (TT : tele) (T : Type) : Type :=
+Fixpoint tele_fun@{u v} (TT : tele@{u}) (T : Type@{v}) : Type@{max(u,v)} :=
   match TT with
   | TeleO => T
   | TeleS b => forall x, tele_fun (b x) T
@@ -58,6 +58,13 @@ Fixpoint tele_bind {U} {TT : tele} : (TT -> U) -> TT -t> U :=
   | @TeleS X b => fun (F : TeleS b -> U) (x : X) => (* b x -t> U *)
                   tele_bind (fun a => F (TargS x a))
   end.
+
+(* Fixpoint tele_bind@{u v} {U : Type@{u}} {TT : tele@{v}} : (TT → U) → tele_fun@{v u} TT U :=
+  match TT as TT return (TT → U) → TT -t> U with
+  | TeleO => λ F, F TargO
+  | @TeleS X b => λ (F : TeleS b → U) (x : X), (* b x -t> U *)
+                  tele_bind (λ a, F (TargS x a))
+  end. *)
 Arguments tele_bind {_ !_} _ /.
 
 (* Show that tele_app ∘ tele_bind is the identity. *)
