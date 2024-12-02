@@ -2104,9 +2104,9 @@ let check_may_eval env sigma redexp rc =
   Evarconv.check_problems_are_solved env sigma;
   let sigma = UnivVariances.register_universe_variances_of env sigma c in
   let sigma = UnivVariances.register_universe_variances_of_undefined env sigma in
-  let sigma = Evd.minimize_universes ~partial:true sigma in
-  let (qs, us), csts = Evd.sort_context_set sigma in
+  let sigma = Evd.minimize_universes sigma in
   let uctx = Evd.universe_context_set sigma in
+  let (qs, us), csts = Evd.sort_context_set sigma in
   let env = Environ.push_context_set uctx (Evarutil.nf_env_evar sigma env) in
   let { Environ.uj_val=c; uj_type=ty; } =
     if Evarutil.has_undefined_evars sigma c
