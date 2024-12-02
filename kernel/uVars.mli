@@ -30,7 +30,13 @@ sig
 
 end
 
-val pr_variances : Variance.t array -> Pp.t
+type variances = Variance.t array
+
+val pr_variances : variances -> Pp.t
+
+val eq_variances : variances -> variances -> bool
+
+val sub_variances : variances -> variances -> bool
 
 (** {6 Universe instances} *)
 
@@ -65,7 +71,7 @@ sig
   val hash : t -> int
   (** Hash value *)
 
-  val pr : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> ?variance:Variance.t array -> t -> Pp.t
+  val pr : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> ?variances:variances -> t -> Pp.t
   (** Pretty-printing, no comments *)
 
   val levels : t -> Quality.Set.t * Level.Set.t
@@ -110,7 +116,7 @@ sig
   val hash : t -> int
   (** Hash value *)
 
-  val pr : (QVar.t -> Pp.t) -> (Universe.t -> Pp.t) -> ?variance:Variance.t array -> t -> Pp.t
+  val pr : (QVar.t -> Pp.t) -> (Universe.t -> Pp.t) -> ?variances:variances -> t -> Pp.t
   (** Pretty-printing, no comments *)
 
   val levels : t -> Quality.Set.t * Level.Set.t
@@ -289,9 +295,9 @@ val make_abstract_instance : AbstractContext.t -> Instance.t
 
 (** {6 Pretty-printing of universes. } *)
 
-val pr_universe_context : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> ?variance:Variance.t array ->
+val pr_universe_context : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> ?variances:variances ->
   UContext.t -> Pp.t
-val pr_abstract_universe_context : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> ?variance:Variance.t array ->
+val pr_abstract_universe_context : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> ?variances:variances ->
   AbstractContext.t -> Pp.t
 
 (** {6 Hash-consing } *)

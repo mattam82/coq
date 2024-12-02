@@ -307,10 +307,10 @@ let instance_hook info global ?hook cst =
   declare_instance env sigma (Some info) global cst;
   (match hook with Some h -> h cst | None -> ())
 
-let declare_instance_constant iinfo global impargs ?hook (name:lident) udecl variances poly sigma term termtype =
+let declare_instance_constant iinfo global impargs ?hook (name:lident) udecl poly sigma term termtype =
   let kind = Decls.(IsDefinition Instance) in
   let cinfo = Declare.CInfo.make ?loc:name.loc ~name:name.v ~impargs ~typ:(Some termtype) () in
-  let info = Declare.Info.make ~kind ~poly ~udecl ?variances () in
+  let info = Declare.Info.make ~kind ~poly ~udecl () in
   let kn = Declare.declare_definition ~cinfo ~info ~opaque:false ~body:term sigma in
   instance_hook iinfo global ?hook kn
 
@@ -333,7 +333,7 @@ let do_declare_instance sigma ~locality ~poly k ctx ctx' pri udecl impargs subst
   Impargs.maybe_declare_manual_implicits false cst impargs;
   instance_hook pri locality cst
 
-let declare_instance_program pm env sigma ~locality ~poly {CAst.v=name;loc} pri impargs udecl variances term termtype =
+let declare_instance_program pm env sigma ~locality ~poly {CAst.v=name;loc} pri impargs udecl term termtype =
   let hook { Declare.Hook.S.scope; dref; _ } =
     let cst = match dref with GlobRef.ConstRef kn -> kn | _ -> assert false in
     let pri = intern_info pri in
@@ -346,12 +346,12 @@ let declare_instance_program pm env sigma ~locality ~poly {CAst.v=name;loc} pri 
   let uctx = Evd.ustate sigma in
   let kind = Decls.IsDefinition Decls.Instance in
   let cinfo = Declare.CInfo.make ?loc ~name ~typ ~impargs () in
-  let info = Declare.Info.make ~udecl ?variances ~poly ~kind ~hook () in
+  let info = Declare.Info.make ~udecl ~poly ~kind ~hook () in
   let pm, _ =
     Declare.Obls.add_definition ~pm ~info ~cinfo ~opaque:false ~uctx ~body obls
   in pm
 
-let declare_instance_open sigma ?hook ~tac ~locality ~poly (id:lident) pri impargs udecl variances ids term termtype =
+let declare_instance_open sigma ?hook ~tac ~locality ~poly (id:lident) pri impargs udecl ids term termtype =
   (* spiwack: it is hard to reorder the actions to do
      the pretyping after the proof has opened. As a
      consequence, we use the low-level primitives to code
@@ -361,7 +361,7 @@ let declare_instance_open sigma ?hook ~tac ~locality ~poly (id:lident) pri impar
   let sigma = Evd.push_future_goals sigma in
   let kind = Decls.(IsDefinition Instance) in
   let hook = Declare.Hook.(make (fun { S.dref ; _ } -> instance_hook pri locality ?hook dref)) in
-  let info = Declare.Info.make ~hook ~kind ~udecl ?variances ~poly () in
+  let info = Declare.Info.make ~hook ~kind ~udecl ~poly () in
   (* XXX: We need to normalize the type, otherwise Admitted / Qed will fails!
      This is due to a bug in proof_global :( *)
   let termtype = Evarutil.nf_evar sigma termtype in
@@ -469,7 +469,7 @@ let interp_props ~program_mode env' cty k ctx ctx' subst sigma = function
     let term = it_mkLambda_or_LetIn def ctx in
     term, termtype, sigma
 
-let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx ctx' pri decl variances imps subst id opt_props =
+let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx ctx' pri decl imps subst id opt_props =
   let term, termtype, sigma = match opt_props with
     | Some props ->
       on_pi1 (fun x -> Some x)
@@ -488,18 +488,18 @@ let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx 
   in
   Flags.silently (fun () ->
       declare_instance_open sigma ?hook ~tac ~locality ~poly
-        id pri imps decl variances (List.map RelDecl.get_name ctx) term termtype)
+        id pri imps decl (List.map RelDecl.get_name ctx) term termtype)
     ()
 
-let do_instance env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl variances imps subst id props =
+let do_instance env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl imps subst id props =
   let term, termtype, sigma =
     interp_props ~program_mode:false env' cty k ctx ctx' subst sigma props
   in
   let termtype, sigma = do_instance_resolve_TC termtype sigma env in
   Pretyping.check_evars_are_solved ~program_mode:false env sigma;
-  declare_instance_constant pri locality imps ?hook id decl variances poly sigma term termtype
+  declare_instance_constant pri locality imps ?hook id decl poly sigma term termtype
 
-let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl variances imps subst id opt_props =
+let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl imps subst id opt_props =
   let term, termtype, sigma =
     match opt_props with
     | Some props ->
@@ -512,10 +512,10 @@ let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' 
       term, termtype, sigma in
   let termtype, sigma = do_instance_resolve_TC termtype sigma env in
   if not (Evd.has_undefined sigma) && not (Option.is_empty opt_props) then
-    let () = declare_instance_constant pri locality imps ?hook id decl variances poly sigma term termtype in
+    let () = declare_instance_constant pri locality imps ?hook id decl poly sigma term termtype in
     pm
   else
-    declare_instance_program pm env sigma ~locality ~poly id pri imps decl variances term termtype
+    declare_instance_program pm env sigma ~locality ~poly id pri imps decl term termtype
 
 let typeclass_univ_instance (cl, u) =
   assert (UVars.eq_sizes (UVars.AbstractContext.size cl.cl_univs) (EInstance.length u));
@@ -537,7 +537,7 @@ let typeclass_univ_instance (cl, u) =
   }
 
 let interp_instance_context ~program_mode env ctx pl tclass =
-  let sigma, decl, variances = interp_cumul_univ_decl_opt env pl in
+  let sigma, decl = interp_cumul_univ_decl_opt env pl in
   let sigma, (impls, ((env', ctx), imps, _locs)) = interp_context_evars ~program_mode env sigma ctx in
   let flags = Pretyping.{ all_no_fail_flags with program_mode } in
   let sigma, (c', imps') = interp_type_evars_impls ~flags ~impls env' sigma tclass in
@@ -556,7 +556,7 @@ let interp_instance_context ~program_mode env ctx pl tclass =
   in
   let sigma = Evarutil.nf_evar_map sigma in
   let sigma = resolve_typeclasses ~filter:Typeclasses.all_evars ~fail:true env sigma in
-  sigma, cl, u, c', ctx', ctx, imps, args, decl, variances
+  sigma, cl, u, c', ctx', ctx, imps, args, decl
 
 let id_of_class env ref =
   let open GlobRef in
@@ -568,7 +568,7 @@ let id_of_class env ref =
     | _ -> assert false
 
 let new_instance_common ~program_mode env instid ctx cl =
-  let (instid, pl) = instid in
+  let ({CAst.loc;v=instid}, pl) = instid in
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
     interp_instance_context ~program_mode env ctx pl cl
   in
@@ -580,21 +580,20 @@ let new_instance_common ~program_mode env instid ctx cl =
         Namegen.next_global_ident_away (Global.safe_env ()) i (Termops.vars_of_env env))
   in
   let env' = push_rel_context ctx env in
-  let variances = ComDefinition.variance_of_entry variances in
-  id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances
+  id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl
 
 let new_instance_interactive ~locality ~poly instid ctx cl
     ?(tac:unit Proofview.tactic option) ?hook
     pri opt_props =
   let env = Global.env() in
-  let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
+  let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false env instid ctx cl in
   id, do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly
-    cty k ctx ctx' pri decl variances imps subst id opt_props
+    cty k ctx ctx' pri decl imps subst id opt_props
 
 let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
   let env = Global.env() in
-  let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
+  let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:true env instid ctx cl in
   let pm =
     do_instance_program ~pm env env' sigma ?hook ~locality ~poly
@@ -603,7 +602,7 @@ let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
 
 let new_instance ~locality ~poly instid ctx cl props ?hook pri =
   let env = Global.env() in
-  let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
+  let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false env instid ctx cl in
   do_instance env env' sigma ?hook ~locality ~poly
     cty k ctx ctx' pri decl variances imps subst id props;

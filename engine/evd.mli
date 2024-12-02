@@ -588,8 +588,6 @@ val sort_context_set : evar_map -> UnivGen.sort_context_set
 val universe_subst : evar_map -> UnivFlex.t
 val universes : evar_map -> UGraph.t
 
-val pr_level : evar_map -> Univ.Level.t -> Pp.t
-
 (** [to_universe_context evm] extracts the local universes and
     constraints of [evm] and orders the universes the same as
     [Univ.ContextSet.to_context]. *)
@@ -623,7 +621,7 @@ val collapse_sort_variables : ?except:Sorts.QVar.Set.t -> evar_map -> evar_map
 val fix_undefined_variables : evar_map -> evar_map
 
 (** Universe minimization (collapse_sort_variables is true by default) *)
-val minimize_universes : ?collapse_sort_variables:bool -> ?variances:UnivMinim.level_variances -> evar_map -> evar_map
+val minimize_universes : ?collapse_sort_variables:bool -> evar_map -> evar_map
 
 (** Lift [UState.update_sigma_univs] *)
 val update_sigma_univs : UGraph.t -> evar_map -> evar_map

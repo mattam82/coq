@@ -1316,7 +1316,7 @@ let check_uctx_impl ~fail uctx uctx' =
 
 let disable_minim, _ = CDebug.create_full ~name:"minimization" ()
 
-let minimize ?variances uctx =
+let minimize ?lbound ?variances uctx =
   if CDebug.get_flag disable_minim then uctx else minimize ?variances uctx
 
 (* XXX print above_prop too *)
@@ -1338,8 +1338,8 @@ let pr ctx =
       (str"UNIVERSES:"++brk(0,1)++
        h (Univ.ContextSet.pr prl (context_set ctx)) ++ fnl () ++
        UnivFlex.pr prl (subst ctx) ++ fnl() ++
-       (* str"GRAPH:" ++ brk(0,1) ++
-       h (UGraph.pr_universes prl (UGraph.repr (ugraph ctx))) ++ fnl () ++ *)
+       str"GRAPH:" ++ brk(0,1) ++
+       h (UGraph.pr_universes prl (UGraph.repr (ugraph ctx))) ++ fnl () ++
        str"SORTS:"++brk(0,1)++
        h (pr_sort_opt_subst ctx) ++ fnl() ++
        str "WEAK CONSTRAINTS:"++brk(0,1)++

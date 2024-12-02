@@ -1057,7 +1057,8 @@ let check_univ_decl_early ~poly ~with_obls sigma udecl terms =
   let uctx = ustate sigma in
   let uctx = UState.collapse_sort_variables uctx in
   let uctx = UState.restrict uctx vars in
-  ignore (UState.check_univ_decl ~poly uctx udecl)
+  (* FIXME compute variances *)
+  ignore (UState.check_univ_decl ~poly uctx UnivMinim.empty_level_variances udecl)
 
 let restrict_universe_context evd vars =
   { evd with universes = UState.restrict evd.universes vars }

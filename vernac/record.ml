@@ -174,10 +174,8 @@ let build_type_telescope ~unconstrained_sorts newps env0 sigma { DataI.arity; _ 
      | _ -> user_err ?loc:(constr_loc t) (str"Sort expected."))
 
 module DefClassEntry = struct
-
-type t = {
+  type t = {
   univs : UState.named_universes_entry;
-  variances : Entries.variance_entry;
   name : lident;
   projname : lident;
   params : Constr.rel_context;
@@ -329,7 +327,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   let is_template =
     List.exists (fun { DataI.arity; _} -> Option.cata check_anonymous_type true arity) records in
   let unconstrained_sorts = not flags.poly && not def && is_template in
-  let sigma, udecl, variances = Constrintern.interp_cumul_univ_decl_opt env0 udecl in
+  let sigma, udecl = Constrintern.interp_cumul_univ_decl_opt env0 udecl in
   let () = List.iter check_parameters_must_be_named params in
   let sigma, (impls_env, ((_env1,params), impls, _paramlocs)) =
     Constrintern.interp_context_evars ~program_mode:false ~unconstrained_sorts env0 sigma params in
@@ -382,7 +380,6 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
     in
     DefclassEntry {
       univs;
-      variances;
       name;
       projname;
       params;
@@ -572,6 +569,12 @@ let build_named_proj ~primitive ~flags ~univs ~uinstance ~kind env paramdecls
   in
   let proj = it_mkLambda_or_LetIn (mkLambda (x,rp,body)) paramdecls in
   let projtyp = it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
+  let univs = match fst univs with
+  | Entries.Monomorphic_entry ->
+    UState.{ universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty;
+      universes_entry_binders = snd univs }
+  | Entries.Polymorphic_entry (uctx, variances) -> UState.{ universes_entry_universes = UState.Polymorphic_entry (uctx, variances); universes_entry_binders = snd univs }
+  in
   let entry = Declare.definition_entry ~univs ~types:projtyp proj in
   let kind = Decls.IsDefinition kind in
   let kn =
@@ -893,14 +896,10 @@ let declare_structure (decl:Record_decl.t) =
   let inds = List.mapi map data in
   Declared.Record kn, inds
 
-let fix_variances v =
-  if Array.for_all Option.is_empty v then None
-  else Some (Array.map (function None -> UVars.Variance.Invariant | Some v -> v) v)
-
 (* declare definitional class (typeclasses that are not record) *)
 (* [data.is_coercion] must be [NoCoercion] and [data.proj_flags] must have exactly 1 element. *)
 let declare_class_constant entry (data:Data.t) =
-  let { DefClassEntry.univs; variances; name; projname; params; sort; typ; projtyp;
+  let { DefClassEntry.univs; name; projname; params; sort; typ; projtyp;
         inhabitant_id; impls; projimpls; }
     = entry
   in
@@ -917,16 +916,16 @@ let declare_class_constant entry (data:Data.t) =
   in
   let class_body = it_mkLambda_or_LetIn projtyp params in
   let class_type = it_mkProd_or_LetIn typ params in
-  let variances = fix_variances variances in
   let class_entry =
-    Declare.definition_entry ~types:class_type ~univs ?variances class_body in
+    Declare.definition_entry ~types:class_type ~univs class_body in
   let cst = Declare.declare_constant ?loc:name.loc ~name:name.v
       (Declare.DefinitionEntry class_entry) ~kind:Decls.(IsDefinition Definition)
   in
-  let inst, univs = match univs with
-    | UState.Monomorphic_entry _, ubinders ->
-      UVars.Instance.empty, (UState.Monomorphic_entry Univ.ContextSet.empty, ubinders)
-    | UState.Polymorphic_entry uctx, _ ->
+  let inst, univs = match univs.universes_entry_universes with
+    | UState.Monomorphic_entry _ ->
+      UVars.Instance.empty,
+      UState.{ univs with universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty }
+    | UState.Polymorphic_entry (uctx, variances) ->
       UVars.Instance.of_level_instance (UVars.UContext.instance uctx), univs
   in
   let cstu = (cst, inst) in

@@ -67,13 +67,7 @@ let print_ref env reduce ref udecl =
   let typ = Arguments_renaming.rename_type typ ref in
   let impargs = select_stronger_impargs (implicits_of_global ref) in
   let impargs = List.map binding_kind_of_status impargs in
-  let variance = let open GlobRef in match ref with
-    | VarRef _ -> None
-    | ConstRef cst -> let cb = Environ.lookup_constant cst env in cb.Declarations.const_variance
-    | IndRef (ind,_) | ConstructRef ((ind,_),_) ->
-      let mind = Environ.lookup_mind ind env in
-      mind.Declarations.mind_variance
-  in
+  let variances = Environ.variances env ref in
   let inst =
     if Environ.is_polymorphic env ref
     then 
@@ -83,7 +77,7 @@ let print_ref env reduce ref udecl =
   in
   let priv = None in (* We deliberately don't print private univs in About. *)
   hov 0 (pr_global ref ++ inst ++ str " :" ++ spc () ++ pr_ltype_env env sigma ~impargs typ ++
-         Printer.pr_abstract_universe_ctx sigma ?variance univs ?priv)
+         Printer.pr_abstract_universe_ctx sigma ?variances univs ?priv)
 
 (** Command [Print Implicit], somehow subsumed by [About] *)
 
@@ -574,7 +568,6 @@ let print_constant env ~with_values with_implicit cst udecl =
   let typ = cb.const_type in
   let univs = cb.const_universes in
   let udecl = Option.map (fun x -> GlobRef.ConstRef cst, x) udecl in
-  let variance = cb.const_variance in
   let uctx =
     UState.of_names
       (Printer.universe_binders_with_opt_names (Declareops.constant_polymorphic_context cb) udecl)
@@ -632,7 +625,7 @@ let print_constant env ~with_values with_implicit cst udecl =
   in
   let ppmain = print_basename cst ++ print_instance sigma cb ++ ppdata in
   let ppmain = if is_axiom then str"*** [ " ++ ppmain ++ str" ]" else ppmain in
-  hov 0 (ppmain ++ Printer.pr_universes sigma univs ?variance ?priv)
+  hov 0 (ppmain ++ Printer.pr_universes sigma univs ?priv)
 
 let print_constant_with_infos env access cst udecl =
   print_constant env ~with_values:(Some access) true cst udecl ++
