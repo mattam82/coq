@@ -615,7 +615,7 @@ let declare_new_instance ~locality ~program_mode ~poly instid ctx cl pri =
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
     interp_instance_context ~program_mode env ctx pl cl
   in
-  do_declare_instance sigma ~locality ~poly k ctx ctx' pri decl variances imps subst instid
+  do_declare_instance sigma ~locality ~poly k ctx ctx' pri decl imps subst instid
 
 let refine_att =
   let open Attributes in

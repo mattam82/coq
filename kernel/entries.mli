@@ -26,7 +26,7 @@ type inductive_universes_entry =
   | Template_ind_entry of {
       uctx : UVars.UContext.t;
       (* The quality part of default_univs must be all qtype *)
-      default_univs : UVars.Instance.t;
+      default_univs : UVars.LevelInstance.t;
     }
 
 type variance_entry = UVars.Variance.t option array
@@ -104,6 +104,7 @@ type parameter_entry = {
 
 type primitive_entry = {
   prim_entry_type : types in_universes_entry option;
+  prim_entry_variance : Declarations.variances option;
   prim_entry_content : CPrimitives.op_or_type;
 }
 

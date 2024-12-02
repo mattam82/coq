@@ -162,11 +162,12 @@ let do_definition_interactive ?loc ~program_mode ?hook ~name ~scope ?clearbody ~
   let flags = Pretyping.{ all_no_fail_flags with program_mode } in
   let evd, udecl, variances = Constrintern.interp_cumul_univ_decl_opt env udecl in
   let variances = variance_of_entry variances in
-  let evd, args, typ,impargs = interp_statement ~program_mode ~flags ~scope env evd name bl t in
+  let evd, args, typ, impargs = interp_statement ~program_mode ~flags ~scope env evd name bl t in
   let evd =
     let inference_hook = if program_mode then Some Declare.Obls.program_inference_hook else None in
     Pretyping.solve_remaining_evars ?hook:inference_hook flags env evd in
-  let evd = Evd.minimize_universes evd in
+  let ivariances = UnivVariances.universe_variances_of_type env evd typ in
+  let evd = Evd.minimize_universes evd ~variances:ivariances in
   Pretyping.check_evars_are_solved ~program_mode env evd;
   let typ = EConstr.to_constr evd typ in
   Evd.check_univ_decl_early ~poly ~with_obls:false evd udecl [typ];
@@ -180,13 +181,13 @@ let do_definition_refine ?loc ?hook ~name ~scope ?clearbody ~poly ~typing_flags 
   let env = Global.env() in
   let env = Environ.update_typing_flags ?typing_flags env in
   (* Explicitly bound universes and constraints *)
-  let evd, udecl = interp_univ_decl_opt env udecl in
+  let evd, udecl, variances = interp_cumul_univ_decl_opt env udecl in
   let evd, (body, typ), impargs =
     interp_definition ~program_mode:false env evd empty_internalization_env bl None c ctypopt
   in
   let typ = match typ with Some typ -> typ | None -> Retyping.get_type_of env evd body in
-
-  let info = Declare.Info.make ?hook ~poly ~scope ?clearbody ~kind ~udecl ?typing_flags ?user_warns () in
+  let variances = variance_of_entry variances in
+  let info = Declare.Info.make ?hook ~poly ~scope ?clearbody ~kind ~udecl ?variances ?typing_flags ?user_warns () in
   let cinfo = Declare.CInfo.make ?loc ~name ~typ ~impargs () in
   let evd = if poly then evd else Evd.fix_undefined_variables evd in
 

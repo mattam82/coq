@@ -104,14 +104,11 @@ sig
   val length : t -> int * int
   (** Instance length *)
 
-  val hcons : t -> t
+  val hcons : t Hashcons.f
   (** Hash-consing. *)
 
   val hash : t -> int
   (** Hash value *)
-
-  val share : t -> t * int
-  (** Simultaneous hash-consing and hash-value computation *)
 
   val pr : (QVar.t -> Pp.t) -> (Universe.t -> Pp.t) -> ?variance:Variance.t array -> t -> Pp.t
   (** Pretty-printing, no comments *)

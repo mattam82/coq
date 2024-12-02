@@ -250,12 +250,8 @@ module Level = struct
 
 end
 
-type universe_level = Level.t
-
-type universe_set = Level.Set.t
-
 (* An algebraic universe [universe] is either a level expression
-   [LevelLevelExpr.t] or a formal max() universe known to be greater than some
+   [LevelExpr.t] or a formal max() universe known to be greater than some
    level expressions.  *)
 
 module Universe =
@@ -312,7 +308,11 @@ struct
       if is_small e then type1
       else (u, n + 1)
 
-    let pr_with f (v, n) =
+    let addn (u, n as e) k =
+      if Int.equal k 0 then e
+      else (u, k + n)
+
+    let pr f (v, n) =
       if Int.equal n 0 then f v
       else f v ++ str"+" ++ int n
 
@@ -326,11 +326,11 @@ struct
 
     let get_level (v,_n) = v
 
-    let map f (v, n as x) =
-      let v' = f v in
-        if v' == v then x
-        else (v', n)
+    let hash = ExprHash.hash
 
+    module Self = struct type nonrec t = t let compare = compare end
+    module Map = CMap.Make(Self)
+    module Set = CSet.Make(Self)
   end
 
   type t = Expr.t list
@@ -339,13 +339,13 @@ struct
 
   let rec hash = function
   | [] -> 0
-  | e :: l  -> Hashset.Combine.combinesmall (LevelExpr.ExprHash.hash e) (hash l)
+  | e :: l  -> Hashset.Combine.combinesmall (Expr.ExprHash.hash e) (hash l)
 
-  let equal x y = x == y || List.equal LevelExpr.equal x y
+  let equal x y = x == y || List.equal Expr.equal x y
 
-  let compare x y = if x == y then 0 else List.compare LevelExpr.compare x y
+  let compare x y = if x == y then 0 else List.compare Expr.compare x y
 
-  module Huniv = Hashcons.Hlist(LevelExpr)
+  module Huniv = Hashcons.Hlist(Expr)
 
   let hcons = Hashcons.simple_hcons Huniv.generate Huniv.hcons ()
 
@@ -361,29 +361,29 @@ struct
   let of_list x = x
 
   let pr f l = match l with
-    | [u] -> LevelExpr.pr f u
+    | [u] -> Expr.pr f u
     | _ ->
       str "max(" ++ hov 0
-        (prlist_with_sep pr_comma (LevelExpr.pr f) l) ++
+        (prlist_with_sep pr_comma (Expr.pr f) l) ++
         str ")"
 
   let raw_pr l = pr Level.raw_pr l
 
   let is_level l = match l with
-    | [l] -> LevelExpr.is_level l
+    | [l] -> Expr.is_level l
     | _ -> false
 
   let rec is_levels l = match l with
-    | l :: r -> LevelExpr.is_level l && is_levels r
+    | l :: r -> Expr.is_level l && is_levels r
     | [] -> true
 
   let level l = match l with
-    | [l] -> LevelExpr.level l
+    | [l] -> Expr.level l
     | _ -> None
 
   let levels ?(init=Level.Set.empty) l =
     let fold acc x =
-      let l = LevelExpr.get_level x in
+      let l = Expr.get_level x in
       Level.Set.add l acc
     in
     List.fold_left fold init l
@@ -393,15 +393,15 @@ struct
 
   let is_small u =
     match u with
-    | [l] -> LevelExpr.is_small l
+    | [l] -> Expr.is_small l
     | _ -> false
 
   (* The level of sets *)
-  let type0 = tip LevelExpr.set
+  let type0 = tip Expr.set
 
   (* When typing [Prop] and [Set], there is no constraint on the level,
      hence the definition of [type1_univ], the type of [Prop] *)
-  let type1 = tip LevelExpr.type1
+  let type1 = tip Expr.type1
 
   let var x = tip (Level.var x, 0)
 
@@ -416,12 +416,12 @@ struct
   let super l =
     if is_small l then type1
     else
-      List.Smart.map (fun x -> LevelExpr.successor x) l
+      List.Smart.map (fun x -> Expr.successor x) l
 
   let addn l k =
     assert (k >= 0);
     if Int.equal k 0 then l
-    else List.Smart.map (fun x -> LevelExpr.addn x k) l
+    else List.Smart.map (fun x -> Expr.addn x k) l
 
   (* Returns the formal universe that is greater than the universes u and v.
      Used to type the products. *)
@@ -474,6 +474,8 @@ struct
 
 end
 
+module LevelExpr = Universe.Expr
+
 type constraint_type = Le | Eq
 
 let constraint_type_ord c1 c2 = match c1, c2 with
@@ -493,9 +495,8 @@ let pr_constraint_type op =
   in str op_str
 
 let hash_constraint_type = function
-  | Lt -> 0
-  | Le -> 1
-  | Eq -> 2
+  | Le -> 0
+  | Eq -> 1
 
 module UConstraintOrd =
 struct
@@ -508,14 +509,13 @@ struct
       if not (Int.equal i' 0) then i'
       else Universe.compare v v'
 end
-
 module Hconstraint =
   Hashcons.Make(
     struct
       type t = univ_constraint
       let hashcons (l1,k,l2) =
-        let hl1, l1 = Level.hcons l1 in
-        let hl2, l2 = Level.hcons l2 in
+        let hl1, l1 = Universe.hcons l1 in
+        let hl2, l2 = Universe.hcons l2 in
         Hashset.Combine.(combinesmall (hash_constraint_type k) (combine hl1 hl2)), (l1, k, l2)
       let eq (l1,k,l2) (l1',k',l2') =
         l1 == l1' && k == k' && l2 == l2'

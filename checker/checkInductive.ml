@@ -106,7 +106,7 @@ let check_template ar1 ar2 = match ar1, ar2 with
   List.equal (Option.equal Sorts.equal) ar.template_param_arguments template_param_arguments &&
   check_abstract_uctx template_context ar.template_context &&
   Sorts.equal ar.template_concl template_concl &&
-  Instance.equal ar.template_defaults template_defaults
+  LevelInstance.equal ar.template_defaults template_defaults
 | None, Some _ | Some _, None -> false
 
 (* if the generated inductive is squashed the original one must be squashed *)

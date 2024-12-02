@@ -245,9 +245,9 @@ let def_class_levels ~def ~env_ar_params sigma aritysorts ctors =
   else
     sigma, s, ctor
 
-let finalize_def_class env sigma ~params ~sort ~projtyp =
+let finalize_def_class env sigma ~variances ~params ~sort ~projtyp =
   let sigma, (params, sort, typ, projtyp) =
-    Evarutil.finalize ~abort_on_undefined_evars:false sigma (fun nf ->
+    Evarutil.finalize ~abort_on_undefined_evars:false sigma ~variances (fun nf ->
         let typ = EConstr.it_mkProd_or_LetIn (EConstr.mkSort sort) params in
         let typ = nf typ in
         (* we know the context is exactly the params because we built typ from mkSort *)
@@ -354,16 +354,16 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   let (sigma, fields) = List.fold_left_map fold sigma records in
   let field_impls, locs, fields = List.split3 fields in
   let field_impls = List.map (List.map (adjust_field_implicits ~isclass (params,impls))) field_impls in
-  let sigma =
-    Pretyping.solve_remaining_evars Pretyping.all_and_fail_flags env_ar_params sigma in
+  let sigma = Pretyping.solve_remaining_evars Pretyping.all_and_fail_flags env_ar_params sigma in
   if def then
     (* XXX to fix: if we enter [Class Foo : typ := Bar : nat.], [typ] will get unfolded here *)
     let sigma, sort, projtyp = def_class_levels ~def ~env_ar_params sigma aritysorts fields in
+    let ivariances = UnivVariances.universe_variances_of_record env0 sigma ~params ~fields ~types:[projtyp] in
     let sigma, params, sort, typ, projtyp =
       (* named and rel context in the env don't matter here
          (they will be replaced by the ones of the unsolved evars in the error message
          which is the env's only use) *)
-      finalize_def_class env_ar_params sigma ~params ~sort ~projtyp
+      finalize_def_class env_ar_params sigma ~variances:ivariances ~params ~sort ~projtyp
     in
     let name, projname = match records with
       | [{name; fs=[AssumExpr (projname, _, _)]}] -> name, projname

@@ -89,7 +89,7 @@ val univ_entry : poly:bool -> t -> named_universes_entry
 val universe_binders : t -> UnivNames.universe_binders
 (** Return local names of universes. *)
 
-val compute_instance_binders : t -> UVars.Instance.t -> UVars.bound_names
+val compute_instance_binders : t -> UVars.LevelInstance.t -> UVars.bound_names
 
 val nf_qvar : t -> QVar.t -> Quality.t
 (** Returns the normal form of the sort variable. *)

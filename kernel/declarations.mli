@@ -37,8 +37,8 @@ type template_universes = {
   template_concl : Sorts.t;
   template_context : UVars.AbstractContext.t;
   (** Template_defaults qualities are all QType.
-      Also the universes are all levels so we can use Instance. *)
-  template_defaults : UVars.Instance.t;
+      Also the universes are all levels so we can use LevelInstance. *)
+  template_defaults : UVars.LevelInstance.t;
 }
 
 (** Inlining level of parameters at functor applications.

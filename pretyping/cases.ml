@@ -314,7 +314,7 @@ let inductive_template env sigma tmloc ind =
         | None -> sigma, ty
         | Some _ ->
           (* XXX qvar? *)
-          let sigma, u = Evd.new_univ_level_variable UState.univ_flexible_alg sigma in
+          let sigma, u = Evd.new_univ_level_variable UState.univ_flexible sigma in
           let s = ESorts.make (Sorts.sort_of_univ (Univ.Universe.make u)) in
           let ctx, _ = destArity sigma ty in
           sigma, mkArity (ctx, s)

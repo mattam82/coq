@@ -1011,7 +1011,7 @@ struct
   let freshen_template sigma = let open Sorts in function
     | SProp | Prop | Set -> assert false
     | Type _ ->
-      let sigma, u = Evd.new_univ_level_variable UState.univ_flexible_alg sigma in
+      let sigma, u = Evd.new_univ_level_variable UState.univ_flexible sigma in
       sigma, ESorts.make (Sorts.sort_of_univ (Univ.Universe.make u))
     | QSort (q,u) ->
       let sigma, q = match Sorts.QVar.var_index q with
@@ -1024,7 +1024,7 @@ struct
       let sigma, u = match Option.bind (Univ.Universe.level u) Univ.Level.var_index with
         | None -> sigma, u
         | Some _ ->
-          let sigma, u = Evd.new_univ_level_variable UState.univ_flexible_alg sigma in
+          let sigma, u = Evd.new_univ_level_variable UState.univ_flexible sigma in
           sigma, Univ.Universe.make u
       in
       sigma, ESorts.make @@ Sorts.qsort q u

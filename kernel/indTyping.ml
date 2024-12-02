@@ -267,7 +267,7 @@ let check_unbounded_from_below (univs,csts) =
   Univ.Constraints.iter (fun (l,d,r) ->
       let bad = match d with
         | Eq ->
-          (match ckeck_univ l with 
+          (match check_univ l with 
           | None -> check_univ r
           | Some _ as x -> x)          
         | Le -> check_univ r
@@ -275,7 +275,7 @@ let check_unbounded_from_below (univs,csts) =
       bad |> Option.iter (fun bad ->
           CErrors.user_err Pp.(str "Universe level " ++ Level.raw_pr bad ++
                                str " cannot be template because it appears in constraint " ++
-                               Level.raw_pr l ++ pr_constraint_type d ++ Level.raw_pr r)))
+                               Universe.raw_pr l ++ pr_constraint_type d ++ Universe.raw_pr r)))
     csts
 
 let check_not_appearing_univs ~template_univs univs =
@@ -318,8 +318,8 @@ let check_no_increment ~template_univs u =
     CErrors.user_err
       Pp.(str "Template polymorphism with conclusion strictly larger than a bound universe not supported.")
 
-let make_template_univ_names (u:UVars.Instance.t) : UVars.bound_names =
-  let qlen, ulen = UVars.Instance.length u in
+let make_template_univ_names (u:UVars.LevelInstance.t) : UVars.bound_names =
+  let qlen, ulen = UVars.LevelInstance.length u in
   {quals = Array.make qlen Anonymous; univs = Array.make ulen Anonymous}
 
 let get_template (mie:mutual_inductive_entry) = match mie.mind_entry_universes with
@@ -457,11 +457,11 @@ let get_template (mie:mutual_inductive_entry) = match mie.mind_entry_universes w
      don't forget to check the default_univs qualities are all QType if so *)
   let template_usubst : UVars.sort_level_subst =
     let bind_instance = UVars.UContext.instance uctx in
-    let () = if not UVars.(eq_sizes (Instance.length bind_instance) (Instance.length default_univs))
+    let () = if not UVars.(eq_sizes (LevelInstance.length bind_instance) (LevelInstance.length default_univs))
       then CErrors.anomaly Pp.(str "Inorrect default template universes declaration.")
     in
-    let bind_qs, bind_us = UVars.Instance.to_array bind_instance in
-    let default_qs, default_us = UVars.Instance.to_array default_univs in
+    let bind_qs, bind_us = UVars.LevelInstance.to_array bind_instance in
+    let default_qs, default_us = UVars.LevelInstance.to_array default_univs in
     let qsubst = Array.fold_left2 (fun qsubst bind_q default_q ->
         let open Sorts.Quality in
         match bind_q, default_q with
@@ -474,7 +474,7 @@ let get_template (mie:mutual_inductive_entry) = match mie.mind_entry_universes w
     in
     let usubst = Array.fold_left2 (fun usubst bind_u default_u ->
         assert (not @@ Level.is_set bind_u);
-        Level.Map.add bind_u default_u usubst)
+        Level.Map.add bind_u (Universe.make default_u) usubst)
         Level.Map.empty
         bind_us default_us
     in

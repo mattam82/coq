@@ -548,8 +548,8 @@ let template_univ_entry sigma udecl ~template_univs pseudo_sort_poly =
   in
   let default_univs =
     let inst = UVars.UContext.instance uctx in
-    let qs, us = UVars.Instance.to_array inst in
-    UVars.Instance.of_array (Array.map (fun _ -> Quality.qtype) qs, us)
+    let qs, us = UVars.LevelInstance.to_array inst in
+    UVars.LevelInstance.of_array (Array.map (fun _ -> Quality.qtype) qs, us)
   in
   sigma, Template_ind_entry {uctx; default_univs}, ubinders, global
 
@@ -649,7 +649,9 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
 
      We also need to restrict to avoid seeing spurious bounds from below
      (ie v <= template_u with v getting restricted away). *)
-  let sigma = Evd.minimize_universes ~collapse_sort_variables:false sigma in
+  let ivariances = UnivVariances.universe_variances_of_inductive env_ar_params sigma ~params:ctx_params ~arities ~constructors in
+
+  let sigma = Evd.minimize_universes ~collapse_sort_variables:false ~variances:ivariances sigma in
   let sigma = restrict_inductive_universes sigma ctx_params arities constructors in
 
   let sigma, univ_entry, ubinders, global_univs =

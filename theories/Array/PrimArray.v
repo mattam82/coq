@@ -4,10 +4,10 @@ Set Universe Polymorphism.
 
 Primitive array := #array_type.
 
-Primitive make : forall A, int -> A -> array A := #array_make.
+Primitive make@{u} : forall A : Type@{u}, int -> A -> array A := #array_make.
 Arguments make {_} _ _.
 
-Primitive get : forall A, array A -> int -> A := #array_get.
+Primitive get@{u} : forall A : Type@{u}, array A -> int -> A := #array_get.
 Arguments get {_} _ _.
 
 Primitive default : forall A, array A -> A:= #array_default.

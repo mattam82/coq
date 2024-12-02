@@ -90,7 +90,7 @@ val do_definition_refine
   -> kind:Decls.logical_kind
   -> ?using:Vernacexpr.section_subset_expr
   -> ?user_warns:Globnames.extended_global_reference UserWarn.with_qf
-  -> universe_decl_expr option
+  -> cumul_univ_decl_expr option
   -> local_binder_expr list
   -> constr_expr
   -> constr_expr option

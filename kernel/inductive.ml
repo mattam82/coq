@@ -269,16 +269,18 @@ let rec template_subst_ctx accu subs ctx params = match ctx, params with
 
 let template_subst_ctx subst ctx params = template_subst_ctx [] subst ctx params
 
+
 let instantiate_template_constraints subst templ =
   let cstrs = UVars.UContext.constraints (UVars.AbstractContext.repr templ.template_context) in
   let fold (u, cst, v) accu =
     (* v is not a local universe by the unbounded from below property *)
-    let u = subst_univs_sort subst (Sorts.sort_of_univ u) in
-    match u with
-    | Sorts.QSort _ | Sorts.SProp -> assert false
-    | Sorts.Prop -> accu
-    | Sorts.Set -> Constraints.add (Universe.type0, cst, v) accu
-    | Sorts.Type u -> Constraints.add (u, cst, v) accu
+    let u = 
+      let level_fn u = match Level.var_index u with
+      | None -> Universe.make u
+      | Some u -> Int.Map.get u (snd subst)
+      in Universe.subst_fn level_fn u
+    in
+    Constraints.add (u, cst, v) accu
   in
   Constraints.fold fold cstrs Constraints.empty
 
@@ -288,7 +290,7 @@ let instantiate_template_universes mib args =
   | Some t -> t
   in
   let ctx = List.rev mib.mind_params_ctxt in
-  let subst = make_subst templ.template_defaults (ctx,templ.template_param_arguments,args) in
+  let subst = make_subst (Instance.of_level_instance templ.template_defaults) (ctx,templ.template_param_arguments,args) in
   let ctx = template_subst_ctx subst ctx templ.template_param_arguments in
   let cstrs = instantiate_template_constraints subst templ in
   (cstrs, ctx, subst)

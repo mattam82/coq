@@ -572,7 +572,7 @@ and eqwhnf cv_pb l2r infos (lft1, (hd1, v1) as appr1) (lft2, (hd2, v2) as appr2)
             eqappr cv_pb l2r infos (lft1,(hd1,v1)) (lft2,(hd2,v2)) cuniv
       else raise NotConvertible
 
-    | (FConstruct (((ind1,j1),u1 as pctor1,args1)), FConstruct (((ind2,j2),u2 as pctor2),args2)) ->
+    | (FConstruct (((ind1,j1 as c1),u1 as pctor1,args1)), FConstruct (((ind2,j2),u2 as pctor2),args2)) ->
       let () = assert_reduced_constructor v1 in
       let () = assert_reduced_constructor v2 in
       let nargs = Array.length args1 in
@@ -584,9 +584,8 @@ and eqwhnf cv_pb l2r infos (lft1, (hd1, v1) as appr1) (lft2, (hd2, v2) as appr2)
           let cuniv = fail_check infos @@ convert_instances ~flex:false u1 u2 cuniv in
           convert_stacks l2r infos lft1 lft2 v1 v2 cuniv
         else
-          let mind = Environ.lookup_mind (fst ind1) (info_env infos.cnv_inf) in
           let nargs = same_args_size v1 v2 in
-          match fail_check infos @@ UCompare.convert_constructors (info_env infos.cnv_inf) (mind, snd ind1, j1) ~nargs u1 u2 cuniv with
+          match fail_check infos @@ UCompare.convert_constructors (info_env infos.cnv_inf) c1 ~nargs u1 u2 cuniv with
           | cuniv -> convert_stacks l2r infos lft1 lft2 v1 v2 cuniv
           | exception MustExpand ->
             let env = info_env infos.cnv_inf in

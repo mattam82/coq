@@ -210,10 +210,9 @@ module Instance : sig
   val equal : t -> t -> bool
   val length : t -> int * int
 
-  val hcons : t -> t
-  val hash : t -> int
 
-  val share : t -> t * int
+  val hcons : t -> int * t
+  val hash : t -> int
 
   val subst_fn : (Sorts.QVar.t -> Quality.t) * (Level.t -> Universe.t) -> t -> t
 
@@ -232,28 +231,17 @@ let empty : t = [||], [||]
 module HInstancestruct =
 struct
   type nonrec t = t
-  type u = (Quality.t -> Quality.t) * (Universe.t -> Universe.t)
 
-  let hashcons (hqual, huniv) (aq, au as a) =
+  let hashcons (aq, au as a) =
     let qlen = Array.length aq in
     let ulen = Array.length au in
-      if Int.equal qlen 0 && Int.equal ulen 0 then empty
-      else begin
-        for i = 0 to qlen - 1 do
-          let x = Array.unsafe_get aq i in
-          let x' = hqual x in
-            if x == x' then ()
-            else Array.unsafe_set aq i x'
-        done;
-        for i = 0 to ulen - 1 do
-          let x = Array.unsafe_get au i in
-          let x' = huniv x in
-            if x == x' then ()
-            else Array.unsafe_set au i x'
-        done;
-        a
-      end
-
+      if Int.equal qlen 0 && Int.equal ulen 0 then 0, empty
+      else 
+        let hq, aq' = Hashcons.hashcons_array Quality.hcons aq in
+        let hu, au' = Hashcons.hashcons_array Universe.hcons au in
+        let a = if aq' == aq && au' == au then a else (aq',au') in
+        Hashset.Combine.combine hq hu, a
+        
   let eq t1 t2 =
     CArray.equal (==) (fst t1) (fst t2)
     && CArray.equal (==) (snd t1) (snd t2)
@@ -275,18 +263,14 @@ struct
         h
 end
 
+
 module HInstance = Hashcons.Make(HInstancestruct)
 
-let hcons = Hashcons.simple_hcons HInstance.generate HInstance.hcons (Quality.hcons, Universe.hcons)
+let hcons = Hashcons.simple_hcons HInstance.generate HInstance.hcons ()
 
 let hash : t -> int = HInstancestruct.hash
 
-let share a = (hcons a, hash a)
-
-let empty = hcons empty
-
 let is_empty (x,y) = CArray.is_empty x && CArray.is_empty y
-
 
 let append (xq,xu as x) (yq,yu as y) =
   if is_empty x then y
@@ -495,7 +479,7 @@ struct
   type t = bound_names * LevelInstance.t constrained
 
   let make names (univs, _ as x) : t =
-    let qs, us = Instance.to_array univs in
+    let qs, us = LevelInstance.to_array univs in
     assert (Array.length names.quals = Array.length qs && Array.length names.univs = Array.length us);
     (names, x)
 

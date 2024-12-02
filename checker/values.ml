@@ -327,7 +327,7 @@ let v_template_universes =
     v_list (v_opt v_sort);
     v_sort;
     v_abs_context;
-    v_instance;
+    v_level_instance;
   |]
 
 let v_primitive =
@@ -403,7 +403,7 @@ let v_cb = v_tuple "constant_body"
     v_relevance;
     v_opt v_vm_indirect_code;
     v_univs;
-    Opt (Array v_variance);
+    v_opt (v_array v_variance);
     v_bool;
     v_typing_flags|]
 

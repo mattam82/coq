@@ -360,7 +360,7 @@ let constraints uctx = snd uctx.local
 
 let compute_instance_binders uctx inst =
   let (qrev, urev) = snd uctx.names in
-  let qinst, uinst = Instance.to_array inst in
+  let qinst, uinst = LevelInstance.to_array inst in
   let qmap = function
     | QVar q ->
       begin try Name (Option.get (QVar.Map.find q qrev).uname)
@@ -996,7 +996,7 @@ let check_univ_decl ~poly uctx decl =
   entry, binders
 
 let restrict_universe_context (univs, csts) keep =
-  debug Pp.(fun () -> str"Restricting universe context: "  ++ pr_universe_context_set Level.raw_pr (univs, csts) ++
+  debug Pp.(fun () -> str"Restricting universe context: "  ++ ContextSet.pr Level.raw_pr (univs, csts) ++
     str " to " ++ Level.Set.pr Level.raw_pr keep);
   let removed = Level.Set.diff univs keep in
   if Level.Set.is_empty removed then univs, csts
@@ -1010,10 +1010,10 @@ let restrict_universe_context (univs, csts) keep =
   let g = UGraph.merge_constraints csts g in
   let allkept = Level.Set.union (UGraph.domain UGraph.initial_universes) (Level.Set.diff allunivs removed) in
   let csts = UGraph.constraints_for ~kept:allkept g in
-  let csts = Constraints.filter (fun (l,d,r) -> not (Universe.is_type0 l lbound && d == Le)) csts in
+  let csts = Constraints.filter (fun (l,d,r) -> not (Universe.is_type0 l && d == Le)) csts in
   let uctx = (Level.Set.inter univs keep, csts) in
   (* debug Pp.(fun () -> str"Extras" ++ Level.Set.pr Level.raw_pr extras); *)
-  debug Pp.(fun () -> str"Restricted universe context" ++ pr_universe_context_set Level.raw_pr uctx);
+  debug Pp.(fun () -> str"Restricted universe context" ++ ContextSet.pr Level.raw_pr uctx);
   uctx
 
 let restrict uctx vars =
@@ -1316,8 +1316,8 @@ let check_uctx_impl ~fail uctx uctx' =
 
 let disable_minim, _ = CDebug.create_full ~name:"minimization" ()
 
-let minimize ?lbound ?variances uctx =
-  if CDebug.get_flag disable_minim then uctx else minimize ?lbound ?variances uctx
+let minimize ?variances uctx =
+  if CDebug.get_flag disable_minim then uctx else minimize ?variances uctx
 
 (* XXX print above_prop too *)
 let pr_weak prl {minim_extra={UnivMinim.weak_constraints=weak; above_prop}} =
