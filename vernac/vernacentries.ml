@@ -171,10 +171,9 @@ let show_top_evars ~proof =
 let show_universes ~proof =
   let Proof.{goals;sigma} = Proof.data proof in
   let env = Global.env () in
-  let variances = UnivVariances.universe_variances_of_partial_proofs env sigma (Proof.partial_proof proof) in
-  let sigma', _variances = Evd.minimize_universes ~variances sigma in
+  let sigma = UnivVariances.register_universe_variances_of_partial_proofs env sigma (Proof.partial_proof proof) in
+  let sigma' = Evd.minimize_universes sigma in
   UState.pr (Evd.ustate sigma) ++ fnl () ++
-  InferCumulativity.pr_variances Univ.Level.raw_pr variances ++ fnl () ++
   v 1 (str "Normalized constraints:" ++ cut() ++
        UState.pr (Evd.ustate sigma'))
 
@@ -2101,8 +2100,8 @@ let check_may_eval env sigma redexp rc =
   let sigma, c = Pretyping.understand_tcc env sigma gc in
   let sigma = Evarconv.solve_unif_constraints_with_heuristics env sigma in
   Evarconv.check_problems_are_solved env sigma;
-  let variances = UnivVariances.universe_variances env sigma c in
-  let sigma, variances = Evd.minimize_universes ~variances sigma in
+  let sigma = UnivVariances.register_universe_variances_of env sigma c in
+  let sigma, variances = Evd.minimize_universes sigma in
   let (qs, us), csts = Evd.sort_context_set sigma in
   let { Environ.uj_val=c; uj_type=ty; } =
     if Evarutil.has_undefined_evars sigma c

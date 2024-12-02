@@ -356,7 +356,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   if def then
     (* XXX to fix: if we enter [Class Foo : typ := Bar : nat.], [typ] will get unfolded here *)
     let sigma, sort, projtyp = def_class_levels ~def ~env_ar_params sigma aritysorts fields in
-    let ivariances = UnivVariances.universe_variances_of_record env0 sigma ~params ~fields ~types:[projtyp] in
+    let sigma = UnivVariances.register_universe_variances_of_record env0 sigma ~env_ar_pars:env_ar ~params ~fields ~types:[projtyp] in
     let sigma, params, sort, typ, projtyp =
       (* named and rel context in the env don't matter here
          (they will be replaced by the ones of the unsolved evars in the error message

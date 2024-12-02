@@ -1041,7 +1041,7 @@ let to_universe_context evd = UState.context evd.universes
 
 let univ_entry ~poly evd = UState.univ_entry ~poly evd.universes
 
-let check_univ_decl ~poly ?(cumulative=true) evd ivariances decl = UState.check_univ_decl ~poly ~cumulative evd.universes ivariances decl
+let check_univ_decl ~poly ?(cumulative=true) evd decl = UState.check_univ_decl ~poly ~cumulative evd.universes decl
 
 let check_univ_decl_early ~poly ?(cumulative=true) ~with_obls sigma udecl terms =
   let () =
@@ -1057,8 +1057,7 @@ let check_univ_decl_early ~poly ?(cumulative=true) ~with_obls sigma udecl terms 
   let uctx = ustate sigma in
   let uctx = UState.collapse_sort_variables uctx in
   let uctx = UState.restrict uctx vars in
-  (* FIXME compute variances *)
-  ignore (UState.check_univ_decl ~poly ~cumulative uctx InferCumulativity.empty_level_variances udecl)
+  ignore (UState.check_univ_decl ~poly ~cumulative uctx udecl)
 
 let restrict_universe_context evd vars =
   { evd with universes = UState.restrict evd.universes vars }
@@ -1215,14 +1214,17 @@ let collapse_sort_variables ?except evd =
   let universes = UState.collapse_sort_variables ?except evd.universes in
   { evd with universes }
 
-let minimize_universes ?(collapse_sort_variables=true) ?variances ?(partial=false) evd =
+let get_variances evd = UState.get_variances evd.universes
+let set_variances evd variances = {evd with universes = UState.set_variances evd.universes variances}
+
+let minimize_universes ?(collapse_sort_variables=true) ?(partial=false) evd =
   let uctx' = if collapse_sort_variables
     then UState.collapse_sort_variables evd.universes
     else evd.universes
   in
   let uctx' = UState.normalize_variables uctx' in
-  let uctx', variances = UState.minimize ?variances ~partial uctx' in
-  {evd with universes = uctx'}, variances
+  let uctx' = UState.minimize ~partial uctx' in
+  {evd with universes = uctx'}
 
 let universe_of_name evd s = UState.universe_of_name evd.universes s
 
