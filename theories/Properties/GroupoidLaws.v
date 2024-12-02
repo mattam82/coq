@@ -31,6 +31,12 @@ Definition assoc {x y z w : A} (e1 : x = y) (e2 : y = z) (e3 : z = w) :
 (** listings: end **)
 Proof. induction e1 using eq_elim; reflexivity. Defined.
 
+  Definition sym_lInv {x y : A} (e : x = y) : eq_sym e ⋅ e = rfl.
+  Proof. induction e using eq_elim. reflexivity. Qed.
+
+  Definition sym_rInv {x y : A} (e : x = y) : e ⋅ eq_sym e = rfl.
+  Proof. induction e using eq_elim. reflexivity. Qed.
+
   Definition inv_refl {x : A} : eq_sym rfl = rfl :> (x = x).
   Proof. reflexivity. Defined.
 
