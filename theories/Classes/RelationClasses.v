@@ -17,12 +17,12 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
-Require Export Coq.Classes.Init.
-Require Import Coq.Program.Basics.
-Require Import Coq.Program.Tactics.
+Require Export Stdlib.Classes.Init.
+Require Import Stdlib.Program.Basics.
+Require Import Stdlib.Program.Tactics.
 
-Require Import Coq.Properties.GroupoidLaws.
-Require Export Coq.Properties.Functions.
+Require Import Stdlib.Properties.GroupoidLaws.
+Require Export Stdlib.Properties.Functions.
 
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 

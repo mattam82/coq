@@ -1,4 +1,4 @@
-From Coq.Properties Require Import GroupoidLaws.
+From Corelib.Properties Require Import GroupoidLaws.
 
 Notation "f ∘ g" := (fun x => f (g x)) (at level 55).
 

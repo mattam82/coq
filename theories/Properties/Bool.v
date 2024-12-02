@@ -1,5 +1,5 @@
-From Coq Require Import Types.Bool.
-From Coq Require Import Tactics.Ltac.
+From Corelib Require Import Types.Bool.
+From Corelib Require Import Tactics.Ltac.
 
 (** Basic properties of [andb] *)
 Lemma andb_prop (a b:bool) : andb a b = true -> (a = true) * (b = true).
