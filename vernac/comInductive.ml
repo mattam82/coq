@@ -610,22 +610,23 @@ let check_trivial_variances = function
   | None -> ()
   | Some variances ->
     Array.iter (function
-      | UVars.Variance.Invariant -> ()
+      | UVars.Variance.Invariant, _ -> ()
       | _ ->
         CErrors.user_err
           Pp.(strbrk "Universe variance was specified but this inductive will not be cumulative."))
     variances
 
 let variance_of_entry ~cumulative ctx variances =
-  if not cumulative then begin check_trivial_variances variances; variances end
+  let ivariances = Option.map UVars.Variances.repr variances in
+  if not cumulative then begin check_trivial_variances ivariances; variances end
   else
-    match variances with
+    match ivariances with
     | None -> variances
     | Some variances ->
       let lvs = Array.length variances in
       let _, lus = UVars.UContext.size ctx in
       assert (lvs <= lus);
-      Some (Array.append variances (Array.make (lus - lvs) UVars.Variance.Invariant))
+      Some (UVars.Variances.of_array (Array.append variances (Array.make (lus - lvs) (UVars.Variance.Invariant, None))))
 
 let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~ctx_params ~indnames ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar_params ~private_ind =
   let {
@@ -674,7 +675,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~ctx_params ~indnames ~a
       })
       indnames arities constructors
   in
-  let UState.{ universes_entry_universes = univ_entry; universes_entry_binders = binders } = Evd.check_univ_decl ~poly sigma ivariances udecl in
+  let UState.{ universes_entry_universes = univ_entry; universes_entry_binders = binders } = Evd.check_univ_decl ~poly ~cumulative sigma ivariances udecl in
 
   let variance = variance_of_entry ~cumulative ~variances univ_entry in
   (* Build the mutual inductive entry *)

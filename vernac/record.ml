@@ -368,7 +368,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
       | _ -> assert false
     in
     let projname = CAst.map Nameops.Name.get_id projname in
-    let univs = Evd.check_univ_decl ~poly:flags.poly sigma udecl in
+    let univs = Evd.check_univ_decl ~poly:flags.poly ~cumulative:flags.cumulative sigma udecl in
     (* definitional classes are encoded as 1 constructor with 1
        field whose type is the projection type *)
     let projimpls = match field_impls with
@@ -413,7 +413,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
     in
     let env_ar = Environ.pop_rel_context nparams env_ar_params in
     let default_dep_elim, mie, ubinders, global_univs =
-      ComInductive.interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances
+      ComInductive.interp_mutual_inductive_constr ~sigma ~flags ~udecl
         ~ctx_params:params ~indnames ~arities_explicit ~arities:typs ~constructors
         ~template_syntax ~env_ar ~private_ind:false
     in
@@ -640,7 +640,7 @@ let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
   in
   let univs = match mib.mind_universes with
     | Monomorphic -> UState.Monomorphic_entry Univ.ContextSet.empty
-    | Polymorphic auctx -> UState.Polymorphic_entry (UVars.AbstractContext.repr auctx)
+    | Polymorphic (auctx, _variances) -> UState.Polymorphic_entry (UVars.AbstractContext.repr auctx, None)
   in
   let univs = univs, UnivNames.empty_binders in
   let fields, _ = mip.mind_nf_lc.(0) in
@@ -825,7 +825,7 @@ let extract_record_data kind records =
   in
   ps, data, decl_data
 
-let pre_process_structure udecl kind ~flags ~primitive_proj (records : Ast.t list) =
+let pre_process_structure udecl kind ~poly ~cumulative ~flags ~primitive_proj (records : Ast.t list) =
   let def = (kind = Vernacexpr.Class true) in
   let indlocs = check_unique_names ~def records in
   let () = check_priorities kind records in
