@@ -707,8 +707,8 @@ let declare_private_constant ?role ~name ~opaque de effs =
   let kn, eff = Global.add_private_constant name ctx de in
   let () = if Univ.Level.Set.is_empty (fst ctx) then ()
     else DeclareUniv.declare_univ_binders (ConstRef kn)
-        { universes_entry_universes = Monomorphic_entry ctx;
-          universes_entry_binders = UnivNames.empty_binders }
+      UState.{ universes_entry_universes = Monomorphic_entry ctx;
+        universes_entry_binders = UnivNames.empty_binders }
   in
   let seff_roles = match role with
   | None -> effs.Evd.seff_roles
@@ -773,7 +773,7 @@ let declare_variable ~name ~kind ~typing_flags d =
           DeclareUniv.name_mono_section_univs (fst uctx);
           Global.push_context_set (Univ.ContextSet.union uctx body_uctx);
           UState.{ universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty; universes_entry_binders = UnivNames.empty_binders }
-        | UState.Polymorphic_entry (uctx, variances) ->
+        | UState.Polymorphic_entry (uctx, _variances) ->
           Global.push_section_context uctx;
           let mk_anon_names u =
             let qs, us = UVars.LevelInstance.to_array u in
@@ -906,7 +906,7 @@ let process_proof ~info:Info.({ udecl; poly; cumulative }) ?(is_telescope=false)
        previous entries requires to accumulate the universes from the
        previous definitions *)
     snd (List.fold_left2_map (fun used_univs ((body, eff), typ) opaque ->
-        let sigma = UnivVariances.universe_variances_constr (Global.env ()) (Evd.from_ctx uctx) ?typ body in
+        let sigma = UnivVariances.register_universe_variances_of_constr (Global.env ()) (Evd.from_ctx uctx) ?typ body in
         let uctx, univs, used_univs, body =
           make_univs_immediate ~poly ~cumulative ?keep_body_ucst_separate ~opaque ~uctx:(Evd.ustate sigma) ~udecl ~eff ~used_univs body typ in
         (used_univs, (definition_entry_core ?using ~univs ?types:typ body, uctx))) Univ.Level.Set.empty entries opaques)
