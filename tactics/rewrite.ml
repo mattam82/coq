@@ -1785,7 +1785,7 @@ let default_morphism env sigma sign m =
     TypeGlobal.build_signature (sigma, Evar.Set.empty) env t (fst sign) (snd sign)
   in
   let evars, morph = app_poly_check env evars TypeGlobal.proper_type [| t; sign; m |] in
-  let evars, mor = TC.resolve_one_typeclass env (goalevars evars) morph in
+  let evars, mor = Class_tactics.resolve_one_typeclass env (goalevars evars) morph in
     mor, proper_projection sigma mor morph
 
 (** Bind to "rewrite" too *)
