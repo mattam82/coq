@@ -210,7 +210,8 @@ val fix_undefined_variables : t -> t
 (** cf UnivFlex *)
 
 (** Universe minimization *)
-val minimize : t -> t
+
+val minimize : ?variances:UnivMinim.level_variances -> t -> t
 
 val collapse_above_prop_sort_variables : to_prop:bool -> t -> t
 
