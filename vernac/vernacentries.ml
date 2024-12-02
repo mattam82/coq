@@ -105,10 +105,10 @@ module DefAttributes = struct
   let clearbody = bool_attribute ~name:"clearbody"
 
   (* [XXX] EJGA: coercion is unused here *)
-  let def_attributes_gen ?(coercion=false) ?(discharge=NoDischarge,"","") () =
+  let def_attributes_gen ?(coercion=false) ?(discharge=NoDischarge,"","") ?(ass_or_def=UVars.Definition) () =
     let discharge, deprecated_thing, replacement = discharge in
     let clearbody = match discharge with DoDischarge -> clearbody | NoDischarge -> return None in
-    (locality ++ user_warns_with_use_globref_instead ++ polymorphic ++ cumulative ++ program ++
+    (locality ++ user_warns_with_use_globref_instead ++ polymorphic ++ cumulative ass_or_def ++ program ++
                canonical_instance ++ typing_flags ++ using ++
                reversible ++ clearbody) >>= fun (((((((((locality, user_warns), polymorphic), cumulative), program),
            canonical_instance), typing_flags), using),
@@ -121,15 +121,15 @@ module DefAttributes = struct
       let scope = scope_of_locality locality discharge deprecated_thing replacement in
       return { scope; locality; polymorphic; cumulative; program; user_warns; canonical_instance; typing_flags; using; reversible; clearbody }
 
-  let parse ?coercion ?discharge f =
-    Attributes.parse (def_attributes_gen ?coercion ?discharge ()) f
+  let parse ?coercion ?discharge ?ass_or_def f =
+    Attributes.parse (def_attributes_gen ?coercion ?discharge ?ass_or_def ()) f
 
   let def_attributes = def_attributes_gen ()
 
 end
 
-let with_def_attributes ?coercion ?discharge ~atts f =
-  let atts = DefAttributes.parse ?coercion ?discharge atts in
+let with_def_attributes ?coercion ?discharge ?ass_or_def ~atts f =
+  let atts = DefAttributes.parse ?coercion ?discharge ?ass_or_def atts in
   if atts.DefAttributes.program then Declare.Obls.check_program_libraries ();
   f ~atts
 
@@ -2628,16 +2628,18 @@ let translate_pure_vernac ?loc ~atts v = let open Vernactypes in match v with
     let atts, refine = Attributes.(parse_with_extra Classes.refine_att) atts in
     if refine then
       vtopenproof(fun () ->
-        with_def_attributes ~coercion ~discharge:(discharge, "\"Let\"", "\"#[local] Definition\"") ~atts
+        with_def_attributes ~coercion ~discharge:(discharge, "\"Let\"", "\"#[local] Definition\"")
+        ~ass_or_def:UVars.Definition ~atts
          vernac_definition_refine dkind lid bl red_option c typ)
     else
       vtmodifyprogram (fun ~pm ->
         with_def_attributes ~coercion ~discharge:(discharge, "\"Let\"", "\"#[local] Definition\"") ~atts
-        vernac_definition ~pm dkind lid bl red_option c typ)
+        ~ass_or_def:UVars.Definition vernac_definition ~pm dkind lid bl red_option c typ)
   | VernacDefinition ((discharge,kind as dkind),lid,ProveBody(bl,typ)) ->
     let coercion = match kind with Decls.Coercion -> true | _ -> false in
     vtopenproof(fun () ->
-      with_def_attributes ~coercion ~discharge:(discharge, "\"Let\"", "\"#[local] Definition\"") ~atts
+      with_def_attributes ~coercion ~discharge:(discharge, "\"Let\"", "\"#[local] Definition\"")
+       ~ass_or_def:UVars.Definition ~atts
        vernac_definition_interactive dkind lid bl typ)
 
   | VernacStartTheoremProof (k,l) ->
@@ -2649,7 +2651,7 @@ let translate_pure_vernac ?loc ~atts v = let open Vernactypes in match v with
 
   | VernacAssumption ((discharge,kind),nl,l) ->
     vtdefault(fun () ->
-        with_def_attributes ~atts
+        with_def_attributes ~ass_or_def:UVars.Assumption ~atts
           ~discharge:(discharge,
                       "\"Variable\" or \"Hypothesis\"",
                       "\"#[local] Parameter\" or \"#[local] Axiom\"")
