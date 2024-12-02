@@ -294,10 +294,10 @@ let pr_universe_instance_binder evd inst csts =
     end
     else strbrk " | " ++
          prlist_with_sep pr_comma
-           (fun (u,d,v) -> hov 0 (prlev u ++ pr_constraint_type d ++ prlev v))
+           (fun (u,d,v) -> hov 0 (Universe.pr prlev u ++ pr_constraint_type d ++ Universe.pr prlev v))
            (Constraints.elements csts)
   in
-  str"@{" ++ UVars.Instance.pr prqvar prlev inst ++ pcsts ++ str"}"
+  str"@{" ++ UVars.Instance.pr prqvar (Universe.pr prlev) inst ++ pcsts ++ str"}"
 
 let pr_universe_instance evd inst =
   let prqvar = Termops.pr_evd_qvar evd in

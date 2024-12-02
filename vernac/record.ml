@@ -153,12 +153,12 @@ let is_sort_variable sigma s =
 
 let build_type_telescope ~unconstrained_sorts newps env0 sigma { DataI.arity; _ } = match arity with
   | None ->
-    let sigma, s = Evd.new_sort_variable Evd.univ_flexible_alg sigma in
+    let sigma, s = Evd.new_sort_variable Evd.univ_flexible sigma in
     sigma, (EConstr.mkSort s, s)
   | Some { CAst.v = CSort s; loc } when Constrexpr_ops.(sort_expr_eq expr_Type_sort s) ->
     (* special case: the user wrote ": Type". We want to allow it to become algebraic
        (and Prop but that may change in the future) *)
-    let sigma, s = Evd.new_sort_variable ?loc UState.univ_flexible_alg sigma in
+    let sigma, s = Evd.new_sort_variable ?loc UState.univ_flexible sigma in
     sigma, (EConstr.mkSort s, s)
   | Some t ->
     let env = EConstr.push_rel_context newps env0 in
@@ -920,7 +920,7 @@ let declare_class_constant entry (data:Data.t) =
     | UState.Monomorphic_entry _, ubinders ->
       UVars.Instance.empty, (UState.Monomorphic_entry Univ.ContextSet.empty, ubinders)
     | UState.Polymorphic_entry uctx, _ ->
-      UVars.UContext.instance uctx, univs
+      UVars.Instance.of_level_instance (UVars.UContext.instance uctx), univs
   in
   let cstu = (cst, inst) in
   let binder =

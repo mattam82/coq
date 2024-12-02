@@ -254,18 +254,23 @@ let check_record data =
 
 (* Template univs must be unbounded from below for subject reduction
    (with partially applied template poly, cf RFC 90).
-
-   We also forbid strict bounds from above because they lead
-   to problems when instantiated with algebraic universes
-   (template_u < v can become w+1 < v which we cannot yet handle). *)
+*)
 let check_unbounded_from_below (univs,csts) =
+  let check_univ u =
+    Level.Set.fold (fun l accu -> 
+      match accu with 
+      | None -> 
+        if Level.Set.mem l univs then Some l
+        else None
+      | _ -> accu) (Universe.levels u) None
+  in
   Univ.Constraints.iter (fun (l,d,r) ->
       let bad = match d with
-        | Eq | Lt ->
-          if Level.Set.mem l univs then Some l
-          else if Level.Set.mem r univs then Some r
-          else None
-        | Le -> if Level.Set.mem r univs then Some r else None
+        | Eq ->
+          (match ckeck_univ l with 
+          | None -> check_univ r
+          | Some _ as x -> x)          
+        | Le -> check_univ r
       in
       bad |> Option.iter (fun bad ->
           CErrors.user_err Pp.(str "Universe level " ++ Level.raw_pr bad ++
@@ -579,13 +584,13 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
         CErrors.user_err Pp.(str "Inductive cannot be both monomorphic and universe cumulative.")
       | Polymorphic_ind_entry uctx ->
         (* no variance for qualities *)
-        let _qualities, univs = Instance.to_array @@ UContext.instance uctx in
+        let _qualities, univs = LevelInstance.to_array @@ UContext.instance uctx in
         let univs = Array.map2 (fun a b -> a,b) univs variances in
         let univs = match sec_univs with
           | None -> univs
           | Some sec_univs ->
             (* no variance for qualities *)
-            let _, sec_univs = UVars.Instance.to_array sec_univs in
+            let _, sec_univs = UVars.LevelInstance.to_array sec_univs in
             let sec_univs = Array.map (fun u -> u, None) sec_univs in
             Array.append sec_univs univs
         in
