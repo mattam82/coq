@@ -213,7 +213,7 @@ val fix_undefined_variables : t -> t
 
 (** Universe minimization *)
 
-val minimize : ?variances:UnivMinim.level_variances -> t -> t
+val minimize : ?variances:InferCumulativity.level_variances -> t -> t
 
 val collapse_above_prop_sort_variables : to_prop:bool -> t -> t
 
@@ -247,7 +247,7 @@ val default_univ_decl : universe_decl
    When polymorphic, the universes corresponding to
    [decl.univdecl_instance] come first in the order defined by that
    list. *)
-val check_univ_decl : poly:bool -> ?cumulative:bool -> t -> UnivMinim.level_variances -> universe_decl -> named_universes_entry
+val check_univ_decl : poly:bool -> ?cumulative:bool -> t -> InferCumulativity.level_variances -> universe_decl -> named_universes_entry
 val check_univ_decl_rev : t -> universe_decl -> t * UVars.UContext.t
 val check_uctx_impl : fail:(Pp.t -> unit) -> t -> t -> unit
 
