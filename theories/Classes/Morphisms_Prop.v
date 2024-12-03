@@ -40,11 +40,11 @@ Program Instance not_iff_morphism'@{| |} :
 
 #[global]
 Program Instance and_impl_morphism@{s|u v|} :
-  Proper (arrow ++> arrow ++> arrow) prod@{s|u v} | 1.
+  Proper (arrow ++> arrow ++> arrow@{s s|max(u,v) max(u,v)}) prod@{s|u v} | 1.
 
 #[global]
 Program Instance and_iff_morphism@{s|u v|} :
-  Proper (iff ++> iff ++> iff) prod@{s|u v}.
+  Proper (iff ++> iff ++> iff@{s|max(u,v) max(u,v)}) prod@{s|u v}.
 Next Obligation.
   intros ? ? [? ?] ? ? [? ?]; split; intros [? ?]; split; eauto.
 Qed.
@@ -52,12 +52,12 @@ Qed.
 (** Logical implication [impl] is a morphism for logical equivalence. *)
 
 #[global]
-Program Instance iff_iff_iff_impl_morphism@{s s'|?|} : Proper (iff ++> iff ++> iff) arrow@{s s'|_ _}.
+Program Instance iff_iff_iff_impl_morphism@{s s'|u v|} : Proper (iff ++> iff ++> iff@{s'|max(u,v) max(u,v)}) arrow@{s s'|u v}.
 
 (** Morphisms for quantifiers *)
 
 #[global]
-Program Instance ex_iff_morphism@{s s' s''|u?|} {A : Type@{s|_}} : Proper (pointwise_relation@{s Type s'|_ _ _} A iff@{s'|u u} ++> iff) (@sigma@{s s' s''|_ _} A).
+Program Instance ex_iff_morphism@{s s' s''|u v|} {A : Type@{s|u}} : Proper (pointwise_relation A iff ++> iff@{s''|max(u,v) max(u,v)}) (@sigma@{s s' s''|u v} A).
 Next Obligation.
 compute. intros. firstorder. intros [? ?]; eexists; eauto. edestruct X; eauto.
 Qed.
@@ -67,8 +67,8 @@ Program Instance ex_flip_impl_morphism@{s|?|?} {A : Type@{s|_}} :
   Proper (pointwise_relation A (flip arrow) ++> flip arrow) (@sigmaR@{s|_ _} A) | 1.
 
 #[global]
-Program Instance all_iff_morphism@{s s'|?|} {A : Type@{s|_}} :
-  Proper (pointwise_relation A iff ++> iff) (@all@{s s'|_ _} A).
+Program Instance all_iff_morphism@{s s'|u v|} {A : Type@{s|u}} :
+  Proper (pointwise_relation A iff ++> iff@{s'|max(u,v) max(u,v)}) (@all@{s s'|u v} A).
 Next Obligation.
 intros A x y r.
 constructor; intros H a;  apply r, H.
