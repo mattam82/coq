@@ -161,5 +161,5 @@ Instance pointwise_transitive@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(transb :
 Proof. firstorder. Qed.
 #[global]
 Instance pointwise_equivalence@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(eqb : Equivalence@{sb srb | b rb} B eqB) :
-  Equivalence (pointwise_relation A eqB) | 9.
+  Equivalence@{sb srb|max(a, b) max(a, rb)} (pointwise_relation A eqB) | 9.
 Proof. split; apply _. Qed.
