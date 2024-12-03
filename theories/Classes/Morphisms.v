@@ -753,8 +753,8 @@ Qed.
 Lemma proper_sym_arrow_iff_2@{sa sra sb srb sf|a ra b rb f|} :
   forall {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sa sra|a ra} A}
   {R' : relation@{sb srb|b rb} B} {f : A -> B -> Type@{sf|f}},
-  (Symmetric R) -> (Symmetric R') -> (Proper (R++>R'++>arrow) f) ->
-  Proper (R++>R'++>iff) f.
+  (Symmetric R) -> (Symmetric R') -> (Proper (R++>R'++>arrow@{sf sf|f f}) f) ->
+  Proper (R++>R'++>iff@{sf|f f}) f.
 Proof.
 intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
 repeat red in Hf. split; eauto.
@@ -766,7 +766,7 @@ Qed.
 #[global]
 Instance PartialOrder_proper_type@{s s'|u v|} {A : Type@{s | u}} (eqA : relation@{s s' | u v} A) {isEq : Equivalence eqA}
   (R : relation@{s s' | u v} A) {isPreOrder : PreOrder R} (_ : PartialOrder eqA R) :
-    Proper (eqA++>eqA++>iff) R.
+    Proper (eqA++>eqA++>iff@{s'|v v}) R.
 Proof.
 intros.
 apply proper_sym_arrow_iff_2. 1-2: typeclasses eauto.
