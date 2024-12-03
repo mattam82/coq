@@ -168,7 +168,7 @@ Definition eq_cast@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 
 Definition eq_cast_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, (y = x :> _ : SProp) -> P y :=
-  fun px y e => eq_cast _ x P px y (eq_sym e).
+  fun px y e => eq_cast@{_ _|u v} _ x P px y (eq_sym e).
 
 Register eq_cast_r as core.eq.sind_r.
 Register eq_cast as core.eq.sind.
