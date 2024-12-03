@@ -263,7 +263,8 @@ let make_univs_immediate_default ~poly ~cumulative ~opaque ~uctx ~udecl ~eff ~us
 let make_univs_immediate ~poly ~cumulative ?keep_body_ucst_separate ~opaque ~uctx ~udecl ~eff ~used_univs body typ =
   (* allow_deferred case *)
   match keep_body_ucst_separate with
-  | Some initial_euctx when not poly -> make_univs_immediate_private_mono ~initial_euctx ~uctx ~udecl ~eff ~used_univs body typ
+  | Some initial_euctx when not poly ->
+    make_univs_immediate_private_mono ~initial_euctx ~uctx ~udecl ~eff ~used_univs body typ
   | _ ->
   (* private_poly_univs case *)
   if poly && opaque && private_poly_univs ()
@@ -1019,12 +1020,12 @@ let declare_possibly_mutual_definitions ~info ~cinfo ~obls ?(is_telescope=false)
 let declare_possibly_mutual_parameters ~info ~cinfo ?(mono_uctx_extra=UState.empty) ~sec_vars typs =
   (* Note, if an initial uctx, minimize and restrict have not been done *)
   (* if the uctx of an abandonned proof, minimize is redundant (see close_proof) *)
-  let { Info.scope; poly; hook; udecl } = info in
+  let { Info.scope; poly; cumulative; hook; udecl } = info in
   pi3 (List.fold_left2 (
     fun (i, subst, csts) { CInfo.name; impargs } (typ, uctx) ->
       let uctx' = UState.restrict uctx (Vars.universes_of_constr typ) in
       let sigma = UnivVariances.register_universe_variances_of_type (Global.env ()) (Evd.from_ctx uctx') (EConstr.of_constr typ) in
-      let univs = UState.check_univ_decl ~poly ~kind:Assumption (Evd.ustate sigma) udecl in
+      let univs = UState.check_univ_decl ~poly ~cumulative ~kind:Assumption (Evd.ustate sigma) udecl in
       let univs = if i = 0 then add_mono_uctx mono_uctx_extra univs else univs in
       let typ = Vars.replace_vars subst typ in
       let pe = {

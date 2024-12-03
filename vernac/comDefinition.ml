@@ -162,7 +162,7 @@ let do_definition_interactive ?loc ~program_mode ?hook ~name ~scope ?clearbody ~
   Pretyping.check_evars_are_solved ~program_mode env evd;
   let evd = Evd.minimize_universes ~partial:udecl.univdecl_extensible_instance evd in
   let typ = EConstr.to_constr evd typ in
-  let info = Declare.Info.make ?loc ?hook ~poly ~scope ?clearbody ~kind ~udecl ?typing_flags ?user_warns () in
+  let info = Declare.Info.make ?loc ?hook ~poly ~cumulative ~scope ?clearbody ~kind ~udecl ?typing_flags ?user_warns () in
   let cinfo = Declare.CInfo.make ~name ~typ ~args ~impargs () in
   Evd.check_univ_decl_early ~poly ~cumulative ~with_obls:false evd udecl [typ];
   let evd = if poly then evd else Evd.fix_undefined_variables evd in
