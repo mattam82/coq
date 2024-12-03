@@ -360,7 +360,7 @@ Section Binary.
    We give an equivalent definition, up-to an equivalence relation
    on the carrier. *)
 
-  Class PartialOrder eqA `{equ : Equivalence A eqA} R `{preo : PreOrder A R} :=
+  Class PartialOrder@{w} (eqA : relation@{s s'|u v} A) `{equ : Equivalence A eqA} (R : relation@{s s'|u w} A) `{preo : PreOrder A R} :=
     partial_order_equivalence : relation_equivalence eqA (relation_conjunction R (flip R)).
 
   (** The equivalence proof is sufficient for proving that [R] must be a
