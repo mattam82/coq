@@ -340,7 +340,7 @@ Proof.
   exact a.
 Qed.
 
-Lemma rewrite_all_in {l : list nat} (Q : nat -> Type) :
+#[universes(polymorphic)] Lemma rewrite_all_in {l : list nat} (Q : nat -> Type) :
   All (fun x => Q (plus x O)) l ->
   All (fun x => Q x) l.
 Proof.
@@ -348,8 +348,9 @@ Proof.
   setoid_rewrite add_0_r_eq in a.
   exact a.
 Qed.
-Check rewrite_all_in@{Set}.
+Check rewrite_all_in@{Set Set}.
 
+#[universes(polymorphic)]
 Lemma rewrite_all_in2 {l : list nat} (Q : nat -> Type) (R : nat -> Type) :
   All (fun x => prod (Q (plus x O)%nat) (R x))%type l ->
   All (fun x => prod (Q x) (R x))%type l.
@@ -358,6 +359,6 @@ Proof.
   setoid_rewrite add_0_r_eq in a.
   exact a.
 Qed.
-Check rewrite_all_in2@{0 0}.
+Check rewrite_all_in2@{Set Set Set}.
 
 End Polymorphism.
