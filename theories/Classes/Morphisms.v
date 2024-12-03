@@ -280,9 +280,10 @@ Section Relations.
    We use an unconvertible premise to avoid looping.
    *)
 
-  Lemma subrelation_proper@{sr'|r'|} (R' : relation@{s sr'|a r'} A) (m : A) (mor : Proper R' m)
-        `(unc : Unconvertible (relation A) R R')
-        `(sub : subrelation A R' R) : Proper R m.
+  Lemma subrelation_proper@{sr|r'|} (R R' : relation@{s sr|a r'} A)
+      (m : A) (mor : Proper R' m)
+      (unc : Unconvertible _ R R')
+      (sub : subrelation R' R) : Proper R m.
   Proof.
     intros. apply sub. apply mor.
   Qed.
@@ -741,16 +742,19 @@ Qed.
     compatible with [iff] as soon as it is compatible with [arrow].
     Same with a binary relation. *)
 
-Lemma proper_sym_arrow_iff@{sa sra sf|a ra f|} : forall {A : Type@{sa|a}} {R : relation@{sa sra|a ra} A} {f : A -> Type@{sf|f}},
-  Symmetric R -> Proper (R++>arrow) f ->
-  Proper (R++>iff) f.
+Lemma proper_sym_arrow_iff@{sa sra sf|a ra f|} :
+  forall {A : Type@{sa|a}} {R : relation@{sa sra|a ra} A} {f : A -> Type@{sf|f}},
+  Symmetric R -> Proper (R++>arrow@{sf sf |f f}) f ->
+  Proper (R++>iff@{sf | f f}) f.
 Proof.
 intros A R Sym f Hf x x' Hxx'. repeat red in Hf. split; eauto.
 Qed.
 
 Lemma proper_sym_arrow_iff_2@{sa sra sb srb sf|a ra b rb f|} :
-forall {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sa sra|a ra} A} {R' : relation@{sb srb|b rb} B} {f : A -> B -> Type@{sf|f}}, (Symmetric R) -> (Symmetric R') -> (Proper (R++>R'++>arrow) f) ->
-Proper (R++>R'++>iff) f.
+  forall {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sa sra|a ra} A}
+  {R' : relation@{sb srb|b rb} B} {f : A -> B -> Type@{sf|f}},
+  (Symmetric R) -> (Symmetric R') -> (Proper (R++>R'++>arrow) f) ->
+  Proper (R++>R'++>iff) f.
 Proof.
 intros A R Sym B R' Sym' f Hf x x' Hxx' y y' Hyy'.
 repeat red in Hf. split; eauto.
