@@ -289,17 +289,27 @@ Program Instance impl_Transitive@{s|u|} : Transitive arrow@{s s|u u}.
 
 (** Logical equivalence. *)
 
+(* forall A : Type@{?s' | ?u'}, iff A A <= forall A : Type@{s | u}, iff A A
+
+      Type@{s|u} <= Type@{s' | u'}
+
+      Reflexive Type iff -> forall x : Type@{u}, (x -> x) * (x -> x)
+*)
+
 #[global]
-Instance iff_Reflexive@{s|u|} : Reflexive iff@{s|u u} := iff_refl.
+Instance iff_Reflexive@{s|u|} : Reflexive iff@{s |u u} :=
+  { reflexivity := iff_refl }.
 #[global]
-Instance iff_Symmetric@{s|u|} : Symmetric iff@{s|u u} := iff_sym.
+Instance iff_Symmetric@{s|u|} : Symmetric iff@{s|u u} :=
+  { symmetry := iff_sym }.
 #[global]
-Instance iff_Transitive@{s|u|} : Transitive iff@{s|u u} := iff_trans.
+Instance iff_Transitive@{s|u|} : Transitive iff@{s|u u} :=
+  { transitivity := iff_trans }.
 
 (** Logical equivalence [iff] is an equivalence relation. *)
 
 #[global]
-Program Instance iff_equivalence@{s|u|} : Equivalence iff@{s|u u}.
+Program Instance iff_equivalence@{s|u|} : @Equivalence@{Type s | u+1 u} Type@{s | u} iff.
 #[global]
 Program Instance arrow_Reflexive@{s|u|} : Reflexive arrow@{s s|u u}.
 #[global]
