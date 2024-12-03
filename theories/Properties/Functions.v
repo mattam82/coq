@@ -12,12 +12,10 @@ Section Equivalence.
   Sort s.
   Universe u.
 
-  Set Debug "ustate".
-
   Theorem iff_refl : forall A:Type@{s|u}, A <-> A.
     Proof.
       split; auto.
-    Defined.
+    Qed.
   Universe v.
   Theorem iff_sym : forall (A:Type@{s|u}) (B:Type@{s|v}), (A <-> B) -> (B <-> A).
     Proof.
