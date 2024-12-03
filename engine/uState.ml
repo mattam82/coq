@@ -1067,8 +1067,8 @@ let pr_pre_variances =
 
 let check_variances ~cumulative ~kind names ivariances inst variances =
   debug Pp.(fun () -> str"Checking variance annotation with cumulative = " ++ bool cumulative);
-  debug Pp.(fun () -> str"Checking variance annotation: " ++ Option.cata pr_pre_variances (mt ()) variances);
-  debug Pp.(fun () -> str"Inferred variances: " ++ Option.cata (InferCumulativity.pr_variances Level.raw_pr) (mt()) ivariances);
+  debug Pp.(fun () -> str"Checking variance annotation: " ++ Option.cata pr_pre_variances (str" no annotation") variances);
+  debug Pp.(fun () -> str"Inferred variances: " ++ Option.cata (InferCumulativity.pr_variances Level.raw_pr) (str" no inferred variances") ivariances);
   let variances = Option.map (extend_variances inst) variances in
   match variances with
   | None -> (match ivariances with
