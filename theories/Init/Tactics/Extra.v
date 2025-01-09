@@ -17,7 +17,7 @@ Require Import Types.
 (** Ex falso quodlibet : a tactic for proving empty instead of the current goal.
     This is just a nicer name for tactics such as [cut empty]. *)
 
-Ltac exfalso := Stdlib.Init.Tactics.Ltac.exfalso.
+Ltac exfalso := Corelib.Init.Tactics.Ltac.exfalso.
 
 (** A tactic for proof by contradiction. With contradict H,
     -   H:~A |-  B    gives       |-  A
