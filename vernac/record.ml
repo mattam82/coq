@@ -827,7 +827,7 @@ let interp_structure ~flags udecl kind ~primitive_proj records =
     } = flags in
   let impargs, params, univs, projections_kind, data, indlocs =
     pre_process_structure udecl kind ~poly ~cumulative records in
-  interp_structure_core ~cumulative finite ~univs ~variances ~primitive_proj impargs params template ~projections_kind ~indlocs data
+  interp_structure_core ~cumulative finite ~univs ~primitive_proj impargs params template ~projections_kind ~indlocs data
 
 let declare_structure { Record_decl.mie; default_dep_elim; primitive_proj; impls; globnames; global_univ_decls; projunivs; ubinders; projections_kind; poly; records; indlocs } =
   Option.iter Global.push_context_set global_univ_decls;

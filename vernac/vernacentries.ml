@@ -951,7 +951,7 @@ let { Goptions.get = is_polymorphic_inductive_cumulativity } =
     ~value:false
     ()
 
-let polymorphic_cumulative =
+let polymorphic_cumulative ~is_defclass =
   let error_poly_context () =
     user_err
       Pp.(str "The cumulative attribute can only be used in a polymorphic context.");
@@ -1085,12 +1085,12 @@ module Preprocessed_Mind_decl = struct
 end
 
 let preprocess_defclass ~atts udecl (id, bl, c, l) =
-  let poly, mode =
-    Attributes.(parse Notations.(polymorphic ++ mode_attr) atts)
+  let (poly, cumulative), mode =
+    Attributes.(parse Notations.(polymorphic_cumulative ~is_defclass:true ++ mode_attr) atts)
   in
   let flags = {
     (* flags which don't matter for definitional classes *)
-    ComInductive.template=None; cumulative=false; finite=BiFinite;
+    ComInductive.template=None; cumulative; finite=BiFinite;
     (* real flags *)
     poly; mode;
   }
@@ -1134,7 +1134,7 @@ let preprocess_record ~atts udecl kind indl =
     Attributes.(
       parse Notations.(
           template
-          ++ polymorphic_cumulative
+          ++ polymorphic_cumulative ~is_defclass:false
           ++ primitive_proj ++ hint_mode_attr)
         atts)
   in
@@ -1197,7 +1197,7 @@ let preprocess_inductive ~atts udecl kind indl =
     Attributes.(
       parse Notations.(
           template
-          ++ polymorphic_cumulative
+          ++ polymorphic_cumulative ~is_defclass:false
           ++ private_ind ++ typing_flags ++ hint_mode_attr)
         atts)
   in
