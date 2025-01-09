@@ -16,7 +16,7 @@
 
 Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
-Require Export Stdlib.Classes.RelationClasses.
+Require Export Corelib.Classes.RelationClasses.
 
 Generalizable Variables A eqA B C D R RA RB RC m f x y.
 Local Obligation Tactic := try solve [ simpl_relation ].

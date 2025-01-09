@@ -13,7 +13,7 @@ Proof.
   admit.
 Defined. (* Toplevel input, characters 15-23:
 Error: Unsatisfied constraints:
-Top.38 <= Stdlib.Init.Specif.7
+Top.38 <= Corelib.Init.Specif.7
 Top.43 <= Top.38
-Top.43 <= Stdlib.Init.Specif.8
+Top.43 <= Corelib.Init.Specif.8
  (maybe a bugged tactic). *)

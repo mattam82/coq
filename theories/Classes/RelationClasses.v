@@ -17,12 +17,12 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
-Require Export Stdlib.Classes.Init.
+Require Export Corelib.Classes.Init.
 Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
 
 Require Import Corelib.Properties.GroupoidLaws.
-Require Export Stdlib.Properties.Functions.
+Require Export Corelib.Properties.Functions.
 
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 

@@ -106,7 +106,7 @@ Fail Print foo@{E}.
 Fail Print mono@{E}.
 
 (* Not everything can be printed with custom universe names. *)
-Fail Print Stdlib.Init.Logic@{E}.
+Fail Print Corelib.Init.Logic@{E}.
 
 (* Nice error when constraints are impossible. *)
 Monomorphic Universes gU gV. Monomorphic Constraint gU < gV.

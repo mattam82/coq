@@ -18,7 +18,7 @@ Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
 
 Require Import Corelib.Classes.Init.
-Require Export Stdlib.Classes.RelationClasses.
+Require Export Corelib.Classes.RelationClasses.
 Require Import Corelib.Classes.Morphisms.
 
 Set Implicit Arguments.

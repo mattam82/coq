@@ -8,7 +8,7 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Stdlib.Classes.ProperTactics.
+Require Export Corelib.Classes.ProperTactics.
 
 Export Morphisms.ProperNotations.
 

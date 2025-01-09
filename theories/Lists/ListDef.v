@@ -42,7 +42,7 @@ Section NatSeq.
 
   Fixpoint seq (start len:nat) : list nat :=
     match len with
-      | 0 => nil
+      | O => nil
       | S len => start :: seq (S start) len
     end.
 
