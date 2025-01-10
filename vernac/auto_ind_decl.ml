@@ -64,7 +64,7 @@ let eq s u = polymorphic_instance (Global.env ()) ~us:[u] (Rocqlib.lib_ref "core
 let int63_eqb () = polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "num.int63.eqb") []
 let float64_eqb () = polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "num.float.leibniz.eqb") []
 
-let sumbool () = polymorphic_instance (Global.env ()) ~us:Univ.Universe.[type0; type0; type0] (Rocqlib.lib_ref "core.sum.type") Sorts.Quality.[qprop; qprop; qtype]
+let sumbool () = polymorphic_instance (Global.env ()) ~us:Univ.Universe.[type0; type0] (Rocqlib.lib_ref "core.sum.type") Sorts.Quality.[qprop; qprop; qtype]
 let andb = fun _ -> polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "core.bool.andb") Sorts.Quality.[qtype]
 let andb_prop = fun _ -> polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "core.bool.andb_prop") []
 let andb_true_intro = fun _ -> polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "core.bool.andb_true_intro") []
@@ -1065,7 +1065,10 @@ let eqI handle (ind,u) list_id =
   let eA = Array.of_list((List.map (fun (s,_,_,_) -> mkVar s) list_id)@
                            (List.map (fun (_,seq,_,_)-> mkVar seq) list_id ))
   and e = mkConstU (get_scheme handle beq_scheme_kind ind,u)
-  in mkApp(e,eA)
+  in
+  let env = Global.env () in
+  Feedback.msg_debug Pp.(str" get_scheme: " ++ Printer.pr_constr_env env (Evd.from_env env) e ++ str"instance: " ++ UVars.Instance.pr  Sorts.QVar.raw_pr (Univ.Universe.pr Univ.Level.raw_pr) u);
+  mkApp(e,eA)
 
 (**********************************************************************)
 (* Boolean->Leibniz *)
@@ -1125,6 +1128,8 @@ let compute_bl_goal env uctx handle (ind,u) lnamesparrec nparrec =
         )))
 
 let compute_bl_tact handle ind lnamesparrec nparrec =
+  Feedback.msg_debug Pp.(str "compute_bl_tact");
+
   let list_id = list_id lnamesparrec in
   let first_intros =
     ( List.map (fun (s,_,_,_) -> s ) list_id )
@@ -1132,11 +1137,18 @@ let compute_bl_tact handle ind lnamesparrec nparrec =
     @ ( List.map (fun (_,_,sbl,_ ) -> sbl) list_id )
   in
   let open Tactics in
+  let open Proofview.Notations in
   intros_using_then first_intros begin fun fresh_first_intros ->
     Tacticals.tclTHENLIST [
         intro_using_then (Id.of_string "x") (fun freshn -> induct_on (EConstr.mkVar freshn));
         intro_using_then (Id.of_string "y") (fun freshm -> destruct_on (EConstr.mkVar freshm));
         intro_using_then (Id.of_string "Z") begin fun freshz ->
+          Proofview.tclENV >>= fun env ->
+            Proofview.tclEVARMAP >>= fun sigma ->
+            Proofview.Goal.enter begin fun gl ->
+              Feedback.msg_debug Pp.(str"goal: " ++ Printer.pr_econstr_env env sigma (Proofview.Goal.concl gl));
+
+
           Tacticals.tclTHENLIST [
               intros;
               Tacticals.tclTRY (
@@ -1183,8 +1195,9 @@ repeat ( apply andb_prop in z;let z1:= fresh "Z" in destruct z as [z1 z]).
 
             ]
           end
-      ]
-    end
+        end
+        ]
+  end
 
 let make_bl_scheme env handle mind =
   let mib = Environ.lookup_mind mind env in
@@ -1422,7 +1435,8 @@ let compute_dec_goal env uctx ind lnamesparrec nparrec =
         create_input (
           mkNamedProd (Context.make_annot x Sorts.Relevant) (mkFullInd env ind (3*nparrec)) (
             mkNamedProd (Context.make_annot y Sorts.Relevant) (mkFullInd env ind (3*nparrec+1)) (
-              mkApp(sumbool(),[|eqnm;mkApp (polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "core.not.type") ~us:[Univ.Universe.type0] @@ Sorts.Quality.[qprop],[|eqnm|])|])
+              let notapp = polymorphic_instance (Global.env ()) (Rocqlib.lib_ref "core.not.type") ~us:[Univ.Universe.type0] (Sorts.Quality.[qprop]) in
+              mkApp(sumbool(),[|eqnm;mkApp (notapp,[|eqnm|])|])
           )
         )
       )

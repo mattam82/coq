@@ -775,28 +775,39 @@ let keep_head_inductive sigma c =
   | Ind (ind, _) -> KeepEqualitiesTable.active ind
   | _ -> false
 
-let find_positions env sigma ~keep_proofs ~no_discr t1 t2 =
-  let project env sorts posn t1 t2 =
+let find_positions env sigma ~keep_proofs ~no_discr ~eqsort ~goalsort t1 t2 =
+  let project env posn t1 t2 =
     let ty1 = get_type_of env sigma t1 in
     let keep =
       if keep_head_inductive sigma ty1 then true
       else
         let s = get_sort_family_of env sigma ty1 in
-        List.mem_f Sorts.family_equal s sorts
+        keep_proofs || not (Sorts.family_equal s InProp)
     in
     if keep then [(List.rev posn,t1,t2)] else []
   in
-  let rec findrec sorts posn t1 t2 =
+  let false_ref = destIndRef (lib_ref "core.False.type") in
+  let eqqual = Sorts.quality (ESorts.kind sigma eqsort) in
+  let goalsort = ESorts.kind sigma goalsort in
+  let false_inst = UVars.Instance.(of_array ([|eqqual|], [||])) in
+  let rec findrec posn t1 t2 =
     let hd1,args1 = whd_all_stack env sigma t1 in
     let hd2,args2 = whd_all_stack env sigma t2 in
+    Feedback.msg_debug Pp.(str"find_positions whds " ++ Printer.pr_econstr_env env sigma (EConstr.applist (hd1, args1)) ++ str" =? " ++
+       Printer.pr_econstr_env env sigma (EConstr.applist (hd2, args2)));
+
     match (EConstr.kind sigma hd1, EConstr.kind sigma hd2) with
       | Construct ((ind1,i1 as sp1),u1), Construct (sp2,_)
           when Int.equal (List.length args1) (constructor_nallargs env sp1)
             ->
-          let sorts' =
-            CList.intersect Sorts.family_equal sorts (sorts_below (top_allowed_sort env (fst sp1)))
-          in
-          (* both sides are fully applied constructors, so either we descend,
+          let mind_specif = lookup_mind_specif env ind1 in
+          let false_mind_specif = lookup_mind_specif env false_ref in
+          let ind_allowed_elim = Inductive.is_allowed_elimination (mind_specif, EInstance.kind sigma u1) Sorts.type1 in
+          let eq_allowed_elim = Inductive.is_allowed_elimination (false_mind_specif, false_inst) goalsort in
+          Feedback.msg_debug Pp.(str"ind allowed elim? " ++ bool ind_allowed_elim);
+          Feedback.msg_debug Pp.(str"eq allowed elim? " ++ bool eq_allowed_elim);
+
+             (* both sides are fully applied constructors, so either we descend,
              or we can discriminate here. *)
           if Environ.QConstruct.equal env sp1 sp2 then
             let nparams = inductive_nparams env ind1 in
@@ -806,26 +817,24 @@ let find_positions env sigma ~keep_proofs ~no_discr t1 t2 =
             let ctxt = (get_constructor ((ind1,u1),mib,mip,params1) i1).cs_args in
             let adjust i = CVars.adjust_rel_to_rel_context ctxt (i+1) - 1 in
             List.flatten
-              (List.map2_i (fun i -> findrec sorts' ((sp1,adjust i)::posn))
+              (List.map2_i (fun i -> findrec ((sp1,adjust i)::posn))
                 0 rargs1 rargs2)
-          else if List.mem_f Sorts.family_equal InType sorts' && not no_discr
+          else if (ind_allowed_elim && eq_allowed_elim) && not no_discr
           then (* see build_discriminator *)
             raise (DiscrFound (List.rev posn,sp1,sp2))
           else
           (* if we cannot eliminate to Type, we cannot discriminate but we
              may still try to project *)
-          project env sorts posn (applist (hd1,args1)) (applist (hd2,args2))
+          project env posn (applist (hd1,args1)) (applist (hd2,args2))
       | _ ->
           let t1_0 = applist (hd1,args1)
           and t2_0 = applist (hd2,args2) in
           if is_conv env sigma t1_0 t2_0 then
             []
           else
-            project env sorts posn t1_0 t2_0
+            project env posn t1_0 t2_0
   in
-  try
-    let sorts = if keep_proofs then [InSet;InType;InProp;InSProp] else [InSet;InType;InSProp] in
-    Inr (findrec sorts [] t1 t2)
+  try Inr (findrec [] t1 t2)
   with DiscrFound (path,c1,c2) ->
     Inl (path,c1,c2)
 
@@ -999,7 +1008,7 @@ let discrimination_pf e (t,t1,t2) discriminator lbeq to_kind =
        (applist (eq_elim, [t;t1;mkNamedLambda sigma (make_annot e ERelevance.relevant) t discriminator;i;t2]))
 
 type equality = {
-  eq_data  : (rocq_eq_data * (EConstr.t * EConstr.t * EConstr.t));
+  eq_data  : (rocq_eq_data * ESorts.t * (EConstr.t * EConstr.t * EConstr.t));
   (* equality data + A : Type, t1 : A, t2 : A *)
   eq_term : EConstr.t;
   (* term [M : R A t1 t2] where [R] is the equality from above *)
@@ -1009,13 +1018,15 @@ type equality = {
 
 let eq_baseid = Id.of_string "e"
 
-let discr_positions env sigma { eq_data = (lbeq,(t,t1,t2)); eq_term = v; eq_evar = evs } cpath dirn =
+let discr_positions env sigma { eq_data = (lbeq,_s,(t,t1,t2)); eq_term = v; eq_evar = evs } cpath dirn =
   build_rocq_True () >>= fun true_0 ->
   build_rocq_False () >>= fun false_0 ->
   let false_ty = Retyping.get_type_of env sigma false_0 in
   let false_kind = Retyping.get_sort_family_of env sigma false_0 in
   let e = next_ident_away eq_baseid (vars_of_env env) in
   let e_env = push_named (Context.Named.Declaration.LocalAssum (make_annot e ERelevance.relevant,t)) env in
+  Feedback.msg_debug (let ter = v in Pp.(str "discr_positions: " ++ Printer.pr_econstr_env env sigma ter));
+
   let discriminator =
     try
       Proofview.tclUNIT
@@ -1026,20 +1037,25 @@ let discr_positions env sigma { eq_data = (lbeq,(t,t1,t2)); eq_term = v; eq_evar
       Proofview.tclZERO ~info ex
   in
     discriminator >>= fun discriminator ->
+      Feedback.msg_debug Pp.(str "discriminator: " ++ Printer.pr_econstr_env env sigma discriminator);
     discrimination_pf e (t,t1,t2) discriminator lbeq false_kind >>= fun pf ->
+      Feedback.msg_debug Pp.(str "discrimination pf: " ++ Printer.pr_econstr_env env sigma pf);
     (* pf : eq t t1 t2 -> False *)
     let pf = EConstr.mkApp (pf, [|v|]) in
     tclTHENS (assert_after Anonymous false_0)
       [onLastHypId gen_absurdity; Tactics.exact_check pf <*> Proofview.Unsafe.tclNEWGOALS evs]
 
 let discrEq eq =
-  let { eq_data = (_, (_, t1, t2)) } = eq in
+  let { eq_data = (_, s, (_, t1, t2)) } = eq in
   Proofview.Goal.enter begin fun gl ->
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
-    match find_positions env sigma ~keep_proofs:false ~no_discr:false t1 t2 with
+    let goalsort = Retyping.get_sort_of env sigma (Proofview.Goal.concl gl) in
+    match find_positions env sigma ~keep_proofs:false ~no_discr:false ~eqsort:s ~goalsort t1 t2 with
     | Inr _ ->
       let info = Exninfo.reify () in
+      Feedback.msg_debug Pp.(str"discr_eq " ++ Printer.pr_econstr_env env sigma t1 ++ str" =? " ++ Printer.pr_econstr_env env sigma t2 ++ str " failed");
+
       tclZEROMSG ~info (str"Not a discriminable equality.")
     | Inl (cpath, (_,dirn), _) ->
       discr_positions env sigma eq cpath dirn
@@ -1057,6 +1073,8 @@ let onEquality with_evars tac (c,lbindc) =
   let sigma = Proofview.Goal.sigma gl in
   let state = Proofview.Goal.state gl in
   let t = Retyping.get_type_of env sigma c in
+  Feedback.msg_debug Pp.(str"goal: " ++ Printer.pr_econstr_env env sigma t);
+  let s = Retyping.get_sort_of env sigma t in
   let t' = try snd (Tacred.reduce_to_quantified_ind env sigma t) with UserError _ -> t in
   let sigma, eq_clause = make_clause with_evars env sigma t' lbindc in
   let filter h =
@@ -1068,7 +1086,7 @@ let onEquality with_evars tac (c,lbindc) =
   let goals = List.map_filter filter eq_clause.EClause.cl_holes in
   let cl_args = Array.map_of_list (fun h -> h.EClause.hole_evar) eq_clause.EClause.cl_holes in
   let (eq,u,eq_args) = find_this_eq_data_decompose env sigma eq_clause.cl_concl in
-  let eq = { eq_data = (eq, eq_args); eq_term = mkApp (c, cl_args); eq_evar = goals } in
+  let eq = { eq_data = (eq, s, eq_args); eq_term = mkApp (c, cl_args); eq_evar = goals } in
   Proofview.Unsafe.tclEVARS sigma <*> tac eq
   end
 
@@ -1243,7 +1261,7 @@ let simplify_args env sigma t =
     | _ -> t
 
 let inject_at_positions env sigma l2r eq posns tac =
-  let { eq_data = (eq, (t,t1,t2)); eq_term = v; eq_evar = evs } = eq in
+  let { eq_data = (eq, s, (t,t1,t2)); eq_term = v; eq_evar = evs } = eq in
   let e = next_ident_away eq_baseid (vars_of_env env) in
   let e_env = push_named (LocalAssum (make_annot e ERelevance.relevant,t)) env in
   let evdref = ref sigma in
@@ -1286,11 +1304,12 @@ let () = CErrors.register_handler (function
 
 let injEqThen keep_proofs tac l2r eql =
   Proofview.Goal.enter begin fun gl ->
-  let { eq_data = (eq, (t,t1,t2)) } = eql in
+  let { eq_data = (eq, s, (t,t1,t2)) } = eql in
   let sigma = Proofview.Goal.sigma gl in
   let env = Proofview.Goal.env gl in
+  let goalsort = Retyping.get_sort_of env sigma (Proofview.Goal.concl gl) in
   let id = try Some (destVar sigma eql.eq_term) with DestKO -> None in
-  match find_positions env sigma ~keep_proofs ~no_discr:true t1 t2 with
+  match find_positions env sigma ~keep_proofs ~no_discr:true ~eqsort:s ~goalsort t1 t2 with
   | Inl _ ->
      assert false
   | Inr [] ->
@@ -1357,12 +1376,13 @@ let injConcl flags ?injection_in_context () = injClause flags ?injection_in_cont
 let injHyp flags ?injection_in_context clear_flag id = injClause flags ?injection_in_context None false (Some (clear_flag,ElimOnIdent CAst.(make id)))
 
 let decompEqThen keep_proofs ntac eq =
-  let { eq_data = (_, (_,t1,t2) as u) } = eq in
+  let { eq_data = (_, eqsort, (_,t1,t2) as u) } = eq in
   Proofview.Goal.enter begin fun gl ->
     let env = Proofview.Goal.env gl in
     let sigma = Proofview.Goal.sigma gl in
+    let goalsort = Retyping.get_sort_of env sigma (Proofview.Goal.concl gl) in
     let ido = try Some (destVar sigma eq.eq_term) with DestKO -> None in
-    match find_positions env sigma ~keep_proofs ~no_discr:false t1 t2 with
+    match find_positions env sigma ~keep_proofs ~no_discr:false ~eqsort ~goalsort t1 t2 with
     | Inl (cpath, (_,dirn), _) ->
       discr_positions env sigma eq cpath dirn
     | Inr [] -> (* Change: do not fail, simplify clear this trivial hyp *)
@@ -1384,7 +1404,10 @@ let dEqThen ~keep_proofs with_evars ntac where =
 
 let intro_decomp_eq tac (eq, _, data) (c, t) =
   Proofview.Goal.enter begin fun gl ->
-    let eq = { eq_data = (eq, data); eq_term = c; eq_evar = [] } in
+    let env = Proofview.Goal.env gl in
+    let sigma = Proofview.Goal.sigma gl in
+    let s = Retyping.get_sort_of env sigma t in
+    let eq = { eq_data = (eq, s, data); eq_term = c; eq_evar = [] } in
     decompEqThen !keep_proof_equalities_for_injection (fun _ -> tac) eq
   end
 
