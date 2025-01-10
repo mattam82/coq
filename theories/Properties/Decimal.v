@@ -12,6 +12,7 @@
 
 From Corelib.Init.Types Require Import Decimal.
 From Corelib.Properties Require Import Bool.
+From Corelib Require Import Init.Types.Unit.
 
 Scheme Equality for uint.
 Scheme Equality for int.

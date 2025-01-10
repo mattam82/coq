@@ -32,7 +32,6 @@ Hint Resolve andb_prop_poly: bool.
 Lemma andb_true_intro (b1 b2 : bool) :
   (b1 = true) /\ (b2 = true) -> andb b1 b2 = true.
 Proof.
-  intros h. destruct h.
   destruct b1; destruct b2; simpl; intros [? ?]; assumption.
 Qed.
 #[global]
