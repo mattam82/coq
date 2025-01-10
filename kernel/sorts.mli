@@ -175,6 +175,7 @@ val is_prop : t -> bool
 val is_small : t -> bool
 val family : t -> family
 val quality : t -> Quality.t
+val extract_univ : t -> Univ.Universe.t (* Returns type0 for all impredicative universes *)
 
 val hcons : t -> t
 
