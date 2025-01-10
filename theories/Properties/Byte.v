@@ -8,17 +8,16 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Import PreludeOptions.
-Require Import Notations.
+(** * Bytes Properties *)
 
-(** listings: unit **)
-Inductive unit@{s| |} : Type@{s|0} :=
-    tt : unit.
-(** listings: end **)
+Lemma of_bits_to_bits (b : byte) : of_bits (to_bits b) = b.
+Proof. destruct b; exact eq_refl. Qed.
 
-Notation True := unit@{Prop|}.
-
-Register unit as core.unit.type.
-Register tt as core.unit.tt.
-Register unit as core.True.type.
-Register tt as core.True.I.
+Lemma to_bits_of_bits (b : _) : to_bits (of_bits b) = b.
+Proof.
+  repeat match goal with
+         | p : prod _ _ |- _ => destruct p
+         | b : bool |- _ => destruct b
+         end;
+    exact eq_refl.
+Qed.

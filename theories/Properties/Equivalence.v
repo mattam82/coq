@@ -52,8 +52,8 @@ Section SigmaAssoc.
   Let T1 := Σ (a : A) (b : B a), C a b.
   Let T2 := Σ (p : Σ (a : A), B a), C (π1 p) (π2 p).
 
-  Let f12 (t : T1) : T2 := let '(a, b, c) := t in ((a, b), c).
-  Let f21 (t : T2) : T1 := let '((a,b), c) := t in (a, b, c).
+  Let f12 (t : T1) : T2 := let '(a; b; c) := t in ((a; b); c).
+  Let f21 (t : T2) : T1 := let '((a; b); c) := t in (a; b; c).
 
   Let f12_is_equiv : isEquiv _ _ f12.
   Proof.
@@ -75,8 +75,8 @@ Section SigmaAssocHom.
   Let T1 := sigma@{s s s|_ _} A (fun a => sigma@{s s s|_ _} (B a) (C a)).
   Let T2 := sigma@{s s s|_ _} (sigma@{s s s|_ _} A B) (fun p => C (proj1 p) (proj2 p)).
 
-  Definition f12 (t : T1) : T2 := let '(a, b, c) := t in ((a, b), c).
-  Definition f21 (t : T2) : T1 := let '((a,b), c) := t in (a, b, c).
+  Definition f12 (t : T1) : T2 := let '(a; b; c) := t in ((a; b); c).
+  Definition f21 (t : T2) : T1 := let '((a;b); c) := t in (a; b; c).
 
   Definition f12_is_equiv : isEquiv@{s s s| _ _} _ _ f12.
   Proof.

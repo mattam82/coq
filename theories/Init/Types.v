@@ -21,3 +21,5 @@ Require Export Types.Unit.
 Require Export Types.List.
 Require Export Types.Option.
 Require Export Types.Ascii.
+Require Export Types.Byte.
+Require Export Types.Comparison.

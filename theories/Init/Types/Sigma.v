@@ -70,7 +70,7 @@ Notation "'Σ' x .. y , B" := (sigma _ (fun x => .. (sigma _ (fun y => B)) ..))
    format "'[' 'Σ'  '/  ' x  ..  y ,  '/  ' B ']'")
   : type_scope.
 
-Notation "( x , .. , y , z )" := (exist x .. (exist y z) ..).
+Notation "( x ; .. ; y ; z )" := (exist x .. (exist y z) ..).
 
 (* Rule order is important to give printing priority to fully typed exists *)
 
@@ -106,7 +106,7 @@ Arguments fst {_ _}.
 Arguments snd {_ _}.
 Arguments existR {_ _}.
 
-Notation "( x ; .. ; y ; z )" := (existR x .. (existR y z) ..).
+Notation "( x , .. , y , z )" := (existR x .. (existR y z) ..).
 
 Scheme sigmaR_elim := Induction for sigmaR Sort Poly.
 

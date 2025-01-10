@@ -242,7 +242,7 @@ Definition leb x y :=
 *)
 
 Definition sqrtrem_step (f g:positive->positive) p :=
- match p with
+ match p return prod _ _ with
   | (s, IsPos r) =>
     let s' := s~0~1 in
     let r' := g (f r) in
