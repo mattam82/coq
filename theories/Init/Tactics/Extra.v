@@ -191,7 +191,7 @@ Ltac now_show c := change c.
 
 Set Implicit Arguments.
 
-Definition empty_ind := empty_elim.
+Definition empty_ind := empty_elim@{Prop|0}.
 
 Lemma decide_left : forall (C:Prop) (decide:({C}+{not@{Prop|Set} C} : Prop)),
   C -> forall P:({C}+{not@{Prop|Set} C} : Prop)->Prop, (forall H:C, P (left _ H)) -> P decide.

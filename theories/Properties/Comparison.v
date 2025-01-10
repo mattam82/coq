@@ -8,19 +8,19 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Box.
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
-Require Export Types.Option.
-Require Export Types.Ascii.
-Require Export Types.Byte.
-Require Export Types.Comparison.
-Require Export Types.Decimal.
+(** * Decimal number properties *)
+
+Lemma CompOpp_involutive c : CompOpp (CompOpp c) = c.
+Proof.
+  destruct c; reflexivity.
+Qed.
+
+Lemma CompOpp_inj c c' : CompOpp c = CompOpp c' -> c = c'.
+Proof.
+  destruct c; destruct c'; auto; discriminate.
+Qed.
+
+Lemma CompOpp_iff : forall c c', CompOpp c = c' <-> c = CompOpp c'.
+Proof.
+  split; intros; apply CompOpp_inj; rewrite CompOpp_involutive; auto.
+Qed.

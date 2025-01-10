@@ -8,19 +8,15 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Box.
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
-Require Export Types.Option.
-Require Export Types.Ascii.
-Require Export Types.Byte.
-Require Export Types.Comparison.
-Require Export Types.Decimal.
+(** * Decimal number properties *)
+
+From Corelib.Init.Types Require Import Decimal.
+From Corelib.Properties Require Import Bool.
+
+Scheme Equality for uint.
+Scheme Equality for int.
+Scheme Equality for decimal.
+Notation int_eq_dec := signed_int_eq_dec.
+Notation int_beq := signed_int_beq.
+Notation internal_int_dec_lb := internal_signed_int_dec_lb.
+Notation internal_int_dec_bl := internal_signed_int_dec_bl.

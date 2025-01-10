@@ -11,7 +11,7 @@
 (** * Boolean Properties *)
 
 (** Basic properties of [andb] *)
-Lemma andb_prop (a b:bool) : andb a b = true -> (a = true) * (b = true).
+Lemma andb_prop (a b:bool) : andb a b = true -> (a = true) /\ (b = true).
 Proof.
   destruct a, b; repeat split; assumption.
 Qed.
@@ -30,8 +30,9 @@ Hint Resolve andb_prop_poly: bool.
 (* Register andb_prop_poly as core.bool.andb_prop. *)
 
 Lemma andb_true_intro (b1 b2 : bool) :
-  (b1 = true) * (b2 = true) -> andb b1 b2 = true.
+  (b1 = true) /\ (b2 = true) -> andb b1 b2 = true.
 Proof.
+  intros h. destruct h.
   destruct b1; destruct b2; simpl; intros [? ?]; assumption.
 Qed.
 #[global]

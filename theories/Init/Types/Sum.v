@@ -15,6 +15,8 @@ Inductive sum@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) : Type@{s''|max
   | left : A -> sum A B
   | right : B -> sum A B.
 
+Register sum as core.sum.type.
+
 Arguments left {_}.
 Arguments right _ {_}.
 
