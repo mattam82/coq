@@ -10,12 +10,14 @@
 
 Require Export CarryType.
 
-Register bool as kernel.ind_bool.
+(* FIXME, reuse bool and sigmas *)
 
-(* FIXME, reuse sigmas *)
+
+Register bool as kernel.ind_bool.
+Register sigmaR as kernel.ind_pair.
+
 Inductive prod (A B : Type) := pair : A -> B -> prod A B.
 
-Register prod as kernel.ind_pair.
 Register carry as kernel.ind_carry.
 Register comparison as kernel.ind_cmp.
 

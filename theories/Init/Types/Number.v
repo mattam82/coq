@@ -8,21 +8,23 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Types.Box.
-Require Export Types.Nat.
-Require Export Types.Bool.
-Require Export Types.Empty.
-Require Export Types.Functions.
-Require Export Types.Sigma.
-Require Export Types.Equality.
-Require Export Types.Sum.
-Require Export Types.Wf.
-Require Export Types.Unit.
-Require Export Types.List.
-Require Export Types.Option.
-Require Export Types.Ascii.
-Require Export Types.Byte.
-Require Export Types.Comparison.
-Require Export Types.Decimal.
-Require Export Types.Hexadecimal.
-Require Export Types.Number.
+(** * Decimal or Hexadecimal numbers *)
+
+From Corelib Require Import Types.Decimal Types.Hexadecimal.
+
+Variant uint := UIntDecimal (u:Decimal.uint) | UIntHexadecimal (u:Hexadecimal.uint).
+
+Variant signed_int := IntDecimal (i:Decimal.int) | IntHexadecimal (i:Hexadecimal.int).
+Notation int := signed_int.
+
+Variant number := Decimal (d:Decimal.decimal) | Hexadecimal (h:Hexadecimal.hexadecimal).
+
+Register uint as num.num_uint.type.
+Register int as num.num_int.type.
+Register number as num.number.type.
+
+(** Pseudo-conversion functions used when declaring
+    Number Notations on [uint] and [int]. *)
+
+Definition uint_of_uint (i:uint) := i.
+Definition int_of_int (i:int) := i.
