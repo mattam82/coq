@@ -17,9 +17,10 @@ Inductive sum@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) : Type@{s''|max
 
 Register sum as core.sum.type.
 
-Arguments left {_}.
-Arguments right _ {_}.
+Arguments left {A B} _, [A] B _.
+Arguments right {A B} _ , A [B] _.
 
+Hint Resolve left right : core.
 Notation "{ A } + { B }" := (sum A B).
 
 Notation "A \/ B" := (sum@{Prop Prop Prop|_ _} A B).

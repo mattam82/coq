@@ -289,6 +289,7 @@ Register byte as core.byte.type.
 
 Local Notation "0" := false.
 Local Notation "1" := true.
+Local Notation "( x , .. , y , z )" := (existR x .. (existR y z) ..).
 
 (** We pick a definition that matches with [Ascii.ascii] *)
 Definition of_bits (b : bool * (bool * (bool * (bool * (bool * (bool * (bool * bool))))))) : byte

@@ -1683,6 +1683,8 @@ let default_elim with_evars clear_flag (c,_ as cx) =
       | IsNonrec ->
           (* For records, induction principles aren't there by default
              anymore.  Instead, we do a case analysis. *)
+          Feedback.msg_debug Pp.(str "Looking for case elimination");
+
           general_case_analysis with_evars clear_flag cx
       | e -> Proofview.tclZERO ~info e
     end
@@ -2380,7 +2382,7 @@ let intro_decomp_eq ?loc l thin tac id =
   | Some (eq,u,eq_args) ->
     !intro_decomp_eq_function
       (fun n -> tac ((CAst.make id)::thin) (Some n) l)
-      (eq,t,eq_args) (c, t)
+      (eq,u,t,eq_args) (c, t)
   | None ->
     let info = Exninfo.reify () in
     Tacticals.tclZEROMSG ~info (str "Not a primitive equality here.")

@@ -37,6 +37,8 @@ let build_induction_scheme_in_type env dep sort ind =
       | _ -> Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort)
     | _ -> Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort
   in
+  Feedback.msg_debug Pp.(str"build_ind_scheme_in_type" ++ Printer.pr_econstr_env env sigma (EConstr.mkSort sort) ++
+    spc () ++ Printer.pr_econstr_env env sigma (EConstr.mkIndU pind));
   let sigma, c = build_induction_scheme env sigma pind dep sort in
   EConstr.to_constr sigma c, Evd.ustate sigma
 
@@ -83,6 +85,7 @@ let weaken_sort_scheme env evd sort npars term ty =
     !evdref, ty, term
 
 let optimize_non_type_induction_scheme kind dep sort env _handle ind =
+  Feedback.msg_debug Pp.(str"optimize_non_type..." ++ pr_opt (fun _ -> str"some ind scheme found") (lookup_scheme kind ind));
   (* This non-local call to [lookup_scheme] is fine since we do not use it on a
      dependency generated on the fly. *)
   match lookup_scheme kind ind with
@@ -171,6 +174,9 @@ let build_case_analysis_scheme_in_type env dep sort ind =
   let (sigma, indu) = Evd.fresh_inductive_instance ~rigid:UnivRigid env sigma ind in
   let indu = Util.on_snd EConstr.EInstance.make indu in
   let sigma, sort = Evd.fresh_sort_in_family ~rigid:UnivRigid sigma sort in
+  Feedback.msg_debug Pp.(str"build_case_scheme_in_type" ++ Printer.pr_econstr_env env sigma (EConstr.mkSort sort) ++
+    spc () ++ Printer.pr_econstr_env env sigma (EConstr.mkIndU indu));
+
   let (sigma, c) = build_case_analysis_scheme env sigma indu dep sort in
   let (c, _) = Indrec.eval_case_analysis c in
   EConstr.Unsafe.to_constr c, Evd.ustate sigma

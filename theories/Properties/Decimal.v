@@ -11,6 +11,7 @@
 (** * Decimal number properties *)
 
 From Corelib.Init.Types Require Import Decimal.
+From Corelib.Init.Types Require Import Sum.
 From Corelib.Properties Require Import Bool.
 From Corelib Require Import Init.Types.Unit.
 

@@ -1061,13 +1061,13 @@ let avoid_of_list_id list_id =
 (*
   build the right eq_I A B.. N eq_A .. eq_N
 *)
-let eqI handle (ind,u) list_id =
+let eqI env uctx handle (ind,u) list_id =
   let eA = Array.of_list((List.map (fun (s,_,_,_) -> mkVar s) list_id)@
                            (List.map (fun (_,seq,_,_)-> mkVar seq) list_id ))
   and e = mkConstU (get_scheme handle beq_scheme_kind ind,u)
   in
-  let env = Global.env () in
-  Feedback.msg_debug Pp.(str" get_scheme: " ++ Printer.pr_constr_env env (Evd.from_env env) e ++ str"instance: " ++ UVars.Instance.pr  Sorts.QVar.raw_pr (Univ.Universe.pr Univ.Level.raw_pr) u);
+  let ty = Retyping.get_type_of env (Evd.from_ctx uctx) (EConstr.of_constr e) in
+  Feedback.msg_debug Pp.(str" get_scheme: " ++ Printer.pr_econstr_env env (Evd.from_env env) ty ++ str"instance: " ++ UVars.Instance.pr  Sorts.QVar.raw_pr (Univ.Universe.pr Univ.Level.raw_pr) u);
   mkApp(e,eA)
 
 (**********************************************************************)
@@ -1082,8 +1082,9 @@ let sort_and_univ env sigma (ind, u) =
   Sorts.quality sort, Sorts.extract_univ sort
 
 let compute_bl_goal env uctx handle (ind,u) lnamesparrec nparrec =
+  Feedback.msg_debug Pp.(str"compute_bl_goal");
   let list_id = list_id lnamesparrec in
-  let eqI = eqI handle (ind,u) list_id in
+  let eqI = eqI env uctx handle (ind,u) list_id in
   let avoid = avoid_of_list_id list_id in
   let x = next_ident_away (Id.of_string "x") avoid in
   let y = next_ident_away (Id.of_string "y") (Id.Set.add x avoid) in
@@ -1242,7 +1243,8 @@ let compute_lb_goal env uctx handle (ind,u) lnamesparrec nparrec =
   let list_id = list_id lnamesparrec in
   let tt = tt () and bb = bb () in
   let avoid = avoid_of_list_id list_id in
-  let eqI = eqI handle (ind,u) list_id in
+  Feedback.msg_debug Pp.(str"compute_lb_goal");
+  let eqI = eqI env uctx handle (ind,u) list_id in
   let x = next_ident_away (Id.of_string "x") avoid in
   let y = next_ident_away (Id.of_string "y") (Id.Set.add x avoid) in
   let sigma = Evd.from_ctx uctx in
@@ -1441,12 +1443,14 @@ let compute_dec_goal env uctx ind lnamesparrec nparrec =
         )
       )
 
-let compute_dec_tact handle (ind,u) lnamesparrec nparrec =
+let compute_dec_tact env uctx handle (ind,u) lnamesparrec nparrec =
   let tt = tt () and ff = ff () and bb = bb () in
   let booleq = eq Sorts.Quality.qtype Univ.Universe.type0 in
   let list_id = list_id lnamesparrec in
+  Feedback.msg_debug Pp.(str"compute_dec_tact");
+
   let _ = get_scheme handle beq_scheme_kind ind in (* This is just an assertion? *)
-  let _non_fresh_eqI = eqI handle (ind,u) list_id in
+  let _non_fresh_eqI = eqI env uctx handle (ind,u) list_id in
   let eqtrue x = mkApp(booleq,[|bb;x;tt|]) in
   let eqfalse x = mkApp(booleq,[|bb;x;ff|]) in
   let first_intros =
@@ -1465,7 +1469,7 @@ let compute_dec_tact handle (ind,u) lnamesparrec nparrec =
       let fresh_list_id =
         List.init n (fun i -> (Array.get a i, Array.get a (i+n),
                                Array.get a (i+2*n), Array.get a (i+3*n))) in
-      eqI handle (ind,u) fresh_list_id
+      eqI env uctx handle (ind,u) fresh_list_id
     in
     intro_using_then (Id.of_string "x") begin fun freshn ->
       intro_using_then (Id.of_string "y") begin fun freshm ->
@@ -1481,8 +1485,10 @@ let compute_dec_tact handle (ind,u) lnamesparrec nparrec =
           (* univ polymorphic schemes may have extra constraints
              from using univ monomorphic f_equal and the like *)
           let env, sigma = Proofview.Goal.(env gl, sigma gl) in
-          let sigma, _ = Typing.type_of env sigma (EConstr.of_constr blI) in
+          Feedback.msg_debug Pp.(str"Typing : " ++ Printer.pr_econstr_env env sigma (EConstr.of_constr blI) ++ UVars.Instance.pr Sorts.QVar.raw_pr (Univ.Universe.pr Univ.Level.raw_pr) u);
+          let sigma, tyblI = Typing.type_of env sigma (EConstr.of_constr blI) in
           let sigma, _ = Typing.type_of env sigma (EConstr.of_constr lbI) in
+          Feedback.msg_debug Pp.(str"Typed as : " ++ Printer.pr_econstr_env env sigma tyblI);
           Tacticals.tclTHENLIST [
               Proofview.Unsafe.tclEVARS sigma;
 
@@ -1493,6 +1499,7 @@ let compute_dec_tact handle (ind,u) lnamesparrec nparrec =
                 (Tacticals.tclTHEN (destruct_on (EConstr.of_constr eqbnm)) Auto.default_auto);
 
               Proofview.Goal.enter begin fun gl ->
+                Feedback.msg_debug Pp.(str" after assert");
                 let freshH2 = fresh_id (Id.of_string "H") gl in
                 Tacticals.tclTHENS (destruct_on_using (EConstr.mkVar freshH) freshH2) [
                     (* left *)
@@ -1551,8 +1558,21 @@ let make_eq_decidability env handle mind =
   let dec_goal = EConstr.of_constr (compute_dec_goal env uctx (ind,u) lnamesparrec nparrec) in
   let poly = Declareops.inductive_is_polymorphic mib in
   let uctx = if poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ctx uctx) dec_goal)) else uctx in
+  let open Proofview.Notations in
+  let prtac tac =
+    (Proofview.tclCASE tac >>=
+      (fun case ->
+        match case with
+        | Fail e ->  Proofview.tclEVARMAP >>= fun evar_map ->
+          Feedback.msg_debug (Termops.pr_evar_map None env evar_map);
+         Proofview.tclZERO (fst e)
+        | Next ((), _) ->
+          Proofview.tclEVARMAP >>= fun evar_map ->
+            Feedback.msg_debug (Termops.pr_evar_map None env evar_map);
+            Proofview.tclUNIT () ))
+  in
   let (ans, _, _, _, ctx) = Declare.build_by_tactic ~poly env ~uctx
-      ~typ:dec_goal (compute_dec_tact handle (ind,u) lnamesparrec nparrec)
+      ~typ:dec_goal (prtac (compute_dec_tact env uctx handle (ind,u) lnamesparrec nparrec))
   in
   ([|ans|], ctx)
 

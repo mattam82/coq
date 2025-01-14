@@ -8,15 +8,7 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Export Corelib.Init.PreludeOptions.
-Require Export Corelib.Init.Notations.
-Require Export Corelib.Init.Typeclasses.
-Require Export Corelib.Init.Types.
-Require Export Corelib.Init.Tactics.Ltac.
-Require Export Corelib.Init.Tactics.Tauto.
-Require Export Corelib.Init.Tactics.Extra.
+Definition sumbool_of_bool (b : bool) : {b = true} + {b = false} :=
+  if b return {b = true} + {b = false} then left eq_refl else right eq_refl.
 
-Declare ML Module "rocq-runtime.plugins.cc_core".
-Declare ML Module "rocq-runtime.plugins.cc".
-Declare ML Module "rocq-runtime.plugins.firstorder_core".
-Declare ML Module "rocq-runtime.plugins.firstorder".
+Hint Resolve sumbool_of_bool : bool.

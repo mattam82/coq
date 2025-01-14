@@ -412,6 +412,8 @@ let do_mutual_induction_scheme ?(force_mutual=false) env ?(isrec=true) l =
     sigma
     l
   in
+  Feedback.msg_debug Pp.(str"do_mutual_induction_scheme " ++ bool isrec );
+
   let sigma, listdecl =
     if isrec then Indrec.build_mutual_induction_scheme env sigma ~force_mutual lrecspec
     else

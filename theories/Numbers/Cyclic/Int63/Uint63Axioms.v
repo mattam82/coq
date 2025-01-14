@@ -10,6 +10,8 @@
 (*            Benjamin Gregoire, Laurent Thery, INRIA, 2007             *)
 (************************************************************************)
 
+From Corelib Require Import Nat.
+From Corelib Require Import Properties.Nat.
 From Corelib Require Import BinNums PosDef IntDef.
 From Corelib Require Export PrimInt63.
 
@@ -26,7 +28,7 @@ Local Infix "<=" := Z.le : Z_scope.
 Local Infix "<" := Z.lt : Z_scope.
 Local Notation "x <= y < z" := (x <= y /\ y < z) : Z_scope.
 
-Definition size := 63%nat.
+Definition size := pow 2 4. 63%nat.
 
 (** The number of digits as an int *)
 Definition digits := 63%uint63.
