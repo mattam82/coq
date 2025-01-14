@@ -2380,7 +2380,7 @@ let intro_decomp_eq ?loc l thin tac id =
   | Some (eq,u,eq_args) ->
     !intro_decomp_eq_function
       (fun n -> tac ((CAst.make id)::thin) (Some n) l)
-      (eq,t,eq_args) (c, t)
+      (eq,u,t,eq_args) (c, t)
   | None ->
     let info = Exninfo.reify () in
     Tacticals.tclZEROMSG ~info (str "Not a primitive equality here.")
