@@ -27,6 +27,31 @@ Qed.
 #[global]
 Hint Resolve andb_prop_poly: bool.
 
+Scheme eq_poly_nodep := Elimination for eq Sort Poly.
+
+(* Scheme eq_poly_nodep' := Elimination for eq Sort Prop. *)
+(*
+Definition eq_poly_nodep''@{α g| u l |} :=
+fun (A : Type@{α | u}) (x : A)
+  (P : forall (a : A) (_ : @eq@{α Prop | u} A x a), Type@{g|l})
+  (f : P x (@eq_refl@{α Prop | u} A x)) (a : A) (e : @eq@{α Prop | u} A x a) =>
+match e as e0 in (@eq _ _ a0) return (P a0 e0) with
+| @eq_refl _ _ => f
+end.
+*)
+
+Set Debug "backtrace".
+Lemma inj_type@{s| |} : eq@{Type Prop| _} true false -> empty@{s|}.
+Proof.
+  intros.
+  discriminate.
+Qed.
+
+Lemma inj@{s | |} : eq@{s s| _} true false -> empty@{s|}.
+Proof.
+  intros.
+  Fail discriminate.
+Abort.
 (* Register andb_prop_poly as core.bool.andb_prop. *)
 
 Lemma andb_true_intro (b1 b2 : bool) :

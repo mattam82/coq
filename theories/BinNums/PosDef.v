@@ -243,12 +243,12 @@ Definition leb x y :=
 
 Definition sqrtrem_step (f g:positive->positive) p :=
  match p return prod _ _ with
-  | (s, IsPos r) =>
+  | (|s, IsPos r|) =>
     let s' := s~0~1 in
     let r' := g (f r) in
     if leb s' r' then (s~1, sub_mask r' s')
     else (s~0, IsPos r')
-  | (s,_)  => (s~0, sub_mask (g (f 1)) 1~0~0)
+  | (| s,_ |)  => (s~0, sub_mask (g (f 1)) 1~0~0)
  end.
 
 Fixpoint sqrtrem p : positive * mask :=

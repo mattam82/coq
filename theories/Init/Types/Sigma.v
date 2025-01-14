@@ -45,7 +45,7 @@ Definition π2@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ T
 
 Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{s Prop Prop|u Set} A P.
 
-Notation "'ex_intro'" := (exist@{_ Prop Prop| _ Set}) (at level 50).
+Notation "'ex_intro'" := (exist@{_ Prop Prop| _ Set}) (at level 50) : core_scope.
 
 Register ex as core.ex.type.
 Register exist as core.ex.intro.
@@ -70,7 +70,7 @@ Notation "'Σ' x .. y , B" := (sigma _ (fun x => .. (sigma _ (fun y => B)) ..))
    format "'[' 'Σ'  '/  ' x  ..  y ,  '/  ' B ']'")
   : type_scope.
 
-Notation "( x ; .. ; y ; z )" := (exist x .. (exist y z) ..).
+Notation "( x ; .. ; y ; z )" := (exist x .. (exist y z) ..) : core_scope.
 
 (* Rule order is important to give printing priority to fully typed exists *)
 
@@ -106,7 +106,7 @@ Arguments fst {_ _}.
 Arguments snd {_ _}.
 Arguments existR {_ _}.
 
-Notation "( x , .. , y , z )" := (existR x .. (existR y z) ..).
+Notation "(| x , .. , y , z |)" := (existR x .. (existR y z) ..) : core_scope.
 
 Scheme sigmaR_elim := Induction for sigmaR Sort Poly.
 
@@ -123,8 +123,9 @@ Section Prod.
 End Prod.
 
 Arguments prod : clear implicits.
-Notation "A * B" := (prod A B).
-Notation "A /\ B" := (prod@{Prop|_ _} A B).
+Notation "A * B" := (prod A B) : type_scope.
+Notation "A /\ B" := (prod@{Prop|_ _} A B) : type_scope.
+Notation "( x , .. , y , z )" := (pair x .. (pair y z) ..) : core_scope.
 
 Register prod as core.prod.type.
 Register pair as core.prod.intro.

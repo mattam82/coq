@@ -231,6 +231,8 @@ Definition to_pos (z:Z) : positive :=
 (** First, a division for positive numbers. Even if the second
    argument is a Z, the answer is arbitrary if it isn't a Zpos. *)
 
+(* Bind Scope type_scope with Sorts. *)
+
 Fixpoint pos_div_eucl (a:positive) (b:Z) : Z * Z :=
   match a with
     | xH => if leb 2 b then (0, 1) else (1, 0)
@@ -339,8 +341,8 @@ Definition sqrtrem n :=
   | 0 => (0, 0)
   | Zpos p =>
     match Pos.sqrtrem p with
-     | (s, Pos.IsPos r) => (Zpos s, Zpos r)
-     | (s, _) => (Zpos s, 0)
+     | (|s, Pos.IsPos r|) => (Zpos s, Zpos r)
+     | (|s, _|) => (Zpos s, 0)
     end
   | Zneg _ => (0,0)
  end.
