@@ -793,9 +793,6 @@ let find_positions env sigma ~keep_proofs ~no_discr ~eqsort ~goalsort t1 t2 =
   let rec findrec posn t1 t2 =
     let hd1,args1 = whd_all_stack env sigma t1 in
     let hd2,args2 = whd_all_stack env sigma t2 in
-    Feedback.msg_debug Pp.(str"find_positions whds " ++ Printer.pr_econstr_env env sigma (EConstr.applist (hd1, args1)) ++ str" =? " ++
-       Printer.pr_econstr_env env sigma (EConstr.applist (hd2, args2)));
-
     match (EConstr.kind sigma hd1, EConstr.kind sigma hd2) with
       | Construct ((ind1,i1 as sp1),u1), Construct (sp2,_)
           when Int.equal (List.length args1) (constructor_nallargs env sp1)
@@ -804,9 +801,6 @@ let find_positions env sigma ~keep_proofs ~no_discr ~eqsort ~goalsort t1 t2 =
           let false_mind_specif = lookup_mind_specif env false_ref in
           let ind_allowed_elim = Inductive.is_allowed_elimination (mind_specif, EInstance.kind sigma u1) Sorts.type1 in
           let eq_allowed_elim = Inductive.is_allowed_elimination (false_mind_specif, false_inst) goalsort in
-          Feedback.msg_debug Pp.(str"ind allowed elim? " ++ bool ind_allowed_elim);
-          Feedback.msg_debug Pp.(str"eq allowed elim? " ++ bool eq_allowed_elim);
-
              (* both sides are fully applied constructors, so either we descend,
              or we can discriminate here. *)
           if Environ.QConstruct.equal env sp1 sp2 then
@@ -1046,7 +1040,6 @@ let lookup_eq_eliminator env sigma (ind, u) ~dep ~from_kind ~carrier_kind ~to_ki
     return instance
   in
   let sigma, instance = prog sigma in
-  (* Feedback.msg_debug Pp.(str"Found eliminator: " ++ Printer.pr_econstr_env env sigma instance); *)
   Proofview.Unsafe.tclEVARS sigma >>= fun () ->
   Proofview.tclUNIT instance
 
@@ -1095,8 +1088,6 @@ let discr_positions env sigma { eq_data = (_, _, s, (t, _, _)) as eq_data; eq_te
   in
     discriminator >>= fun discriminator ->
     discrimination_pf e_env e eq_data discriminator false_kind >>= fun pf ->
-      (* Feedback.msg_debug Pp.(str "discrimination pf: " ++ Printer.pr_econstr_env e_env sigma pf); *)
-    (* pf : eq t t1 t2 -> False *)
     let pf = EConstr.mkApp (pf, [|v|]) in
     tclTHENS (assert_after Anonymous false_0)
       [onLastHypId gen_absurdity; Tactics.exact_check pf <*> Proofview.Unsafe.tclNEWGOALS evs]
@@ -1127,7 +1118,6 @@ let onEquality with_evars tac (c,lbindc) =
   let sigma = Proofview.Goal.sigma gl in
   let state = Proofview.Goal.state gl in
   let t = Retyping.get_type_of env sigma c in
-  Feedback.msg_debug Pp.(str"goal: " ++ Printer.pr_econstr_env env sigma t);
   let s = Retyping.get_sort_of env sigma t in
   let t' = try snd (Tacred.reduce_to_quantified_ind env sigma t) with UserError _ -> t in
   let sigma, eq_clause = make_clause with_evars env sigma t' lbindc in

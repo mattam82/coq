@@ -1142,9 +1142,6 @@ let compute_bl_tact handle ind lnamesparrec nparrec =
           Proofview.tclENV >>= fun env ->
             Proofview.tclEVARMAP >>= fun sigma ->
             Proofview.Goal.enter begin fun gl ->
-              Feedback.msg_debug Pp.(str"goal: " ++ Printer.pr_econstr_env env sigma (Proofview.Goal.concl gl));
-
-
           Tacticals.tclTHENLIST [
               intros;
               Tacticals.tclTRY (
