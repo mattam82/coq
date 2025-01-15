@@ -19,6 +19,8 @@ Local Notation "2" := (Zpos 2) : Z_scope.
 Local Infix "^" := Z.pow : Z_scope.
 Local Notation "x <= y" := (Z.compare x y <> Gt) : Z_scope.
 Local Notation "x < y" := (Z.compare x y = Lt) : Z_scope.
+Local Notation "'false'" := falsePrim : Z_scope.
+Local Notation "'true'" := truePrim : Z_scope.
 
 Definition min_int := Eval vm_compute in (lsl 1 62).
 

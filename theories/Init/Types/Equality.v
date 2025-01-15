@@ -199,6 +199,8 @@ Definition f_equal@{s s' e|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B)
 
 Register f_equal as core.eq.congr.
 
+Arguments f_equal [_ _] _ [_ _] _.
+
 Definition f_equal2@{s1 s2 s' e|u1 u2 v|}
   {A1 : Type@{s1|u1}}
   {A2 : Type@{s2|u2}}
@@ -211,6 +213,8 @@ Definition f_equal2@{s1 s2 s' e|u1 u2 v|}
   fun e1 => match e1 with | eq_refl => fun e2 => match e2 with | eq_refl => eq_refl end end.
 
 Register f_equal2 as core.eq.congr2.
+
+Arguments f_equal2 [_ _ _] _ [_ _ _ _] _ _.
 
 Axiom cast@{α|u| } : forall (A B:Type@{α|u}) (e: A = B :> _ : SProp), A -> B.
 

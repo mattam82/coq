@@ -10,13 +10,43 @@
 
 Require Export CarryType.
 
-(* FIXME, reuse bool and sigmas *)
+(* We use non sort/univ poly definition for bool and prod to get an efficient representation in memory *)
 
+Inductive boolPrim : Set := truePrim | falsePrim.
 
-Register bool as kernel.ind_bool.
-Register sigmaR as kernel.ind_pair.
+#[universes(polymorphic=no)]
+Record prodPrim (A B : Type) : Type := pairPrim { fstPrim : A ; sndPrim : B}.
 
-Inductive prod (A B : Type) := pair : A -> B -> prod A B.
+Arguments fstPrim {_ _}.
+Arguments sndPrim {_ _}.
+Arguments pairPrim {_ _}.
+
+(* We introduce coercions to sort poly def to be able to use generic lemmas *)
+
+Definition bool_of_boolPrim : boolPrim -> bool@{Type|} :=
+  fun b => if b then true else false.
+
+Coercion bool_of_boolPrim : boolPrim >-> bool.
+
+Definition boolPrim_of_bool : bool@{Type|} -> boolPrim :=
+  fun b => if b then truePrim else falsePrim.
+
+(* Coercion boolPrim_of_bool : bool >-> boolPrim *)
+
+Definition sigmaR_of_prodPrim A B : prodPrim A B -> sigmaR A (fun _ => B) :=
+  fun p => (fstPrim p , sndPrim p).
+
+Coercion sigmaR_of_prodPrim : prodPrim >-> sigmaR.
+
+Definition prod_of_prodPrim A B : prodPrim A B -> prod A B :=
+  fun p => (fstPrim p , sndPrim p).
+
+Coercion prod_of_prodPrim : prodPrim >-> prod.
+
+(* Register data types used by primitive operations *)
+
+Register boolPrim as kernel.ind_bool.
+Register prodPrim as kernel.ind_pair.
 
 Register carry as kernel.ind_carry.
 Register comparison as kernel.ind_cmp.
@@ -36,7 +66,6 @@ Definition parser (x : pos_neg_int63) : option int :=
   | Pos p => Some p
   | Neg _ => None
   end.
-
 
 Declare Scope int63_scope.
 Module Import Int63NotationsInternalA.

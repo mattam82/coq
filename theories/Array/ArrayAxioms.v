@@ -1,6 +1,8 @@
-From Corelib Require Import PrimArray.
+From Corelib Require Import PrimArray PrimInt63.
 
 Local Notation in_bounds i t := (PrimInt63.ltb i (length t)).
+Local Notation "'false'" := falsePrim.
+Local Notation "'true'" := truePrim.
 
 Axiom get_out_of_bounds : forall A (t:array A) i,
   in_bounds i t = false -> t.[i] = default t.

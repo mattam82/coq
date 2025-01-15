@@ -7,12 +7,9 @@
 (*         *     GNU Lesser General Public License Version 2.1          *)
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
-(*            Benjamin Gregoire, Laurent Thery, INRIA, 2007             *)
-(************************************************************************)
 
-Set Implicit Arguments.
+(** Compatibility file for making Rocq act similar to Coq v8.18 *)
 
-#[universes(polymorphic=no)]
-Variant carry (A : Type) :=
-| C0 : A -> carry A
-| C1 : A -> carry A.
+Require Export Corelib.Compat.Coq819.
+
+#[export] Set Warnings "-deprecated-since-8.19".

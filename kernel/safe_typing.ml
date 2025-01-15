@@ -1632,9 +1632,9 @@ let check_register_ind (type t) ind (r : t CPrimitives.prim_ind) env =
   | CPrimitives.PIT_bool ->
     check_nparams 0;
     check_nconstr 2;
-    check_name 0 "true";
+    check_name 0 "truePrim";
     check_type_cte 0;
-    check_name 1 "false";
+    check_name 1 "falsePrim";
     check_type_cte 1
   | CPrimitives.PIT_carry ->
     check_nparams 1;
@@ -1658,7 +1658,7 @@ let check_register_ind (type t) ind (r : t CPrimitives.prim_ind) env =
   | CPrimitives.PIT_pair ->
     check_nparams 2;
     check_nconstr 1;
-    check_name 0 "pair";
+    check_name 0 "pairPrim";
     let c = ob.mind_user_lc.(0) in
     let s =  Pp.str "the constructor does not have the expected type" in
     begin match Term.decompose_prod c with

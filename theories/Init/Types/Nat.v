@@ -41,6 +41,8 @@ Definition nat_rect@{s | u|} : forall P : nat@{Type|} -> Type@{s | u},
   | S n0 => f0 n0 (F n0)
   end.
 
+Definition nat_ind := nat_rect@{Prop|0}.
+
 Declare Scope hex_nat_scope.
 Delimit Scope hex_nat_scope with xnat.
 

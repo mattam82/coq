@@ -7,12 +7,5 @@
 (*         *     GNU Lesser General Public License Version 2.1          *)
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
-(*            Benjamin Gregoire, Laurent Thery, INRIA, 2007             *)
-(************************************************************************)
 
-Set Implicit Arguments.
-
-#[universes(polymorphic=no)]
-Variant carry (A : Type) :=
-| C0 : A -> carry A
-| C1 : A -> carry A.
+Declare ML Module "rocq-runtime.plugins.extraction".

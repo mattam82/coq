@@ -52,7 +52,7 @@ Section ListPolyDefinitions.
 
   Section Map.
     Universe u'.
-    Context (B : Type@{s|u'})
+    Context {B : Type@{s|u'}}
             (f : A -> B).
 
     Fixpoint map (l : list A) : list B :=
