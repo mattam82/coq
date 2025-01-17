@@ -8,18 +8,16 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Import PreludeOptions.
-Require Import Notations.
+(** #<style> .doc { font-family: monospace; white-space: pre; } </style># **)
 
-(** listings: unit **)
-Inductive unit@{s| |} : Type@{s|0} :=
-    tt : unit.
-(** listings: end **)
+(** Compatibility layer for [under] and [setoid_rewrite].
 
-Notation True := unit@{Prop|}.
-Notation I := tt@{Prop|}.
+ Note: this file does not require [ssreflect]; it is both required by
+ [ssrsetoid] and required by [ssrunder].
 
-Register unit as core.unit.type.
-Register tt as core.unit.tt.
-Register unit as core.True.type.
-Register tt as core.True.I.
+ Redefine [Corelib.Classes.RelationClasses.Reflexive] here, so that doing
+ [Require Import ssreflect] does not [Require Import RelationClasses],
+ and conversely. **)
+
+Register Reflexive as plugins.ssreflect.reflexive_type.
+Register reflexivity as plugins.ssreflect.reflexive_proof.

@@ -97,6 +97,11 @@ Register sig_rect as core.sig.rect.
 Notation proj1_sig := proj1.
 Notation proj2_sig := proj2.
 
+(** listings: end **)
+
+Arguments exist {_ _}.
+
+
 (** listings: sigmaR **)
 Record sigmaR@{s|u v|} (A : Type@{s|u}) (P:A -> Type@{s|v}) : Type@{s|max(u,v)}
   := existR { fst : A ; snd : P fst }.
@@ -153,11 +158,12 @@ Definition sigT_rect@{| u u' u''|} := sigmaR_elim@{Type|u u' u''}.
 
 Register sigT_rect as core.sigT.rect.
 
-Record sigT2@{s|u v|} {A:Type@{s|u}} (B C:A -> Type@{s|v}) : Type@{s|max(u,v)} := existT2
+Record sigmaR2@{s|u v|} {A:Type@{s|u}} (B C:A -> Type@{s|v}) : Type@{s|max(u,v)} := existT2
   { fst2 : A;
     snd2 : B fst2;
     thd2: C fst2}.
 
+Notation sigT2 := (@sigmaR2 _).
 
 (* Notations *)
 
@@ -168,6 +174,12 @@ Notation "{ x | P }" := (sig (fun x => P)) : type_scope.
 Notation "{ x : A | P }" := (sig (A:=A) (fun x => P)) : type_scope.
 Notation "{ x & P }" := (sigT (fun x => P)) : type_scope.
 Notation "{ x : A & P }" := (@sigmaR A (fun x => P)) : type_scope.
+
+Notation "{ x : A | P & Q }" := (sigmaR2 (A:=A) (fun x => P) (fun x => Q)) :
+  type_scope.
+Notation "{ x : A & P & Q }" := (sigmaR2 (A:=A) (fun x => P) (fun x => Q)) :
+  type_scope.
+
 
 Notation "{ ' pat | P }" := (sig (fun pat => P)) : type_scope.
 Notation "{ ' pat : A | P }" := (sig (A:=A) (fun pat => P)) : type_scope.
