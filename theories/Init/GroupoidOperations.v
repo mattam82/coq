@@ -62,21 +62,20 @@ Register eq_trans as core.eq.trans.
 
 (* Aliases *)
 
+Definition _eq_sym {A} {x y : A} (e : x = y) : y = x :=
+    leibniz _ _ _ (fun y => y = x) (refl _ _) _ e.
 
-Notation sym_eq := eq_sym (only parsing).
+Notation sym_eq := _eq_sym (only parsing).
 Notation trans_eq := eq_trans (only parsing).
 Notation sym_not_eq := not_eq_sym (only parsing).
 
 Notation refl_equal := eq_refl (only parsing).
-Notation sym_equal := eq_sym (only parsing).
+Notation sym_equal := _eq_sym (only parsing).
 Notation trans_equal := eq_trans (only parsing).
 Notation sym_not_equal := not_eq_sym (only parsing).
 
-
-(*
-#[global]
-Hint Immediate eq_sym not_eq_sym: core.
-*)
+#[export]
+Hint Immediate _eq_sym not_eq_sym: core.
 
 Definition eq_elim_r@{sa se sp|la le lp|} {eq} (A:Type@{sa|la})
   `{Has_Leibniz@{sa se sp|la le lp} eq}
