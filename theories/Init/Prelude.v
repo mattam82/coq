@@ -15,6 +15,8 @@ Require Export Corelib.Init.Types.
 Require Export Corelib.Init.Tactics.Ltac.
 Require Export Corelib.Init.Tactics.Tauto.
 Require Export Corelib.Init.Tactics.Extra.
+Require Export Corelib.Init.Classes.
+Require Export Corelib.Init.GroupoidOperations.
 
 Declare ML Module "rocq-runtime.plugins.cc_core".
 Declare ML Module "rocq-runtime.plugins.cc".

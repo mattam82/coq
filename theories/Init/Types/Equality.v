@@ -13,37 +13,49 @@ Require Import Notations.
 Require Import Typeclasses.
 Require Import Empty.
 
+
 Class Has_refl@{sa se|la le|} (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}) := refl : forall A x, eq A x x.
 
+Arguments refl {_ _}.
+
 Register Has_refl as rocq.core.Has_refl.
+
 
 Class Has_J@{sa se sp|la le lp|} (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}) (Has_refl : Has_refl eq) :=
   J : forall (A : Type@{sa | la}) (x : A) (P : forall y : A, eq A x y -> Type@{sp | lp}), P x (refl A x) -> forall y e, P y e.
 
+Arguments J {_ _ _}.
+
 Register Has_J as rocq.core.Has_J.
-
-Class Has_JRefl@{sa se se' se''|la le le' le''|}
-  (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le})
-  (Has_refl : Has_refl@{sa se|la le} eq)
-  (Has_J : Has_J@{sa se se'|la le le'} eq Has_refl)
-  (eqe : forall A : Type@{se' | le'}, A -> A -> Type@{se''|le''})
-  :=
-  J_refl : forall (A : Type@{sa | la}) (x : A) (P : forall y : A, eq A x y -> Type@{se' | le'}) (f : P x (refl A x)),
-    eqe _ (J A x P f x (refl A x)) f.
-
-Register Has_JRefl as rocq.core.Has_JRefl.
 
 Class Has_Leibniz@{sa se sp|la le lp|} (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}) :=
   leibniz : forall (A : Type@{sa | la}) (x : A) (P : A -> Type@{sp | lp}), P x -> forall y, eq A x y -> P y.
+
+Arguments leibniz _ {_}.
+
+Register Has_Leibniz as rocq.core.Has_Leibniz.
 
 Definition J_no_dep@{s s' sp|l l' lp|} {eq} {refl} (eqr : Has_J@{s s' sp|l l' lp} eq refl) :
   forall (A : Type@{s | l}) (x : A) (P : A -> Type@{sp | lp}), P x -> forall y (e : eq A x y), P y :=
   fun A x P px y e => J _ x (fun y _ => P y) px y e.
 
-Instance Has_J_Has_Leibniz@{s s' sp|l l' lp|} {eq} {refl} (eqr : Has_J@{s s' sp|l l' lp} eq refl) : Has_Leibniz@{s s' sp|l l' lp} eq :=
-  J_no_dep eqr.
+Definition Has_J_Has_Leibniz@{s s' sp|l l' lp|} {eq} {refl} (eqr : Has_J@{s s' sp|l l' lp} eq refl) : Has_Leibniz@{s s' sp|l l' lp} eq :=
+  fun A x P px y e => J_no_dep _ A x P px y e.
 
-Register Has_Leibniz as rocq.core.Has_Leibniz.
+#[projections(primitive=no)]
+Class Has_JRefl@{sa se se' se''|la le le' le''|}
+  (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le})
+  (Has_refl : Has_refl@{sa se|la le} eq)
+  (Has_J : Has_J@{sa se se'|la le le'} eq Has_refl)
+  (Has_Leibniz : Has_Leibniz@{sa se se'|la le le'} eq)
+  (eqe : forall A : Type@{se' | le'}, A -> A -> Type@{se''|le''}) : Type
+  :=
+  {
+    J_refl : forall (A : Type@{sa | la}) (x : A) (P : forall y : A, eq A x y -> Type@{se' | le'}) (f : P x (refl A x)), eqe _ (J A x P f x (refl A x)) f ;
+    leibniz_refl : forall (A : Type@{sa | la}) (x : A) (P : A -> Type@{se' | le'}) (f : P x), eqe _ (leibniz eq A x P f x (refl A x)) f
+  }.
+
+Register Has_JRefl as rocq.core.Has_JRefl.
 
 (** listings: eq **)
 Inductive eq@{s s'|l|} {A:Type@{s|l}} (x:A) : A -> Type@{s'|l} :=
@@ -62,6 +74,15 @@ Definition eqdiag@{s|l|} {A : Type@{s|l}} := eq@{s s| l} (A:=A).
 
 Notation "x ≡ y" := (eqdiag x y) (at level 60) : type_scope.
 Notation "x ≡ y :> A" := (@eqdiag A x y) (at level 60) : type_scope.
+
+Instance eq_Has_refl@{s s'|l|} : Has_refl@{s s'|l l} (@eq) :=
+  fun A x => eq_refl.
+
+Instance eq_Has_J_elim@{s se|l l'|} : Has_J@{s se se|l l l'} (@eq) _ := @eq_elim@{s se|l l'}.
+
+Instance eq_Has_Leibniz_elim@{s se|l l'|} : Has_Leibniz@{s se se|l l l'} (@eq) :=
+  fun A x P => @eq_elim@{s se|l l'} A x (fun y _ => P y).
+
 Definition eq_ind@{s | u|} [A] [x] P := @eq_elim@{s Prop|u Set} A x (fun a _ => P a).
 
 Definition eq_singleton@{s s' | u v|} [A:Type@{s|u}] [x:A]
@@ -69,9 +90,15 @@ Definition eq_singleton@{s s' | u v|} [A:Type@{s|u}] [x:A]
   P x (eq_refl x) -> forall [a : A] (e : x = a :> A), P a e :=
   fun t _ e => match e with eq_refl => t end.
 
+Instance eq_Has_J_Singleton@{s sp|l lp|} : Has_J@{s Prop sp|l 0 lp} (@eq) _ := @eq_singleton@{s sp|l lp}.
+
+Instance eq_Has_Leibniz_Singleton@{s sp|l lp|} : Has_Leibniz@{s Prop sp|l 0 lp} (@eq) :=
+  fun A x P => @eq_singleton@{s sp|l lp} A x (fun y _ => P y).
+
 Definition eq_rect@{u v|} [A:Type@{u}] [x:A]
   (P : forall a : A, Type@{v}) :
   P x -> forall [a : A] (e : x = a), P a := @eq_singleton A x (fun a _ => P a).
+(* this one generates additional universes  J@{Type Prop Type | _ 0 v} A x (fun a _ => P a) *)
 
 Definition eq_rec@{u|} [A:Type@{u}] [x:A]
   (P : forall a : A, Set) :
@@ -86,145 +113,52 @@ Arguments eq_sind [A] x P _ y _ : rename.
 Arguments eq_rec [A] x P _ y _ : rename.
 Arguments eq_rect [A] x P _ y _ : rename.
 
-Instance eq_Has_refl@{s s'|l|} : Has_refl@{s s'|l l} (@eq) :=
-  { refl A x := eq_refl }.
-
-Instance eq_Has_J_Singleton@{s sp|l lp|} : Has_J@{s Prop sp|l 0 lp} (@eq) _ :=
-  { J := @eq_singleton@{s sp|l lp} }.
-
-Instance eq_Has_J_Singleton_refl@{s sp|l lp|} : Has_JRefl@{s Prop sp Prop|l 0 lp 0} (@eq) _ (eq_Has_J_Singleton@{s sp|l lp}) (@eq) :=
- { J_refl A x P f := eq_refl }.
+Instance eq_Has_J_Singleton_refl@{s sp|l lp|} : Has_JRefl@{s Prop sp Prop|l 0 lp 0} (@eq) _
+  (eq_Has_J_Singleton@{s sp|l lp}) (eq_Has_Leibniz_Singleton@{s sp|l lp}) (@eq) :=
+ { J_refl A x P f := eq_refl; leibniz_refl A x P f := eq_refl }.
 
 Definition eq_type_elim@{s s' | u v|} [A:Type@{s|u}] [x:A]
   (P : forall a : A, (x = a :> A : Type@{u}) -> Type@{s'|v}) :
   P x (eq_refl x) -> forall [a : A] (e : x = a :> A), P a e :=
   fun t _ e => match e with eq_refl => t end.
 
-Instance eq_Has_J_Type_refl@{s sp|l lp|} : Has_JRefl@{s Prop sp Prop|l 0 lp 0} (@eq) _ (eq_Has_J_Singleton@{s sp|l lp}) (@eq) :=
-{ J_refl A x P f := eq_refl }.
-
 Instance eq_Has_JType @{s sp|l lp|} : Has_J@{s Type sp|l l lp} (@eq@{s Type|l}) _ :=
-  { J := @eq_type_elim@{s sp|l lp} }.
+  fun A x P Px y e => @eq_type_elim@{s sp|l lp} A x P Px y e.
+
+Instance eq_Has_LeibnizType @{s sp|l lp|} : Has_Leibniz@{s Type sp|l l lp} (@eq@{s Type|l}) :=
+  fun A x P Px y e => @eq_type_elim@{s sp|l lp} A x (fun y _ => P y) Px y e.
+
+Instance eq_Has_J_Type_refl@{s sp|l lp|} : Has_JRefl@{s Prop sp Prop|l 0 lp 0} (@eq) _
+  (eq_Has_J_Singleton@{s sp|l lp}) (eq_Has_Leibniz_Singleton@{s sp|l lp}) (@eq) :=
+{ J_refl A x P f := eq_refl ; leibniz_refl A x P f := eq_refl }.
 
 #[global]
 Hint Resolve eq_refl: core.
-
-Section GroupoidOperations.
-  Sort sa se.
-  Universe a.
-  Context {A : Type@{sa|a}}.
-  #[warnings="-notation-overridden"]
-  Local Notation "x = y" := (eq@{_ se|_} x y) : type_scope.
-
-  Definition eq_sym {x y : A} (e : x = y) : y = x :=
-    match e with | eq_refl _ => eq_refl _ end.
-
-(** listings: eqtrans **)
-Definition eq_trans {x y z : A} (e1 : x = y) : y = z -> x = z :=
-    match e1 with | eq_refl _ => fun x => x end.
-(** listings: end **)
-
-  Definition tr@{b|} {B : Type@{sa|b}} (e : @eq@{_ sa|max(a+1,b+1)} Type@{sa|max(a,b)} A B) : A -> B :=
-    match e in @eq _ _ B return A -> B with | eq_refl _ => fun x => x end.
-
-  Definition ap@{sb|b|} {B : Type@{sb|b}} (f : A -> B) {x y : A} (e : x = y) : f x = f y :=
-    match e with | eq_refl _ => eq_refl _ end.
-
-End GroupoidOperations.
-Notation congr := ap.
 
 Register eq as core.eq.type.
 Register eq_refl as core.eq.refl.
 Register eq_ind as core.eq.ind.
 Register eq_rect as core.eq.rect.
 Register eq_elim as core.eq.rect.
-Register eq_sym as core.eq.sym.
-Register eq_trans as core.eq.trans.
-Register congr as core.eq.congr.
 
-Definition eq_elim_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{_ β | _} y x -> P y :=
-  fun px y e =>
-    match e in _ = x return P x -> P y with
-    | eq_refl => fun py => py
-    end px.
 
-Register eq_elim_r as core.eq.poly_r.
+Section ap.
+  Sort sa se sb se'.
+  Universe la le lb le'.
+  Context {eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}}
+          {A : Type@{sa|la}}
+          {eq' : forall A : Type@{sb | lb}, A -> A -> Type@{se'|le'}}
+          {_refl: Has_refl@{sb se'|lb le'} eq'}
+          {_leibniz: Has_Leibniz@{sa se se'|la le le'} eq}.
 
-Definition eq_rect_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{α Type|_} y x -> P y :=
-  fun px y e =>
-  match e in _ = x return P x -> P y with
-  | eq_refl => fun py => py
-  end px.
+  #[warnings="-notation-overridden"]
+  Local Notation "x = y" := (eq _ x y) : type_scope.
+  #[warnings="-notation-overridden"]
+  Local Notation "x <> y" := (~ (eq _ x y)) : type_scope.
 
-Register eq_rect_r as core.eq.rect_r.
+  Definition ap {B} (f : A -> B) {x y : A} (e : x = y) : eq' _ (f x) (f y) :=
+    leibniz _ _ _ (fun y => eq' B (f x) (f y)) (refl _ _) _ e.
 
-Definition eq_singleton_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, y = x -> P y :=
-  fun px y e =>
-    match e in _ = x return P x -> P y with
-    | eq_refl => fun py => py
-    end px.
+End ap.
 
-Definition eq_ind_r@{α|u|} := eq_singleton_r@{α Prop | u Set}.
-
-Register eq_singleton_r as core.eq.ind_r.
-
-Definition eq_elim_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{_ β |_} x y -> P y :=
-  fun px y e =>
-    match e in _ = y return P x -> P y with
-    | eq_refl => fun px => px
-    end px.
-
-Register eq_elim_d as core.eq.poly.
-
-Definition eq_rect_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, eq@{α Type|_} x y -> P y :=
-  fun px y e =>
-  match e in _ = y return P x -> P y with
-  | eq_refl => fun py => py
-  end px.
-
-Register eq_rect_d as core.eq.rect.
-
-Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, x = y -> P y := eq_singleton (fun y _ => P y).
-
-Register eq_ind_d as core.eq.ind.
-
-Definition f_equal@{s s' e|u v|} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) {x y} : eq@{_ e| _} x y -> eq@{_ e| _} (f x) (f y) :=
-  fun e => match e with | eq_refl => eq_refl end.
-
-Register f_equal as core.eq.congr.
-
-Arguments f_equal [_ _] _ [_ _] _.
-
-Definition f_equal2@{s1 s2 s' e|u1 u2 v|}
-  {A1 : Type@{s1|u1}}
-  {A2 : Type@{s2|u2}}
-  {B : Type@{s'|v}}
-  (f:A1 -> A2 -> B)
-  {x1 y1:A1} {x2 y2:A2} :
-  eq@{_ e|_} x1 y1 ->
-  eq@{_ e|_} x2 y2 ->
-  eq@{_ e|_} (f x1 x2) (f y1 y2) :=
-  fun e1 => match e1 with | eq_refl => fun e2 => match e2 with | eq_refl => eq_refl end end.
-
-Register f_equal2 as core.eq.congr2.
-
-Arguments f_equal2 [_ _ _] _ [_ _ _ _] _ _.
-
-Axiom cast@{α|u| } : forall (A B:Type@{α|u}) (e: A = B :> _ : SProp), A -> B.
-
-Definition eq_cast@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, (x = y :> _ : SProp) -> P y :=
-  fun px y e => cast (P x) (P y) (f_equal P e) px.
-
-Definition eq_cast_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
-  P x -> forall y:A, (y = x :> _ : SProp) -> P y :=
-  fun px y e => eq_cast@{_ _|u v} _ x P px y (eq_sym e).
-
-Register eq_cast_r as core.eq.sind_r.
-Register eq_cast as core.eq.sind.
+Register ap as core.eq.congr.

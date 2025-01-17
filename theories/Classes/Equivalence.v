@@ -17,8 +17,7 @@
 Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
 
-Require Import Corelib.Classes.Init.
-Require Export Corelib.Classes.RelationClasses.
+Require Import Corelib.Classes.Tactics.
 Require Import Corelib.Classes.Morphisms.
 
 Set Implicit Arguments.
@@ -52,14 +51,16 @@ Infix "=~=" := pequiv (at level 70, no associativity) : equiv_scope.
 
 (** Shortcuts to make proof search easier. *)
 
-#[global]
-Program Instance equiv_reflexive@{s s' | u v|} `(sa : Equivalence@{s s' | u v} A) : Reflexive equiv.
+Arguments equiv {_} _ {_} _ _.
 
-#[global]
-Program Instance equiv_symmetric@{s s' | u v|} `(sa : Equivalence@{s s' | u v} A) : Symmetric equiv.
+#[export]
+Program Instance equiv_reflexive@{s s' | u v|} `(sa : Equivalence@{s s' | u v} A) : Reflexive (equiv R).
 
-#[global]
-Program Instance equiv_transitive@{s s' | u v|} `(sa : Equivalence@{s s' | u v} A) : Transitive equiv.
+#[export]
+Program Instance equiv_symmetric@{s s' | u v|} `(sa : Equivalence@{s s' | u v} A) : Symmetric (equiv R).
+
+#[export]
+Program Instance equiv_transitive@{s s' | u v|} `(sa : Equivalence@{s s' | u v} A) : Transitive (equiv R).
 Next Obligation.
 intros; eapply transitivity; eauto.
 Qed.
@@ -147,19 +148,19 @@ End Respecting.
 
 (** The default equivalence on function spaces, with higher-priority than [eq]. *)
 
-#[global]
+#[export]
 Instance pointwise_reflexive@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(reflb : Reflexive@{sb srb | b rb} B eqB) :
   Reflexive (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
-#[global]
+#[export]
 Instance pointwise_symmetric@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(symb : Symmetric@{sb srb | b rb} B eqB) :
   Symmetric (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
-#[global]
+#[export]
 Instance pointwise_transitive@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(transb : Transitive@{sb srb | b rb} B eqB) :
   Transitive (pointwise_relation A eqB) | 9.
 Proof. firstorder. Qed.
-#[global]
+#[export]
 Instance pointwise_equivalence@{sa sb srb | a b rb|} {A : Type@{sa|a}} `(eqb : Equivalence@{sb srb | b rb} B eqB) :
   Equivalence@{sb srb|max(a, b) max(a, rb)} (pointwise_relation A eqB) | 9.
 Proof. split; apply _. Qed.

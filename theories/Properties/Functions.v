@@ -28,9 +28,24 @@ Section Equivalence.
     intros A B C [H1 H2] [H3 H4]; split; auto.
   Qed.
 
-
-
 End Equivalence.
 
 #[global]
 Hint Unfold iff: extcore.
+
+(** Logical equivalence. *)
+
+#[export]
+Instance iff_Reflexive@{s|u|} : Reflexive iff@{s |u u} :=
+  { reflexivity := iff_refl }.
+#[global]
+Instance iff_Symmetric@{s|u|} : Symmetric iff@{s|u u} :=
+  { symmetry := iff_sym }.
+#[global]
+Instance iff_Transitive@{s|u|} : Transitive iff@{s|u u} :=
+  { transitivity := iff_trans }.
+
+(** Logical equivalence [iff] is an equivalence relation. *)
+
+#[export]
+Instance iff_equivalence@{s|u|} : @Equivalence@{Type s | u+1 u} Type@{s | u} iff := {}.

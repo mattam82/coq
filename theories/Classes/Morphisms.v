@@ -16,7 +16,7 @@
 
 Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
-Require Export Corelib.Classes.RelationClasses.
+Require Import Corelib.Classes.Tactics.
 
 Generalizable Variables A eqA B C D R RA RB RC m f x y.
 Local Obligation Tactic := try solve [ simpl_relation ].
@@ -78,11 +78,14 @@ Class Proper (R : relation@{s s'|u v} A) (m : A) := proper_prf : R m m.
 End Proper.
 
 Section Proper2.
-  Sort s s'.
-  Universe u.
-  Context {A : Type@{s|u}}.
-  Lemma eq_proper_proxy (x : A) : ProperProxy (@eq@{s s'|u} A) x.
-  Proof. firstorder. Qed.
+  Sort sa se.
+  Universe la le.
+  Context {A : Type@{sa|la}}
+    {eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}}
+    {_refl: Has_refl@{sa se|la le} eq}.
+
+  Lemma eq_proper_proxy (x : A) : ProperProxy (eq A) x.
+  Proof. red; apply refl. Qed.
 End Proper2.
 
 
@@ -105,8 +108,9 @@ Definition respectful@{sa sb sra srb|a b ra rb|} {A : Type@{sa|a}} {B : Type@{sb
   : relation (A -> B) := fun f g => forall x y, R x y -> R' (f x) (g y).
 (** listings: end **)
 
-Lemma rewrite_relation_eq_dom@{sa sb sr se|a b r|} {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R}:
-  RewriteRelation@{sb sr|max(a,b) max(a,r)} (respectful (@eq@{sa se|a} A) R).
+Lemma rewrite_relation_eq_dom@{sa sb sr se|a le b r|} {eq : forall A : Type@{sa | a}, A -> A -> Type@{se|le}} {_refl: Has_refl@{sa se|a le} eq}
+  {A : Type@{sa|a}} {B : Type@{sb|b}} {R : relation@{sb sr|b r} B} {_ : RewriteRelation R} :
+  RewriteRelation@{sb sr|max(a,b) max(a,le,r)} (respectful (eq A) R).
 Proof. split. Qed.
 
 (** Pointwise reflexive *)
@@ -123,7 +127,8 @@ Ltac rewrite_relation_fun :=
 Global Hint Extern 2 (@RewriteRelation (_ -> _) _) =>
   rewrite_relation_fun : typeclass_instances.
 
-Lemma eq_rewrite_relation@{sa se|a|} {A : Type@{sa|a}} : RewriteRelation (@eq@{sa se|a} A).
+Lemma eq_rewrite_relation@{sa se|la le|} {A : Type@{sa|la}} {eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}}
+  {_leibniz: Has_Leibniz@{sa se se|la le le} eq} : RewriteRelation (eq A).
 Proof. split. Qed.
 
 Ltac eq_rewrite_relation A :=
@@ -238,22 +243,27 @@ Section Relations.
              (sig : forall a, relation@{sb sr|b r} (B a)) : relation (forall x, B x) :=
     fun f g => forall a, sig a (f a) (g a).
 
-  Lemma pointwise_pointwise@{s' sb|r b|} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
-    relation_equivalence@{sb s'|max(a,b) max(a,r)} (pointwise_relation@{_ _ _|a b r} R)
-    (respectful@{_ _ _ _|a b a r} (@eq@{_ s'|a} A) R).
+  Lemma pointwise_pointwise@{se s' sb|e r b|?} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B)
+    {eq : forall A : Type@{s | a}, A -> A -> Type@{se|e}}
+    {_leibniz: Has_Leibniz@{s se s'|a e r} eq}
+    {_refl: Has_refl@{s se|a e} eq}
+    {eq' : forall A : Type@{sb | b}, A -> A -> Type@{s'|r}}
+    {_leibniz': Has_Leibniz@{sb s' s'|b r r} eq'}
+    {_refl': Has_refl@{sb s'|b r} eq'}
+     :
+    relation_equivalence@{sb s'|max(a,b) max(a,e,r)} (pointwise_relation@{_ _ _|a b r} R)
+     (respectful@{_ _ _ _|a b e r} (eq A) R).
   Proof.
     intros. split.
-    - intros X a b []. apply X.
-    - firstorder.
+    - intros X a b e. red in X. unshelve eapply (ap y) in e; try eassumption. eapply (leibniz _ _ _ _ (X a) _ e).
+    - intros f a. eapply (f a a). apply refl.
   Qed.
 
   Lemma pointwise_pointwise_prop@{s' sb|r b|} {B : Type@{sb|b}} (R : relation@{sb s'|b r} B) :
     relation_equivalence@{sb s'|max(a,b) max(a,r)} (pointwise_relation@{_ _ _|a b r} R)
     (respectful@{_ _ _ _|a b Set r} (@eq@{_ Prop|a} A) R).
   Proof.
-    intros. split.
-    - intros X a b []. apply X.
-    - firstorder.
+    unshelve eapply pointwise_pointwise with (eq':=@eq) ; typeclasses eauto.
   Qed.
 
   (** Subrelations induce a morphism on the identity. *)
@@ -288,9 +298,17 @@ Section Relations.
     intros. apply sub. apply mor.
   Qed.
 
-  Global Instance proper_subrelation_proper_arrow :
-    Proper (subrelation ++> eq ++> arrow) (@Proper A).
-  Proof. reduce. destruct X0. firstorder. Qed.
+  Global Instance proper_subrelation_proper_arrow@{se| le |}
+  {eq : forall A:Type@{s | a}, A -> A -> Type@{se|le}}
+  `{Has_Leibniz@{s se se|a le le} eq}
+  :
+  Proper (subrelation@{s se | a le} ++> (eq A) ++> arrow@{se se|le le}) (@Proper@{s se | a le} A).
+  Proof. reduce. unshelve eapply (leibniz _ _ _ _ _ _ X0).
+    unshelve eapply (leibniz _ _ _ (fun y0 => y y0 x0) _ _ X0). firstorder. Defined.
+
+  Global Instance proper_subrelation_proper_arrow_eq :
+    Proper (subrelation ++> (@eq A) ++> arrow) (@Proper A) :=
+    proper_subrelation_proper_arrow.
 
   Global Instance pointwise_subrelation@{sb sr'|b r'|} {B : Type@{sb|b}} (R R' : relation@{sb sr'|b r'} B) (sub : subrelation R R') :
     subrelation@{_ _|max(a,b) max(a,r')} (@pointwise_relation A B R) (pointwise_relation R') | 4.
@@ -426,15 +444,23 @@ Section GenericInstances.
   (** Every Transitive relation induces a morphism by "pushing" an [R x y] on the left of an [R x z] proof to get an [R y z] goal. *)
 
   Global Program
-  Instance trans_co_eq_inv_arrow_morphism@{| |}
-  (_ : Transitive R) : Proper (R ++> (@eq@{sa sra|a} A) ++> flip (C := Type@{sra|ra}) arrow) R | 2.
+  Instance trans_co_eq_inv_arrow_morphism@{|e |}
+  {eq : forall A : Type@{sa | a}, A -> A -> Type@{sra|e}}
+  {_leibniz: Has_Leibniz@{sa sra sra|a e ra} eq}
+  (_ : Transitive R) : Proper (R ++> (eq A) ++> flip (C := Type@{sra|ra}) arrow) R | 2.
 
   Next Obligation.
   Proof with auto.
-    intros H x y X y0 y1 e X0; destruct e.
+    intros ? ? H x y X y0 y1 e. red. unshelve eapply (leibniz _ _ _ (fun y1 => arrow (R y y1) (R x y0)) _ _ e). intro.
     apply transitivity with y...
   Qed.
 
+  Global Program
+  Instance trans_co_eq_inv_arrow_morphism_eq@{| ? | ?}
+  (_ : Transitive R) : Proper (R ++> (@eq@{sa sra|a} A) ++> flip (C := Type@{sra|ra}) arrow) R | 2.
+  Next Obligation.
+    eapply trans_co_eq_inv_arrow_morphism_obligation_1@{a}; typeclasses eauto.
+  Qed.
   (** Every Symmetric and Transitive relation gives rise to an equivariant morphism. *)
 
   Global Program
@@ -561,8 +587,12 @@ Instance respectful_per@{sa sra sb srb | a ra b rb |}
 
   (** That's if and only if *)
 
-  Lemma eq_subrelation `(Reflexive A R) : subrelation (@eq@{sa sra | a} A) R.
-  Proof. simpl_relation. Qed.
+  Lemma eq_subrelation `(Reflexive A R)  {eq : forall A : Type@{sa | a}, A -> A -> Type@{sra|e}}
+  {_leibniz: Has_Leibniz@{sa sra sra|a e ra} eq} : subrelation (eq A) R.
+  Proof. reduce. eapply leibniz; eauto. Qed.
+
+  Lemma eq_subrelation_eq `(Reflexive A R) : subrelation (@eq@{sa sra | a} A) R.
+  Proof. apply eq_subrelation; typeclasses eauto. Qed.
 
   (** Once we have normalized, we will apply this instance to simplify the problem. *)
 
@@ -570,15 +600,19 @@ Instance respectful_per@{sa sra sb srb | a ra b rb |}
 
 End GenericInstances.
 
+Global Instance reflexive_eq_dom_reflexive@{sa sb sra sr | a e b r |}
+  {eq : forall A : Type@{sa | a}, A -> A -> Type@{sra|e}}
+  {_leibniz: Has_Leibniz@{sa sra sr|a e r} eq}
+  {A : Type@{sa|a}} {B : Type@{sb|b}} {RB : relation@{sb sr | b r} B}
+  (hr : Reflexive RB) :
+  Reflexive (eq A ++> RB).
+Proof. simpl_relation. eapply (leibniz eq _ _ (fun y => RB _ (x y))); eauto. Qed.
 
-Global Instance reflexive_eq_dom_reflexive@{sa sb sr | a b r |}
+Global Instance reflexive_eq_dom_reflexive_eq@{sa sb sr | a b r |}
   {A : Type@{sa|a}} {B : Type@{sb|b}} {RB : relation@{sb sr | b r} B}
   (hr : Reflexive RB) :
   Reflexive (@eq@{_ sr|a} A ++> RB).
-Proof. simpl_relation. Qed.
-
-Lemma proper_eq@{s | a |} {A : Type@{s | a}} (x : A) : Proper (@eq@{_ _|a} A) x.
-Proof. intros. apply reflexive_proper. Qed.
+Proof. eapply reflexive_eq_dom_reflexive@{sa sb sr sr|_ _ _ _}; eauto. Qed.
 
 #[projections(primitive=no)]
 Class PartialApplication.
@@ -631,20 +665,21 @@ Ltac partial_application_tactic :=
 (** Bootstrap !!! *)
 
 #[global]
-Instance proper_proper {A} : Proper (relation_equivalence ++> eq ++> iff) (@Proper A).
+Instance proper_proper@{sa se sra|a e ra|} {eq : forall A : Type@{sa | a}, A -> A -> Type@{se|e}}
+    {_leibniz: Has_Leibniz@{sa se sra|a e ra} eq}
+    {A} : Proper (relation_equivalence@{sa sra| a ra} ++> (eq A) ++> iff@{sra| ra ra}) (@Proper A).
 Proof.
-  intros R R' HRR' x y eq; destruct eq. red in HRR'.
-  split ; red ; intros X.
+  intros R R' HRR' x y He. unshelve eapply (leibniz _ _ _ (fun y => _ <-> Proper R' y) _ _ He).
+  red in HRR'. split ; red ; intros X.
   - apply (fst (HRR' _ _)), X.
   - apply (snd (HRR' _ _)), X.
 Qed.
 
-Ltac proper_reflexive :=
-  match goal with
-    | [ _ : normalization_done |- _ ] => fail 1
-    | _ => class_apply proper_eq || class_apply @reflexive_proper
-  end.
-
+#[global]
+Instance proper_proper_eq {A} : Proper (relation_equivalence ++> eq ++> iff) (@Proper A).
+Proof.
+  eapply proper_proper.
+Qed.
 
 #[global]
 Hint Extern 1 (subrelation (flip _) _) => class_apply @flip1 : typeclass_instances.
@@ -661,9 +696,6 @@ Hint Extern 2 (@Proper _ (flip _) _) => class_apply @proper_flip_proper
   : typeclass_instances.
 #[global]
 Hint Extern 4 (@Proper _ _ _) => partial_application_tactic
-  : typeclass_instances.
-#[global]
-Hint Extern 7 (@Proper _ _ _) => proper_reflexive
   : typeclass_instances.
 
 (** Special-purpose class to do normalization of signatures w.r.t. flip. *)
@@ -789,8 +821,8 @@ split; compute.
     + apply PreOrder_Transitive with y; assumption.
     + intro Hxz.
     apply Hxy'.
-    apply partial_order_antisym; auto.
-    apply transitivity with z; [assumption|].
+    eapply partial_order_antisym; eauto.
+    eapply transitivity with z; [assumption|].
     now apply H.
 Qed.
 

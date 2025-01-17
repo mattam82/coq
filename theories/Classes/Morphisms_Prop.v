@@ -15,6 +15,7 @@
 *)
 
 Require Import Corelib.Classes.Morphisms.
+Require Import Corelib.Classes.Tactics.
 Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
 
@@ -97,6 +98,7 @@ Qed.
 
 (** Equivalent relations have the same accessible points *)
 
+(* TODO move
 #[global]
 Instance Acc_rel_morphism {A:Type} :
  @Proper@{Type Prop|_ _} ((A -> A -> Prop) -> A -> Prop) (relation_equivalence ++> eq ++> iff@{Prop|_ _}) (@Acc A).
@@ -120,3 +122,4 @@ Proof.
  - rewrite <- r. apply H.
  - rewrite r. apply H.
 Qed.
+*)

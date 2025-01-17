@@ -15,3 +15,4 @@
 #[export] Set Universe Minimization ToSet.
 #[export] Set Primitive Projections.
 #[export] Set Printing Coercions.
+#[export] Set Typeclasses Default Mode "!".

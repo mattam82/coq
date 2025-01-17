@@ -14,9 +14,7 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
-Require Corelib.Classes.RelationClasses.
 Require Import Corelib.Classes.Morphisms.
-Require Export Corelib.Classes.RelationClasses.
 Require Import Corelib.Program.Basics.
 
 Generalizable Variables A R.

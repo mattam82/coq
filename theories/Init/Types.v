@@ -26,3 +26,4 @@ Require Export Types.Comparison.
 Require Export Types.Decimal.
 Require Export Types.Hexadecimal.
 Require Export Types.Number.
+Require Export Types.Relations.

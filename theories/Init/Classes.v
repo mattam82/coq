@@ -17,9 +17,13 @@
 
 (** Hints for the proof search: these combinators should be considered rigid. *)
 
-Require Import Corelib.Program.Basics.
+Require Import Corelib.Init.Types.Functions.
+Require Import Corelib.Init.Types.Empty.
+Require Import Corelib.Init.Types.Unit.
+Require Import Corelib.Init.Tactics.Ltac.
 
-Global Typeclasses Opaque id const flip compose arrow iff not all.
+#[export]
+Typeclasses Opaque id const flip compose arrow iff not all.
 
 (** Apply using the same opacity information as typeclass proof search. *)
 

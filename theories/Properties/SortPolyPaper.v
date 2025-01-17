@@ -1,5 +1,3 @@
-Set Universe Polymorphism.
-
 (** listings: true eq false **)
 Lemma true_false_sprop: true@{SProp|} = false@{SProp|}.
 Proof. reflexivity. Qed.

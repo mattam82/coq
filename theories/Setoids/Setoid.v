@@ -60,8 +60,3 @@ Ltac refl_st :=
     | H : Setoid_Theory _ ?eqA |- ?eqA _ _ =>
       apply (Seq_refl _ _ H); auto
   end.
-
-Definition gen_st : forall A : Set, Setoid_Theory _ (@eq A).
-Proof.
-  constructor; congruence.
-Qed.

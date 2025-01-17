@@ -32,15 +32,15 @@ Import GroupoidNotations.
 
 Definition equiv_refl@{sa|a|} (A : Type@{sa|a}) : equiv@{sa sa sa| _ _} A A
 :=
-  {| map := id ; map_is_equiv := {| sect := id ; retr := id ; sect_eq := rfl ; retr_eq := rfl |} |}.
+  {| map := id ; map_is_equiv := {| sect := id ; retr := id ; sect_eq := @eq_refl _ ; retr_eq := @eq_refl _ |} |}.
 
-Definition equiv_trans@{sa sb sc|a b c|} (A : Type@{sa|a}) (B : Type@{sb|b}) (C : Type@{sc|c}) (AB : equiv A B) (BC : equiv B C) : equiv A C.
+Definition equiv_trans@{sa sb sc|a b c ? |?} (A : Type@{sa|a}) (B : Type@{sb|b}) (C : Type@{sc|c}) (AB : equiv A B) (BC : equiv B C) : equiv A C.
 Proof.
   refine {| map := BC ∘ AB |}.
   simple refine {| sect := AB.(sect) ∘ BC.(sect) ; retr := AB.(retr) ∘ BC.(retr) |}.
   all: intro; cbn.
-  - rewrite sect_eq. refine (sect_eq _ _).
-  - rewrite retr_eq. refine (retr_eq _ _).
+  - setoid_rewrite sect_eq. refine (sect_eq _ _).
+  - setoid_rewrite BC.(retr_eq). refine (retr_eq _ _).
 Defined.
 
 Section SigmaAssoc.

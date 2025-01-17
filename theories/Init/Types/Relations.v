@@ -17,12 +17,20 @@
    Institution: LRI, CNRS UMR 8623 - University Paris Sud
 *)
 
-Require Export Corelib.Classes.Init.
+(*
 Require Import Corelib.Program.Basics.
 Require Import Corelib.Program.Tactics.
+*)
 
-Require Import Corelib.Properties.GroupoidLaws.
-Require Export Corelib.Properties.Functions.
+Require Export Corelib.Init.PreludeOptions.
+Require Export Corelib.Init.Notations.
+Require Export Corelib.Init.Classes.
+Require Export Corelib.Init.Types.Functions.
+Require Export Corelib.Init.Types.Equality.
+Require Export Corelib.Init.Types.Sigma.
+Require Export Corelib.Init.Types.Sum.
+Require Export Corelib.Init.Types.Empty.
+Require Export Corelib.Init.Tactics.Ltac.
 
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
@@ -43,11 +51,14 @@ Section Defs.
   Typeclasses Opaque complement iff.
 
   (** These are convertible. *)
+(*
   Lemma complement_inverse R : complement (flip R) = flip (complement R).
   Proof. reflexivity. Qed.
-
+*)
   Class Irreflexive (R : relation A) :=
     irreflexivity : Reflexive (complement R).
+
+  Arguments irreflexivity _ {_} _.
 
   Class Symmetric (R : relation A) :=
     symmetry : forall {x y}, R x y -> R y x.
@@ -66,38 +77,40 @@ Section Defs.
 
   #[projections(primitive=no)]
   Class PreOrder (R : relation A)  := {
-    #[global] PreOrder_Reflexive :: Reflexive R | 2 ;
-    #[global] PreOrder_Transitive :: Transitive R | 2 }.
+    #[export] PreOrder_Reflexive :: Reflexive R | 2 ;
+    #[export] PreOrder_Transitive :: Transitive R | 2 }.
 
   (** A [StrictOrder] is both Irreflexive and Transitive. *)
 
   #[projections(primitive=no)]
   Class StrictOrder (R : relation A)  := {
-    #[global] StrictOrder_Irreflexive :: Irreflexive R ;
-    #[global] StrictOrder_Transitive :: Transitive R }.
+    #[export] StrictOrder_Irreflexive :: Irreflexive R ;
+    #[export] StrictOrder_Transitive :: Transitive R }.
 
   (** By definition, a strict order is also asymmetric *)
-  Global Instance StrictOrder_Asymmetric `(StrictOrder R) : Asymmetric R.
-  Proof. firstorder. Qed.
+  #[export]
+  Instance StrictOrder_Asymmetric `(StrictOrder R) : Asymmetric R.
+  Proof. intros x y e X. eapply (irreflexivity R x). apply (transitivity y); eauto. Defined.
 
   (** A partial equivalence relation is Symmetric and Transitive. *)
 
   #[projections(primitive=no)]
   Class PER (R : relation A)  := {
-    #[global] PER_Symmetric :: Symmetric R | 3 ;
-    #[global] PER_Transitive :: Transitive R | 3 }.
+    #[export] PER_Symmetric :: Symmetric R | 3 ;
+    #[export] PER_Transitive :: Transitive R | 3 }.
 
   (** Equivalence relations. *)
 
   #[projections(primitive=no)]
   Class Equivalence (R : relation A)  := {
-    #[global] Equivalence_Reflexive :: Reflexive R ;
-    #[global] Equivalence_Symmetric :: Symmetric R ;
-    #[global] Equivalence_Transitive :: Transitive R }.
+    #[export] Equivalence_Reflexive :: Reflexive R ;
+    #[export] Equivalence_Symmetric :: Symmetric R ;
+    #[export] Equivalence_Transitive :: Transitive R }.
 
   (** An Equivalence is a PER plus reflexivity. *)
 
-  Global Instance Equivalence_PER {R} `(Equivalence R) : PER R | 10 :=
+  #[export]
+  Instance Equivalence_PER {R} `(Equivalence R) : PER R | 10 :=
     { PER_Symmetric := Equivalence_Symmetric ;
       PER_Transitive := Equivalence_Transitive }.
 
@@ -106,59 +119,65 @@ Section Defs.
   Class Antisymmetric eqA `{equ : Equivalence eqA} (R : relation A) :=
     antisymmetry : forall {x y}, R x y -> R y x -> eqA x y.
 
+  Arguments antisymmetry {_ _} _ {_ _ _} _ _.
+
   Class subrelation (R: relation A) (R' : relation A) :=
     is_subrelation : forall {x y}, R x y -> R' x y.
 
   (** Any symmetric relation is equal to its inverse. *)
-
-  Lemma subrelation_symmetric R `(Symmetric R) : subrelation (flip R) R.
-  Proof. hnf. intros x y H'. red in H'. apply symmetry. assumption. Qed.
+  #[export]
+  Instance subrelation_symmetric R `(Symmetric R) : subrelation (flip R) R.
+  Proof. hnf. intros x y H'. red in H'. apply symmetry. assumption. Defined.
 
   Section flip.
 
-    Lemma flip_Reflexive `{Reflexive R} : Reflexive (flip R).
-    Proof. tauto. Qed.
+    #[export]
+    Instance flip_Reflexive `{Reflexive R} : Reflexive (flip R).
+    Proof. apply H. Defined.
 
-    Program Definition flip_Irreflexive `(Irreflexive R) : Irreflexive (flip R) :=
-      irreflexivity (R:=R).
+    #[export]
+    Instance flip_Irreflexive `(Irreflexive R) : Irreflexive (flip R) :=
+      irreflexivity R.
 
-    Program Definition flip_Symmetric `(Symmetric R) : Symmetric (flip R) :=
+    #[export]
+    Instance flip_Symmetric `(Symmetric R) : Symmetric (flip R) :=
       fun x y H => symmetry (R:=R) H.
 
-    Program Definition flip_Asymmetric `(Asymmetric R) : Asymmetric (flip R) :=
+    #[export]
+    Instance flip_Asymmetric `(Asymmetric R) : Asymmetric (flip R) :=
       fun x y H H' => asymmetry (R:=R) H H'.
 
-    Program Definition flip_Transitive `(Transitive R) : Transitive (flip R) :=
+    #[export]
+    Instance flip_Transitive `(Transitive R) : Transitive (flip R) :=
       fun x y z H H' => transitivity (R:=R) _ H' H.
 
-    Program Definition flip_Antisymmetric `(Antisymmetric eqA R) :
+    #[export]
+    Instance flip_Antisymmetric `(Antisymmetric eqA R) :
       Antisymmetric eqA (flip R).
-    Proof. firstorder. Qed.
+    Proof. intros x y e e'. unfold flip in *. apply (antisymmetry R); eauto. Defined.
 
     (** Inversing the larger structures *)
 
-    Lemma flip_PreOrder `(PreOrder R) : PreOrder (flip R).
-    Proof. firstorder. Qed.
-
-    Lemma flip_StrictOrder `(StrictOrder R) : StrictOrder (flip R).
-    Proof. firstorder. Qed.
-
-    Lemma flip_PER `(PER R) : PER (flip R).
-    Proof. firstorder. Qed.
-
-    Lemma flip_Equivalence `(Equivalence R) : Equivalence (flip R).
-    Proof. firstorder. Qed.
+    #[export]
+    Instance flip_PreOrder `(PreOrder R) : PreOrder (flip R) := {}.
+    #[export]
+    Instance flip_StrictOrder `(StrictOrder R) : StrictOrder (flip R) := {}.
+    #[export]
+    Instance flip_PER `(PER R) : PER (flip R) := {}.
+    #[export]
+    Instance flip_Equivalence `(Equivalence R) : Equivalence (flip R) := {}.
 
   End flip.
 
   Section complement.
 
-    Definition complement_Irreflexive `(Reflexive R)
-      : Irreflexive (complement R).
-    Proof. firstorder. Qed.
+    #[export]
+    Instance complement_Irreflexive `(Reflexive R): Irreflexive (complement R).
+    Proof. intros x f. apply f; eauto. Defined.
 
-    Definition complement_Symmetric `(Symmetric R) : Symmetric (complement R).
-    Proof. firstorder. Qed.
+    #[export]
+    Instance complement_Symmetric `(Symmetric R) : Symmetric (complement R).
+    Proof. unfold complement. intros x y f e . apply f. apply symmetry; auto. Defined.
   End complement.
 
 
@@ -176,150 +195,40 @@ Section Defs.
   (** Any [Equivalence] declared in the context is automatically considered
    a rewrite relation. *)
 
-  Global Instance equivalence_rewrite_relation `(Equivalence eqA) : RewriteRelation eqA.
-  Defined.
-
-  (** Leibniz equality. *)
-  Section Leibniz.
-    Global Instance eq_Reflexive : Reflexive (@eq A) := @eq_refl A.
-    Global Instance eq_Symmetric : Symmetric (@eq A) := @eq_sym A.
-    Global Instance eq_Transitive : Transitive (@eq A) := @eq_trans A.
-
-    (** Leibinz equality [eq] is an equivalence relation.
-        The instance has low priority as it is always applicable
-        if only the type is constrained. *)
-
-    Global Program Instance eq_equivalence : Equivalence (@eq A) | 10.
-  End Leibniz.
+  Instance equivalence_rewrite_relation `(Equivalence eqA) : RewriteRelation eqA := {}.
 
 End Defs.
 
-Global Arguments transitivity {A R Transitive x} y {z}.
+Arguments irreflexivity {_} _ {_} _.
+Arguments antisymmetry {_ _ _} _ {_ _ _} _ _.
+Arguments transitivity {A R Transitive x} y {z}.
 
 (** Default rewrite relations handled by [setoid_rewrite]. *)
-#[global]
-Instance rr_impl@{s|u|} : RewriteRelation arrow@{s s|u u}.
-Defined.
+#[export]
+Instance rr_impl@{s|u|} : RewriteRelation arrow@{s s|u u} := {}.
 
-
-#[global]
+#[export]
 Instance rr_iff@{s|u|} : RewriteRelation iff@{s|u u}.
 Defined.
 
-(** Hints to drive the typeclass resolution avoiding loops
- due to the use of full unification. *)
-#[global]
-Hint Extern 1 (Reflexive (complement _)) => class_apply @irreflexivity : typeclass_instances.
-#[global]
-Hint Extern 3 (Symmetric (complement _)) => class_apply complement_Symmetric : typeclass_instances.
-#[global]
-Hint Extern 3 (Irreflexive (complement _)) => class_apply complement_Irreflexive : typeclass_instances.
-
-#[global]
-Hint Extern 3 (Reflexive (flip _)) => apply flip_Reflexive : typeclass_instances.
-#[global]
-Hint Extern 3 (Irreflexive (flip _)) => class_apply flip_Irreflexive : typeclass_instances.
-#[global]
-Hint Extern 3 (Symmetric (flip _)) => class_apply flip_Symmetric : typeclass_instances.
-#[global]
-Hint Extern 3 (Asymmetric (flip _)) => class_apply flip_Asymmetric : typeclass_instances.
-#[global]
-Hint Extern 3 (Antisymmetric (flip _)) => class_apply flip_Antisymmetric : typeclass_instances.
-#[global]
-Hint Extern 3 (Transitive (flip _)) => class_apply flip_Transitive : typeclass_instances.
-#[global]
-Hint Extern 3 (StrictOrder (flip _)) => class_apply flip_StrictOrder : typeclass_instances.
-#[global]
-Hint Extern 3 (PreOrder (flip _)) => class_apply flip_PreOrder : typeclass_instances.
-
-#[global]
+#[export]
 Hint Extern 4 (subrelation (flip _) _) =>
   class_apply @subrelation_symmetric : typeclass_instances.
-
-#[global]
-Hint Resolve irreflexivity : ord.
-
-Unset Implicit Arguments.
-
-Ltac solve_relation :=
-  match goal with
-  | [ |- ?R ?x ?x ] => reflexivity
-  | [ H : ?R ?x ?y |- ?R ?y ?x ] => symmetry ; exact H
-  end.
-
-#[global]
-Hint Extern 4 => solve_relation : relations.
 
 (** We can already dualize all these properties. *)
 
 (** * Standard instances. *)
 
-Ltac reduce_hyp H :=
-  match type of H with
-    | context [ _ <-> _ ] => fail 1
-    | _ => red in H ; try reduce_hyp H
-  end.
-
-Ltac reduce_goal :=
-  match goal with
-    | [ |- _ <-> _ ] => fail 1
-    | _ => red ; intros ; try reduce_goal
-  end.
-
-Tactic Notation "reduce" "in" hyp(Hid) := reduce_hyp Hid.
-
-Ltac reduce := reduce_goal.
-
-Tactic Notation "apply" "*" constr(t) :=
-  first [ refine t | refine (t _) | refine (t _ _) | refine (t _ _ _) | refine (t _ _ _ _) |
-    refine (t _ _ _ _ _) | refine (t _ _ _ _ _ _) | refine (t _ _ _ _ _ _ _) ].
-
-Ltac simpl_relation :=
-  unfold flip, arrow ; try reduce ; program_simpl ;
-    try ( solve [ dintuition auto with relations ]).
-
-Local Obligation Tactic := simpl_relation.
-
 (** Logical implication. *)
 
-#[global]
-Program Instance impl_Reflexive@{s|u|} : Reflexive arrow@{s s|u u}.
-#[global]
-Program Instance impl_Transitive@{s|u|} : Transitive arrow@{s s|u u}.
-
-(** Logical equivalence. *)
-
-(* forall A : Type@{?s' | ?u'}, iff A A <= forall A : Type@{s | u}, iff A A
-
-      Type@{s|u} <= Type@{s' | u'}
-
-      Reflexive Type iff -> forall x : Type@{u}, (x -> x) * (x -> x)
-*)
-
-#[global]
-Instance iff_Reflexive@{s|u|} : Reflexive iff@{s |u u} :=
-  { reflexivity := iff_refl }.
-#[global]
-Instance iff_Symmetric@{s|u|} : Symmetric iff@{s|u u} :=
-  { symmetry := iff_sym }.
-#[global]
-Instance iff_Transitive@{s|u|} : Transitive iff@{s|u u} :=
-  { transitivity := iff_trans }.
-
-(** Logical equivalence [iff] is an equivalence relation. *)
-
-#[global]
-Program Instance iff_equivalence@{s|u|} : @Equivalence@{Type s | u+1 u} Type@{s | u} iff.
-#[global]
-Program Instance arrow_Reflexive@{s|u|} : Reflexive arrow@{s s|u u}.
-#[global]
-Program Instance arrow_Transitive@{s|u|} : Transitive arrow@{s s|u u}.
+#[export]
+Instance impl_Reflexive@{s|u|} : Reflexive arrow@{s s|u u} := fun A a => a.
+#[export]
+Instance impl_Transitive@{s|u|} : Transitive arrow@{s s|u u} := fun A B C f g x => g (f x).
 
 (** We now develop a generalization of results on relations for arbitrary predicates.
    The resulting theory can be applied to homogeneous binary relations but also to
    arbitrary n-ary predicates. *)
-
-Local Open Scope list_scope.
 
 (** A compact representation of non-dependent arities, with the codomain singled-out. *)
 
@@ -332,7 +241,8 @@ Section Binary.
   Definition relation_equivalence : relation@{Type s'|_ _} (relation@{s s'|u v} A)
     := fun R R' => forall x y, iff (R x y) (R' x y).
 
-  Global Instance: RewriteRelation relation_equivalence.
+  #[export]
+  Instance: RewriteRelation relation_equivalence.
   Defined.
 
   Definition relation_conjunction (R : relation@{s s'|u v} A) (R' : relation@{s s'|u v} A) : relation A :=
@@ -343,17 +253,19 @@ Section Binary.
     fun x y => sum (R x y) (R' x y).
   (** Relation equivalence is an equivalence, and subrelation defines a partial order. *)
 
-  Global Instance relation_equivalence_equivalence :
+  #[export]
+  Instance relation_equivalence_equivalence :
     Equivalence relation_equivalence.
   Proof.
     split; red; unfold relation_equivalence, iff.
     - intros **. split; intros ?; assumption.
     - intros **. edestruct X. split; eassumption.
     - intros x y z X X0 x0 y0. destruct (X x0 y0). destruct (X0 x0 y0). split; eauto.
-  Qed.
+  Defined.
 
-  Global Instance relation_implication_preorder : PreOrder (@subrelation A).
-  Proof. firstorder. Qed.
+  #[export]
+  Instance relation_implication_preorder : PreOrder (@subrelation A).
+  Proof. split; unfold subrelation; red; eauto. Defined.
 
   (** *** Partial Order.
    A partial order is a preorder which is additionally antisymmetric.
@@ -363,17 +275,20 @@ Section Binary.
   Class PartialOrder@{w} (eqA : relation@{s s'|u v} A) `{equ : Equivalence A eqA} (R : relation@{s s'|u w} A) `{preo : PreOrder A R} :=
     partial_order_equivalence : relation_equivalence eqA (relation_conjunction R (flip R)).
 
+  Arguments partial_order_equivalence {_ _} _ {_ _} _ _.
+
   (** The equivalence proof is sufficient for proving that [R] must be a
    morphism for equivalence (see Morphisms).  It is also sufficient to
    show that [R] is antisymmetric w.r.t. [eqA] *)
 
-  Global Instance partial_order_antisym `(PartialOrder eqA R) : Antisymmetric eqA R.
+  #[export]
+  Instance partial_order_antisym `(PartialOrder eqA R) : Antisymmetric eqA R.
   Proof with auto.
-    reduce_goal.
-    firstorder.
-  Qed.
+    red. intros x y r r'. apply (snd (partial_order_equivalence R x y)). split; eauto.
+  Defined.
 
-  Lemma PartialOrder_inverse `(PartialOrder eqA R) : PartialOrder eqA (flip R).
+  #[export]
+  Instance PartialOrder_inverse `(PartialOrder eqA R) : PartialOrder eqA (flip R).
   Proof.
     split.
     - intros X.
@@ -390,21 +305,7 @@ Section Binary.
   Qed.
 End Binary.
 
-#[global]
-Hint Extern 3 (PartialOrder (flip _)) => class_apply PartialOrder_inverse : typeclass_instances.
-
-(** The partial order defined by subrelation and relation equivalence. *)
-
-(* Program Instance subrelation_partial_order : *)
-(*   ! PartialOrder (relation A) relation_equivalence subrelation. *)
-(* Obligation Tactic := idtac. *)
-
-(* Next Obligation. *)
-(* Proof. *)
-(*   intros x. refine (fun x => x). *)
-(* Qed. *)
-
-Global Typeclasses Opaque relation_equivalence.
+Typeclasses Opaque relation_equivalence.
 
 (* Register bindings for the generalized rewriting tactic *)
 
