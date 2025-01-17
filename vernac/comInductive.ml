@@ -677,9 +677,9 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~ctx_params ~indnames ~a
       indnames arities constructors
   in
   let UState.{ universes_entry_universes = univ_entry; universes_entry_binders = binders } = 
-    Evd.check_univ_decl ~poly ~cumulative  ~kind:UVars.Definition sigma udecl in
+    Evd.check_univ_decl ~poly ~cumulative ~kind:UVars.Definition sigma udecl in
 
-  let variance = variance_of_entry ~cumulative ~variances univ_entry in
+  (* let variance = variance_of_entry ~cumulative ~variances univ_entry in *)
   (* Build the mutual inductive entry *)
   let mind_ent =
     { mind_entry_params = ctx_params;

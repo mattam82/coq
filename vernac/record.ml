@@ -899,6 +899,20 @@ let declare_structure (decl:Record_decl.t) =
   let inds = List.mapi map data in
   Declared.Record kn, inds
 
+(* let class_constant_projection_variances nparams variances =
+  let map_variances v =
+    let v = UVars.Variances.repr v in
+    let open  UVars.VarianceOccurrence in
+    let map_var { in_binders; in_term; in_type; under_impred_qvars } =
+      { in_binders = in_binders;
+        in_term = None;
+        in_type = Option.union UVars.Variance.sup in_term in_type;
+        under_impred_qvars }
+    in
+    UVars.Variances.make (Array.map map_var v)
+  in
+  Option.map map_variances variances *)
+
 (* declare definitional class (typeclasses that are not record) *)
 (* [data.is_coercion] must be [NoCoercion] and [data.proj_flags] must have exactly 1 element. *)
 let declare_class_constant entry (data:Data.t) =
@@ -930,7 +944,7 @@ let declare_class_constant entry (data:Data.t) =
       UState.{ univs with universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty }
     | UState.Polymorphic_entry (uctx, variances) ->
       UVars.Instance.of_level_instance (UVars.UContext.instance uctx),
-      UState.{ univs with universes_entry_universes = Polymorphic_entry (uctx, None) }
+      UState.{ univs with universes_entry_universes = Polymorphic_entry (uctx, Option.map (fun _ -> Entries.Infer_variances) variances) }
   in
   let cstu = (cst, inst) in
   let binder =

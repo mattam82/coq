@@ -38,7 +38,7 @@ let to_entry mind (mb:mutual_inductive_body) : Entries.mutual_inductive_entry =
       | None -> Monomorphic_ind_entry
       | Some template -> template
       end
-    | Polymorphic (auctx, variances) -> Polymorphic_ind_entry (AbstractContext.repr auctx, variances)
+    | Polymorphic (auctx, variances) -> Polymorphic_ind_entry (AbstractContext.repr auctx, Option.map (fun v -> Check_variances v) variances)
   in
   let ntyps = Array.length mb.mind_packets in
   let mind_entry_params = match mb.mind_template with

@@ -16,7 +16,11 @@ open Constr
    constants/axioms, mutual inductive definitions, modules and module
    types *)
 
-type variance_entry = UVars.Variances.t option
+type variance_declaration_entry =
+  | Infer_variances
+  | Check_variances of UVars.Variances.t
+
+type variance_entry = variance_declaration_entry option
 
 type universes_entry =
   | Monomorphic_entry

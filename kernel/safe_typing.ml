@@ -869,7 +869,7 @@ let constant_entry_of_side_effect eff =
     | Monomorphic ->
       Monomorphic_entry
     | Polymorphic (auctx, variances) ->
-      Polymorphic_entry (UVars.AbstractContext.repr auctx, variances)
+      Polymorphic_entry (UVars.AbstractContext.repr auctx, Option.map (fun x -> Check_variances x) variances)
   in
   let p =
     match cb.const_body with

@@ -592,7 +592,7 @@ val universes : evar_map -> UGraph.t
     [Univ.ContextSet.to_context]. *)
 val to_universe_context : evar_map -> UVars.UContext.t
 
-val univ_entry : poly:bool -> evar_map -> UState.named_universes_entry
+val univ_entry : poly:bool -> evar_map -> Entries.variance_entry -> UState.named_universes_entry
 
 val check_univ_decl : poly:bool -> ?cumulative:bool -> kind:UVars.assumption_or_definition ->
   evar_map -> UState.universe_decl -> UState.named_universes_entry

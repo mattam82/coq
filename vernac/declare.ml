@@ -286,12 +286,14 @@ let extend_variances univs =
   | Monomorphic_entry _ -> us
   | Polymorphic_entry (uctx, variances) ->
     let _, ulen = UVars.UContext.size uctx in
-    let extend vars =
+    let extend = function
+    | Entries.Check_variances vars ->
       let avars = UVars.Variances.repr vars in
-      if Array.length avars = ulen then vars
+      if Array.length avars = ulen then Entries.Check_variances vars
       else if Array.length avars > ulen then CErrors.user_err Pp.(str"More variance annotations than bound universes")
       else CErrors.user_err Pp.(str"More bound universes than variance annotations")
        (* UVars.Variances.of_array (Array.append avars (Array.make (ulen - Array.length avars) (UVars.(VariancePos.make Variance.Invariant Position.InTerm)))) *)
+    | Entries.Infer_variances -> Entries.Infer_variances
     in
     Polymorphic_entry (uctx, Option.map extend variances)
   in

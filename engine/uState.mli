@@ -18,7 +18,7 @@ open Sorts
 
 type universes_entry =
 | Monomorphic_entry of Univ.ContextSet.t
-| Polymorphic_entry of UVars.UContext.t * UVars.variances option
+| Polymorphic_entry of UVars.UContext.t * Entries.variance_entry
 
 exception UniversesDiffer
 
@@ -85,7 +85,7 @@ type named_universes_entry =
   { universes_entry_universes : universes_entry;
     universes_entry_binders : UnivNames.universe_binders }
 
-val univ_entry : poly:bool -> t -> UVars.variances option -> named_universes_entry
+val univ_entry : poly:bool -> t -> Entries.variance_entry -> named_universes_entry
 (** Pick from {!context} or {!context_set} based on [poly]. *)
 
 val universe_binders : t -> UnivNames.universe_binders
