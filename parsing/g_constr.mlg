@@ -142,6 +142,8 @@ GRAMMAR EXTEND Gram
       | "Type"; "@{"; "_"; "}" -> { None, UAnonymous {rigid=UnivRigid} }
       | "Type"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" ->
         { Some (CQVar q), u }
+      | IDENT "Univ"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" -> { Some (CQVar q), u }
+      | IDENT "𝒰"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" -> { Some (CQVar q), u }
       | "Type"; "@{"; u = universe; "}" -> { None, UNamed u } ] ]
   ;
   sort_family:
