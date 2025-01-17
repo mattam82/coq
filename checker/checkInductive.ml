@@ -44,7 +44,7 @@ let to_entry mind (mb:mutual_inductive_body) : Entries.mutual_inductive_entry =
       | None -> Monomorphic_ind_entry
       | Some ctx -> Template_ind_entry ctx.template_context
       end
-    | Polymorphic (auctx, variances) -> Polymorphic_ind_entry (AbstractContext.repr auctx, variances)
+    | Polymorphic (auctx, variances) -> Polymorphic_ind_entry (AbstractContext.repr auctx, Option.map (fun v -> Check_variances v) variances)
   in
   let ntyps = Array.length mb.mind_packets in
   let mind_entry_inds = Array.map_to_list (fun ind ->

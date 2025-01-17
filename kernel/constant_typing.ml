@@ -117,9 +117,13 @@ let process_universes env ?sec_univs = function
           (* no variance for qualities *)
           let inst = UContext.instance (AbstractContext.repr auctx) in
           let _, inst = UVars.LevelInstance.to_array inst in
-          let variances = UVars.subst_sort_level_variances usubst variances in
-          let univs = Array.map2 (fun a b -> a,Some b) inst
-             (UVars.Variances.repr variances) in
+          let univs =
+            match variances with
+            | Check_variances variances ->
+              let variances = UVars.subst_sort_level_variances usubst variances in
+              Array.map2 (fun a b -> a,Some b) inst (UVars.Variances.repr variances)
+            | Infer_variances -> Array.map (fun a -> a,None) inst
+          in
           let univs =
             match sec_univs with
             | None -> univs
@@ -139,6 +143,14 @@ let check_primitive_type env op_t u t =
   | Result.Error () ->
     Type_errors.error_incorrect_primitive env (make_judge op_t inft) t
 
+let compatible_variance_entry v e =
+  match v, e with
+  | None, None -> true
+  | Some _, Some Infer_variances -> true
+  | Some v, Some (Check_variances v') -> UVars.Variances.equal v v'
+  | None, Some _ -> false
+  | Some _, None -> false
+
 let adjust_primitive_univ_entry p auctx variances = function
   | Monomorphic_entry ->
     assert (AbstractContext.is_empty auctx && Option.is_empty variances); (* ensured by ComPrimitive *)
@@ -152,10 +164,10 @@ let adjust_primitive_univ_entry p auctx variances = function
             && Constraints.is_empty (UContext.constraints uctx))
     then CErrors.user_err Pp.(str "Incorrect universes for primitive " ++
                                 str (CPrimitives.op_or_type_to_string p));
-    if not (Option.equal UVars.Variances.equal variances variances') then
+    if not (compatible_variance_entry variances variances') then
       CErrors.user_err Pp.(str "Incorrect universe variances for primitive " ++
         str (CPrimitives.op_or_type_to_string p));
-    Polymorphic_entry (UContext.refine_names (AbstractContext.names auctx) uctx, variances)
+    Polymorphic_entry (UContext.refine_names (AbstractContext.names auctx) uctx, Option.map (fun x -> Check_variances x) variances)
 
 let on_variances fn = function
   | PreMonomorphic -> 0, Monomorphic

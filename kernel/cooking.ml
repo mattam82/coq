@@ -307,7 +307,7 @@ let create_cache info =
     of judgment into a [cooking_info] *)
 let make_cooking_info ~recursive expand_info hyps uctx =
   let abstr_rev_inst = List.rev (Named.instance_list (fun id -> id) hyps) in
-  let abstr_ausubst, abstr_auctx = abstract_universes uctx in
+  let abstr_ausubst, abstr_auctx = UVars.abstract_universes uctx in
   let abstr_info = { abstr_ctx = hyps; abstr_auctx; abstr_ausubst } in
   let abstr_inst_info = {
     abstr_rev_inst = abstr_rev_inst;

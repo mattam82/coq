@@ -18,8 +18,6 @@ open UVars
 val universes_context : universes -> AbstractContext.t
 val universes_variances : universes -> UVars.variances option
 
-val abstract_universes : Entries.universes_entry -> UVars.sort_level_subst * universes
-
 (** {6 Arities} *)
 
 val map_decl_arity : ('a -> 'c) -> ('b -> 'd) ->

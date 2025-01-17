@@ -595,7 +595,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~ctx_params ~indnames ~a
     match univ_entry with
     | UState.Monomorphic_entry ctx -> Monomorphic_ind_entry, ctx
     | UState.Polymorphic_entry (uctx, variances) ->
-      let variances = variance_of_entry ~cumulative uctx variances in
+      (* let variances = variance_of_entry ~cumulative uctx variances in *)
       Polymorphic_ind_entry (uctx, variances), Univ.ContextSet.empty
   in
   (* Build the mutual inductive entry *)
