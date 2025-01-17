@@ -793,7 +793,6 @@ let interp_structure_core ~cumulative finite ~univs ~primitive_proj impargs para
   | Monomorphic_ind_entry -> univs, Some global_univ_decls, ind_univs
   | Template_ind_entry _ -> univs, Some global_univ_decls, ind_univs
   | Polymorphic_ind_entry (ctx, variances) ->
-    let variances = ComInductive.variance_of_entry ~cumulative ctx variances in
     let univs =
       UState.{ universes_entry_universes = Polymorphic_entry (ctx, variances);
                universes_entry_binders = UnivNames.empty_binders }
@@ -851,6 +850,20 @@ let get_class_params : Data.t list -> Data.t = function
   | _ ->
     CErrors.user_err (str "Mutual definitional classes are not supported.")
 
+(* let class_constant_projection_variances nparams variances =
+  let map_variances v =
+    let v = UVars.Variances.repr v in
+    let open  UVars.VarianceOccurrence in
+    let map_var { in_binders; in_term; in_type; under_impred_qvars } =
+      { in_binders = in_binders;
+        in_term = None;
+        in_type = Option.union UVars.Variance.sup in_term in_type;
+        under_impred_qvars }
+    in
+    UVars.Variances.make (Array.map map_var v)
+  in
+  Option.map map_variances variances *)
+
 (* declare definitional class (typeclasses that are not record) *)
 (* [data] is a list with a single [Data.t] with a single field (in [Data.rdata])
    and [Data.is_coercion] must be [NoCoercion] *)
@@ -877,7 +890,7 @@ let declare_class_constant ~univs paramimpls params data =
       UState.{ univs with universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty }
     | UState.Polymorphic_entry (uctx, variances) ->
       UVars.Instance.of_level_instance (UVars.UContext.instance uctx),
-      UState.{ univs with universes_entry_universes = Polymorphic_entry (uctx, None) }
+      UState.{ univs with universes_entry_universes = Polymorphic_entry (uctx, Option.map (fun _ -> Entries.Infer_variances) variances) }
   in
   let cstu = (cst, inst) in
   let inst_type = appvectc (mkConstU cstu) (Context.Rel.instance mkRel 0 params) in

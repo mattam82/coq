@@ -22,7 +22,7 @@ let _debug_ustate_model_flag, debug_model = CDebug.create_full ~name:"ustate_mod
 
 type universes_entry =
 | Monomorphic_entry of Univ.ContextSet.t
-| Polymorphic_entry of UVars.UContext.t * UVars.variances option
+| Polymorphic_entry of UVars.UContext.t * Entries.variance_entry
 
 module UNameMap = Id.Map
 
@@ -1152,7 +1152,7 @@ let check_univ_decl ~poly ?(cumulative=true) ~kind uctx decl =
   let entry =
     if poly then
       let uctx, variances = check_poly_univ_decl ~cumulative ~kind uctx decl in
-      Polymorphic_entry (uctx, variances)
+      Polymorphic_entry (uctx, Option.map (fun v -> Entries.Check_variances v) variances)
     else Monomorphic_entry (check_mono_univ_decl uctx decl) in
   { universes_entry_universes = entry;
     universes_entry_binders = binders; }
