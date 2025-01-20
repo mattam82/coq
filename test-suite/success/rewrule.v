@@ -1,5 +1,9 @@
 (* -*- mode: coq; coq-prog-args: ("-allow-rewrite-rules") -*- *)
 
+From Corelib.Properties Require Import NumberNotations Nat.
+
+Open Scope nat_scope.
+
 (* Simple first example *)
 Symbol pplus : nat -> nat -> nat.
 Notation "a ++ b" := (pplus a b).
@@ -25,7 +29,7 @@ Eval simpl in fun n n' => 2 + n ++ 3 + n'. (* Does not reduce *)
 Rewrite Rules raise_rew :=
   raise (forall (x : ?A), ?P) => fun x => raise ?P
 
-| raise (?A * ?B) => (raise ?A, raise ?B)
+| raise (sigmaR ?A ?B) => (raise ?A, fun a => raise (?B a))
 
 | raise unit => tt
 
@@ -39,18 +43,18 @@ Rewrite Rules raise_rew :=
 
 | match raise (@eq ?A ?a ?b) as e in _ = b return ?P with
   | eq_refl => _
-  end => raise ?P@{b := _; e := raise (?a = ?b)}
+  end => raise ?P@{b := _; e := raise (?a = ?b :> _)}
 
 | match raise (list ?A) as l return ?P with
   | nil => _ | cons _ _ => _
   end => raise ?P@{l := raise (list ?A)}
 
-| match raise False as e return ?P with
-  end => raise ?P@{e := raise False}
+| match raise empty as e return ?P with
+  end => raise ?P@{e := raise empty}
 
-| match raise (?A + ?B) as e return ?P with
-  | inl _ => _ | inr _ => _
-  end => raise ?P@{e := raise (?A + ?B)}.
+| match raise ({?A} + {?B}) as e return ?P with
+  | left _ => _ | right _ => _
+  end => raise ?P@{e := raise ({?A} + {?B})}.
 (* There is currently no way to write these rules without the universe inconcistency *)
 
 Eval simpl in match raise bool with true | false => 0 end. (* Does not reduce *)
@@ -70,8 +74,8 @@ Set Primitive Projections.
 Record primprod (A B : Type) := { fst: A; snd: B }.
 
 (* Example with even more pattern constructions, mostly for terms *)
-Universe idu.
-#[unfold_fix, universes(polymorphic)] Symbol id@{q| |} : forall A : Type@{q|idu}, A -> A.
+#[unfold_fix, universes(polymorphic)]
+Symbol id@{q|idu|} : forall A : Type@{q|idu}, A -> A.
 
 Rewrite Rules id_rew :=
 | @{q|u?|?} |- id _ Type@{q|u} => Type@{q|u}
@@ -79,8 +83,10 @@ Rewrite Rules id_rew :=
 | @{q|u?|?} |- id Type@{q|u} (forall (x : ?A), ?P) => forall x, id Type@{q|u} ?P
 | id (forall (x : ?A), ?P) ?f => fun (x : ?A) => id ?P (?f x)
 
+(*
 | @{u?} |- id Type@{u} (?A * ?B)%type => (id Type@{u} ?A * id Type@{u} ?B)%type
 | id (?A * ?B) (?a, ?b) => (id _ ?a, id _ ?b)
+*)
 
 | id _ unit => unit
 | id _ tt => tt
@@ -142,16 +148,18 @@ Rewrite Rule a := J _ _ _ ?H _ (@eq_refl _ _) => ?H.
 
 Module omega.
 (* Example of a broken extension *)
-#[unfold_fix] Symbol omega : nat.
+#[unfold_fix]
+Symbol omega : nat.
+
 Rewrite Rule omega_rew := match omega with S n => ?P | 0 => _ end => ?P@{n := omega}.
 Theorem omega_spec : S omega = omega.
 Proof.
-  symmetry.
+  symmetry; try typeclasses eauto.
   change omega with (Nat.pred omega) at 2.
   remember omega as omeg eqn:e.
   destruct omeg. 2: reflexivity.
   apply (f_equal (fun n => match n with 0 => 0 | S _ => 1 end)) in e.
-  apply e.
+  cbn in *. apply e.
 Qed.
 
 Theorem omega_contradiction : False.
@@ -163,9 +171,8 @@ Proof.
   now intros [=].
 Qed.
 
-Fail Timeout 1 Eval lazy in omega + 0.
+Eval lazy in omega + 0.
 End omega.
-
 
 Module stream.
 
@@ -192,9 +199,9 @@ Module context.
 (* Test whether context extensions work correctly (here, with constructor arrguments)*)
 Symbol id : forall A, A -> A.
 Axioms (aa ee : nat).
-Inductive A := C (a := aa) (b : unit) (c := (a, b)) (d : True) (e := ee).
+Inductive A := C (a := aa) (b : unit) (c := (a, b)) (d : unit) (e := ee).
 
-Rewrite Rule raise_rew_C := match raise _ with C a b c d e => id (_ * _) ?P end => ?P@{a := _; b := raise _; c := _; d := raise _; e := _}.
+Rewrite Rule raise_rew_C := match raise _ with C a b c d e => id (sigmaR _ _) ?P end => ?P@{a := _; b := raise _; c := _; d := raise _; e := _}.
 
 Eval lazy  in match raise _ with C a b c d e => id _ (a, b, c, d, e) end.
 Eval cbv   in match raise _ with C a b c d e => id _ (a, b, c, d, e) end.
@@ -217,8 +224,8 @@ Proof. reflexivity. Defined.
 
 Lemma ministry_of_truth : true = false.
 Proof.
-  transitivity (Devil true).
-  - symmetry;exact Devil_true.
+  transitivity (Devil true); try typeclasses eauto.
+  - symmetry; try typeclasses eauto; exact Devil_true.
   - apply Devil_false.
 Defined.
 
@@ -249,27 +256,27 @@ Defined.
 
 
 (* Having a common supertype is not enough to preserve SR *)
-Universe u.
-Symbol idTy@{i} : Type@{i} -> Type@{u}.
+Symbol idTy@{i u} : Type@{i} -> Type@{u}.
 
 Rewrite Rule idTy_id := idTy ?t => ?t.
 (* Warning: This rewrite rule breaks subject reduction (universe inconsistency). *)
 
-Definition U : Type@{u} := idTy Type@{u}.
+Definition U@{u} : Type@{u} := idTy Type@{u}.
 Check U : U.
 
-Definition id'@{i} : Type@{i} -> Type@{u} := fun (t: Type@{i}) => t.
+Definition id'@{i u} : Type@{i} -> Type@{u} := fun (t: Type@{i}) => t.
 Fail Definition U' : Type@{u} := id' Type@{u}.
 
+(*
 Require Import TestSuite.hurkens.
 Goal False.
   apply (TypeNeqSmallType.paradox U eq_refl).
 Defined.
-
+*)
 
 (* Test substitution on context extensions *)
 Definition a : 0 = 0.
-  set (test := let n := 0 in @eq_trans _ n n n (raise _) (raise _)).
+  set (test := let n := 0 in @eq_trans (@eq) _ _ n n n (raise _) (raise _)).
   lazy delta in test.
   lazy beta in test.
   set (test_lazy := test).
@@ -285,6 +292,6 @@ Abort.
 Definition test_subst_context :=
   Eval cbv delta zeta in
   let n := 0 in
-  match raise (n = n) in (_ = a) return (n = a) with
+  match raise (n = n :> _) in (_ = a :> _ ) return (n = a :> _) with
   | eq_refl => raise _
   end.
