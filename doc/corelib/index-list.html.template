@@ -13,22 +13,55 @@ through the <tt>Require Import</tt> command.</p>
     The prelude (automatically loaded when starting Coq)
   </dt>
   <dd>
-    theories/Init/Ltac.v
+    theories/Init/PreludeOptions.v
+    theories/Init/Typeclasses.v
     theories/Init/Notations.v
-    theories/Init/Datatypes.v
-    theories/Init/Logic.v
-    theories/Init/Byte.v
-    theories/Init/Nat.v
-    theories/Init/Decimal.v
-    theories/Init/Hexadecimal.v
-    theories/Init/Number.v
-    theories/Init/Peano.v
-    theories/Init/Specif.v
-    theories/Init/Sumbool.v
-    theories/Init/Tactics.v
-    theories/Init/Tauto.v
-    theories/Init/Wf.v
+    theories/Init/Types/Decimal.v
+    theories/Init/Types/Ascii.v
+    theories/Init/Types/Relations.v
+    theories/Init/Types/String.v
+    theories/Init/Types/Unit.v
+    theories/Init/Types/Number.v
+    theories/Init/Types/Bool.v
+    theories/Init/Types/Sum.v
+    theories/Init/Types/Option.v
+    theories/Init/Types/Wf.v
+    theories/Init/Types/Byte.v
+    theories/Init/Types/Box.v
+    theories/Init/Types/Comparison.v
+    theories/Init/Types/Equality.v
+    theories/Init/Types/Sigma.v
+    theories/Init/Types/Hexadecimal.v
+    theories/Init/Types/Functions.v
+    theories/Init/Types/Empty.v
+    theories/Init/Types/List.v
+    theories/Init/Types/Nat.v
+    theories/Init/Types.v
+    theories/Init/Classes.v
+    theories/Init/GroupoidOperations.v
+    theories/Init/Tactics/Extra.v
+    theories/Init/Tactics/Tauto.v
+    theories/Init/Tactics/Ltac.v
     (theories/Init/Prelude.v)
+  </dd>
+
+  <dt> <b>Properties of basic types</b> </dt>
+  <dd>
+    theories/Properties/Decimal.v
+    theories/Properties/Number.v
+    theories/Properties/GroupoidLaws.v
+    theories/Properties/Bool.v
+    theories/Properties/Sum.v
+    theories/Properties/Equivalence.v
+    theories/Properties/Peano.v
+    theories/Properties/SortPolyPaper.v
+    theories/Properties/Byte.v
+    theories/Properties/Comparison.v
+    theories/Properties/Hexadecimal.v
+    theories/Properties/NumberNotations.v
+    theories/Properties/Functions.v
+    theories/Properties/List.v
+    theories/Properties/Nat.v
   </dd>
 
   <dt> <b>Binary numbers</b>:
@@ -62,24 +95,14 @@ through the <tt>Require Import</tt> command.</p>
     theories/Floats/FloatAxioms.v
   </dd>
 
-  <dt> <b>Relations</b>:
-       Relations (definitions)
-  </dt>
-  <dd>
-    theories/Relations/Relation_Definitions.v
-  </dd>
-
   <dt> <b>Classes</b>:
   </dt>
   <dd>
-    theories/Classes/Init.v
-    theories/Classes/RelationClasses.v
     theories/Classes/Morphisms.v
     theories/Classes/Morphisms_Prop.v
     theories/Classes/Equivalence.v
-    theories/Classes/CRelationClasses.v
-    theories/Classes/CMorphisms.v
-    theories/Classes/SetoidTactics.v
+    theories/Classes/ProperTactics.v
+    theories/Classes/Tactics.v
   </dd>
 
   <dt> <b>Setoids</b>:
@@ -88,21 +111,12 @@ through the <tt>Require Import</tt> command.</p>
     theories/Setoids/Setoid.v
   </dd>
 
-  <dt> <b>Lists</b>:
-    Polymorphic lists
-  </dt>
-  <dd>
-    theories/Lists/ListDef.v
-  </dd>
-
   <dt> <b>Program</b>:
     Support for dependently-typed programming
   </dt>
   <dd>
     theories/Program/Basics.v
-    theories/Program/Wf.v
     theories/Program/Tactics.v
-    theories/Program/Utils.v
   </dd>
 
   <dt> <b>SSReflect</b>:
