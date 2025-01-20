@@ -104,7 +104,7 @@ Definition eq_ind_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
 Register eq_ind_d as core.eq.ind.
 
 Definition f_equal@{s s' e|u v |} {A : Type@{s|u}} {B : Type@{s'|v}} (f : A -> B) {x y} : eq@{_ e| _} x y -> eq@{_ e| _} (f x) (f y)
-  := ap@{s e s' e|u u v v} (_leibniz := fun A x P Px y e => eq_Has_Leibniz_elim A x P Px y e) f.
+  := ap@{s e s' e|u u v v} (_leibniz := eq_Has_Leibniz_elim) f.
 
 Register f_equal as core.eq.congr.
 
