@@ -359,15 +359,15 @@ Notation odflt := Option.default.
 Notation obind := Option.bind.
 Notation omap := Option.map.
 Notation olift := Option.lift.
-Notation some := (@Some _) (only parsing).
+Notation some := (Some) (only parsing).
 
 (**  Shorthand for some basic equality lemmas.  **)
 
 Notation erefl := eq_refl@{_ Prop|_}.
 Notation ecast i T e x := (let: erefl in _ = i := e return T in x).
-Definition esym {A x y} := @sym_eq@{_ Prop | _} A x y.
-Definition nesym {A x y} := @sym_not_eq@{_ Prop | _} A x y.
-Definition etrans {A x y z}:= @trans_eq@{_ Prop|_} A x y z.
+Definition esym {A x y} := @sym_eq A x y.
+Definition nesym {A x y} := @sym_not_eq A x y.
+Definition etrans {A x y z}:= @trans_eq A x y z.
 Definition congr1 := f_equal@{_ _ Prop|_ _}.
 Definition congr2 := f_equal2@{_ _ _ Prop|_ _ _}.
 (**  Force at least one implicit when used as a view.  **)
@@ -546,7 +546,7 @@ Definition tag@{s|l l'|} A P := @fst@{s |l l'} A P.
 Definition tagged : forall w: sigmaR _ T_, T_(tag w) := @snd I [eta T_].
 Definition Tagged x := @existR I [eta T_] i x.
 
-Definition tag2 (w : @sigT2 I T_ U_) := let: existT2 _ _ _ i _ _ := w in i.
+Definition tag2 (w : @sigmaR2 I T_ U_) := let: existT2 _ _ _ i _ _ := w in i.
 Definition tagged2 w : T_(tag2 w) := let: existT2 _ _ _ _ x _ := w in x.
 Definition tagged2' w : U_(tag2 w) := let: existT2 _ _ _ _ _ y := w in y.
 Definition Tagged2 x y := @existT2 I [eta T_] [eta U_] i x y.
@@ -557,7 +557,7 @@ Arguments Tagged [I i].
 Arguments Tagged2 [I i].
 Prenex Implicits tag tagged Tagged tag2 tagged2 tagged2' Tagged2.
 
-Coercion tag_of_tag2 I T_ U_ (w : @sigT2 I T_ U_) :=
+Coercion tag_of_tag2 I T_ U_ (w : @sigmaR2 I T_ U_) :=
   Tagged (fun i => T_ i * U_ i)%type (tagged2 w, tagged2' w).
 
 Lemma all_tag I T U :
@@ -714,7 +714,7 @@ Lemma esymK T x y : cancel (@esym T x y) (@esym T y x).
 Proof. by case: y /. Qed.
 *)
 
-Lemma etrans_id T x y (eqxy : x = y :> T : Prop) : etrans (@erefl _ x) eqxy = eqxy.
+Lemma etrans_id T x y (eqxy : x = y :> T : Prop) : transitivity _ (reflexivity x) eqxy = eqxy.
 Proof. by case: y / eqxy. Qed.
 
 Section InjectionsTheory.
@@ -746,7 +746,10 @@ Lemma ocan_comp [fo : B -> option A] [ho : C -> option B]
 Proof.
 move=> fK hK c /=; rewrite -[RHS]hK/=. case hcE : (ho c) => [b|]//=.
 by rewrite -[b in RHS]fK; case: (fo b) => //=; have := hK c; rewrite hcE.
-Fail Qed.
+Set Printing All.
+(* Qed. *)
+(* FIXME! something forces an eq@{Type Type} while an eq@{Type Prop} is expected (or the contrary...) *)
+Admitted.
 
 Lemma eq_inj : injective f -> f =1 g -> injective g.
 Proof. by move=> injf eqfg x y; rewrite -2!eqfg; apply: injf. Qed.

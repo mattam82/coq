@@ -57,13 +57,15 @@ End Leibniz.
 
 Notation congr := ap.
 
-Register eq_sym as core.eq.sym.
-Register eq_trans as core.eq.trans.
-
 (* Aliases *)
 
 Definition _eq_sym {A} {x y : A} (e : x = y) : y = x :=
     leibniz _ _ _ (fun y => y = x) (refl _ _) _ e.
+
+Register _eq_sym as core.eq.sym.
+
+Definition ind_eq_trans@{l} := @eq_trans@{Type Prop|l 0} (@eq) _.
+Register ind_eq_trans as core.eq.trans.
 
 Notation sym_eq := _eq_sym (only parsing).
 Notation trans_eq := eq_trans (only parsing).

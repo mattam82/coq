@@ -68,6 +68,5 @@ Declare Scope bool_scope.
 Delimit Scope bool_scope with bool.
 Bind Scope bool_scope with bool.
 
-
 Infix "||" := orb : bool_scope.
 Infix "&&" := andb : bool_scope.

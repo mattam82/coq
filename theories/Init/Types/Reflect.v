@@ -8,19 +8,21 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Import PreludeOptions.
-Require Import Notations.
+From Corelib Require Import PreludeOptions.
+From Corelib Require Import Notations.
+From Corelib Require Import Types.Bool.
+From Corelib Require Import Types.Empty.
 
-Inductive sum@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) : Type@{s''|max(u,v)} :=
-  | left : A -> sum A B
-  | right : B -> sum A B.
+(************************************************)
+(** * Reflect: a specialized inductive type for
+    relating propositions and booleans
+************************************************)
 
-Register sum as core.sum.type.
+Inductive reflect@{s sb se|l|} (P : 𝒰@{s|l}) : bool@{sb|} -> Type@{se |l} :=
+ | ReflectT : P -> reflect P true
+ | ReflectF : ~ P -> reflect P false.
 
-Arguments left {A B} _, [A] B _.
-Arguments right {A B} _ , A [B] _.
-
-Hint Resolve left right : core.
-Notation "A + B" := (sum A B).
-Notation "{ A } + { B }" := (sum@{Prop Prop Type|_ _} A B) (only parsing).
-Notation "A \/ B" := (sum@{Prop Prop Prop|_ _} A B).
+#[global]
+Hint Constructors reflect : bool.
+Arguments ReflectT : clear implicits.
+Arguments ReflectF : clear implicits.

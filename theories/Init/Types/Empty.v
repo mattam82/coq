@@ -21,6 +21,8 @@ Notation SFalse := empty@{SProp|}.
 
 Definition not@{s|u|} (A : Type@{s|u}) := forall (_ : A), empty@{s|}.
 
+Hint Unfold not : core.
+
 Definition False_rect@{s|u|} (P : False -> Type@{s|u}) u : P u := match u with end.
 
 Notation "~ x" := (not x).

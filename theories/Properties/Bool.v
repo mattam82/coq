@@ -83,15 +83,15 @@ Hint Constructors eq_true : eq_true.
 
 Register eq_true as core.eq_true.type.
 
-(** Another way of interpreting booleans as propositions *)
+
+(** Interpreting booleans as propositions *)
 
 Definition is_true b := b = true.
 
 Definition is_true_poly@{s| |} (b : bool@{s|}) := b ≡ true.
 
 (** [is_true] can be activated as a coercion by
-   ([Local]) [Coercion is_true : bool >-> Sortclass].
-*)
+   ([Local]) [Coercion is_true : bool >-> Sortclass]. *)
 
 (** Additional rewriting lemmas about [eq_true] *)
 

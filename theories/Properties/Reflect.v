@@ -8,19 +8,9 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-Require Import PreludeOptions.
-Require Import Notations.
-
-Inductive sum@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) : Type@{s''|max(u,v)} :=
-  | left : A -> sum A B
-  | right : B -> sum A B.
-
-Register sum as core.sum.type.
-
-Arguments left {A B} _, [A] B _.
-Arguments right {A B} _ , A [B] _.
-
-Hint Resolve left right : core.
-Notation "A + B" := (sum A B).
-Notation "{ A } + { B }" := (sum@{Prop Prop Type|_ _} A B) (only parsing).
-Notation "A \/ B" := (sum@{Prop Prop Prop|_ _} A B).
+(** Properties of the reflect predicate *)
+Goal forall b (r : reflect True b), b = true.
+Proof.
+  intros b r. destruct r; try reflexivity.
+  contradiction.
+Qed.

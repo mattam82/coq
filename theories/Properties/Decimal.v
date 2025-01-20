@@ -9,14 +9,13 @@
 (************************************************************************)
 
 (** * Decimal number properties *)
-
 From Corelib.Init.Types Require Import Decimal.
 From Corelib.Init.Types Require Import Sum.
 From Corelib.Properties Require Import Bool.
 From Corelib Require Import Init.Types.Unit.
 
 Scheme Equality for uint.
-Scheme Equality for int.
+Scheme Equality for signed_int.
 Scheme Equality for decimal.
 Notation int_eq_dec := signed_int_eq_dec.
 Notation int_beq := signed_int_beq.

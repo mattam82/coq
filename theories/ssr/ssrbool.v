@@ -12,7 +12,8 @@
 
 (** #<style> .doc { font-family: monospace; white-space: pre; } </style># **)
 
-Require Import ssreflect ssrfun.
+From Corelib Require Import Properties.Bool.
+From Corelib Require Import ssreflect ssrfun.
 
 (**
  A theory of boolean predicates and operators. A large part of this file is
@@ -299,9 +300,9 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Notation reflect := Datatypes.reflect.
-Notation ReflectT := Datatypes.ReflectT.
-Notation ReflectF := Datatypes.ReflectF.
+Notation reflect := Reflect.reflect.
+Notation ReflectT := Reflect.ReflectT.
+Notation ReflectF := Reflect.ReflectF.
 
 Reserved Notation "~~ b" (at level 35, right associativity).
 Reserved Notation "b ==> c" (at level 55, right associativity).
@@ -477,7 +478,7 @@ Notation "b ==> c" := (implb b c) : bool_scope.
 Notation "b1 (+) b2" := (addb b1 b2) : bool_scope.
 
 (**  Constant is_true b := b = true is defined in Init.Datatypes.  **)
-Coercion is_true : bool >-> Sortclass. (* Prop *)
+Coercion Properties.Bool.is_true : bool >-> Sortclass. (* Prop *)
 
 Lemma prop_congr : forall b b' : bool, b = b' -> b = b' :> Prop.
 Proof. by move=> b b' ->. Qed.
@@ -585,6 +586,8 @@ Proof. by case: b => // /(_ isT). Qed.
  to use ssr's boolean if rather than Rocq's "generic" if.             **)
 
 Coercion isSome T (u : option T) := if u is Some _ then true else false.
+
+
 
 Coercion is_inl A B (u : A + B) := if u is inl _ then true else false.
 
