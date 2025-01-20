@@ -587,15 +587,14 @@ Proof. by case: b => // /(_ isT). Qed.
 
 Coercion isSome T (u : option T) := if u is Some _ then true else false.
 
+Coercion is_left A B (u : A + B) := if u is left _ then true else false.
 
+#[deprecated(since = "Rocq 9.0", note="Use is_left")]
+Notation is_inl := is_left (only parsing).
+#[deprecated(since = "Rocq 9.0", note="Use is_left")]
+Notation is_inleft := is_left (only parsing).
 
-Coercion is_inl A B (u : A + B) := if u is inl _ then true else false.
-
-Coercion is_left A B (u : {A} + {B}) := if u is left _ then true else false.
-
-Coercion is_inleft A B (u : A + {B}) := if u is inleft _ then true else false.
-
-Prenex Implicits  isSome is_inl is_left is_inleft.
+Prenex Implicits isSome is_left.
 
 Definition decidable P := {P} + {~ P}.
 
@@ -619,8 +618,11 @@ Variant if_spec (not_b : Prop) : bool -> A -> Set :=
   | IfSpecTrue  of      b : if_spec not_b true vT
   | IfSpecFalse of  not_b : if_spec not_b false vF.
 
+Hint Unfold is_true : core.
+
 Lemma ifP : if_spec (b = false) b (if b then vT else vF).
-Proof. by case def_b: b; constructor. Qed.
+(* FIXME *)
+Proof. case def_b: b; constructor. apply symmetry in def_b. destruct def_b. reflexivity. done. Qed.
 
 Lemma ifPn : if_spec (~~ b) b (if b then vT else vF).
 Proof. by case def_b: b; constructor; rewrite ?def_b. Qed.
