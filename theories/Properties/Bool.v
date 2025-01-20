@@ -40,7 +40,6 @@ match e as e0 in (@eq _ _ a0) return (P a0 e0) with
 end.
 *)
 
-Set Debug "backtrace".
 Lemma inj_type@{s| |} : eq@{Type Prop| _} true false -> empty@{s|}.
 Proof.
   intros.
@@ -123,3 +122,72 @@ Hint Constructors BoolSpec : core.
 Register BoolSpec as core.BoolSpec.type.
 Register BoolSpecT as core.BoolSpec.BoolSpecT.
 Register BoolSpecF as core.BoolSpec.BoolSpecF.
+
+(** Reciprocally, from a decidability, we could state a
+    [reflect] as soon as we have a [bool_of_sumbool]. *)
+
+(** For instance, we could state the correctness of [Bool.eqb] via [reflect]: *)
+
+Lemma eqb_spec (b b' : bool) : reflect (b = b') (Bool.eqb b b').
+Proof.
+ destruct b, b'; constructor; eauto; discriminate.
+Qed.
+
+(************************)
+(** * Order on booleans *)
+(************************)
+
+#[ local ] Definition le (b1 b2:bool) :=
+  match b1 with
+    | true => b2 = true
+    | false => True
+  end.
+#[global]
+Hint Unfold le: bool.
+
+Lemma le_implb : forall b1 b2, le b1 b2 <-> implb b1 b2 = true.
+Proof.
+  destruct b1, b2; now intuition.
+Qed.
+
+#[ local ] Definition lt (b1 b2:bool) :=
+  match b1 with
+    | true => False
+    | false => b2 = true
+  end.
+#[global]
+Hint Unfold lt: bool.
+
+#[ local ] Definition compare (b1 b2 : bool) :=
+  match b1, b2 with
+   | false, true => Lt
+   | true, false => Gt
+   | _, _ => Eq
+  end.
+
+Inductive CompareSpec@{s|u|} (Peq Plt Pgt : Prop) :
+comparison -> Type@{s|u} :=
+| CompEq : Peq -> CompareSpec Peq Plt Pgt Eq
+| CompLt : Plt -> CompareSpec Peq Plt Pgt Lt
+| CompGt : Pgt -> CompareSpec Peq Plt Pgt Gt.
+#[export]
+Hint Constructors CompareSpec : core.
+
+Register CompareSpec as core.CompareSpec.type.
+Register CompEq as core.CompareSpec.CompEq.
+Register CompLt as core.CompareSpec.CompLt.
+Register CompGt as core.CompareSpec.CompGt.
+
+Lemma compare_spec : forall b1 b2,
+  CompareSpec (b1 = b2) (lt b1 b2) (lt b2 b1) (compare b1 b2).
+Proof. destruct b1, b2; auto. all:constructor; cbn; eauto. Qed.
+
+
+
+(** Notations *)
+Module BoolNotations.
+Infix "<=" := le : bool_scope.
+Infix "<" := lt : bool_scope.
+Infix "?=" := compare (at level 70) : bool_scope.
+Infix "=?" := eqb (at level 70) : bool_scope.
+End BoolNotations.

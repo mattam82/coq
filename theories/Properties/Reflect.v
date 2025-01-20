@@ -14,3 +14,26 @@ Proof.
   intros b r. destruct r; try reflexivity.
   contradiction.
 Qed.
+
+(** Relation with iff : *)
+
+Lemma reflect_iff : forall P b, reflect P b -> (P<->b=true).
+Proof.
+ destruct 1; intuition; discriminate.
+Qed.
+
+Lemma iff_reflect : forall P b, (P<->b=true) -> reflect P b.
+Proof.
+ destruct b; econstructor; intuition. discriminate H.
+Defined.
+
+(** It would be nice to join [reflect_iff] and [iff_reflect]
+    in a unique [iff] statement, but this isn't allowed since
+    [iff] is in Prop. *)
+
+(** Reflect implies decidability of the proposition *)
+
+Lemma reflect_dec : forall P b, reflect P b -> {P}+{~P}.
+Proof.
+ destruct 1; auto.
+Defined.

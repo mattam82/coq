@@ -33,7 +33,7 @@ Local Notation "0" := O.
 Definition eq_S@{s e| |} := f_equal@{s s e|0 0} S.
 Definition f_equal_nat@{s s' e| |} := f_equal@{s s' e| 0 0} (A:=nat).
 
-#[global]
+#[export]
 Hint Resolve f_equal_nat: core.
 
 (** The predecessor function *)
@@ -50,14 +50,14 @@ Qed.
 (** Injectivity of successor *)
 
 Definition eq_add_S n m (H: S n = S m): n = m := f_equal pred H.
-#[global]
+#[export]
 Hint Immediate eq_add_S: core.
 
 Theorem not_eq_S : forall n m:nat, n <> m -> S n <> S m.
 Proof.
   red; auto.
 Qed.
-#[global]
+#[export]
 Hint Resolve not_eq_S: core.
 
 Definition IsSucc (n:nat) : Prop :=
@@ -72,24 +72,23 @@ Theorem O_S : forall n:nat, 0 <> S n.
 Proof.
   discriminate.
 Qed.
-#[global]
+#[export]
 Hint Resolve O_S: core.
 
 Theorem n_Sn : forall n:nat, n <> S n.
 Proof.
   intro n; induction n; auto.
 Qed.
-#[global]
+#[export]
 Hint Resolve n_Sn: core.
 
 (** Addition *)
 
 Notation plus := Nat.add (only parsing).
-Infix "+" := Nat.add : nat_scope.
 
 Definition f_equal2_plus := f_equal2 plus.
 Definition f_equal2_nat := f_equal2 (A1:=nat) (A2:=nat).
-#[global]
+#[export]
 Hint Resolve f_equal2_nat: core.
 
 Lemma plus_n_O : forall n:nat, n = n + 0.
@@ -97,9 +96,9 @@ Proof.
   intro n; induction n; simpl; auto.
 Qed.
 
-#[global]
+#[export]
 Remove Hints eq_refl : core.
-#[global]
+#[export]
 Hint Resolve plus_n_O eq_refl: core.  (* We want eq_refl to have higher priority than plus_n_O *)
 
 Lemma plus_O_n : forall n:nat, 0 + n = n.
@@ -111,7 +110,7 @@ Lemma plus_n_Sm : forall n m:nat, S (n + m) = n + S m.
 Proof.
   intros n m; induction n; simpl; auto.
 Qed.
-#[global]
+#[export]
 Hint Resolve plus_n_Sm: core.
 
 Lemma plus_Sn_m : forall n m:nat, S n + m = S (n + m).
@@ -130,14 +129,14 @@ Notation mult := Nat.mul (only parsing).
 Infix "*" := Nat.mul : nat_scope.
 
 Definition f_equal2_mult := f_equal2 mult.
-#[global]
+#[export]
 Hint Resolve f_equal2_mult: core.
 
 Lemma mult_n_O : forall n:nat, 0 = n * 0.
 Proof.
   intro n; induction n; simpl; auto.
 Qed.
-#[global]
+#[export]
 Hint Resolve mult_n_O: core.
 
 Lemma mult_n_Sm : forall n m:nat, n * m + n = n * S m.
@@ -146,7 +145,8 @@ Proof.
   rewrite <- H, <- plus_n_Sm. f_equal.
   pattern m at 1 3; elim m; simpl; auto.
 Qed.
-#[global]
+
+#[export]
 Hint Resolve mult_n_Sm: core.
 
 (** Standard associated names *)
@@ -170,24 +170,24 @@ where "n <= m" := (le n m) : nat_scope.
 
 Register le_n as num.nat.le_n.
 
-#[global]
+#[export]
 Hint Constructors le: core.
 (*i equivalent to : "Hints Resolve le_n le_S : core." i*)
 
 Definition lt (n m:nat) := S n <= m.
-#[global]
+#[export]
 Hint Unfold lt: core.
 
 Infix "<" := lt : nat_scope.
 
 Definition ge (n m:nat) := m <= n.
-#[global]
+#[export]
 Hint Unfold ge: core.
 
 Infix ">=" := ge : nat_scope.
 
 Definition gt (n m:nat) := m < n.
-#[global]
+#[export]
 Hint Unfold gt: core.
 
 Infix ">" := gt : nat_scope.

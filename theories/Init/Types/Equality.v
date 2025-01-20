@@ -141,7 +141,6 @@ Register eq_ind as core.eq.ind.
 Register eq_rect as core.eq.rect.
 Register eq_elim as core.eq.rect.
 
-
 Section ap.
   Sort sa se sb se'.
   Universe la le lb le'.
@@ -162,3 +161,24 @@ Section ap.
 End ap.
 
 Register ap as core.eq.congr.
+
+Section apd.
+  Sort sa sb se se'.
+  Universe la le lb le'.
+  Context {eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}}
+          {_refl: Has_refl@{sa se|la le} eq}
+          {A : Type@{sa|la}}
+          {eq' : forall A : Type@{lb+1}, A -> A -> Type@{se'|le'}}
+          {_refl': Has_refl@{Type se'|lb+1 le'} eq'}
+          {_J: Has_J@{sa se se'|la le le'} eq _refl}.
+
+  #[warnings="-notation-overridden"]
+  Local Notation "x = y" := (eq _ x y) : type_scope.
+  #[warnings="-notation-overridden"]
+  Local Notation "x <> y" := (~ (eq _ x y)) : type_scope.
+
+  Definition apd {a} (P : forall b : A, a = b -> Type@{sb | lb})
+    (b : A) (e : a = b) : eq' _ (P a (refl A a)) (P b e) :=
+    J _ a (fun b e => eq' _ (P a (refl _ _)) (P b e)) (refl _ _) b e.
+
+End apd.

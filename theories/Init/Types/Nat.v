@@ -11,6 +11,8 @@
 Require Import PreludeOptions.
 Require Import Notations.
 
+Declare Scope nat_scope.
+
 Section NatSortPoly.
   Sort s.
 
@@ -21,8 +23,9 @@ Section NatSortPoly.
   Fixpoint plus (a b : nat) : nat :=
     match a with
       | O => b
-      | S n => S (plus n b)
-    end.
+      | S n => S (n + b)
+    end
+  where "n + m" := (plus n m) : nat_scope.
 
   Definition pred (a : nat) : nat :=
     match a with
@@ -31,6 +34,14 @@ Section NatSortPoly.
     end.
 
 End NatSortPoly.
+
+Notation "n + m" := (plus n m) : nat_scope.
+Declare Scope hex_nat_scope.
+Delimit Scope hex_nat_scope with xnat.
+Delimit Scope nat_scope with nat.
+Bind Scope nat_scope with nat.
+
+Arguments S _%_nat.
 
 Definition nat_rect@{s | u|} : forall P : nat@{Type|} -> Type@{s | u},
   P O -> (forall n : nat@{Type|}, P n -> P (S n)) -> forall n : nat@{Type|}, P n :=
@@ -42,14 +53,6 @@ Definition nat_rect@{s | u|} : forall P : nat@{Type|} -> Type@{s | u},
   end.
 
 Definition nat_ind := nat_rect@{Prop|0}.
-
-Declare Scope hex_nat_scope.
-Delimit Scope hex_nat_scope with xnat.
-
-Declare Scope nat_scope.
-Delimit Scope nat_scope with nat.
-Bind Scope nat_scope with nat.
-Arguments S _%_nat.
 
 Register nat as num.nat.type.
 Register O as num.nat.O.

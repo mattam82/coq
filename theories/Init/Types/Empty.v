@@ -16,6 +16,9 @@ Require Import Typeclasses.
 Inductive empty@{s| |} : Type@{s|0} :=.
 (** listings: end **)
 
+Definition empty_rect@{α | u | } : forall (P : empty@{Type|} -> Type@{α | u }) (e : empty), P e
+    := fun P e => match e with end.
+
 Notation False := empty@{Prop|}.
 Notation SFalse := empty@{SProp|}.
 
@@ -29,6 +32,10 @@ Notation "~ x" := (not x).
 
 Register not as core.not.type.
 Register empty as core.False.type.
+
+#[export]
+Hint Unfold not: core.
+
 
 #[projections(primitive=no)]
 Class ExFalso@{s s'| l|} (empty : Type@{s|0}) : Type := { ex_falso : forall (P : empty -> Type@{s'|l}) u, P u }.

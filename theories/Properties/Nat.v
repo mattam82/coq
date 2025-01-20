@@ -43,13 +43,7 @@ Definition pred n :=
 
 Register pred as num.nat.pred.
 
-Fixpoint add n m :=
-  match n with
-  | 0 => m
-  | S p => S (p + m)
-  end
-
-where "n + m" := (add n m) : nat_scope.
+Definition add := plus.
 
 Register add as num.nat.add.
 
