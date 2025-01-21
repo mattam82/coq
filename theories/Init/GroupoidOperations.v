@@ -55,6 +55,10 @@ Section Leibniz.
   Global Program Instance eq_equivalence : Equivalence (eq A) | 10.
 End Leibniz.
 
+Tactic Notation "symmetry_eq" := symmetry; try typeclasses eauto.
+Tactic Notation "transitivity_eq" := transitivity; try typeclasses eauto.
+Tactic Notation "transitivity_eq" constr(t) := transitivity t; try typeclasses eauto.
+
 Notation congr := ap.
 
 (* Aliases *)

@@ -12,8 +12,8 @@
 
 (** #<style> .doc { font-family: monospace; white-space: pre; } </style># **)
 
-From Corelib Require Import Properties.Bool.
-From Corelib Require Import ssreflect ssrfun.
+Require Import ssreflect ssrfun.
+From Corelib.Properties Require Import Bool.
 
 (**
  A theory of boolean predicates and operators. A large part of this file is
@@ -625,7 +625,7 @@ Lemma ifP : if_spec (b = false) b (if b then vT else vF).
 Proof. case def_b: b; constructor. apply symmetry in def_b. destruct def_b. reflexivity. done. Qed.
 
 Lemma ifPn : if_spec (~~ b) b (if b then vT else vF).
-Proof. by case def_b: b; constructor; rewrite ?def_b. Qed.
+Proof. by case def_b: b; constructor; rewrite ?def_b. Fail Qed.
 
 Lemma ifT : b -> (if b then vT else vF) = vT. Proof. by move->. Qed.
 Lemma ifF : b = false -> (if b then vT else vF) = vF. Proof. by move->. Qed.

@@ -59,4 +59,5 @@ End Basic_Test.
 
 Lemma test {A:Type} (a b : A) (P : A -> Type) : a ~ b -> P a -> P b.
 Proof.
-  intros e Pa. setoid_rewrite <- e.
+  intros e Pa. setoid_rewrite <- e. auto.
+Defined.
