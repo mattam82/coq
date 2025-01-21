@@ -154,7 +154,7 @@ Symbol omega : nat.
 Rewrite Rule omega_rew := match omega with S n => ?P | 0 => _ end => ?P@{n := omega}.
 Theorem omega_spec : S omega = omega.
 Proof.
-  symmetry; try typeclasses eauto.
+  symmetry_eq.
   change omega with (Nat.pred omega) at 2.
   remember omega as omeg eqn:e.
   destruct omeg. 2: reflexivity.
@@ -224,8 +224,8 @@ Proof. reflexivity. Defined.
 
 Lemma ministry_of_truth : true = false.
 Proof.
-  transitivity (Devil true); try typeclasses eauto.
-  - symmetry; try typeclasses eauto; exact Devil_true.
+  transitivity_eq (Devil true).
+  - symmetry_eq; exact Devil_true.
   - apply Devil_false.
 Defined.
 
