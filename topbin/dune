@@ -19,6 +19,11 @@
  (package rocq-runtime)
  (files (rocq.bc as rocq.byte)))
 
+(install
+ (section bin)
+ (package rocq-runtime)
+ (files coq_environment.txt))
+
 (executable
  (name coqtop_bin)
  (public_name coqtop)
