@@ -596,7 +596,6 @@ let rwprocess_rule env dir rule =
         loop d sigma EConstr.(mkApp (r, [|x|])) (EConstr.Vars.subst1 x at) rs 0
       | App (pr, a) when is_const_ref env sigma pr prod_type ->
         let r0 = Reductionops.clos_whd_flags RedFlags.all env sigma r in
-        debug_ssr (fun () -> Pp.(str"decompose="++pr_econstr_pat env sigma r0));
         let sigma, pL, pR = match EConstr.kind sigma r0 with
         | App (c, ra) when is_const_ref env sigma c prod_intro ->
           (sigma, ra.(2), ra.(3))
@@ -606,8 +605,6 @@ let rwprocess_rule env dir rule =
           let sigma, pi2 = Evd.fresh_global env sigma prod_proj2 in
           let pL = EConstr.mkApp (pi1, ra) in
           let pR = EConstr.mkApp (pi2, ra) in
-          debug_ssr (fun () -> Pp.(str"decompose2="++pr_econstr_pat env sigma pL));
-          debug_ssr (fun () -> Pp.(str"decompose3="++pr_econstr_pat env sigma pR));
           (sigma, pL, pR)
         in
         if EConstr.is_lib_ref env sigma "core.True.type" a.(0) then

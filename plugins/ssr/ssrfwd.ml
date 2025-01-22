@@ -117,7 +117,7 @@ let basecuttac k c =
     match Typing.sort_of env sigma c with
     | exception e when CErrors.noncritical e ->
       let _, info = Exninfo.capture e in
-      Tacticals.tclZEROMSG ~info (str "Not a proposition or a type.")
+      Tacticals.tclZEROMSG ~info (str "Not a universe.")
     | sigma, sc ->
       let r = ESorts.relevance_of_sort sc in
       let needs_typing, sigma, f, glf =

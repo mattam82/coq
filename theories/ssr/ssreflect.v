@@ -187,10 +187,10 @@ Delimit Scope form_scope with FORM.
 Open Scope form_scope.
 
 (**  Constants for abstract: and #[#: name #]# intro pattern  **)
-Definition abstract_lock := unit.
-Definition abstract_key := tt.
+Definition abstract_lock := unit@{Type|}.
+Definition abstract_key : abstract_lock := tt.
 
-Definition abstract (statement : Type) (id : nat) (lock : abstract_lock) :=
+Definition abstract@{s|l|} (statement : Type@{s|l}) (id : nat) (lock : abstract_lock) :=
   let: tt := lock in statement.
 
 Declare Scope ssr_scope.
