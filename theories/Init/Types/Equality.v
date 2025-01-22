@@ -94,17 +94,17 @@ Definition eq_singleton@{s s' | u v|} [A:Type@{s|u}] [x:A]
   P x (eq_refl x) -> forall [a : A] (e : x = a :> A), P a e :=
   fun t _ e => match e with eq_refl => t end.
 
-Instance eq_Has_J_Singleton@{s sp|l lp|} : Has_J@{s Prop sp|l 0 lp} (@eq) _ := @eq_singleton@{s sp|l lp}.
+Instance eq_Has_J_Singleton@{s sp|l lp} : Has_J@{s Prop sp|l 0 lp} (@eq) _ := @eq_singleton@{s sp|l lp}.
 
-Instance eq_Has_Leibniz_Singleton@{s sp|l lp|} : Has_Leibniz@{s Prop sp|l 0 lp} (@eq) :=
+Instance eq_Has_Leibniz_Singleton@{s sp|l lp} : Has_Leibniz@{s Prop sp|l 0 lp} (@eq) :=
   fun A x P => @eq_singleton@{s sp|l lp} A x (fun y _ => P y).
 
-Definition eq_rect@{u v|} [A:Type@{u}] [x:A]
+Definition eq_rect@{u v} [A:Type@{u}] [x:A]
   (P : forall a : A, Type@{v}) :
   P x -> forall [a : A] (e : x = a), P a := @eq_singleton A x (fun a _ => P a).
 (* this one generates additional universes  J@{Type Prop Type | _ 0 v} A x (fun a _ => P a) *)
 
-Definition eq_rec@{u|} [A:Type@{u}] [x:A]
+Definition eq_rec@{u} [A:Type@{u}] [x:A]
   (P : forall a : A, Set) :
   P x -> forall [a : A] (e : x = a), P a := @eq_singleton A x (fun a _ => P a).
 
