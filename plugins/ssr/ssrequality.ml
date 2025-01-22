@@ -379,22 +379,21 @@ let id_map_redex _ sigma ~before:_ ~after = sigma, after
     ⊢ c : c_ty
     ⊢ c_ty ≡ EQN rdx_ty rdx new_rdx
 *)
-let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_rdx dir (sigma, c) c_ty (eq, eqq) =
+let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty carrier_quality new_rdx dir (sigma, c) c_ty eq equality_quality =
   let open Tacmach in
   let open Tacticals in
   Proofview.Goal.enter begin fun gl ->
 (*   ppdebug(lazy(str"sigma@pirrel_rewrite=" ++ pr_evar_map None sigma)); *)
   let env = pf_env gl in
-  let rdxq = Retyping.get_sort_of env sigma rdx_ty in
   let beta = Reductionops.clos_norm_flags RedFlags.beta env sigma in
   let sigma, new_rdx = map_redex env sigma ~before:rdx ~after:new_rdx in
   let sigma, elim =
     let sort = Tacticals.sort_of_goal gl in
     let (eqT,_) = EConstr.decompose_app_list sigma eq in
     let elim =
-      Equality.eq_eliminator env sigma eqT (dir = L2R)
-      ~carrier_quality:(EConstr.ESorts.quality sigma rdxq)
-      ~equality_quality:eqq
+      Equality.eq_eliminator env sigma eq (dir = L2R)
+      ~carrier_quality
+      ~equality_quality
       ~predicate_quality:(EConstr.ESorts.quality sigma sort)
     in match elim with
     | Some (sigma, elim) ->
@@ -420,6 +419,7 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_
     try
       let open EConstr in
       let elimT = Retyping.get_type_of env sigma elim in
+      let elimT = Reductionops.whd_all env sigma elimT in
       let (idA, tA, elimT) = destProd sigma elimT in
       let (_, _, elimT) = destProd sigma elimT in
       let (idP, tP, _) = destProd sigma elimT in
@@ -502,7 +502,9 @@ let rwcltac ?under ?map_redex cl rdx dir (sigma, r) q =
       | AtomicType(e, a) when Ssrcommon.is_ind_ref env sigma e c_eq ->
           let new_rdx = if dir = L2R then a.(2) else a.(1) in
           let () = debug_ssr (fun () -> Pp.(str"pirrel_rewrite")) in
-          pirrel_rewrite ?under ?map_redex cl rdx a.(0) new_rdx dir (sigma, r) c_ty q, Tacticals.tclIDTAC, sigma0
+          let eq_quality = EConstr.ESorts.quality sigma (Retyping.get_sort_of env sigma c_ty) in
+          let carrier_quality = EConstr.ESorts.quality sigma (Retyping.get_sort_of env sigma a.(0)) in
+          pirrel_rewrite ?under ?map_redex cl rdx a.(0) carrier_quality new_rdx dir (sigma, r) c_ty e eq_quality, Tacticals.tclIDTAC, sigma0
       | _ ->
           let () = debug_ssr (fun () -> Pp.(str"convert_concl")) in
           let cl' = EConstr.mkApp (EConstr.mkNamedLambda sigma (make_annot pattern_id rdxtr) rdxt cl, [|rdx|]) in
@@ -682,7 +684,7 @@ let rwrxtac ?under ?map_redex occ rdx_pat dir rule =
       let rpat pats (d, r, lhs, rhs, q) =
         let r = Reductionops.nf_evar r_sigma r in
         let lhs = Reductionops.nf_evar r_sigma lhs in
-        mk_tpattern ~ok:(rw_progress rhs) ~rigid env0 r d lhs pats
+        mk_tpattern ~ok:(rw_progress rhs) ~up_q:q ~rigid env0 r d lhs pats
       in
       let rpats = List.fold_left rpat (empty_tpatterns r_sigma) rules in
       let find_R, end_R = mk_tpattern_matcher sigma0 occ ~upats_origin rpats in
@@ -692,7 +694,7 @@ let rwrxtac ?under ?map_redex occ rdx_pat dir rule =
       let r = ref None in
       (fun env c _ h -> do_once r (fun () -> find_rule c, c); EConstr.mkRel h),
       (fun concl -> closed0_check env0 sigma0 concl e;
-        let (d,(ev,ctx,c), q) , x = assert_done r in (q, d,(true, ev,ctx, Reductionops.nf_evar ev c)) , x) in
+        let (d,(ev,ctx,c), q) , x = assert_done r in (Some q, d,(true, ev,ctx, Reductionops.nf_evar ev c)) , x) in
   let concl0 = Reductionops.nf_evar sigma0 concl0 in
   let concl = eval_pattern env0 sigma0 concl0 rdx_pat occ find_R in
   let (q, d, (_, sigma, uc, t)), rdx = conclude concl in

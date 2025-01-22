@@ -587,7 +587,7 @@ Proof. by case: b => // /(_ isT). Qed.
 
 Coercion isSome T (u : option T) := if u is Some _ then true else false.
 
-Coercion is_left A B (u : A + B) := if u is left _ then true else false.
+Coercion is_left@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) (u : A + B) := if u is left _ then true@{s''|} else false@{s''}.
 
 #[deprecated(since = "Rocq 9.0", note="Use is_left")]
 Notation is_inl := is_left (only parsing).
@@ -623,21 +623,8 @@ Hint Unfold is_true : core.
 Lemma ifP : if_spec (b = false) b (if b then vT else vF).
 Proof. by case def_b: b; constructor. Qed.
 
-Axiom debug@{s|u|} : forall {A : Type@{s|u}}, A.
-Set Printing All.
-Set Printing Universes.
-About eq_singleton_r.
-Set Debug "ssreflect".
-Set Debug "ustate".
 Lemma ifPn : if_spec (~~ b) b (if b then vT else vF).
-Proof.
-  case def_b: b; constructor. rewrite ?def_b. apply debug. apply debug. Qed.
-  Show Universes.
- rewrite ?def_b.
- Set Printing Depth 1000.
- Show Proof.
-  Show Universes. apply debug. apply debug. Qed. Show Proof.  Qed.
-
+Proof. by case def_b: b; constructor; rewrite ?def_b. Qed.
 Lemma ifT : b -> (if b then vT else vF) = vT. Proof. by move->. Qed.
 Lemma ifF : b = false -> (if b then vT else vF) = vF. Proof. by move->. Qed.
 Lemma ifN : ~~ b -> (if b then vT else vF) = vF. Proof. by move/negbTE->. Qed.
@@ -781,8 +768,7 @@ Hint View for apply// equivPif|3 xorPif|3 equivPifn|3 xorPifn|3.
 (**  Allow the direct application of a reflection lemma to a boolean assertion.  **)
 Coercion elimT : reflect >-> Funclass.
 
-#[universes(template)]
-Variant implies P Q := Implies of P -> Q.
+Variant implies@{s s'|l l'|} (P : Type@{s|l}) (Q : Type@{s'|l'}) : Type@{s'|max(l,l')} := Implies of P -> Q.
 Lemma impliesP P Q : implies P Q -> P -> Q. Proof. by case. Qed.
 Lemma impliesPn (P Q : Prop) : implies P Q -> ~ Q -> ~ P.
 Proof. by case=> iP ? /iP. Qed.
@@ -791,15 +777,15 @@ Hint View for move/ impliesPn|2 impliesP|2.
 Hint View for apply/ impliesPn|2 impliesP|2.
 
 (**  Impredicative or, which can emulate a classical not-implies.  **)
-Definition unless condition property : Prop :=
+Definition unless@{s|l|} (condition property : Type@{s|l}) : Prop :=
  forall goal : Prop, (condition -> goal) -> (property -> goal) -> goal.
 
 Notation "\unless C , P" := (unless C P) : type_scope.
 
-Lemma unlessL C P : implies C (\unless C, P).
+Lemma unlessL@{s|l|} (C P : Type@{s|l}) : implies C (\unless C, P).
 Proof. by split=> hC G /(_ hC). Qed.
 
-Lemma unlessR C P : implies P (\unless C, P).
+Lemma unlessR@{s|l|} (C P : Type@{s|l}) : implies P (\unless C, P).
 Proof. by split=> hP G _ /(_ hP). Qed.
 
 Lemma unless_sym C P : implies (\unless C, P) (\unless P, C).

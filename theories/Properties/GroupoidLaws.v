@@ -43,7 +43,7 @@ Instance Proper_eq@{sa se sp|la le lp|} {eq} (A:Type@{sa|la})
   `{Has_refl@{sa se|la le} eq}
    (P:A -> Type@{sp|lp}) : Proper (eq A ++> flip arrow@{sp sp | lp lp}) P.
 Proof.
-compute. intros. eapply leibniz; eauto. eapply eq_sym; eauto.
+compute. intros. eapply leibniz; eauto. eapply _eq_sym; eauto.
 Defined.
 
 Definition eq_elim_r@{sa se sp|la le lp|} {eq} (A:Type@{sa|la})

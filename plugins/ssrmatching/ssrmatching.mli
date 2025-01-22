@@ -139,6 +139,7 @@ val empty_tpatterns : Evd.evar_map -> tpatterns
   @raise UserEerror is the pattern is a wildcard *)
 val mk_tpattern :
   ?p_origin:ssrdir * EConstr.t ->
+  ?up_q:EConstr.t * Sorts.Quality.t ->
   ?ok:(EConstr.t -> evar_map -> bool) ->
   rigid:(Evar.t -> bool) ->
   env ->
@@ -165,7 +166,7 @@ type find_P =
   @raise UserEerror if too many occurrences were specified *)
 
 type conclude =
-  unit -> EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * (EConstr.t * Sorts.Quality.t)
+  unit -> EConstr.t * ssrdir * (bool * evar_map * UState.t * EConstr.t) * (EConstr.t * Sorts.Quality.t) option
 
 (** [mk_tpattern_matcher b o sigma0 occ sigma_tplist] creates a pair
     a function [find_P] and [conclude] with the behaviour explained above.

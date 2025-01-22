@@ -314,7 +314,7 @@ type tpattern = {
   up_t : EConstr.t;                      (* equation proof term or matched term *)
   up_dir : ssrdir;                    (* direction of the rule *)
   up_ok : EConstr.t -> evar_map -> bool; (* progress test for rewrite *)
-  up_q : Sorts.Quality.t ;               (* Sort of the equality when the pattern corresponds to the lhs of a rewrite *)
+  up_q : (EConstr.t * Sorts.Quality.t) option ;               (* Sort of the equality when the pattern corresponds to the lhs of a rewrite *)
   }
 
 type tpatterns = {
@@ -385,7 +385,7 @@ let evars_for_FO ~hack ~rigid env (ise0:evar_map) c0 =
 
 (* Compile a match pattern from a term; t is the term to fill. *)
 (* p_origin can be passed to obtain a better error message     *)
-let mk_tpattern ?p_origin ?(hack=false) ?(ok = all_ok)  ?(up_q=Sorts.Quality.qprop) ~rigid env t dir p { tpat_sigma = ise; tpat_pats = pats } =
+let mk_tpattern ?p_origin ?(hack=false) ?up_q ?(ok = all_ok) ~rigid env t dir p { tpat_sigma = ise; tpat_pats = pats } =
   let open EConstr in
   let k, f, a =
     let f, a = Reductionops.whd_betaiota_stack env ise p in
@@ -662,7 +662,7 @@ type find_P =
   k:subst ->
      EConstr.t
 type conclude = unit ->
-  EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * (EConstr.t * Sorts.Quality.t)
+  EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * (EConstr.t * Sorts.Quality.t) option
 
 let rec uniquize = function
   | [] -> []
@@ -832,7 +832,7 @@ let conclude_tpattern ~raise_NoMatch ~upat_that_matched ~upats_origin ~upats { m
     | Some (env,_,x) -> env,List.hd x | None when raise_NoMatch -> raise NoMatch
     | None -> CErrors.anomaly (str"companion function never called.") in
   let p' = EConstr.mkApp (pf, pa) in
-  if max_occ <= !nocc then p', u.up_dir, (c, sigma, uc, u.up_t), (Retyping.get_type_of env sigma u.up_t, u.up_q)
+  if max_occ <= !nocc then p', u.up_dir, (c, sigma, uc, u.up_t), u.up_q
   else ssrfail env sigma upats_origin upats (SsrOccMissing (!nocc, max_occ, p'))
 
 (* upats_origin makes a better error message only            *)
@@ -1320,8 +1320,8 @@ let fill_rel_occ_pattern env sigma cl pat occ =
   sigma, e, cl
 
 (* clenup interface for external use *)
-let mk_tpattern ?p_origin ?ok ~rigid env sigma_t dir c =
-  mk_tpattern ?p_origin ?ok ~rigid env sigma_t dir c
+let mk_tpattern ?p_origin ?up_q ?ok ~rigid env sigma_t dir c =
+  mk_tpattern ?p_origin ?up_q ?ok ~rigid env sigma_t dir c
 
 let eval_pattern ?raise_NoMatch env0 sigma0 concl0 pattern occ do_subst =
   fst (eval_pattern ?raise_NoMatch env0 sigma0 concl0 pattern occ do_subst)
