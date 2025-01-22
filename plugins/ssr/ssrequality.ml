@@ -389,7 +389,6 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty carr
   let sigma, new_rdx = map_redex env sigma ~before:rdx ~after:new_rdx in
   let sigma, elim =
     let sort = Tacticals.sort_of_goal gl in
-    let (eqT,_) = EConstr.decompose_app_list sigma eq in
     let elim =
       Equality.eq_eliminator env sigma eq (dir = L2R)
       ~carrier_quality
