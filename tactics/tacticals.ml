@@ -578,6 +578,11 @@ let onAllHypsAndConcl tac =
     tclMAP tac (fullGoal gl)
     end
 
+let sort_of_goal gl =
+  (* Retyping will expand evars anyway. *)
+  let c = Proofview.Goal.concl gl in
+  pf_apply Retyping.get_sort_of gl c
+
 let elimination_sort_of_goal gl =
   (* Retyping will expand evars anyway. *)
   let c = Proofview.Goal.concl gl in

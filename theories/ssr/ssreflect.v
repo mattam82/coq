@@ -331,7 +331,7 @@ Variant phant (p : Type) : Prop := Phant.
 
 (**  Internal tagging used by the implementation of the ssreflect elim.  **)
 
-Definition protect_term (A : Type) (x : A) : A := x.
+Definition protect_term@{s|l|} (A : Type@{s | l}) (x : A) : A := x.
 
 Register protect_term as plugins.ssreflect.protect_term.
 

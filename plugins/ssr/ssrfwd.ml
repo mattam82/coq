@@ -70,7 +70,8 @@ let ssrsettac id ((_, (pat, pty)), (_, occ)) =
   let c, (sigma, cty) =  match EConstr.kind sigma c with
   | Cast(t, DEFAULTcast, ty) -> t, (sigma, ty)
   | _ -> c, Typing.type_of env sigma c in
-  let cl' = EConstr.mkLetIn (make_annot (Name id) ERelevance.relevant, c, cty, cl) in
+  let r = Retyping.relevance_of_type env sigma cty in
+  let cl' = EConstr.mkLetIn (make_annot (Name id) r, c, cty, cl) in
   Proofview.Unsafe.tclEVARS sigma <*>
   convert_concl ~check:true cl' <*>
   introid id
@@ -301,10 +302,12 @@ let havetac ist
        itac_c <*> simpltac <*> tacopen_skols <*> unfold [abstract; abstract_key]
    | _,true,true  ->
      let sigma, _, ty, _ = pf_interp_ty ~resolve_typeclasses:fixtc env sigma ist cty in
-     sigma, EConstr.mkArrow ty ERelevance.relevant concl, hint <*> itac, clr
+     let r = Retyping.relevance_of_type env sigma ty in
+     sigma, EConstr.mkArrow ty r concl, hint <*> itac, clr
    | _,false,true ->
      let sigma, _, ty, _ = pf_interp_ty ~resolve_typeclasses:fixtc env sigma ist cty in
-     sigma, EConstr.mkArrow ty ERelevance.relevant concl, hint, itac_c
+     let r = Retyping.relevance_of_type env sigma ty in
+     sigma, EConstr.mkArrow ty r concl, hint, itac_c
    | _, false, false ->
      let sigma, n, cty, _  = pf_interp_ty ~resolve_typeclasses:fixtc env sigma ist cty in
      sigma, cty, (binderstac n) <*> hint, Tacticals.tclTHEN itac_c simpltac

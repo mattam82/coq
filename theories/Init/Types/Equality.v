@@ -31,9 +31,13 @@ Register Has_J as rocq.core.Has_J.
 Class Has_Leibniz@{sa se sp|la le lp|} (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}) :=
   leibniz : forall (A : Type@{sa | la}) (x : A) (P : A -> Type@{sp | lp}), P x -> forall y, eq A x y -> P y.
 
+Class Has_Leibniz_r@{sa se sp|la le lp|} (eq : forall A : Type@{sa | la}, A -> A -> Type@{se|le}) :=
+  leibniz_r : forall (A : Type@{sa | la}) (x : A) (P : A -> Type@{sp | lp}), P x -> forall y, eq A y x -> P y.
+
 Arguments leibniz _ {_}.
 
 Register Has_Leibniz as rocq.core.Has_Leibniz.
+Register Has_Leibniz_r as rocq.core.Has_Leibniz_r.
 
 Definition J_no_dep@{s s' sp|l l' lp|} {eq} {refl} (eqr : Has_J@{s s' sp|l l' lp} eq refl) :
   forall (A : Type@{s | l}) (x : A) (P : A -> Type@{sp | lp}), P x -> forall y (e : eq A x y), P y :=
@@ -83,6 +87,12 @@ Instance eq_Has_J_elim@{s se|l l'|} : Has_J@{s se se|l l l'} (@eq) _ := @eq_elim
 Instance eq_Has_Leibniz_elim@{s se|l l'|} : Has_Leibniz@{s se se|l l l'} (@eq) :=
   fun A x P => @eq_elim@{s se|l l'} A x (fun y _ => P y).
 
+Definition eq_sym@{sa se|l| } {A : Type@{sa|l}} {x y : A} : @eq@{sa se|l} A x y -> @eq@{sa se|l} A y x :=
+  fun e => match e with eq_refl => eq_refl end.
+
+Instance eq_Has_Leibniz_r_elim@{s se|l l'|} : Has_Leibniz_r@{s se se|l l l'} (@eq) :=
+  fun A x P p y e => @eq_elim@{s se|l l'} A x (fun y _ => P y) p y (eq_sym e).
+
 Definition eq_ind@{s | u|} [A] [x] P := @eq_elim@{s Prop|u Set} A x (fun a _ => P a).
 
 Definition eq_singleton@{s s' | u v|} [A:Type@{s|u}] [x:A]
@@ -94,6 +104,9 @@ Instance eq_Has_J_Singleton@{s sp|l lp|} : Has_J@{s Prop sp|l 0 lp} (@eq) _ := @
 
 Instance eq_Has_Leibniz_Singleton@{s sp|l lp|} : Has_Leibniz@{s Prop sp|l 0 lp} (@eq) :=
   fun A x P => @eq_singleton@{s sp|l lp} A x (fun y _ => P y).
+
+Instance eq_Has_Leibniz_r_Singleton@{s sp|l lp|} : Has_Leibniz_r@{s Prop sp|l 0 lp} (@eq) :=
+  fun A x P p y e => @eq_singleton@{s sp|l lp} A x (fun y _ => P y) p y (eq_sym e).
 
 Definition eq_rect@{u v|} [A:Type@{u}] [x:A]
   (P : forall a : A, Type@{v}) :

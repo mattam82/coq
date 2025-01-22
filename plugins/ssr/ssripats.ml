@@ -394,13 +394,14 @@ let tclMK_ABSTRACT_VAR id = Goal.enter begin fun gl ->
       let abstract_ty = EConstr.mkApp(abstract, [|ty; abstract_id; lock|]) in
       let sigma, m = Evarutil.new_evar env sigma abstract_ty in
       sigma, (m, abstract_ty) in
+    let r = Retyping.relevance_of_type env sigma abstract_ty in
     let sigma, kont =
-      let rd = Context.Rel.Declaration.LocalAssum (make_annot (Name id) EConstr.ERelevance.relevant, abstract_ty) in
+      let rd = Context.Rel.Declaration.LocalAssum (make_annot (Name id) r, abstract_ty) in
       let sigma, ev = Evarutil.new_evar (EConstr.push_rel rd env) sigma concl in
       sigma, ev
     in
     let term =
-      EConstr.(mkApp (mkLambda(make_annot (Name id) ERelevance.relevant,abstract_ty,kont),[|abstract_proof|])) in
+      EConstr.(mkApp (mkLambda(make_annot (Name id) r,abstract_ty,kont),[|abstract_proof|])) in
     let sigma, _ = Typing.type_of env sigma term in
     sigma, term
   end in
@@ -673,8 +674,6 @@ let elim_intro_tac ipats ?seed what eqid ssrelim is_rec clr =
        end in
        let rec gen_eq_tac () = Goal.enter begin fun g ->
          let sigma, env, concl = Goal.(sigma g, env g, concl g) in
-         let sigma, eq =
-           EConstr.fresh_global env sigma (Rocqlib.lib_ref "core.eq.type") in
          let ctx, last = EConstr.decompose_prod_decls sigma concl in
          let open EConstr in
          let args = match kind_of_type sigma last with
@@ -689,12 +688,18 @@ let elim_intro_tac ipats ?seed what eqid ssrelim is_rec clr =
          else
            Ssrcommon.tacTYPEOF case >>= fun case_ty ->
            let open EConstr in
+           let case_rel = Retyping.relevance_of_type env sigma case_ty in
+           let sigma, eq = EConstr.fresh_global env sigma
+            (Rocqlib.lib_ref "core.eq.type") in
            let refl =
              mkApp (eq, [|Vars.lift 1 case_ty; mkRel 1; Vars.lift 1 case|]) in
            let name = Ssrcommon.mk_anon_id "K" (Tacmach.pf_ids_of_hyps g) in
-
+           let reld =
+            Rel.Declaration.LocalAssum (make_annot (Name name) case_rel, case_ty) in
+           let refl_rel =
+             Retyping.relevance_of_type (EConstr.push_rel reld env) sigma refl in
            let new_concl =
-             mkProd (make_annot (Name name) ERelevance.relevant, case_ty, mkArrow refl ERelevance.relevant (Vars.lift 2 concl)) in
+             mkProd_or_LetIn reld (mkArrow refl refl_rel (Vars.lift 2 concl)) in
            let erefl, sigma = mkCoqRefl case_ty case env sigma in
            Proofview.Unsafe.tclEVARS sigma <*>
            Tactics.apply_type ~typecheck:true new_concl [case;erefl]
@@ -717,8 +722,10 @@ let mkEq dir cl c t n env sigma =
   let eqargs = [|t; c; c|] in
   eqargs.(Ssrequality.dir_org dir) <- mkRel n;
   let eq, sigma = mkCoqEq env sigma in
+  let eqapp = mkApp (eq, eqargs) in
+  let eqappr = Retyping.relevance_of_type env sigma eqapp in
   let refl, sigma = mkCoqRefl t c env sigma in
-  mkArrow (mkApp (eq, eqargs)) ERelevance.relevant (Vars.lift 1 cl), refl, sigma
+  mkArrow eqapp eqappr (Vars.lift 1 cl), refl, sigma
 
 (** in [tac/v: last gens..] the first (last to be run) generalization is
     "special" in that is it also the main argument of [tac] and is eventually
@@ -762,7 +769,8 @@ let tclLAST_GEN ~to_ind ((oclr, occ), t) conclusion = tclINDEPENDENTL begin
       Unsafe.tclEVARS sigma <*>
       Ssrcommon.tacTYPEOF p >>= fun pty ->
       (* TODO: check bug: cl0 no lift? *)
-      let ccl = EConstr.mkProd (make_annot (Ssrcommon.constr_name sigma c) EConstr.ERelevance.relevant, pty, cl0) in
+      let ptyr = Retyping.relevance_of_type env sigma pty in
+      let ccl = EConstr.mkProd (make_annot (Ssrcommon.constr_name sigma c) ptyr, pty, cl0) in
       tclUNIT (false, ccl, p, clr)
   else
     Ssrcommon.errorstrm Pp.(str "generalized term didn't match")

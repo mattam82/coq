@@ -158,6 +158,7 @@ val onClause   : (Id.t option -> unit tactic) -> clause -> unit tactic
 val onAllHyps           : (Id.t -> unit tactic) -> unit tactic
 val onAllHypsAndConcl   : (Id.t option -> unit tactic) -> unit tactic
 
+val sort_of_goal : Proofview.Goal.t -> ESorts.t
 val elimination_sort_of_goal : Proofview.Goal.t -> Sorts.family
 val elimination_sort_of_hyp  : Id.t -> Proofview.Goal.t -> Sorts.family
 val elimination_sort_of_clause : Id.t option -> Proofview.Goal.t -> Sorts.family

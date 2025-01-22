@@ -201,8 +201,10 @@ let find_eliminator env sigma ~concl ~is_case ?elim oc c_gen =
     let sigma, c_ty = Typing.type_of env sigma c in
     let ((kn, i),_ as indu), unfolded_c_ty =
       Tacred.reduce_to_quantified_ind env sigma c_ty in
+    debug_ssr Pp.(fun () -> str "concl=" ++ pr_econstr_env env sigma concl);
     let sort = Retyping.get_sort_of env sigma concl in
     let sigma, elim, elimty =
+      debug_ssr Pp.(fun () -> str "sort=" ++ pr_econstr_env env sigma (EConstr.mkSort sort));
       if not is_case then
         let sigma, elim = Evd.fresh_global env sigma
             (Indrec.lookup_eliminator env (kn,i) (EConstr.ESorts.family sigma sort))
@@ -369,7 +371,8 @@ let generate_pred env sigma0 ~concl patterns predty eqid is_rec deps elim_args n
       let sigma, eq = get_eq_type env sigma in
       let sigma, gen_eq_tac, eq_ty =
         let refl = EConstr.mkApp (eq, [|t; c; c|]) in
-        let new_concl = EConstr.mkArrow refl EConstr.ERelevance.relevant (EConstr.Vars.lift 1 concl0) in
+        let reflr = Retyping.relevance_of_type env sigma refl in
+        let new_concl = EConstr.mkArrow refl reflr (EConstr.Vars.lift 1 concl0) in
         let new_concl = fire_subst sigma new_concl in
         let sigma, erefl = mkRefl env sigma t c in
         let erefl = fire_subst sigma erefl in
@@ -397,7 +400,12 @@ let generate_pred env sigma0 ~concl patterns predty eqid is_rec deps elim_args n
       in
       let rel = k + if c_is_head_p then 1 else 0 in
       let sigma, src = mkProt env sigma eq_ty EConstr.(mkApp (eq,[|t; c; mkRel rel|])) in
-      let concl = EConstr.mkArrow src EConstr.ERelevance.relevant (EConstr.Vars.lift 1 concl) in
+      let relvar = let ind, us = EConstr.destInd sigma eq in
+        let qs = fst @@ UVars.Instance.to_array (EConstr.EInstance.kind sigma us) in
+        if Array.length qs = 2 then Sorts.relevance_of_quality qs.(1) else Sorts.Relevant
+      in
+      let concl = EConstr.mkArrow src (EConstr.ERelevance.make relvar) (EConstr.Vars.lift 1 concl) in
+      debug_ssr Pp.(fun () -> str"concl: " ++ Printer.pr_econstr_env env sigma concl);
       let clr = if deps <> [] then clr else [] in
       sigma, concl, gen_eq_tac, clr
   | _ -> sigma, concl, Tacticals.tclIDTAC, clr in
@@ -475,6 +483,8 @@ let ssrelim ?(is_case=false) deps what ?elim eqid elim_intro_tac =
   let sigma, c_is_head_p = get_head_pattern env sigma elim_is_dep elim_args n_elim_args inf_deps_r cty in
   debug_ssr (fun () -> Pp.(str"c_is_head_p= " ++ bool c_is_head_p));
   let sigma, predty = Typing.type_of env sigma pred in
+  debug_ssr (fun () -> Pp.(str"pred= " ++ pr_econstr_env env sigma pred));
+  debug_ssr (fun () -> Pp.(str"pred_ty= " ++ pr_econstr_env env sigma predty));
   (* Patterns for the inductive types indexes to be bound in pred are computed
    * looking at the ones provided by the user and the inferred ones looking at
    * the type of the elimination principle *)
@@ -489,7 +499,9 @@ let ssrelim ?(is_case=false) deps what ?elim eqid elim_intro_tac =
     generate_pred env sigma0 ~concl patterns predty eqid is_rec deps elim_args n_elim_args c_is_head_p clr sigma
   in
   let sigma, pty = Typing.type_of env sigma elim_pred in
-  let sigma = List.fold_left (fun sigma (_, arg, argty) -> Typing.check env sigma arg argty) sigma elim_args in
+  let sigma = List.fold_left (fun sigma (_, arg, argty) ->
+    debug_ssr (fun () -> Pp.(str"checking arg=" ++ pr_econstr_env env sigma arg ++ str"has type " ++ pr_econstr_env env sigma argty));
+    Typing.check env sigma arg argty) sigma elim_args in
   debug_ssr (fun () -> Pp.(str"elim_pred=" ++ pr_econstr_env env sigma elim_pred));
   debug_ssr (fun () -> Pp.(str"elim_pred_ty=" ++ pr_econstr_env env sigma pty));
   let sigma = unify_HO env sigma pred elim_pred in
@@ -530,7 +542,8 @@ let revtoptac n0 =
   let n = nb_prod sigma concl - n0 in
   let dc, cl = EConstr.decompose_prod_n_decls sigma n concl in
   let ty = EConstr.it_mkProd_or_LetIn cl (List.rev dc) in
-  let dc' = dc @ [Context.Rel.Declaration.LocalAssum(make_annot (Name rev_id) EConstr.ERelevance.relevant, ty)] in
+  let r = Retyping.relevance_of_type env sigma ty in
+  let dc' = dc @ [Context.Rel.Declaration.LocalAssum(make_annot (Name rev_id) r, ty)] in
   Refine.refine ~typecheck:true begin fun sigma ->
     let f = EConstr.it_mkLambda_or_LetIn (mkEtaApp (EConstr.mkRel (n + 1)) (-n) 1) dc' in
     let sigma, ev = Evarutil.new_evar env sigma ty in
@@ -582,19 +595,25 @@ let perform_injection c =
   let sigma = Proofview.Goal.sigma gl in
   let sigma, cty = Typing.type_of env sigma c in
   let mind, t = Tacred.reduce_to_quantified_ind env sigma cty in
-  let dc, eqt = EConstr.decompose_prod sigma t in
+  let dc, eqt = EConstr.decompose_prod_decls sigma t in
+  let envdc = EConstr.push_rel_context dc env in
+  let eqtr =
+    Retyping.relevance_of_type envdc sigma eqt
+  in
   if dc = [] then injectl2rtac sigma c else
   if not (EConstr.Vars.closed0 sigma eqt) then
     CErrors.user_err (Pp.str "can't decompose a quantified equality") else
   let cl = Proofview.Goal.concl gl in
   let n = List.length dc in
   let c_eq = mkEtaApp c n 2 in
-  let cl1 = EConstr.mkLambda EConstr.(make_annot Anonymous ERelevance.relevant, mkArrow eqt ERelevance.relevant cl, mkApp (mkRel 1, [|c_eq|])) in
+  let dom = EConstr.mkArrow eqt eqtr cl in
+  let domr = Retyping.relevance_of_type envdc sigma dom in
+  let cl1 = EConstr.mkLambda EConstr.(make_annot Anonymous domr, dom, mkApp (mkRel 1, [|c_eq|])) in
   let id = injecteq_id in
   let id_with_ebind = (EConstr.mkVar id, NoBindings) in
   let injtac = Tacticals.tclTHEN (introid id) (injectidl2rtac id id_with_ebind) in
   Proofview.Unsafe.tclEVARS sigma <*>
-  Tacticals.tclTHENLAST (Tactics.apply (EConstr.it_mkLambda cl1 dc)) injtac
+  Tacticals.tclTHENLAST (Tactics.apply (EConstr.it_mkLambda_or_LetIn cl1 dc)) injtac
   end
 
 let ssrscase_or_inj_tac c =

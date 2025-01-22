@@ -113,9 +113,10 @@ Definition eq_singleton_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}
     | eq_refl => fun py => py
     end px.
 
-Definition eq_ind_r@{α|u|} := eq_singleton_r@{α Prop | u Set}.
-
 Register eq_singleton_r as core.eq.ind_r.
+
+Definition eq_ind_r@{α|u|} := eq_singleton_r@{α Prop | u 0}.
+
 
 Definition eq_elim_d@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, eq@{_ β |_} x y -> P y :=

@@ -1009,47 +1009,50 @@ let list_init n (x : 'a t) : 'a list t =
       return (x :: r)
 in aux n
 
-let lookup_eq_eliminator env sigma (ind, u) ~dep ~from_kind ~carrier_kind ~to_kind =
+let lookup_eq_eliminator env eq ~dep ~l2r ~equality_quality ~carrier_quality ~predicate_quality =
   let has_J_ref = Rocqlib.lib_ref "rocq.core.Has_J" in
   let has_refl_ref = Rocqlib.lib_ref "rocq.core.Has_refl" in
-  let has_Leibniz_ref = Rocqlib.lib_ref "rocq.core.Has_Leibniz" in
-  let prog =
-    let* query =
-      let* univs = list_init 3 new_univ in
-      let qs = [ carrier_kind; from_kind; to_kind ] in
-      let names = UVars.Instance.of_array (Array.of_list qs, Array.of_list univs) in
-      let f = if dep then has_J_ref else has_Leibniz_ref in
-      let* has_J_class = fun sigma -> Evd.fresh_global ~names env sigma f in
-      if dep then
-        let has_refl_names = UVars.Instance.of_array (Array.of_list (List.firstn 2 qs), Array.of_list (List.firstn 2 univs)) in
-        let* has_refl_class = fun sigma -> Evd.fresh_global ~names:has_refl_names env sigma has_refl_ref in
-        let* has_refl = new_evar ~typeclass_candidate:true env (EConstr.mkApp (has_refl_class, [| mkIndU (ind, u) |])) in
-        let app = EConstr.mkApp (has_J_class, [| mkIndU (ind, u); has_refl |]) in
-        let* _ty = fun sigma -> Typing.type_of env sigma app in
-        return app
-      else let app = EConstr.mkApp (has_J_class, [| mkIndU (ind, u) |]) in
-      let* _ty = fun sigma -> Typing.type_of env sigma app in
-      return app
-    in
-    let* instance = fun sigma ->
-      try Class_tactics.resolve_one_typeclass env sigma query
-      with Not_found -> user_err Pp.(str"Eliminator not found for equality in sort: " ++ Sorts.Quality.raw_pr from_kind ++
-        str" carrier quality: " ++ Sorts.Quality.raw_pr carrier_kind ++
-        str" target quality: " ++ Sorts.Quality.raw_pr to_kind)
-    in
-    return instance
-  in
-  let sigma, instance = prog sigma in
-  Proofview.Unsafe.tclEVARS sigma >>= fun () ->
-  Proofview.tclUNIT instance
+  let has_Leibniz_ref =
+    if l2r then Rocqlib.lib_ref "rocq.core.Has_Leibniz_r"
+    else Rocqlib.lib_ref "rocq.core.Has_Leibniz" in
+  let* univs = list_init 3 new_univ in
+  let qs = [ carrier_quality; equality_quality; predicate_quality ] in
+  let names = UVars.Instance.of_array (Array.of_list qs, Array.of_list univs) in
+  let f = if dep then has_J_ref else has_Leibniz_ref in
+  let* has_J_class = fun sigma -> Evd.fresh_global ~names env sigma f in
+  if dep then
+    let has_refl_names = UVars.Instance.of_array (Array.of_list (List.firstn 2 qs), Array.of_list (List.firstn 2 univs)) in
+    let* has_refl_class = fun sigma -> Evd.fresh_global ~names:has_refl_names env sigma has_refl_ref in
+    let* has_refl = new_evar ~typeclass_candidate:true env (EConstr.mkApp (has_refl_class, [| eq |])) in
+    let app = EConstr.mkApp (has_J_class, [| eq; has_refl |]) in
+    let* _ty = fun sigma -> Typing.type_of env sigma app in
+    return app
+  else let app = EConstr.mkApp (has_J_class, [| eq |]) in
+  let* _ty = fun sigma -> Typing.type_of env sigma app in
+  return app
 
-let discrimination_pf env e (lbeq,u,s,(t,t1,t2)) discriminator to_kind =
+let lookup_eq_eliminator_tac env sigma (ind, u) ~dep ~equality_quality ~carrier_quality ~predicate_quality =
+  let sigma, query = lookup_eq_eliminator env (EConstr.mkIndU (ind, u)) ~l2r:false ~dep ~equality_quality ~carrier_quality ~predicate_quality sigma in
+  let sigma, instance =
+    try Class_tactics.resolve_one_typeclass env sigma query
+    with Not_found -> user_err Pp.(str"Eliminator not found for equality in sort: " ++ Sorts.Quality.raw_pr equality_quality ++
+      str" carrier quality: " ++ Sorts.Quality.raw_pr carrier_quality ++
+      str" target quality: " ++ Sorts.Quality.raw_pr predicate_quality)
+  in
+  Proofview.Unsafe.tclEVARS sigma >>= fun () -> Proofview.tclUNIT instance
+
+let eq_eliminator env sigma eq l2r ~carrier_quality ~equality_quality ~predicate_quality =
+  let sigma, query = lookup_eq_eliminator env eq ~dep:false ~l2r ~carrier_quality ~equality_quality ~predicate_quality sigma in
+  try Some (Class_tactics.resolve_one_typeclass env sigma query)
+  with Not_found -> None
+
+let discrimination_pf env e (lbeq,u,s,(t,t1,t2)) discriminator predicate_quality =
   build_rocq_I () >>= fun i ->
   Proofview.tclEVARMAP >>= fun sigma ->
-  lookup_eq_eliminator env sigma (destIndRef lbeq.eq, u) ~dep:false
-    ~from_kind:(ESorts.quality sigma s)
-    ~carrier_kind:(ESorts.quality sigma (Retyping.get_sort_of env sigma t))
-    ~to_kind >>= fun eq_elim ->
+  lookup_eq_eliminator_tac env sigma (destIndRef lbeq.eq, u) ~dep:false
+    ~equality_quality:(ESorts.quality sigma s)
+    ~carrier_quality:(ESorts.quality sigma (Retyping.get_sort_of env sigma t))
+    ~predicate_quality >>= fun eq_elim ->
     Proofview.tclEVARMAP >>= fun sigma ->
     let term =
       (applist (eq_elim, [t;t1;mkNamedLambda sigma (make_annot e ERelevance.relevant) t discriminator;i;t2]))

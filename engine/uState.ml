@@ -188,6 +188,7 @@ let undefined m =
   QMap.domain mq
 
 let collapse_above_prop ~to_prop m =
+  debug Pp.(fun () -> str"UState.collapse_above_prop");
   let map q v = match v with
     | None ->
       if not @@ QSet.mem q m.above then None else
@@ -198,6 +199,7 @@ let collapse_above_prop ~to_prop m =
   { m with qmap = QMap.mapi map m.qmap; above = QSet.empty }
 
 let collapse m =
+  debug Pp.(fun () -> str"UState.collapse");
   let map q v = match v with
   | None -> if QSet.mem q m.named || QSet.mem q m.global then None else Some (QConstant QType)
   | Some _ -> v

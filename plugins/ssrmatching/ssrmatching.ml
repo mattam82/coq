@@ -662,7 +662,7 @@ type find_P =
   k:subst ->
      EConstr.t
 type conclude = unit ->
-  EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * Sorts.Quality.t
+  EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * (EConstr.t * Sorts.Quality.t)
 
 let rec uniquize = function
   | [] -> []
@@ -832,7 +832,7 @@ let conclude_tpattern ~raise_NoMatch ~upat_that_matched ~upats_origin ~upats { m
     | Some (env,_,x) -> env,List.hd x | None when raise_NoMatch -> raise NoMatch
     | None -> CErrors.anomaly (str"companion function never called.") in
   let p' = EConstr.mkApp (pf, pa) in
-  if max_occ <= !nocc then p', u.up_dir, (c, sigma, uc, u.up_t), u.up_q
+  if max_occ <= !nocc then p', u.up_dir, (c, sigma, uc, u.up_t), (Retyping.get_type_of env sigma u.up_t, u.up_q)
   else ssrfail env sigma upats_origin upats (SsrOccMissing (!nocc, max_occ, p'))
 
 (* upats_origin makes a better error message only            *)

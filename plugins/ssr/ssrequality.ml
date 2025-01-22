@@ -28,8 +28,6 @@ open Ssrprinters
 open Ssrcommon
 open Proofview.Notations
 
-module ERelevance = EConstr.ERelevance
-
 let ssroldreworder = Summary.ref ~name:"SSR:oldreworder" false
 let () =
   Goptions.(declare_bool_option
@@ -165,10 +163,11 @@ let newssrcongrtac arg ist =
   (fun () ->
     try
     let sigma, t_lhs = Evarutil.new_Type sigma in
+    let lhsr = EConstr.ESorts.relevance_of_sort @@ EConstr.destSort sigma t_lhs in
     let sigma, t_rhs = Evarutil.new_Type sigma in
     let sigma, lhs = mk_evar env sigma t_lhs in
     let sigma, rhs = mk_evar env sigma t_rhs in
-    let arrow = EConstr.mkArrow lhs ERelevance.relevant (EConstr.Vars.lift 1 rhs) in
+    let arrow = EConstr.mkArrow lhs lhsr (EConstr.Vars.lift 1 rhs) in
     tclMATCH_GOAL env sigma arrow
     (fun sigma ->
       let lr = [|fs sigma lhs;fs sigma rhs|] in
@@ -380,18 +379,26 @@ let id_map_redex _ sigma ~before:_ ~after = sigma, after
     ⊢ c : c_ty
     ⊢ c_ty ≡ EQN rdx_ty rdx new_rdx
 *)
-let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_rdx dir (sigma, c) c_ty q =
+let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_rdx dir (sigma, c) c_ty (eq, eqq) =
   let open Tacmach in
   let open Tacticals in
   Proofview.Goal.enter begin fun gl ->
 (*   ppdebug(lazy(str"sigma@pirrel_rewrite=" ++ pr_evar_map None sigma)); *)
   let env = pf_env gl in
+  let rdxq = Retyping.get_sort_of env sigma rdx_ty in
   let beta = Reductionops.clos_norm_flags RedFlags.beta env sigma in
   let sigma, new_rdx = map_redex env sigma ~before:rdx ~after:new_rdx in
   let sigma, elim =
-    let _sort = Tacticals.elimination_sort_of_goal gl in
-    match Equality.eq_elimination_ref (dir = L2R) q with
-    | Some r -> Evd.fresh_global env sigma r
+    let sort = Tacticals.sort_of_goal gl in
+    let elim =
+      Equality.eq_eliminator env sigma eq (dir = L2R)
+      ~carrier_quality:(EConstr.ESorts.quality sigma rdxq)
+      ~equality_quality:eqq
+      ~predicate_quality:(EConstr.ESorts.quality sigma sort)
+    in match elim with
+    | Some (sigma, elim) ->
+      debug_ssr Pp.(fun () -> str"elim=" ++ pr_econstr_env env sigma elim);
+      sigma, elim
     | None ->
       let ((kn, i) as ind, _) = Tacred.eval_to_quantified_ind env sigma c_ty in
       let sort = Tacticals.elimination_sort_of_goal gl in
@@ -415,13 +422,15 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty new_
       let (idA, tA, elimT) = destProd sigma elimT in
       let (_, _, elimT) = destProd sigma elimT in
       let (idP, tP, _) = destProd sigma elimT in
-      let sigma = Typing.check_actual_type env sigma (Retyping.get_judgment_of env sigma rdx_ty) tA in
+      let j = Retyping.get_judgment_of env sigma rdx_ty in
+      let jr = ESorts.relevance_of_sort @@ EConstr.destSort sigma j.uj_type in
+      let sigma = Typing.check_actual_type env sigma j tA in
       let tP = mkLetIn (idA, rdx_ty, tA, mkLetIn (anonR, mkProp, mkType Univ.Universe.type1, tP)) in
       (* Do not fully retype pred, we already know that the domain is well-typed.
          The way this is written makes it easier to profile which part of
          typing is takes time. *)
       let sigma, pred =
-        let id = make_annot (Name pattern_id) ERelevance.relevant in
+        let id = make_annot (Name pattern_id) jr in
         let penv = EConstr.push_rel (LocalAssum (id, rdx_ty)) env in
         let pred = Vars.subst_var sigma pattern_id pred in
         let sigma, predty = Typing.type_of penv sigma pred in
@@ -480,6 +489,7 @@ let rwcltac ?under ?map_redex cl rdx dir (sigma, r) q =
   let r_n' = abs_cterm env sigma0 n r_n in
   let r' = EConstr.Vars.subst_var sigma pattern_id r_n' in
   let sigma, rdxt = Typing.type_of env sigma rdx in
+  let rdxtr = Retyping.relevance_of_type env sigma rdxt in
   let () = debug_ssr (fun () -> Pp.(str"r@rwcltac=" ++ pr_econstr_env env sigma r)) in
   let cvtac, rwtac, sigma0 =
     if EConstr.Vars.closed0 sigma0 r' then
@@ -490,9 +500,11 @@ let rwcltac ?under ?map_redex cl rdx dir (sigma, r) q =
       match kind_of_type sigma (Reductionops.whd_all env sigma c_ty) with
       | AtomicType(e, a) when Ssrcommon.is_ind_ref env sigma e c_eq ->
           let new_rdx = if dir = L2R then a.(2) else a.(1) in
+          let () = debug_ssr (fun () -> Pp.(str"pirrel_rewrite")) in
           pirrel_rewrite ?under ?map_redex cl rdx a.(0) new_rdx dir (sigma, r) c_ty q, Tacticals.tclIDTAC, sigma0
       | _ ->
-          let cl' = EConstr.mkApp (EConstr.mkNamedLambda sigma (make_annot pattern_id ERelevance.relevant) rdxt cl, [|rdx|]) in
+          let () = debug_ssr (fun () -> Pp.(str"convert_concl")) in
+          let cl' = EConstr.mkApp (EConstr.mkNamedLambda sigma (make_annot pattern_id rdxtr) rdxt cl, [|rdx|]) in
           let sigma, _ = Typing.type_of env sigma cl' in
           let sigma0 = pf_merge_uc_of sigma sigma0 in
           convert_concl ~check:true cl', rewritetac ?under dir r', sigma0
@@ -502,8 +514,10 @@ let rwcltac ?under ?map_redex cl rdx dir (sigma, r) q =
         try EConstr.destCast sigma0 r2 with e when CErrors.noncritical e ->
         errorstrm Pp.(str "no cast from " ++ pr_econstr_pat env sigma0 r
                     ++ str " to " ++ pr_econstr_env env sigma0 r2) in
-      let cl' = EConstr.mkNamedProd sigma (make_annot rule_id ERelevance.relevant) (EConstr.it_mkProd_or_LetIn r3t dc) (EConstr.Vars.lift 1 cl) in
-      let cl'' = EConstr.mkNamedProd sigma (make_annot pattern_id ERelevance.relevant) rdxt cl' in
+      let rrule = EConstr.it_mkProd_or_LetIn r3t dc in
+      let r = Retyping.relevance_of_type env sigma0 rrule in
+      let cl' = EConstr.mkNamedProd sigma (make_annot rule_id r) rrule (EConstr.Vars.lift 1 cl) in
+      let cl'' = EConstr.mkNamedProd sigma (make_annot pattern_id rdxtr) rdxt cl' in
       let itacs = [introid pattern_id; introid rule_id] in
       let cltac = Tactics.clear [pattern_id; rule_id] in
       let rwtacs = [
@@ -527,7 +541,7 @@ let rwcltac ?under ?map_redex cl rdx dir (sigma, r) q =
       then Tacticals.tclZEROMSG Pp.(str "Rewriting impacts evars" ++ error)
       else Tacticals.tclZEROMSG Pp.(str "Dependent type error in rewrite of "
         ++ pr_econstr_env env sigma0
-          (EConstr.mkNamedLambda sigma (make_annot pattern_id ERelevance.relevant) rdxt cl)
+          (EConstr.mkNamedLambda sigma (make_annot pattern_id rdxtr) rdxt cl)
         ++ error)
     | (e, info) -> Proofview.tclZERO ~info e
     end
@@ -598,10 +612,7 @@ let rwprocess_rule env dir rule =
          loop d sigma pL a.(0) rs2 0
       | App (r_eq, a) when Hipattern.match_with_equality_type env sigma t != None ->
         let (ind, u) = EConstr.destInd sigma r_eq and rhs = Array.last a in
-        let q = 
-            let qs = fst (UVars.Instance.to_array (EConstr.EInstance.kind sigma u)) in
-            if Int.equal (Array.length qs) 2 then qs.(1) else Sorts.Quality.qtype 
-        in
+        let q = EConstr.ESorts.quality sigma (Retyping.get_sort_of env sigma t) in
         let np = Inductiveops.inductive_nparamdecls env ind in
         let indu = (ind, u) in
         let ind_ct = Inductiveops.type_of_constructors env indu in
@@ -612,7 +623,7 @@ let rwprocess_rule env dir rule =
           let lhs, rhs = if d = L2R then lhs, rhs else rhs, lhs in
 (* msgnl (str "RW: " ++ pr_rwdir d ++ str " " ++ pr_constr_pat r ++ str " : "
             ++ pr_constr_pat lhs ++ str " ~> " ++ pr_constr_pat rhs); *)
-          d, r, lhs, rhs, q
+          d, r, lhs, rhs, (r_eq, q)
 (*
           let l_i, r_i = if d = L2R then i, 1 - ndep else 1 - ndep, i in
           let lhs = a.(np - l_i) and rhs = a.(np - r_i) in
@@ -624,14 +635,14 @@ let rwprocess_rule env dir rule =
           let lhs = EConstr.Vars.substl (array_list_of_tl (Array.sub a 0 np)) lhs0 in
           let lhs, rhs = if d = R2L then lhs, rhs else rhs, lhs in
           let d' = if Array.length a = 1 then d else converse_dir d in
-          d', r, lhs, rhs, q in
+          d', r, lhs, rhs, (r_eq, q) in
         sigma, rdesc :: rs
       | App (s_eq, a) when is_setoid sigma s_eq a ->
         let np = Array.length a and i = 3 - dir_org d in
         let lhs = a.(np - i) and rhs = a.(np + i - 3) in
         let a' = Array.copy a in let _ = a'.(np - i) <- EConstr.mkVar pattern_id in
         let r' = EConstr.mkCast (r, DEFAULTcast, EConstr.mkApp (s_eq, a')) in
-        sigma, (d, r', lhs, rhs, Sorts.Quality.qprop) :: rs
+        sigma, (d, r', lhs, rhs, (s_eq, Sorts.Quality.qprop)) :: rs
       | _ ->
         if red = 0 then loop d sigma r t rs 1
         else errorstrm Pp.(str "not a rewritable relation: " ++ pr_econstr_pat env sigma t

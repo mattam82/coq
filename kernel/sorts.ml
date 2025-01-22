@@ -508,6 +508,13 @@ let relevance_subst_fn f = function
     | QVar qv' ->
       if qv' == qv then r else RelevanceVar qv'
 
+let relevance_of_quality q =
+  let open Quality in
+  match q with
+  | QConstant QSProp -> Irrelevant
+  | QConstant (QProp | QType) -> Relevant
+  | QVar qv -> RelevanceVar qv
+
 let relevance_of_sort = function
   | SProp -> Irrelevant
   | Prop | Set | Type _ -> Relevant

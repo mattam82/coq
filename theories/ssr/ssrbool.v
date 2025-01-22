@@ -621,11 +621,22 @@ Variant if_spec (not_b : Prop) : bool -> A -> Set :=
 Hint Unfold is_true : core.
 
 Lemma ifP : if_spec (b = false) b (if b then vT else vF).
-(* FIXME *)
-Proof. case def_b: b; constructor. apply symmetry in def_b. destruct def_b. reflexivity. done. Qed.
+Proof. by case def_b: b; constructor. Qed.
 
+Axiom debug@{s|u|} : forall {A : Type@{s|u}}, A.
+Set Printing All.
+Set Printing Universes.
+About eq_singleton_r.
+Set Debug "ssreflect".
+Set Debug "ustate".
 Lemma ifPn : if_spec (~~ b) b (if b then vT else vF).
-Proof. by case def_b: b; constructor; rewrite ?def_b. Fail Qed.
+Proof.
+  case def_b: b; constructor. rewrite ?def_b. apply debug. apply debug. Qed.
+  Show Universes.
+ rewrite ?def_b.
+ Set Printing Depth 1000.
+ Show Proof.
+  Show Universes. apply debug. apply debug. Qed. Show Proof.  Qed.
 
 Lemma ifT : b -> (if b then vT else vF) = vT. Proof. by move->. Qed.
 Lemma ifF : b = false -> (if b then vT else vF) = vF. Proof. by move->. Qed.

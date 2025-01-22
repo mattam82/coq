@@ -1,10 +1,12 @@
 ; Default flags for all Coq libraries.
 (env
  (dev     (flags :standard -w -9-27@60-69@70 \ -short-paths)
-          (coq (flags :standard -w +default)))
+          (coq (flags :standard -allow-rewrite-rules -w +default)))
  (release (flags :standard)
+          (coq (flags :standard -allow-rewrite-rules -w +default))
           (ocamlopt_flags :standard -O3 -unbox-closures))
  (ireport (flags :standard -w -9-27+60-70)
+          (coq (flags :standard -allow-rewrite-rules -w +default))
           (ocamlopt_flags :standard -O3 -unbox-closures -inlining-report)))
 
 ; Information about flags for release mode:
