@@ -93,6 +93,10 @@ Proof. compute. intros. eapply (leibniz eq); eauto. eapply eq_sym; eauto. Define
 
 Register eq_elim_r as core.eq.poly_r.
 
+Instance eq_Has_Leibniz_r_elim@{s se|l l'|} : Has_Leibniz_r@{s se se|l l l'} (@eq) :=
+  fun A x P p y e => eq_elim A x (fun y _ => P y) p y
+      (@eq_sym _ (eq_Has_Leibniz_elim@{s se|l l}) _ _ _ _ e).
+
 (*
   Definition eq_rect_r@{α β|u v ? | ? } (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}) :
   P x -> forall y:A, eq@{α Type|_} y x -> P y := fun px y e => eq_elim_r@{α Type β| u u v} _ _ _ px _ e.
@@ -114,6 +118,9 @@ Definition eq_singleton_r@{α β|u v|} (A:Type@{α|u}) (x:A) (P:A -> Type@{β|v}
     end px.
 
 Register eq_singleton_r as core.eq.ind_r.
+
+Instance eq_Has_Leibniz_r_Singleton@{s sp|l lp|} : Has_Leibniz_r@{s Prop sp|l 0 lp} (@eq) :=
+  eq_singleton_r@{s sp|l lp}.
 
 Definition eq_ind_r@{α|u|} := eq_singleton_r@{α Prop | u 0}.
 
