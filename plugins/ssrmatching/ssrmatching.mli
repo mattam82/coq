@@ -163,8 +163,9 @@ type find_P =
   @return the instance of the pattern, the evarmap after the pattern
     instantiation, the proof term and the ssrdit stored in the tpattern
   @raise UserEerror if too many occurrences were specified *)
+
 type conclude =
-  unit -> EConstr.t * ssrdir * (bool * evar_map * UState.t * EConstr.t) * Sorts.Quality.t
+  unit -> EConstr.t * ssrdir * (bool * Evd.evar_map * UState.t * EConstr.t) * (EConstr.t * Sorts.Quality.t)
 
 (** [mk_tpattern_matcher b o sigma0 occ sigma_tplist] creates a pair
     a function [find_P] and [conclude] with the behaviour explained above.
