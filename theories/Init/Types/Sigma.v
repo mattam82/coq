@@ -43,9 +43,9 @@ Definition π1@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ T
 
 Definition π2@{s s'|u v|} {A:Type@{s|u}} {P:A -> Type@{s'|v}} (p : sigma@{_ _ Type|_ _} A P) : P (π1 p) := match p with exist _ b => b end.
 
-Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{s Prop Prop|u Set} A P.
+Definition ex@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Prop := sigma@{s Prop Prop|u 0} A P.
 
-Notation "'ex_intro'" := (exist@{_ Prop Prop| _ Set}) (at level 50) : core_scope.
+Notation "'ex_intro'" := (exist@{_ Prop Prop| _ 0}) (at level 50) : core_scope.
 
 Register ex as core.ex.type.
 Register exist as core.ex.intro.
@@ -79,7 +79,6 @@ Notation "'exists' x .. y , p" := (ex (fun x => .. (ex (fun y => p)) ..))
    format "'[' 'exists'  '/  ' x  ..  y ,  '/  ' p ']'")
   : type_scope.
 
-
 (** Subsets and Sigma-types *)
 
 (** [(sig A P)], or more suggestively [{x:A | P x}], denotes the subset
@@ -87,9 +86,9 @@ Notation "'exists' x .. y , p" := (ex (fun x => .. (ex (fun y => p)) ..))
     Similarly [(sig2 A P Q)], or [{x:A | P x & Q x}], denotes the subset
     of elements of the type [A] which satisfy both [P] and [Q]. *)
 
-Definition sig@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Type@{s|u} := sigma@{s Prop s| u Set} A P.
+Definition sig@{s|u|} {A:Type@{s|u}} (P:A -> Prop) : Type@{s|u} := sigma@{s Prop s| u 0} A P.
  
-Definition sig_rect@{u u'} := sigma_elim@{Type SProp Type | u Set u'}.
+Definition sig_rect@{u u'} := sigma_elim@{Type SProp Type | u 0 u'}.
 
 Register sigma as core.sig.type.
 
@@ -123,6 +122,8 @@ Section Prod.
   Universe u v.
   Context {A : Type@{s|u}} {B : Type@{s|v}}.
   Definition prod := sigmaR A (fun _ => B).
+  Definition fst_nodep := @fst A (fun _ => B).
+  Definition snd_nodep := @snd A (fun _ => B).
   Definition pair (a : A) (b : B) : prod := {| fst := a ; snd := b |}.
   Definition prod_rect@{o} (P : prod -> Type@{s|o}) (h : forall a b, P (pair a b)) : forall p, P p := fun p => h p.(fst) p.(snd).
 End Prod.
@@ -136,8 +137,8 @@ Register prod as core.prod.type.
 Register pair as core.prod.intro.
 Register prod_rect as core.prod.rect.
 
-Register fst as core.prod.proj1.
-Register snd as core.prod.proj2.
+Register fst_nodep as core.prod.proj1.
+Register snd_nodep as core.prod.proj2.
 
 #[global]
 Hint Resolve pair : core.
@@ -175,7 +176,7 @@ Notation "{ x : A | P }" := (sig (A:=A) (fun x => P)) : type_scope.
 Notation "{ x & P }" := (sigT (fun x => P)) : type_scope.
 Notation "{ x : A & P }" := (@sigmaR A (fun x => P)) : type_scope.
 
-Notation "{ x : A | P & Q }" := (sigmaR2 (A:=A) (fun x => P) (fun x => Q)) :
+Notation "{ x : A | P & Q }" := (sig (A:=A) (fun x => P /\ Q)) :
   type_scope.
 Notation "{ x : A & P & Q }" := (sigmaR2 (A:=A) (fun x => P) (fun x => Q)) :
   type_scope.
@@ -185,6 +186,11 @@ Notation "{ ' pat | P }" := (sig (fun pat => P)) : type_scope.
 Notation "{ ' pat : A | P }" := (sig (A:=A) (fun pat => P)) : type_scope.
 Notation "{ ' pat & P }" := (sigT (fun pat => P)) : type_scope.
 Notation "{ ' pat : A & P }" := (@sigmaR A (fun pat => P)) : type_scope.
+
+Notation "'exists2' x , p & q" := (sigma@{_ Prop Prop| _ 0} _ (fun x => p /\ q))
+  (at level 200, x binder, right associativity,
+   format "'[' 'exists2'  '/  ' x  ,  '/  ' p & '/ ' q ']'")
+  : type_scope.
 
 Add Printing Let sigma.
 

@@ -609,10 +609,10 @@ Qed.
 Lemma all_sig2 I T P Q :
     (forall x : I, {y : T x | P x y & Q x y}) ->
   {f : forall x, T x | forall x, P x (f x) & forall x, Q x (f x)}.
-Proof. intro s. unshelve esplit; intro i.
+Proof. intro s. unshelve esplit; [|split]; intro i.
   - destruct (s i); eauto.
-  - cbn. by destruct (s i).
-  - cbn. by destruct (s i).
+  - cbn. by destruct (s i) as [? [? ?]].
+  - cbn. by destruct (s i) as [? [? ?]].
 Qed.
 (* ** old proof ** Proof. by case/all_sig=> f /all_pair[]; exists f. Qed.*)
 
