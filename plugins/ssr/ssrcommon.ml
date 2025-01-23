@@ -718,6 +718,7 @@ open Util
 (** Constructors for constr_expr *)
 let mkCProp loc = CAst.make ?loc @@ CSort Constrexpr_ops.expr_Prop_sort
 let mkCType loc = CAst.make ?loc @@ CSort (Constrexpr_ops.expr_Type_sort UState.univ_flexible)
+let mkCUniv loc = CAst.make ?loc @@ CSort (Some (Constrexpr.CQAnon loc), UAnonymous {rigid = UState.univ_flexible})
 let mkCVar ?loc id = CAst.make ?loc @@ CRef (qualid_of_ident ?loc id, None)
 let rec mkCHoles ?loc n =
   if n <= 0 then [] else (CAst.make ?loc @@ CHole (None)) :: mkCHoles ?loc (n - 1)
@@ -746,7 +747,7 @@ let pf_interp_ty ?(resolve_typeclasses=false) env sigma0 ist ty =
        n_binders := !n_binders + List.length (List.flatten (List.map (function CLocalAssum (nal,_,_,_) -> nal | CLocalDef (na,_,_,_) -> [na] | CLocalPattern _ -> (* We count a 'pat for 1; TO BE CHECKED *) [CAst.make Name.Anonymous]) abs));
        CProdN (abs, force_type t)
      | CLetIn (n, v, oty, t) -> incr n_binders; CLetIn (n, v, oty, force_type t)
-     | _ -> (mkCCast ty (mkCProp None)).v)) ty in
+     | _ -> (mkCCast ty (mkCUniv None)).v)) ty in
      mk_term NoFlag (force_type ty) in
    let strip_cast (sigma, t) =
      let open EConstr in

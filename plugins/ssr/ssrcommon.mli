@@ -77,6 +77,7 @@ val mkCHoles : ?loc:Loc.t -> int -> constr_expr list
 val mkCVar : ?loc:Loc.t -> Id.t -> constr_expr
 val mkCCast : ?loc:Loc.t -> constr_expr ->  constr_expr ->  constr_expr
 val mkCType : Loc.t option -> constr_expr
+val mkCUniv : Loc.t option -> constr_expr
 val mkCProp : Loc.t option -> constr_expr
 val mkCArrow : ?loc:Loc.t -> constr_expr ->  constr_expr ->  constr_expr
 val mkCLambda : ?loc:Loc.t -> Name.t -> constr_expr ->  constr_expr ->  constr_expr
