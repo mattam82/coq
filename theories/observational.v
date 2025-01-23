@@ -52,8 +52,8 @@ Section Basic_Test.
   Variable g : forall b:B, D b.
 
   (* remark that when the domain/codomain match, one of the casts is eliminated *)
-  Eval simpl in (cast _ _(obseq_fun1) f).
-  Eval lazy in (cast _ _ (eq_sym obseq_fun1) g).
+  (* Eval simpl in (cast _ _(obseq_fun1) f). *)
+  (* Eval lazy in (cast _ _ (eq_sym obseq_fun1) g). *)
 
 End Basic_Test.
 
