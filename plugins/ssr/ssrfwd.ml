@@ -278,8 +278,10 @@ let havetac ist
      let sigma, t, _ = interp sigma false (combineCG ct cty (mkCCast ?loc) mkRCast) in
      let sigma, ty = Typing.type_of env sigma t in
      let ctx, _ = EConstr.decompose_prod_n_decls sigma 1 ty in
+     debug_ssr (fun () -> Pp.(str"Am I Here EE?"));
      sigma, ty, assert_is_conv (ctx, concl) <*> Tactics.apply t, itac_c
    | FwdHave, false, false ->
+    debug_ssr (fun () -> Pp.(str"Am I Here EEE?"));
      let skols = List.flatten (List.map (function
        | IOpAbstractVars ids -> ids
        | _ -> assert false) skols) in
@@ -287,8 +289,10 @@ let havetac ist
        List.map (fun id -> snd @@ (* FIXME: evar leak *)
          Ssripats.Internal.examine_abstract env sigma (EConstr.mkVar id)) skols in
      let sigma = List.fold_right (unlock_abs env) skols_args sigma in
+     debug_ssr (fun () -> Pp.(str"Am I Here' ?"));
      let sigma, t, n_evars =
        interp sigma false (combineCG ct cty (mkCCast ?loc) mkRCast) in
+      debug_ssr (fun () -> Pp.(str"Am I Here 2 ?"));
      if skols <> [] && n_evars <> 0 then
        CErrors.user_err (Pp.strbrk @@ "Automatic generalization of unresolved implicit "^
                      "arguments together with abstract variables is "^
@@ -309,7 +313,9 @@ let havetac ist
      let r = Retyping.relevance_of_type env sigma ty in
      sigma, EConstr.mkArrow ty r concl, hint, itac_c
    | _, false, false ->
-     let sigma, n, cty, _  = pf_interp_ty ~resolve_typeclasses:fixtc env sigma ist cty in
+    debug_ssr (fun () -> Pp.(str"hello"));
+    let sigma, n, cty, _  = pf_interp_ty ~resolve_typeclasses:fixtc env sigma ist cty in
+     debug_ssr (fun () -> Pp.(str"="++pr_econstr_pat env sigma cty));
      sigma, cty, (binderstac n) <*> hint, Tacticals.tclTHEN itac_c simpltac
    | _, true, false -> assert false in
   Proofview.Unsafe.tclEVARS sigma <*>

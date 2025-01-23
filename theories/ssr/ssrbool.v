@@ -811,10 +811,7 @@ Definition classically@{s|l} (P : Type@{s|l}) : Prop := forall b : bool, (P -> b
 Lemma classicP (P : Prop) : classically P <-> ~ ~ P.
 Proof.
 split=> [cP nP | nnP [] // nP]; last by case nnP; move/nP.
-(* FIXME have is not sort poly *)
-(* by have: P -> false; [move/nP | move/cP].*)
-assert (P -> false) ; [by move/nP | ]. by specialize (cP _ H).
-Qed.
+by have: P -> false; [move/nP | move/cP]. Qed.
 
 Lemma classicW@{s|l} (P : Type@{s|l}) : P -> classically P. Proof. by move=> hP _ ->. Qed.
 
@@ -1810,7 +1807,7 @@ Definition equivalence_rel := forall x y z, R z z * (R x y -> R x z = R y z).
 Lemma equivalence_relP : equivalence_rel <-> reflexive /\ left_transitive.
 Proof.
 split=> [eqiR | [Rxx trR] x y z]; last by split=> [|/trR->].
-split=> [x | x y Rxy z]; [by destruct (eqiR x x x) | destruct (eqiR x y z); eauto].
+by split=> [x | x y Rxy z]; [rewrite (eqiR x x x) | rewrite (eqiR x y z); eauto].
 Qed.
 
 End RelationProperties.
@@ -2160,9 +2157,9 @@ Lemma ocan_in_comp [A B C : Type] (D : {pred B}) (D' : {pred C})
   {in D', ocancel (obind f \o h) (h' \o f')}.
 Proof.
 move=> hD fK hK c cD /=; rewrite -[RHS]hK/=; case hcE : (h c) => [b|]//=.
-(* have bD : (b \in D) by have := hD _ cD; rewrite hcE inE.
-by rewrite -[b in RHS]fK; case: (f b) => //=; have /hK := cD; rewrite hcE.*)
-Admitted.
+have bD : (b \in D) by have := hD _ cD; rewrite hcE inE.
+by rewrite -[b in RHS]fK; case: (f b) => //=; have /hK := cD; rewrite hcE.
+Qed.
 
 
 Section in_sig.

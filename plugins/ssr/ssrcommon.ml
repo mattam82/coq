@@ -746,7 +746,7 @@ let pf_interp_ty ?(resolve_typeclasses=false) env sigma0 ist ty =
        n_binders := !n_binders + List.length (List.flatten (List.map (function CLocalAssum (nal,_,_,_) -> nal | CLocalDef (na,_,_,_) -> [na] | CLocalPattern _ -> (* We count a 'pat for 1; TO BE CHECKED *) [CAst.make Name.Anonymous]) abs));
        CProdN (abs, force_type t)
      | CLetIn (n, v, oty, t) -> incr n_binders; CLetIn (n, v, oty, force_type t)
-     | _ -> (mkCCast ty (mkCType None)).v)) ty in
+     | _ -> (mkCCast ty (mkCProp None)).v)) ty in
      mk_term NoFlag (force_type ty) in
    let strip_cast (sigma, t) =
      let open EConstr in
@@ -756,7 +756,8 @@ let pf_interp_ty ?(resolve_typeclasses=false) env sigma0 ist ty =
      | LetInType(n,v,ty,t) -> decr n_binders; mkLetIn (n, v, ty, aux t)
      | _ -> anomaly "pf_interp_ty: ssr Type cast deleted by typecheck" in
      sigma, aux t in
-   let sigma, cty as ty = strip_cast (interp_term env sigma0 ist ty) in
+   let tty = interp_term env sigma0 ist ty in
+   let sigma, cty as ty = strip_cast tty in
    let ty =
      if not resolve_typeclasses then ty
      else
