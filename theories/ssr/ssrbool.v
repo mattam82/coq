@@ -1977,29 +1977,25 @@ Lemma subon2 (Phf : ph (allQ2 f)) (Ph : ph (allQ2 f)) :
   prop_on2 d2' Phf Ph -> prop_on2 d2 Phf Ph.
 Proof. by move=> allQ x y /sub2=> d2fx /sub2; apply: allQ. Qed.
 
+Set Debug "ssreflect".
+
 Lemma can_in_inj : {in D1, cancel f g} -> {in D1 &, injective f}.
-Proof.
-(* FIXME *)
-(* by move=> fK x y /fK{2}<- /fK{2}<- ->. Qed.*)
-Admitted.
+Proof. by move=> fK x y /fK{2}<- /fK{2}<- ->. Qed.
 
 Lemma canLR_in x y : {in D1, cancel f g} -> y \in D1 -> x = f y -> g x = y.
-Proof.
-(* FIXME *)
-(* by move=> fK D1y ->; rewrite fK. Qed.*)
-Admitted.
+Proof. by move=> fK D1y ->; rewrite fK. Qed.
 
 Lemma canRL_in x y : {in D1, cancel f g} -> x \in D1 -> f x = y -> x = g y.
-Proof. (* by move=> fK D1x <-; rewrite fK. Qed.*) Admitted.
+Proof. by move=> fK D1x <-; rewrite fK. Qed.
 
 Lemma on_can_inj : {on D2, cancel f & g} -> {on D2 &, injective f}.
-Proof. (* by move=> fK x y /fK{2}<- /fK{2}<- ->. Qed.*) Admitted.
+Proof. by move=> fK x y /fK{2}<- /fK{2}<- ->. Qed.
 
 Lemma canLR_on x y : {on D2, cancel f & g} -> f y \in D2 -> x = f y -> g x = y.
-Proof. (* by move=> fK D2fy ->; rewrite fK. Qed.*) Admitted.
+Proof. by move=> fK D2fy ->; rewrite fK. Qed.
 
 Lemma canRL_on x y : {on D2, cancel f & g} -> f x \in D2 -> f x = y -> x = g y.
-Proof. (* by move=> fK D2fx <-; rewrite fK. Qed.*) Admitted.
+Proof. by move=> fK D2fx <-; rewrite fK. Qed.
 
 Lemma inW_bij : bijective f -> {in D1, bijective f}.
 Proof. by case=> g' fK g'K; exists g'; split => * ? *; auto. Qed.
@@ -2280,14 +2276,12 @@ Hypothesis mem_g : {homo g : x / x \in rD >-> x \in aD}.
 Lemma homoRL_in :
     {in aD &, {homo f : x y / aR x y >-> rR x y}} ->
   {in rD & aD, forall x y, aR (g x) y -> rR x (f y)}.
-Proof. (* by move=> Hf x y hx hy /Hf; rewrite fgK ?mem_g// ?inE; apply. Qed.*)
-Admitted.
+Proof. by move=> Hf x y hx hy /Hf; rewrite fgK ?mem_g// ?inE; apply. Qed.
 
 Lemma homoLR_in :
     {in aD &, {homo f : x y / aR x y >-> rR x y}} ->
   {in aD & rD, forall x y, aR x (g y) -> rR (f x) y}.
-Proof. (* by move=> Hf x y hx hy /Hf; rewrite fgK ?mem_g// ?inE; apply. Qed.*)
-Admitted.
+Proof. by move=> Hf x y hx hy /Hf; rewrite fgK ?mem_g// ?inE; apply. Qed.
 
 Lemma homo_mono_in :
     {in aD &, {homo f : x y / aR x y >-> rR x y}} ->
@@ -2295,27 +2289,23 @@ Lemma homo_mono_in :
   {in rD &, {mono g : x y / rR x y >-> aR x y}}.
 Proof.
 move=> mf mg x y hx hy; case: (boolP (rR _ _))=> [/mg //|]; first exact.
-(* by apply: contraNF=> /mf; rewrite !fgK ?mem_g//; apply.
+by apply: contraNF=> /mf; rewrite !fgK ?mem_g//; apply.
 Qed.
-*)
-Admitted.
 
 Lemma monoLR_in :
     {in aD &, {mono f : x y / aR x y >-> rR x y}} ->
   {in aD & rD, forall x y, rR (f x) y = aR x (g y)}.
-Proof. (* by move=> mf x y hx hy; rewrite -{1}[y]fgK ?mem_g// mf ?mem_g. Qed.*)
-Admitted.
+Proof. by move=> mf x y hx hy; rewrite -{1}[y]fgK ?mem_g// mf ?mem_g. Qed.
+
 Lemma monoRL_in :
     {in aD &, {mono f : x y / aR x y >-> rR x y}} ->
   {in rD & aD, forall x y, rR x (f y) = aR (g x) y}.
-Proof. (* by move=> mf x y hx hy; rewrite -{1}[x]fgK ?mem_g// mf ?mem_g. Qed.*)
-Admitted.
+Proof. by move=> mf x y hx hy; rewrite -{1}[x]fgK ?mem_g// mf ?mem_g. Qed.
 
 Lemma can_mono_in :
     {in aD &, {mono f : x y / aR x y >-> rR x y}} ->
   {in rD &, {mono g : x y / rR x y >-> aR x y}}.
-Proof. (* by move=> mf x y hx hy; rewrite -mf ?mem_g// !fgK ?mem_g. Qed.*)
-Admitted.
+Proof. by move=> mf x y hx hy; rewrite -mf ?mem_g// !fgK ?mem_g. Qed.
 End MonoHomoMorphismTheory_in.
 Arguments homoRL_in {aT rT f g aD rD aP rP}.
 Arguments homoLR_in {aT rT f g aD rD aP rP}.
@@ -2400,19 +2390,16 @@ Variables (f : aT -> rT) (g : rT -> aT).
 Lemma inj_can_sym_in_on :
     {homo f : x / x \in aD >-> x \in rD} -> {in aD, {on rD, cancel f & g}} ->
   {in rD &, {on aD &, injective g}} -> {in rD, {on aD, cancel g & f}}.
-Proof. (* by move=> fD fK gI x x_rD gx_aD; apply: gI; rewrite ?inE ?fK ?fD.  Qed.*)
-Admitted.
+Proof. by move=> fD fK gI x x_rD gx_aD; apply: gI; rewrite ?inE ?fK ?fD. Qed.
 
 Lemma inj_can_sym_on : {in aD, cancel f g} ->
   {on aD &, injective g} -> {on aD, cancel g & f}.
-Proof. (* by move=> fK gI x gx_aD; apply: gI; rewrite ?inE ?fK. Qed.*)
-Admitted.
+Proof. by move=> fK gI x gx_aD; apply: gI; rewrite ?inE ?fK. Qed.
 
 Lemma inj_can_sym_in : {homo f \o g : x / x \in rD} -> {on rD, cancel f & g} ->
   {in rD &, injective g} ->  {in rD, cancel g f}.
-Proof. (* by move=> fgD fK gI x x_rD; apply: gI; rewrite ?fK ?fgD. Qed.*)
-Admitted.
+Proof. by move=> fgD fK gI x x_rD; apply: gI; rewrite ?fK ?fgD. Qed.
 End inj_can_sym_in_on.
 Arguments inj_can_sym_in_on {aT rT aD rD f g}.
-Arguments inj_can_sym_on {aT rT aD rD f}.
-Arguments inj_can_sym_in {aT rT aD rD f}.
+Arguments inj_can_sym_on {aT rT aD f g}.
+Arguments inj_can_sym_in {aT rT rD f g}.
