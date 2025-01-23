@@ -13,7 +13,8 @@
 (** #<style> .doc { font-family: monospace; white-space: pre; } </style># **)
 
 Require Import ssreflect ssrfun.
-From Corelib.Properties Require Import Nat NumberNotations Bool.
+From Corelib Require Import NumberNotations.
+From Corelib.Properties Require Import Nat Bool.
 
 (**
  A theory of boolean predicates and operators. A large part of this file is
@@ -1977,8 +1978,6 @@ Lemma subon2 (Phf : ph (allQ2 f)) (Ph : ph (allQ2 f)) :
   prop_on2 d2' Phf Ph -> prop_on2 d2 Phf Ph.
 Proof. by move=> allQ x y /sub2=> d2fx /sub2; apply: allQ. Qed.
 
-Set Debug "ssreflect".
-
 Lemma can_in_inj : {in D1, cancel f g} -> {in D1 &, injective f}.
 Proof. by move=> fK x y /fK{2}<- /fK{2}<- ->. Qed.
 
@@ -2307,12 +2306,12 @@ Lemma can_mono_in :
   {in rD &, {mono g : x y / rR x y >-> aR x y}}.
 Proof. by move=> mf x y hx hy; rewrite -mf ?mem_g// !fgK ?mem_g. Qed.
 End MonoHomoMorphismTheory_in.
-Arguments homoRL_in {aT rT f g aD rD aP rP}.
-Arguments homoLR_in {aT rT f g aD rD aP rP}.
-Arguments homo_mono_in {aT rT f g aD rD aP rP}.
-Arguments monoLR_in {aT rT f g aD rD aP rP}.
-Arguments monoRL_in {aT rT f g aD rD aP rP}.
-Arguments can_mono_in {aT rT f g aD rD aP rP}.
+Arguments homoRL_in {aT rT f g aD rD aP rP} : rename.
+Arguments homoLR_in {aT rT f g aD rD aP rP} : rename.
+Arguments homo_mono_in {aT rT f g aD rD aP rP} : rename.
+Arguments monoLR_in {aT rT f g aD rD aP rP} : rename.
+Arguments monoRL_in {aT rT f g aD rD aP rP} : rename.
+Arguments can_mono_in {aT rT f g aD rD aP rP} : rename.
 
 Section HomoMonoMorphismFlip.
 Variables (aT rT : Type) (aR : rel aT) (rR : rel rT) (f : aT -> rT).
