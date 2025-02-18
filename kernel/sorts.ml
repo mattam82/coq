@@ -10,9 +10,9 @@
 
 open Univ
 
-type family = InSProp | InProp | InSet | InType | InQSort
+type family = InSProp | InProp | InSet | InType | InErased | InQSort
 
-let all_families = [InSProp; InProp; InSet; InType; InQSort]
+let all_families = [InSProp; InProp; InSet; InType; InErased; InQSort]
 
 module QGlobal = struct
   open Names
@@ -134,7 +134,7 @@ struct
 end
 
 module Quality = struct
-  type constant = QProp | QSProp | QType
+  type constant = QProp | QSProp | QType | QErased
   type t = QVar of QVar.t | QConstant of constant
 
   let var i = QVar (QVar.make_var i)
@@ -151,8 +151,8 @@ module Quality = struct
 
   module Constants = struct
     let equal a b = match a, b with
-    | QProp, QProp | QSProp, QSProp | QType, QType -> true
-    | (QProp | QSProp | QType), _ -> false
+    | QProp, QProp | QSProp, QSProp | QType, QType | QErased, QErased -> true
+    | (QProp | QSProp | QType | QErased), _ -> false
 
     let compare a b = match a, b with
       | QProp, QProp -> 0
@@ -162,16 +162,21 @@ module Quality = struct
       | QSProp, _ -> -1
       | _, QSProp -> 1
       | QType, QType -> 0
+      | QType, _ -> -1
+      | _, QType -> 1
+      | QErased, QErased -> 0
 
     let pr = function
       | QProp -> Pp.str "Prop"
       | QSProp -> Pp.str "SProp"
       | QType -> Pp.str "Type"
+      | QErased -> Pp.str "Erased"
 
     let hash = function
       | QSProp -> 0
       | QProp -> 1
       | QType -> 2
+      | QErased -> 3
 
   end
 
@@ -235,6 +240,7 @@ module Quality = struct
   let qsprop = hcons (QConstant QSProp)
   let qprop = hcons (QConstant QProp)
   let qtype = hcons (QConstant QType)
+  let qerased = hcons (QConstant QErased)
 
   module Self = struct type nonrec t = t let compare = compare end
   module Set = CSet.Make(Self)
@@ -319,6 +325,7 @@ type t =
   | Prop
   | Set
   | Type of Universe.t
+  | Erased of Universe.t
   | QSort of QVar.t * Universe.t
 
 let sprop = SProp
@@ -330,6 +337,8 @@ let qsort q u = QSort (q, u)
 let sort_of_univ u =
   if Universe.is_type0 u then set else Type u
 
+let erased_of_univ u = Erased u
+
 let make q u =
   let open Quality in
   match q with
@@ -337,58 +346,65 @@ let make q u =
   | QConstant QSProp -> sprop
   | QConstant QProp -> prop
   | QConstant QType -> sort_of_univ u
+  | QConstant QErased -> Erased u
 
 let compare s1 s2 =
   if s1 == s2 then 0 else
     match s1, s2 with
     | SProp, SProp -> 0
-    | SProp, (Prop | Set | Type _ | QSort _) -> -1
-    | (Prop | Set | Type _ | QSort _), SProp -> 1
+    | SProp, (Prop | Set | Type _ | Erased _ | QSort _) -> -1
+    | (Prop | Set | Type _ | Erased _ | QSort _), SProp -> 1
     | Prop, Prop -> 0
-    | Prop, (Set | Type _ | QSort _) -> -1
+    | Prop, (Set | Type _ | Erased _ | QSort _) -> -1
     | Set, Prop -> 1
     | Set, Set -> 0
-    | Set, (Type _ | QSort _) -> -1
-    | Type _, QSort _ -> -1
+    | Set, (Type _ | Erased _ | QSort _) -> -1
+    | Type _, (Erased _ | QSort _) -> -1
     | Type u1, Type u2 -> Universe.compare u1 u2
     | Type _, (Prop | Set) -> 1
+    | Erased _, QSort _ -> -1
+    | Erased u1, Erased u2 -> Universe.compare u1 u2
+    | Erased _, (Prop | Set | Type _) -> 1
     | QSort (q1, u1), QSort (q2, u2) ->
       let c = QVar.compare q1 q2 in
       if Int.equal c 0 then Universe.compare u1 u2 else c
-    | QSort _, (Prop | Set | Type _) -> 1
+    | QSort _, (Prop | Set | Type _ | Erased _) -> 1
 
 let equal s1 s2 = Int.equal (compare s1 s2) 0
 
 let super = function
   | SProp | Prop | Set -> Type (Universe.type1)
-  | Type u | QSort (_, u) -> Type (Universe.super u)
+  | Type u | QSort (_, u) | Erased u -> Erased (Universe.super u)
 
 let is_sprop = function
   | SProp -> true
-  | Prop | Set | Type _ | QSort _ -> false
+  | Prop | Set | Type _ | QSort _ | Erased _ -> false
 
 let is_prop = function
   | Prop -> true
-  | SProp | Set | Type _ | QSort _-> false
+  | SProp | Set | Type _ | QSort _ | Erased _ -> false
 
 let is_set = function
   | Set -> true
-  | SProp | Prop | Type _ | QSort _ -> false
+  | SProp | Prop | Type _ | QSort _ | Erased _ -> false
 
 let is_small = function
   | SProp | Prop | Set -> true
-  | Type _ | QSort _ -> false
+  | Type _ | QSort _ | Erased _ -> false (* Weird that we don't test u = 0 here *)
 
 let levels s = match s with
 | SProp | Prop -> Level.Set.empty
 | Set -> Level.Set.singleton Level.set
-| Type u | QSort (_, u) -> Universe.levels u
+| Type u | QSort (_, u) | Erased u -> Universe.levels u
 
 let subst_fn (fq,fu) = function
   | SProp | Prop | Set as s -> s
   | Type v as s ->
     let v' = Universe.subst_fn fu v in
     if v' == v then s else sort_of_univ v'
+  | Erased v as s ->
+      let v' = Universe.subst_fn fu v in
+      if v' == v then s else Erased v'
   | QSort (q, v) as s ->
     let open Quality in
     match fq q with
@@ -399,18 +415,21 @@ let subst_fn (fq,fu) = function
     | QConstant QSProp -> sprop
     | QConstant QProp -> prop
     | QConstant QType -> sort_of_univ (Universe.subst_fn fu v)
+    | QConstant QErased -> Erased (Universe.subst_fn fu v)
 
 let family = function
   | SProp -> InSProp
   | Prop -> InProp
   | Set -> InSet
   | Type _ -> InType
+  | Erased _ -> InErased
   | QSort _ -> InQSort
 
 let quality = let open Quality in function
 | Set | Type _ -> QConstant QType
 | Prop -> QConstant QProp
 | SProp -> QConstant QSProp
+| Erased _ -> QConstant QErased
 | QSort (q, _) -> QVar q
 
 let family_compare a b = match a,b with
@@ -426,12 +445,15 @@ let family_compare a b = match a,b with
   | InType, InType -> 0
   | InType, _ -> -1
   | _, InType -> 1
+  | InErased, InErased -> 0
+  | InErased, _ -> -1
+  | _, InErased -> 1
   | InQSort, InQSort -> 0
 
 let family_equal a b =  match a, b with
   | InSProp, InSProp | InProp, InProp | InSet, InSet | InType, InType -> true
-  | InQSort, InQSort -> true
-  | (InSProp | InProp | InSet | InType | InQSort), _ -> false
+  | InErased, InErased | InQSort, InQSort -> true
+  | (InSProp | InProp | InSet | InType | InErased | InQSort), _ -> false
 
 let family_leq a b =
   family_equal a b
@@ -450,10 +472,13 @@ let hash = function
   | Type u ->
     let h = Univ.Universe.hash u in
     combinesmall 2 h
+  | Erased u ->
+    let h = Univ.Universe.hash u in
+    combinesmall 3 h
   | QSort (q, u) ->
     let h = Univ.Universe.hash u in
     let h' = QVar.hash q in
-    combinesmall 3 (combine h h')
+    combinesmall 4 (combine h h')
 
 module Hsorts =
   Hashcons.Make(
@@ -466,6 +491,9 @@ module Hsorts =
         | Type u as c ->
           let u' = huniv u in
             if u' == u then c else Type u'
+        | Erased u as c ->
+          let u' = huniv u in
+            if u' == u then c else Erased u'
         | QSort (q, u) as c ->
           let u' = huniv u in
           if u' == u then c else QSort (q, u)
@@ -473,8 +501,9 @@ module Hsorts =
       let eq s1 s2 = match (s1,s2) with
         | SProp, SProp | Prop, Prop | Set, Set -> true
         | (Type u1, Type u2) -> u1 == u2
+        | (Erased u1, Erased u2) -> u1 == u2
         | QSort (q1, u1), QSort (q2, u2) -> q1 == q2 && u1 == u2
-        | (SProp | Prop | Set | Type _ | QSort _), _ -> false
+        | (SProp | Prop | Set | Type _ | Erased _ | QSort _), _ -> false
 
       let hash = hash
     end)
@@ -504,7 +533,7 @@ let relevance_subst_fn f = function
     let open Quality in
     match f qv with
     | QConstant QSProp -> Irrelevant
-    | QConstant (QProp | QType) -> Relevant
+    | QConstant (QProp | QType | QErased) -> Relevant
     | QVar qv' ->
       if qv' == qv then r else RelevanceVar qv'
 
@@ -512,12 +541,12 @@ let relevance_of_quality q =
   let open Quality in
   match q with
   | QConstant QSProp -> Irrelevant
-  | QConstant (QProp | QType) -> Relevant
+  | QConstant (QProp | QType | QErased) -> Relevant
   | QVar qv -> RelevanceVar qv
 
 let relevance_of_sort = function
   | SProp -> Irrelevant
-  | Prop | Set | Type _ -> Relevant
+  | Prop | Set | Type _ | Erased _ -> Relevant
   | QSort (q, _) -> RelevanceVar q
 
 let debug_print = function
@@ -525,6 +554,7 @@ let debug_print = function
   | Prop -> Pp.(str "Prop")
   | Set -> Pp.(str "Set")
   | Type u -> Pp.(str "Type(" ++ Univ.Universe.raw_pr u ++ str ")")
+  | Erased u -> Pp.(str "Erased(" ++ Univ.Universe.raw_pr u ++ str ")")
   | QSort (q, u) -> Pp.(str "QSort(" ++ QVar.raw_pr q ++ str ","
                         ++ spc() ++ Univ.Universe.raw_pr u ++ str ")")
 
@@ -538,13 +568,15 @@ let pr_sort_family = function
   | InProp -> Pp.(str "Prop")
   | InSet -> Pp.(str "Set")
   | InType -> Pp.(str "Type")
+  | InErased -> Pp.(str "Erased")
   | InQSort -> Pp.(str "Type") (* FIXME? *)
 
 type pattern =
-  | PSProp | PSSProp | PSSet | PSType of int option | PSQSort of int option * int option
+  | PSProp | PSSProp | PSSet | PSType of int option | PSErased of int option | PSQSort of int option * int option
 
 let extract_univ = function
   | Type u
+  | Erased u
   | QSort (_, u) -> u
   | Prop | SProp | Set -> Univ.Universe.type0
 
@@ -555,5 +587,6 @@ let pattern_match ps s qusubst =
   | PSSet, Set -> Some qusubst
   | PSType uio, Set -> Some (Partial_subst.maybe_add_univ uio Univ.Universe.type0 qusubst)
   | PSType uio, Type u -> Some (Partial_subst.maybe_add_univ uio u qusubst)
+  | PSErased uio, Erased u -> Some (Partial_subst.maybe_add_univ uio u qusubst)
   | PSQSort (qio, uio), s -> Some (qusubst |> Partial_subst.maybe_add_quality qio (quality s) |> Partial_subst.maybe_add_univ uio (extract_univ s))
-  | (PSProp | PSSProp | PSSet | PSType _), _ -> None
+  | (PSProp | PSSProp | PSSet | PSType _ | PSErased _), _ -> None

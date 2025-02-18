@@ -387,9 +387,10 @@ let decompose_lam_n = decompose_lambda_n
 let decompose_lam_n_assum = decompose_lambda_n_assum
 let decompose_lam_n_decls = decompose_lambda_n_decls
 
-type sorts_family = Sorts.family = InSProp | InProp | InSet | InType | InQSort
+type sorts_family = Sorts.family = InSProp | InProp | InSet | InType | InErased | InQSort
 
 type sorts = Sorts.t = private
   | SProp | Prop | Set
   | Type of Univ.Universe.t  (** Type *)
+  | Erased of Univ.Universe.t  (** Erased *)
   | QSort of Sorts.QVar.t * Univ.Universe.t

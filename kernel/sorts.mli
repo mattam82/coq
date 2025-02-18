@@ -10,7 +10,7 @@
 
 (** {6 The sorts of CCI. } *)
 
-type family = InSProp | InProp | InSet | InType | InQSort
+type family = InSProp | InProp | InSet | InType | InErased | InQSort
 
 val all_families : family list
 
@@ -63,7 +63,7 @@ sig
 end
 
 module Quality : sig
-  type constant = QProp | QSProp | QType
+  type constant = QProp | QSProp | QType | QErased
   type t = QVar of QVar.t | QConstant of constant
 
   module Constants : sig
@@ -75,6 +75,7 @@ module Quality : sig
   val qprop : t
   val qsprop : t
   val qtype : t
+  val qerased : t
 
   val var : int -> t
   (** [var i] is [QVar (QVar.make_var i)] *)
@@ -156,6 +157,7 @@ type t = private
   | Prop
   | Set
   | Type of Univ.Universe.t
+  | Erased of Univ.Universe.t
   | QSort of QVar.t * Univ.Universe.t
 
 val sprop : t
@@ -184,6 +186,7 @@ val family_equal : family -> family -> bool
 val family_leq : family -> family -> bool
 
 val sort_of_univ : Univ.Universe.t -> t
+val erased_of_univ : Univ.Universe.t -> t
 
 val levels : t -> Univ.Level.Set.t
 
@@ -212,6 +215,6 @@ val debug_print_relevance : relevance -> Pp.t
 val pr_sort_family : family -> Pp.t
 
 type pattern =
-  | PSProp | PSSProp | PSSet | PSType of int option | PSQSort of int option * int option
+  | PSProp | PSSProp | PSSet | PSType of int option | PSErased of int option | PSQSort of int option * int option
 
 val pattern_match : pattern -> t -> ('t, Quality.t, Univ.Universe.t) Partial_subst.t -> ('t, Quality.t, Univ.Universe.t) Partial_subst.t option

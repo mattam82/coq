@@ -183,37 +183,48 @@ let make_subst =
   in
   make Univ.Level.Map.empty
 
-let subst_univs_sort subs = function
-| Sorts.QSort _ -> no_sort_variable ()
-| Sorts.Prop | Sorts.Set | Sorts.SProp as s -> s
-| Sorts.Type u ->
-  (* We implement by hand a max on universes that handles Prop *)
-  let u = Universe.repr u in
+let subst_univs_sort subs s =
   let supern u n = iterate Universe.super n u in
-  let map (u, n) =
-    if Level.is_set u then Some (Universe.type0, n)
-    else match Level.Map.find u subs with
-    | TemplateProp ->
-      if Int.equal n 0 then
-        (* This is an instantiation of a template universe by Prop, ignore it *)
-        None
-      else
-        (* Prop + S n actually means Set + S n *)
-        Some (Universe.type0, n)
-    | TemplateUniv v -> Some (v,n)
-    | exception Not_found ->
-      (* Either an unbound template universe due to missing arguments, or a
-         global one appearing in the inductive arity. *)
-      Some (Universe.make u, n)
+  let maxu u =
+    (* We implement by hand a max on universes that handles Prop *)
+    let u = Universe.repr u in
+    let map (u, n) =
+      if Level.is_set u then Some (Universe.type0, n)
+      else match Level.Map.find u subs with
+      | TemplateProp ->
+        if Int.equal n 0 then
+          (* This is an instantiation of a template universe by Prop, ignore it *)
+          None
+        else
+          (* Prop + S n actually means Set + S n *)
+          Some (Universe.type0, n)
+      | TemplateUniv v -> Some (v,n)
+      | exception Not_found ->
+        (* Either an unbound template universe due to missing arguments, or a
+          global one appearing in the inductive arity. *)
+        Some (Universe.make u, n)
+      in List.filter_map map u
   in
-  let u = List.filter_map map u in
-  match u with
-  | [] ->
-    (* No constraints, fall in Prop *)
-    Sorts.prop
-  | (u,n) :: rest ->
-    let fold accu (u, n) = Universe.sup accu (supern u n) in
-    Sorts.sort_of_univ (List.fold_left fold (supern u n) rest)
+  match s with
+  | Sorts.QSort _ -> no_sort_variable ()
+  | Sorts.Prop | Sorts.Set | Sorts.SProp as s -> s
+  | Sorts.Type u ->
+    (match maxu u with
+    | [] ->
+      (* No constraints, fall in Prop *)
+      Sorts.prop
+    | (u,n) :: rest ->
+      let fold accu (u, n) = Universe.sup accu (supern u n) in
+      Sorts.sort_of_univ (List.fold_left fold (supern u n) rest))
+  | Sorts.Erased u ->
+    match maxu u with
+    | [] ->
+      (* No constraints, fall in Prop *)
+      Sorts.prop
+    | (u,n) :: rest ->
+      let fold accu (u, n) = Universe.sup accu (supern u n) in
+      Sorts.erased_of_univ (List.fold_left fold (supern u n) rest)
+
 
 let get_arity c =
   let decls, c = Term.decompose_prod_decls c in
@@ -248,6 +259,7 @@ let instantiate_template_constraints subst templ =
     | Sorts.Prop -> accu
     | Sorts.Set -> Constraints.add (Universe.type0, cst, v) accu
     | Sorts.Type u -> Constraints.add (u, cst, v) accu
+    | Sorts.Erased u -> Constraints.add (u, cst, v) accu
   in
   Constraints.fold fold cstrs Constraints.empty
 
@@ -365,8 +377,9 @@ let quality_leq q q' =
     | QSProp, _
     | _, QType
     | QProp, QProp
+    | QProp, QErased
       -> true
-    | (QProp|QType), _ -> false
+    | (QProp|QType|QErased), _ -> false
     end
   | QVar _, QConstant QType -> true
   | (QVar _|QConstant _), _ -> false
@@ -404,7 +417,7 @@ let is_allowed_elimination specifu s =
   | Some SquashToSet ->
     begin match s with
       | SProp|Prop|Set -> true
-      | QSort _ | Type _ ->
+      | QSort _ | Type _ | Erased _ ->
         (* XXX in [Type u] case, should we check [u == set] in the ugraph? *)
         false
     end

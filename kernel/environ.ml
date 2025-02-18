@@ -336,12 +336,12 @@ let is_impredicative_set env = env.env_typing_flags.impredicative_set
 let is_impredicative_sort env = function
   | Sorts.SProp | Sorts.Prop -> true
   | Sorts.Set -> is_impredicative_set env
-  | Sorts.Type _ | Sorts.QSort _ -> false
+  | Sorts.Type _ | Sorts.Erased _ | Sorts.QSort _ -> false
 
 let is_impredicative_family env = function
   | Sorts.InSProp | Sorts.InProp -> true
   | Sorts.InSet -> is_impredicative_set env
-  | Sorts.InType | Sorts.InQSort -> false
+  | Sorts.InType | Sorts.InErased | Sorts.InQSort -> false
 
 let type_in_type env = not (typing_flags env).check_universes
 let deactivated_guard env = not (typing_flags env).check_guarded

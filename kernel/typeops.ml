@@ -123,6 +123,7 @@ let type_of_type u =
 let type_of_sort = function
   | SProp | Prop | Set -> type1
   | Type u -> type_of_type u
+  | Erased u -> type_of_type u
   | QSort (_, u) -> type_of_type u
 
 (*s Type of a de Bruijn index. *)
@@ -318,23 +319,27 @@ let sort_of_product env domsort rangsort =
     (* Product rule (Prop/Set,Set,Set) *)
     | ((Prop | Set),  Set) -> rangsort
     (* Product rule (Type,Set,?) *)
-    | ((Type u1 | QSort (_, u1)), Set) ->
+    | ((Type u1 | Erased u1 | QSort (_, u1)), Set) ->
         if is_impredicative_set env then
           (* Rule is (Type,Set,Set) in the Set-impredicative calculus *)
           rangsort
         else
           (* Rule is (Type_i,Set,Type_i) in the Set-predicative calculus *)
           Sorts.sort_of_univ (Universe.sup Universe.type0 u1)
-    (* Product rule (Prop,Type_i,Type_i) *)
-    | (Set,  Type u2)  -> Sorts.sort_of_univ (Universe.sup Universe.type0 u2)
-    | (Set,  QSort (q, u2))  ->
+    (* Product rule (Set,Type_i,Type_i) *)
+    | (Set, Type u2)  -> Sorts.sort_of_univ (Universe.sup Universe.type0 u2)
+    | (Set, Erased u2)  -> Sorts.erased_of_univ (Universe.sup Universe.type0 u2)
+    | (Set, QSort (q, u2))  ->
       Sorts.qsort q (Universe.sup Universe.type0 u2)
     (* Product rule (Prop,Type_i,Type_i) *)
-    | (Prop, (Type _ | QSort _))  -> rangsort
+    | (Prop, (Type _ | QSort _ | Erased _))  -> rangsort
     (* Product rule (Type_i,Type_i,Type_i) *)
-    | ((Type u1 | QSort (_, u1)), Type u2) -> Sorts.sort_of_univ (Universe.sup u1 u2)
-    | ((Type u1 | QSort (_, u1)), (QSort (q, u2))) ->
+    | ((Type u1 | Erased u1 | QSort (_, u1)), Type u2) -> Sorts.sort_of_univ (Universe.sup u1 u2)
+    | ((Type u1 | Erased u1 | QSort (_, u1)), Erased u2) -> Sorts.erased_of_univ (Universe.sup u1 u2)
+    | ((Type u1 | Erased u1 | QSort (_, u1)), (QSort (q, u2))) ->
       Sorts.qsort q (Universe.sup u1 u2)
+
+
 
 (* [judge_of_product env name (typ1,s1) (typ2,s2)] implements the rule
 
@@ -397,6 +402,7 @@ let make_param_univs env indu spec args argtys =
       | Prop -> TemplateProp
       | Set -> TemplateUniv Universe.type0
       | Type u -> TemplateUniv u
+      | Erased u -> TemplateUniv u
       | QSort _ -> assert false)
     argtys
 
@@ -636,7 +642,7 @@ and execute_aux tbl env cstr =
     | Sort s ->
       let () = match s with
       | SProp -> if not (Environ.sprop_allowed env) then error_disallowed_sprop env
-      | QSort _ | Prop | Set | Type _ -> ()
+      | QSort _ | Prop | Set | Type _ | Erased _ -> ()
       in
       type_of_sort s
 

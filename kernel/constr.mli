@@ -95,6 +95,7 @@ val mkSProp : types
 val mkProp : types
 val mkSet  : types
 val mkType : Univ.Universe.t -> types
+val mkErased : Univ.Universe.t -> types
 
 
 (** This defines the strategy to use for verifiying a Cast *)

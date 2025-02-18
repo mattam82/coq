@@ -214,7 +214,7 @@ let compute_constructor_levels env evd sign =
 
 let is_flexible_sort evd s = match ESorts.kind evd s with
 | Set | Prop | SProp -> false
-| Type u | QSort (_, u) ->
+| Type u | Erased u | QSort (_, u) ->
   match Univ.Universe.level u with
   | Some l -> Evd.is_flexible_level evd l
   | None -> false
@@ -244,7 +244,7 @@ let prop_lowering_candidates evd ~arities_explicit inds =
       (List.for_all (fun s -> match ESorts.kind evd s with
            | SProp | Prop -> true
            | Set -> false
-           | Type _ | QSort _ ->
+           | Type _ | Erased _ | QSort _ ->
              not (Evd.check_leq evd ESorts.set s)
              && in_candidates s candidates))
       (Option.List.cons indices ctors)
@@ -274,7 +274,7 @@ let include_constructor_argument env evd ~poly ~ctor_sort ~inductive_sort =
       match ESorts.kind evd s with
       | SProp | Prop -> None
       | Set -> Some Univ.Universe.type0
-      | Type u | QSort (_,u) -> Some u
+      | Type u | Erased u | QSort (_,u) -> Some u
     in
     match univ_of_sort ctor_sort, univ_of_sort inductive_sort with
     | _, None ->
@@ -287,7 +287,7 @@ let include_constructor_argument env evd ~poly ~ctor_sort ~inductive_sort =
   else
     match ESorts.kind evd ctor_sort with
     | SProp | Prop -> evd
-    | Set | Type _ | QSort _ ->
+    | Set | Type _ | Erased _ | QSort _ ->
       Evd.set_leq_sort env evd ctor_sort inductive_sort
 
 type default_dep_elim = DeclareInd.default_dep_elim = DefaultElim | PropButDepElim
@@ -400,6 +400,7 @@ let non_template_levels ~params entry =
      (until constraint checking can handle arbitrary +k, cf #19230) *)
   let concl_univs = match u with
     | Sorts.Type u -> Univ.Universe.repr u
+    | Sorts.Erased u -> Univ.Universe.repr u (* FIXME Tentatively allowing inductives in Erased to be template-poly *)
     | QSort _ -> assert false
     | SProp | Prop | Set -> []
   in

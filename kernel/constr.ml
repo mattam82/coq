@@ -374,6 +374,7 @@ let of_kind = function
 
 (* Construct a type *)
 let mkType u = of_kind @@ Sort (Sorts.sort_of_univ u)
+let mkErased u = of_kind @@ Sort (Sorts.erased_of_univ u)
 let mkSort s = of_kind @@ Sort s
 
 (* Constructs the product (x:t1)t2 *)

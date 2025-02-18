@@ -203,7 +203,7 @@ open Sorts
 let get_algebraic = function
 | Prop | SProp -> assert false
 | Set -> Universe.type0
-| Type u | QSort (_, u) -> u
+| Type u | Erased u | QSort (_, u) -> u
 
 let check_eq_sort ugraph s1 s2 = match s1, s2 with
 | (SProp, SProp) | (Prop, Prop) | (Set, Set) -> true
@@ -213,20 +213,24 @@ let check_eq_sort ugraph s1 s2 = match s1, s2 with
   check_eq ugraph (get_algebraic s1) (get_algebraic s2)
 | QSort (q1, u1), QSort (q2, u2) ->
   QVar.equal q1 q2 && check_eq ugraph u1 u2
-| (QSort _, (Type _ | Set)) | ((Type _ | Set), QSort _) -> false
+| Erased u, Erased u' -> check_eq ugraph u u'
+| (Erased _ | Set | Type _), (Erased _ | Set | Type _) -> type_in_type ugraph
+| (QSort _, (Type _ | Erased _ | Set)) | ((Type _ | Erased _ | Set), QSort _) -> false
 
 let check_leq_sort ugraph s1 s2 = match s1, s2 with
 | (SProp, SProp) | (Prop, Prop) | (Set, Set) -> true
 | (SProp, _) -> type_in_type ugraph
 | (Prop, SProp) -> type_in_type ugraph
 | (Prop, (Set | Type _)) -> type_in_type ugraph || cumulative_prop ugraph
-| (Prop, QSort _) -> false
+| (Prop, (Erased _ | QSort _)) -> false
 | (_, (SProp | Prop)) -> type_in_type ugraph
 | (Type _ | Set), (Type _ | Set) ->
   check_leq ugraph (get_algebraic s1) (get_algebraic s2)
 | QSort (q1, u1), QSort (q2, u2) ->
   QVar.equal q1 q2 && check_leq ugraph u1 u2
-| (QSort _, (Type _ | Set)) | ((Type _ | Set), QSort _) -> false
+| Erased u, Erased u' -> check_leq ugraph u u'
+| (Erased _ | Set | Type _), (Erased _ | Set | Type _) -> type_in_type ugraph
+| (QSort _, (Type _ | Set | Erased _)) | ((Type _ | Set | Erased _), QSort _) -> false
 
 (** Pretty-printing *)
 
@@ -273,6 +277,7 @@ let explain_universe_inconsistency default_prq default_prl (printers, (o,u,v,p) 
   | Sorts.Prop -> str "Prop"
   | Sorts.SProp -> str "SProp"
   | Sorts.Type u -> Universe.pr prl u
+  | Sorts.Erased u -> str "Erased@{ " ++ Universe.pr prl u ++ str"}"
   | Sorts.QSort (q, u) -> str "Type@{" ++ prq q ++ str " | " ++ Universe.pr prl u ++ str"}"
   in
   let pr_rel = function

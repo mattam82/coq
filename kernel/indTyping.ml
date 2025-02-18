@@ -99,18 +99,18 @@ let check_univ_leq ?(is_real_arg=false) env u info =
         | QSort (q,_) -> if Sorts.Quality.equal (QVar q) (Sorts.quality info.ind_univ)
           then { info with record_arg_info = HasRelevantArg }
           else info
-        | Prop | Set | Type _ -> { info with record_arg_info = HasRelevantArg }
+        | Prop | Set | Type _ | Erased _ -> { info with record_arg_info = HasRelevantArg }
   in
   if (Environ.type_in_type env) then info
   else match u, info.ind_univ with
-  | SProp, (SProp | Prop | Set | Type _) ->
+  | SProp, (SProp | Prop | Set | Type _ | Erased _) ->
     (* Inductive types provide explicit lifting from SProp to other universes,
        so allow SProp <= any. *)
     info
 
   | Prop, SProp -> { info with ind_squashed = Some AlwaysSquashed }
   | (SProp|Prop), QSort _ -> add_squash (Sorts.quality u) info
-  | Prop, (Prop | Set | Type _) -> info
+  | Prop, (Prop | Set | Type _ | Erased _) -> info
 
   | Set, (SProp | Prop) -> { info with ind_squashed = Some AlwaysSquashed }
   | Set, QSort (_, indu) ->
@@ -118,7 +118,7 @@ let check_univ_leq ?(is_real_arg=false) env u info =
     then add_squash qtype info
     else { info with missing = u :: info.missing }
   | Set, Set -> info
-  | Set, Type indu ->
+  | Set, (Type indu | Erased indu) ->
     if UGraph.check_leq (universes env) Universe.type0 indu
     then info
     else { info with missing = u :: info.missing }
@@ -137,23 +137,35 @@ let check_univ_leq ?(is_real_arg=false) env u info =
     then (* imprecise but we don't handle complex impredicative set squashings  *)
       { info with ind_squashed = Some AlwaysSquashed }
     else { info with missing = u :: info.missing }
-  | QSort (_,uu), Type indu ->
+  | QSort (_,uu), (Type indu | Erased indu) ->
     if UGraph.check_leq (universes env) uu indu
     then info
     else { info with missing = u :: info.missing }
 
-  | Type _, (SProp | Prop) -> { info with ind_squashed = Some AlwaysSquashed }
-  | Type uu, Set ->
+  | (Type _ | Erased _), (SProp | Prop) -> { info with ind_squashed = Some AlwaysSquashed }
+  | (Type uu | Erased uu), Set ->
     if UGraph.check_leq (universes env) uu Universe.type0
     then info
     else if is_impredicative_set env
     then { info with ind_squashed = Some AlwaysSquashed }
     else { info with missing = u :: info.missing }
-  | Type uu, QSort (_, indu) ->
+  | (Type uu | Erased uu), QSort (_, indu) ->
     if UGraph.check_leq (universes env) uu indu
     then add_squash qtype info
     else { info with missing = u :: info.missing }
   | Type uu, Type indu ->
+    if UGraph.check_leq (universes env) uu indu
+    then info
+    else { info with missing = u :: info.missing }
+  | Erased uu, Erased indu ->
+    if UGraph.check_leq (universes env) uu indu
+    then info
+    else { info with missing = u :: info.missing }
+  | Type uu, Erased indu ->
+    if UGraph.check_leq (universes env) uu indu
+    then { info with ind_squashed = Some AlwaysSquashed }
+    else { info with missing = u :: info.missing }
+  | Erased uu, Type indu ->
     if UGraph.check_leq (universes env) uu indu
     then info
     else { info with missing = u :: info.missing }
@@ -349,7 +361,7 @@ let get_template univs ~env_params ~env_ar_par ~params entries data =
       plevels
     in
     let plevels = match sort with
-    | Type u ->
+    | Type u | Erased u ->
       let fold accu (l, n) = if Int.equal n 0 then accu else Level.Set.remove l accu in
       List.fold_left fold plevels (Universe.repr u)
     | Prop | SProp | Set -> plevels

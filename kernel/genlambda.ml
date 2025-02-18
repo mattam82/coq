@@ -73,7 +73,9 @@ let pp_sort s =
   | Sorts.Set -> str "Set"
   | Sorts.Prop -> str "Prop"
   | Sorts.SProp -> str "SProp"
-  | Sorts.Type _ | Sorts.QSort _ -> str "Type"
+  | Sorts.Type _ -> str "Type"
+  | Sorts.Erased _ -> str "Erased"
+  | Sorts.QSort _ -> str "𝒰"
 
 let pr_con sp = str(Names.Label.to_string (Constant.label sp))
 

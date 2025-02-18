@@ -145,6 +145,12 @@ let safe_sort_pattern_of_sort ~loc evd (qsubst, usubst) (st, sq, su as state) s 
       | Some (lvlold, lvl) ->
         (st, sq, update_invtblu1 ~loc evd (Univ.Universe.make lvlold) lvl su), PSType (Some lvl)
       end
+  | Erased u ->
+    begin match universe_level_subst_var_index usubst u with
+    | None -> state, PSErased None
+    | Some (lvlold, lvl) ->
+      (st, sq, update_invtblu1 ~loc evd (Univ.Universe.make lvlold) lvl su), PSErased (Some lvl)
+    end
   | SProp -> state, PSSProp
   | Prop -> state, PSProp
   | Set -> state, PSSet
