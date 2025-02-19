@@ -111,6 +111,7 @@ let set_above_prop q m =
 
 let unify_quality ~fail ~cumulative_prop c q1 q2 local = match q1, q2 with
 | QConstant QType, QConstant QType
+| QConstant QErased, QConstant QErased
 | QConstant QProp, QConstant QProp
 | QConstant QSProp, QConstant QSProp -> local
 | QConstant QProp, QVar q when c == Conversion.CUMUL && cumulative_prop ->
@@ -124,20 +125,21 @@ let unify_quality ~fail ~cumulative_prop c q1 q2 local = match q1, q2 with
       | Some local -> local
       | None -> fail ()
   end
-| QVar q, (QConstant (QType | QProp | QSProp) as qv)
-| (QConstant (QType | QProp | QSProp) as qv), QVar q ->
+| QVar q, (QConstant (QType | QErased | QProp | QSProp) as qv)
+| (QConstant (QType | QErased | QProp | QSProp) as qv), QVar q ->
   begin match set q qv local with
   | Some local -> local
   | None -> fail ()
   end
-| (QConstant QType, QConstant (QProp | QSProp)) -> fail ()
+| (QConstant (QType | QErased), QConstant (QProp | QSProp | QErased)) -> fail ()
 | (QConstant QProp, QConstant QType) ->
   begin match c with
   | CONV -> fail ()
   | CUMUL -> if cumulative_prop then local else fail ()
   end
-| (QConstant QSProp, QConstant (QType | QProp)) -> fail ()
-| (QConstant QProp, QConstant QSProp) -> fail ()
+| (QConstant QErased, QConstant QType) -> fail ()
+| (QConstant QSProp, QConstant (QType | QErased | QProp)) -> fail ()
+| (QConstant QProp, QConstant (QErased | QSProp)) -> fail ()
 
 let nf_quality m = function
   | QConstant _ as q -> q
@@ -517,7 +519,7 @@ let nf_relevance uctx r = match r with
 | RelevanceVar q ->
   match nf_qvar uctx q with
   | QConstant QSProp -> Sorts.Irrelevant
-  | QConstant QProp | QConstant QType -> Sorts.Relevant
+  | QConstant (QProp | QType | QErased) -> Sorts.Relevant
   | QVar q' ->
     (* XXX currently not used in nf_evars_and_universes_opt_subst
        does it matter? *)
@@ -549,7 +551,7 @@ let classify s = match s with
 | Prop -> USmall UProp
 | SProp -> USmall USProp
 | Set -> USmall USet
-| Type u | QSort (_, u) ->
+| Type u | Erased u | QSort (_, u) ->
   match Universe.level u with
   | None -> UAlgebraic u
   | Some l -> ULevel (l, u)

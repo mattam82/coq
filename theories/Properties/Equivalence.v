@@ -88,3 +88,5 @@ Section SigmaAssocHom.
   Definition sigma_hom_assoc : equiv T1 T2 :=
     {| map := f12 ; map_is_equiv := f12_is_equiv |}.
 End SigmaAssocHom.
+
+Monomorphic Sort news.

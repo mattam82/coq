@@ -223,7 +223,7 @@ let update_impred_qvars (f : Sorts.QVar.t -> Sorts.Quality.t option) vars =
           match q with
           | QVar v -> Impredicative (Sorts.QVar.Set.add v impred)
           | QConstant (QProp | QSProp) -> acc
-          | QConstant QType -> Predicative)
+          | QConstant (QType | QErased) -> Predicative)
       vars (Impredicative Sorts.QVar.Set.empty)
     in Some pred
 
@@ -242,7 +242,7 @@ let impred_qvars_of_quality q =
   match q with
   | QVar qv -> Impredicative (Sorts.QVar.Set.singleton qv)
   | QConstant (QProp | QSProp) -> Impredicative Sorts.QVar.Set.empty
-  | QConstant QType -> Predicative
+  | QConstant (QType | QErased) -> Predicative
 
 let equal_qvars (x : impred_qvars) (y : impred_qvars) =
   let eq_pred x y = match x, y with

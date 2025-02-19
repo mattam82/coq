@@ -426,7 +426,7 @@ let pirrel_rewrite ?(under=false) ?(map_redex=id_map_redex) pred rdx rdx_ty carr
       let j_uj_type = Reductionops.whd_all env sigma j.uj_type in
       let jr = ESorts.relevance_of_sort @@ EConstr.destSort sigma j_uj_type in
       let sigma = Typing.check_actual_type env sigma j tA in
-      let tP = mkLetIn (idA, rdx_ty, tA, mkLetIn (anonR, mkProp, mkType Univ.Universe.type1, tP)) in
+      let tP = mkLetIn (idA, rdx_ty, tA, mkLetIn (anonR, mkProp, mkErased Univ.Universe.type1, tP)) in
       (* Do not fully retype pred, we already know that the domain is well-typed.
          The way this is written makes it easier to profile which part of
          typing is takes time. *)

@@ -41,7 +41,7 @@ module ESorts = struct
   let prop = make Sorts.prop
   let sprop = make Sorts.sprop
   let set = make Sorts.set
-  let type1 = make Sorts.type1
+  let erased1 = make Sorts.erased1
 
   let super sigma s =
     make (Sorts.super (kind sigma s))
@@ -184,6 +184,7 @@ let mkSProp = of_kind (Sort (ESorts.make Sorts.sprop))
 let mkProp = of_kind (Sort (ESorts.make Sorts.prop))
 let mkSet = of_kind (Sort (ESorts.make Sorts.set))
 let mkType u = of_kind (Sort (ESorts.make (Sorts.sort_of_univ u)))
+let mkErased u = of_kind (Sort (ESorts.make (Sorts.erased_of_univ u)))
 let mkRel n = of_kind (Rel n)
 let mkVar id = of_kind (Var id)
 let mkMeta n = of_kind (Meta n)
@@ -217,7 +218,7 @@ let mkRef (gr,u) = let open GlobRef in match gr with
 
 let mkLEvar = Evd.MiniEConstr.mkLEvar
 
-let type1 = mkSort ESorts.type1
+let erased1 = mkSort ESorts.erased1
 
 let applist (f, arg) = mkApp (f, Array.of_list arg)
 let applistc f arg = mkApp (f, Array.of_list arg)
@@ -908,6 +909,8 @@ let univs_and_qvars_visitor sigma =
   let visit_sort (qs,us as acc) s =
     match ESorts.kind sigma s with
     | Sorts.Type u ->
+      qs, Universe.levels ~init:us u
+    | Sorts.Erased u ->
       qs, Universe.levels ~init:us u
     | Sorts.QSort (q,u) ->
       Sorts.QVar.Set.add q qs, Universe.levels ~init:us u

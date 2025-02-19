@@ -112,16 +112,16 @@ let instantiate_context u subst nas ctx =
 
 (* Prop and Set *)
 
-let type1 = mkSort Sorts.type1
+let erased1 = mkSort Sorts.erased1
 
 (* Type of Type(i). *)
 
 let type_of_type u =
   let uu = Universe.super u in
-    mkType uu
+  mkErased uu
 
 let type_of_sort = function
-  | SProp | Prop | Set -> type1
+  | SProp | Prop | Set -> erased1
   | Type u -> type_of_type u
   | Erased u -> type_of_type u
   | QSort (_, u) -> type_of_type u

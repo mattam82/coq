@@ -16,7 +16,7 @@ Declare Scope nat_scope.
 Section NatSortPoly.
   Sort s.
 
-  Inductive nat : Type@{s|Set} :=
+  Inductive nat : Type@{s|0} :=
     | O : nat
     | S (_ : nat) : nat.
 

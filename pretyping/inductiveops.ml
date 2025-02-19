@@ -247,19 +247,21 @@ let inductive_has_local_defs env ind =
   not (Int.equal l1 l2)
 
 (* XXX use above_prop from the ustate *)
-let quality_leq q q' =
+let quality_leq pq indq =
   let open Sorts.Quality in
-  match q, q' with
+  match pq, indq with
   | QVar q, QVar q' -> Sorts.QVar.equal q q'
-  | QConstant q, QConstant q' ->
-    begin match q, q' with
+  | QConstant pq, QConstant indq ->
+    begin match pq, indq with
     | QSProp, _
     | _, QType
-    | QProp, QProp
+    | QProp, (QProp | QErased)
+    | QErased, QErased
       -> true
-    | (QProp|QType), _ -> false
+    | (QProp|QType|QErased), _ -> false
     end
   | QVar _, QConstant QType -> true
+  | QConstant QErased, QVar _ -> true (* FIXME use an above_erased, QVar should be instantiated with Erased or Type only *)
   | (QVar _|QConstant _), _ -> false
 
 type squash = SquashToSet | SquashToQuality of Sorts.Quality.t
@@ -296,22 +298,29 @@ let squash_elim_sort env sigma squash rtnsort = match squash with
   (* Squashed inductive in Set, only happens with impredicative Set *)
   begin match ESorts.kind sigma rtnsort with
   | Set | SProp | Prop -> sigma
-  | QSort _ | Type _ ->
+  | QSort _ | Type _ | Erased _ ->
     Evd.set_eq_sort env sigma rtnsort ESorts.set
   end
 | SquashToQuality (QConstant QProp) ->
   (* Squashed inductive in Prop, return sort must be Prop or SProp *)
   begin match ESorts.kind sigma rtnsort with
   | SProp | Prop -> sigma
-  | QSort _ | Type _ | Set ->
+  | QSort _ | Type _ | Erased _ | Set ->
     Evd.set_eq_sort env sigma rtnsort ESorts.prop
   end
 | SquashToQuality (QConstant QSProp) ->
   (* Squashed inductive in SProp, return sort must be SProp. *)
   begin match ESorts.kind sigma rtnsort with
   | SProp -> sigma
-  | Type _ | Set | Prop | QSort _ ->
+  | Type _ | Erased _ | Set | Prop | QSort _ ->
     Evd.set_eq_sort env sigma rtnsort ESorts.sprop
+  end
+| SquashToQuality (QConstant QErased) ->
+  (* Sort poly squash to erased, return sort must be in Prop, SProp or Erased *)
+  begin match ESorts.kind sigma rtnsort with
+  | SProp | Prop | Erased _ -> sigma
+  | QSort _ | Type _ | Set ->
+    Evd.set_leq_sort env sigma (ESorts.make (Sorts.make Sorts.Quality.qerased Univ.Universe.type0)) rtnsort
   end
 | SquashToQuality (QConstant QType) ->
   (* Sort poly squash to type *)
@@ -329,11 +338,13 @@ let is_allowed_elimination sigma ((mib,_),_ as specifu) s =
     | Some SquashToSet ->
       begin match EConstr.ESorts.kind sigma s with
       | SProp|Prop|Set -> true
-      | QSort _ | Type _ ->
+      | QSort _ | Type _ | Erased _ ->
         (* XXX in [Type u] case, should we check [u == set] in the ugraph? *)
         false
       end
     | Some (SquashToQuality indq) -> quality_leq (EConstr.ESorts.quality sigma s) indq
+
+let debug = CDebug.create ~name:"inductiveops" ()
 
 let make_allowed_elimination env sigma ((mib,_),_ as specifu) s =
   let open Sorts in
@@ -345,12 +356,13 @@ let make_allowed_elimination env sigma ((mib,_),_ as specifu) s =
     | Some SquashToSet ->
       begin match EConstr.ESorts.kind sigma s with
       | SProp|Prop|Set -> Some sigma
-      | QSort _ | Type _ ->
+      | QSort _ | Type _ | Erased _ -> (* FIXME think about this one *)
         try Some (Evd.set_leq_sort env sigma s ESorts.set)
         with UGraph.UniverseInconsistency _ -> None
       end
     | Some (SquashToQuality indq) ->
       let sq = EConstr.ESorts.quality sigma s in
+      debug Pp.(fun () -> str"Inductive squashed to quality: " ++ Quality.raw_pr indq ++ str" sq = " ++ Quality.raw_pr sq);
       if quality_leq sq indq then Some sigma
       else
         let mk q = ESorts.make @@ Sorts.make q Univ.Universe.type0 in
@@ -376,6 +388,8 @@ let sorts_below top =
       | _, InQSort -> false
       | InSProp, _ -> true
       | InProp, InSet -> true
+      | (InProp | InErased), InErased -> true
+      | InErased, (InSProp | InProp | InSet | InType) -> false
       | _, InType -> true
       | (InProp|InSet|InType), _ -> false)
     Sorts.[InSProp;InProp;InSet;InType]
@@ -727,7 +741,7 @@ let arity_of_case_predicate env (ind,params) dep k =
 
 let univ_level_mem l s = match s with
 | Prop | Set | SProp -> false
-| Type u -> Univ.univ_level_mem l u
+| Type u | Erased u -> Univ.univ_level_mem l u
 | QSort (_, u) -> assert false (* template cannot contain sort variables *)
 
 (* Compute the inductive argument types: replace the sorts

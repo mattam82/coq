@@ -394,11 +394,15 @@ let detype_sort sigma = function
       (if !print_universes
        then None, detype_universe sigma u
        else glob_Type_sort)
+  | Erased u ->
+      (if !print_universes
+       then Some (GQConstant Sorts.Quality.QErased), detype_universe sigma u
+       else glob_Erased_sort)
   | QSort (q, u) ->
     if !print_universes || print_sort_quality ()
     then
       let u = if !print_universes then detype_universe sigma u else UNamed [] in
-      let q = if print_sort_quality () then Some (detype_qvar sigma q) else None in
+      let q = if print_sort_quality () then Some (GQualVar (detype_qvar sigma q)) else None in
       q, u
     else glob_Type_sort
 

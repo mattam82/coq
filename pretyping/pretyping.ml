@@ -236,15 +236,16 @@ type pretype_flags = {
   unconstrained_sorts : bool;
 }
 
-let glob_opt_qvar ?loc ~flags sigma = function
+let glob_opt_quality ?loc ~flags sigma = function
   | None ->
     if flags.unconstrained_sorts then
       let sigma, q = new_quality_variable ?loc sigma in
-      sigma, Some q
+      sigma, Some (Sorts.Quality.QVar q)
     else sigma, None
   | Some q ->
-    let sigma, q = glob_qvar ?loc sigma q in
+    let sigma, q = glob_quality ?loc sigma q in
     sigma, Some q
+
 
 let glob_universe ?loc sigma = function
   | [] -> assert false
@@ -280,20 +281,20 @@ let sort ?loc ~flags sigma (q, l) = match l with
 | UNamed [GProp, 0] -> assert (Option.is_empty q); sigma, ESorts.prop
 | UNamed [GSet, 0] when Option.is_empty q -> sigma, ESorts.set
 | UNamed u ->
-  let sigma, q = glob_opt_qvar ?loc ~flags sigma q in
+  let sigma, q = glob_opt_quality ?loc ~flags sigma q in
   let sigma, u = glob_universe ?loc sigma u in
   let s = match q with
     | None -> Sorts.sort_of_univ u
-    | Some q -> Sorts.qsort q u
+    | Some q -> Sorts.make q u
   in
   sigma, ESorts.make s
 | UAnonymous {rigid} ->
-  let sigma, q = glob_opt_qvar ?loc ~flags sigma q in
+  let sigma, q = glob_opt_quality ?loc ~flags sigma q in
   let sigma, l = new_univ_level_variable ?loc rigid sigma in
   let u = Univ.Universe.make l in
   let s = match q with
     | None -> Sorts.sort_of_univ u
-    | Some q -> Sorts.qsort q u
+    | Some q -> Sorts.make q u
   in
   sigma, ESorts.make s
 
@@ -943,6 +944,14 @@ struct
   let template_sort qopt boundus (s:Sorts.t) =
     match s with
     | SProp | Prop | Set -> ESorts.make s
+    | Erased u ->
+      let subst_fn u = Univ.Level.Map.find_opt u boundus in
+      let u = UnivSubst.subst_univs_universe subst_fn u in
+      let s = match qopt with
+        | None -> Sorts.erased_of_univ u
+        | Some (_,q) -> Sorts.qsort q u
+      in
+      ESorts.make s
     | Type u ->
       let subst_fn u = Univ.Level.Map.find_opt u boundus in
       let u = UnivSubst.subst_univs_universe subst_fn u in
@@ -1032,6 +1041,7 @@ struct
           Univ.Universe.type0
         | Set -> Univ.Universe.type0
         | Type u -> u
+        | Erased u -> u
         | QSort (_,u) ->
           (* quality guaranteed = Option.get qopt *)
           u
@@ -1243,7 +1253,7 @@ struct
              information when typing the body. *)
           let s = Retyping.get_sort_of !!env sigma ty in
           if Environ.is_impredicative_sort !!env (ESorts.kind sigma s)
-             || Evd.check_leq sigma ESorts.type1 s
+             || Evd.check_leq sigma ESorts.erased1 s
           then
             let sigma, prod = define_evar_as_product !!env sigma ev in
             let na,dom,rng = destProd sigma prod in

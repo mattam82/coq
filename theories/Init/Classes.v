@@ -32,7 +32,7 @@ Ltac class_apply c := autoapply c with typeclass_instances.
 (** The unconvertible typeclass, to test that two objects of the same type are
    actually different. *)
 #[universes(polymorphic)]
-Class Unconvertible (A : Type) (a b : A) := unconvertible : unit.
+Class Unconvertible@{s|l} (A : 𝒰@{s|l}) (a b : A) := unconvertible : unit.
 
 Ltac unconvertible :=
   match goal with

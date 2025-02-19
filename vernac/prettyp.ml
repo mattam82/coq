@@ -248,19 +248,20 @@ let print_squash env ref udecl = match ref with
           | Prop -> str "SProp or Prop"
           | Set -> str "SProp, Prop or Set"
           | Type _ -> str "not in a variable sort quality"
+          | Erased _ -> str "SProp or Prop or Erased"
           | QSort (q,_) -> str "in sort quality " ++ Termops.pr_evd_qvar sigma q
       in
       let unless = match squash with
         | AlwaysSquashed -> str "."
         | SometimesSquashed qs ->
           let target = match inds with
-            | SProp | Prop | Set -> target
+            | SProp | Prop | Set | Erased _ -> target
             | Type _ -> str "instantiated to constant qualities"
             | QSort (q,_) ->
               let ppq = Termops.pr_evd_qvar sigma q in
               str "equal to the instantiation of " ++ ppq ++ pr_comma() ++
               str "or to qualities smaller" ++ spc() ++
-              str "(SProp <= Prop <= Type, and all variables <= Type)" ++ spc() ++
+              str "(SProp <= Prop <= Erased <= Type, and all variables <= Type)" ++ spc() ++
               str "than the instantiation of " ++ ppq
           in
           let qs = Sorts.Quality.Set.elements qs in

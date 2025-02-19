@@ -148,23 +148,27 @@ exception SingletonInductiveBecomesProp of inductive
 type output_q =
   | OutputType
   (* if the [QVar.t option] is None then it means Prop *)
-  | OutputVar of Sorts.QVar.t option * Univ.Level.Set.t
+  | OutputQual of Sorts.Quality.t option * Univ.Level.Set.t
 
 let template_sort ~forbid_polyprop output_q boundus (s:Sorts.t) =
   match s with
   | SProp | Prop | Set -> ESorts.make s
   | QSort _ -> assert false
-  | Type u ->
+  | Type u | Erased u ->
     let subst_fn u = Univ.Level.Map.find_opt u boundus in
     let u = UnivSubst.subst_univs_universe subst_fn u in
     let s = match output_q with
-      | OutputType -> Sorts.sort_of_univ u
-      | OutputVar (None, _) ->
+      | OutputType ->
+        (match s with
+        | Type _ -> Sorts.sort_of_univ u
+        | Erased _ -> Sorts.erased_of_univ u
+        | _ -> assert false)
+      | OutputQual (None, _) ->
         begin match forbid_polyprop with
         | None -> Sorts.prop
         | Some indna -> raise (SingletonInductiveBecomesProp indna)
         end
-      | OutputVar (Some q, _) -> Sorts.qsort q u
+      | OutputQual (Some q, _) -> Sorts.make q u
     in
     ESorts.make s
 
@@ -188,7 +192,7 @@ let rec finish_template ~forbid_polyprop output_q boundus = let open TemplateAri
   | TemplateArg (na,ctx,domu,codom) ->
     let output_q = match output_q with
       | OutputType -> OutputType
-      | OutputVar (q, used_levels) ->
+      | OutputQual (q, used_levels) ->
         if Univ.Level.Set.mem domu used_levels
         then OutputType
         else output_q
@@ -215,17 +219,19 @@ let rec type_of_template_knowing_parameters ~forbid_polyprop arity_sort_of outpu
     let s = arity_sort_of arg in
     let output_q = match output_q with
       | OutputType -> output_q
-      | OutputVar (q, used_levels) ->
+      | OutputQual (q, used_levels) ->
         if not (Univ.Level.Set.mem domu used_levels) then output_q
         else match s with
           | Sorts.SProp -> OutputType (* invalid type, return whatever *)
           | Set | Type _ -> OutputType
           | Prop -> output_q
+          | Erased _ -> OutputQual (Some Sorts.Quality.qerased, used_levels)
           | QSort (q', _) ->
+            let q' = (Sorts.Quality.QVar q') in
             match q with
-            | None -> OutputVar (Some q', used_levels)
+            | None -> OutputQual (Some q', used_levels)
             | Some q ->
-              if Sorts.QVar.equal q q' then output_q
+              if Sorts.Quality.equal q q' then output_q
               else
                 (* no other supremum for different qvars
                    (Type is a supremum because they're above Prop) *)
@@ -234,7 +240,7 @@ let rec type_of_template_knowing_parameters ~forbid_polyprop arity_sort_of outpu
     let boundus =
       let u = match s with
         | Sorts.SProp | Prop | Set -> Univ.Universe.type0
-        | Type u | QSort (_, u) -> u
+        | Type u | Erased u | QSort (_, u) -> u
       in
       bind_template_univ ~domu u boundus
     in
@@ -245,7 +251,7 @@ let rec type_of_template_knowing_parameters ~forbid_polyprop arity_sort_of outpu
 let type_of_template_knowing_parameters ~forbid_polyprop arity_sort_of (can_be_prop,typ) args =
   let output_q = match can_be_prop.TemplateArity.template_can_be_prop with
     | None -> OutputType
-    | Some used_levels -> OutputVar (None, used_levels)
+    | Some used_levels -> OutputQual (None, used_levels)
   in
   type_of_template_knowing_parameters ~forbid_polyprop arity_sort_of output_q Univ.Level.Map.empty typ args
 
@@ -316,8 +322,8 @@ let retype ?metas ?(polyprop=true) sigma =
     | Cast (c,_, s) when isSort sigma s -> destSort sigma s
     | Sort s ->
       begin match ESorts.kind sigma s with
-      | SProp | Prop | Set -> ESorts.type1
-      | Type u | QSort (_, u) -> ESorts.make (Sorts.sort_of_univ (Univ.Universe.super u))
+      | SProp | Prop | Set -> ESorts.erased1
+      | Type u | Erased u | QSort (_, u) -> ESorts.make (Sorts.erased_of_univ (Univ.Universe.super u))
       end
     | Prod (name,t,c2) ->
       let dom = sort_of env t in

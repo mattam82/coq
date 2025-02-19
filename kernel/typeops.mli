@@ -37,7 +37,6 @@ val check_context :
 val assumption_of_judgment :  env -> unsafe_judgment -> Sorts.relevance
 
 (** {6 Type of sorts. } *)
-val type1 : types
 val type_of_sort : Sorts.t -> types
 
 (** {6 Type of a bound variable. } *)

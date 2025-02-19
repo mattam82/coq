@@ -218,6 +218,7 @@ let coerce ?loc env sigma (x : EConstr.constr) (y : EConstr.constr)
        | Prop, Type _ when UGraph.cumulative_prop (Evd.universes sigma) -> sigma, None
        | Set, Type _ -> sigma, None
        | Type x, Type y when Univ.Universe.equal x y -> sigma, None (* false *)
+       | Erased x, Erased y when Univ.Universe.equal x y -> sigma, None
        | _ -> subco sigma)
     | Prod (name, a, b), Prod (name', a', b') ->
       let name' =
@@ -758,10 +759,14 @@ let default_flags_of_patvars env sigma ~patvars_abstract =
   let flags = default_flags_of env in
   if patvars_abstract then { flags with allowed_evars = allow_all_but_patvars sigma } else flags
 
+let debug = CDebug.create ~name:"coercion" ()
+
 (* Look for cj' obtained from cj by inserting coercions, s.t. cj'.typ = t *)
 let inh_conv_coerce_to_gen ?loc ~program_mode ~resolve_tc ?use_coercions ?(patvars_abstract=false) rigidonly env sigma ?(flags=default_flags_of_patvars env sigma ~patvars_abstract) cj t =
   let (sigma, val', otrace) =
     try
+      debug Pp.(fun () -> str"Coercing " ++ Termops.Internal.print_constr_env env sigma cj.uj_type ++ str" to " ++
+        Termops.Internal.print_constr_env env sigma t);
       let (sigma, val', trace) = inh_conv_coerce_to_fail ?loc ?use_coercions env sigma ~flags rigidonly cj.uj_val cj.uj_type t in
       (sigma, val', Some trace)
     with NoCoercionNoUnifier (best_failed_sigma,e) as exn ->

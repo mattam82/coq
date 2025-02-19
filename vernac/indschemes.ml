@@ -439,6 +439,9 @@ let do_mutual_induction_scheme ?(force_mutual=false) env ?(isrec=true) l =
         | InType -> Some (if dep then case_dep else case_nodep)
         | InProp -> Some (if dep then casep_dep else casep_nodep)
         | InQSort -> Some (if dep then case_poly_dep else case_poly_nodep)
+        | InErased ->
+          (* currently we don't have standard scheme kinds for this *)
+          None
         | InSProp | InSet ->
           (* currently we don't have standard scheme kinds for this *)
           None

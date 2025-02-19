@@ -331,7 +331,7 @@ type t =
 let sprop = SProp
 let prop = Prop
 let set = Set
-let type1 = Type Universe.type1
+let erased1 = Erased Universe.type1
 let qsort q u = QSort (q, u)
 
 let sort_of_univ u =
@@ -373,7 +373,7 @@ let compare s1 s2 =
 let equal s1 s2 = Int.equal (compare s1 s2) 0
 
 let super = function
-  | SProp | Prop | Set -> Type (Universe.type1)
+  | SProp | Prop | Set -> Erased (Universe.type1)
   | Type u | QSort (_, u) | Erased u -> Erased (Universe.super u)
 
 let is_sprop = function

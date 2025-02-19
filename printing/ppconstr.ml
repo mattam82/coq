@@ -218,8 +218,8 @@ let tag_var = tag Tag.variable
     | CQualVar q -> pr_qvar_expr q
 
   let pr_quality_univ (q, l) = match q with
-  | None -> pr_univ l
-  | Some q ->  pr_qvar_expr q ++ spc() ++ str "|" ++ spc () ++ pr_univ l
+  | None -> tag_type (str "Type") ++ spc () ++ str"|" ++ spc () ++ pr_univ l
+  | Some q ->  pr_quality_expr q ++ spc() ++ str "|" ++ spc () ++ pr_univ l
 
   let pr_univ_annot pr x = str "@{" ++ pr x ++ str "}"
 
@@ -229,7 +229,7 @@ let tag_var = tag Tag.variable
     | None, UNamed [CSet, 0] -> tag_type (str "Set")
     | None, UNamed [] -> tag_type (str "Type")
     | None, UAnonymous {rigid=UnivRigid} -> tag_type (str "Type")
-    | u -> hov 0 (tag_type (str "Type") ++ pr_univ_annot pr_quality_univ u)
+    | u -> hov 0 (tag_type (str "𝒰") ++ pr_univ_annot pr_quality_univ u)
 
   let pr_qualid sp =
     let (sl, id) = repr_qualid sp in

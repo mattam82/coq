@@ -38,7 +38,7 @@ type relevance_expr =
 
 type relevance_info_expr = relevance_expr option
 
-type sort_expr = (qvar_expr option * opt_universe_expr)
+type sort_expr = (quality_expr option * opt_universe_expr)
 
 type instance_expr = quality_expr list * opt_universe_expr list
 

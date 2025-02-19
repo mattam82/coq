@@ -212,7 +212,8 @@ struct
     | Const (c,_u) -> mkConstU (c,UVars.Instance.empty)
     | Ind (c,_u) -> mkIndU (c,UVars.Instance.empty)
     | Construct (c,_u) -> mkConstructU (c,UVars.Instance.empty)
-    | Sort (Type _u) -> mkSort (type1)
+    | Sort (Type _u) -> mkSort (Sorts.sort_of_univ Univ.Universe.type0)
+    | Sort (Erased _u) -> mkSort (Sorts.erased_of_univ Univ.Universe.type0)
     | _ -> Constr.map drop_univ c
 
   let mkSymb s = make (Symb (s, Constr.hash (drop_univ s)))

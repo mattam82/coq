@@ -35,7 +35,7 @@ Program Instance not_iff_morphism@{s|u|} :
 
 #[global]
 Program Instance not_iff_morphism'@{| |} :
-  Proper@{_ _|Set+1 Set} (respectful@{Type Type Prop Prop|Set+1 Set+1 Set Set} iff@{Prop|Set Set} iff@{Prop| Set Set}) not@{Prop|Set}.
+  Proper@{_ _|Set+1 Set} (respectful@{Erased Erased Prop Prop|Set+1 Set+1 Set Set} iff@{Prop|Set Set} iff@{Prop| Set Set}) not@{Prop|Set}.
 
 (** Logical conjunction. *)
 

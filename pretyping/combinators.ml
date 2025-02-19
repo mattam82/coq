@@ -22,10 +22,11 @@ module RelDecl = Context.Rel.Declaration
 (**************)
 (** Telescope *)
 
-type family = SPropF | PropF | TypeF
+type family = SPropF | PropF | TypeF | ErasedF
 let family_of_sort_family = let open Sorts in function
     | InSProp -> SPropF
     | InProp -> PropF
+    | InErased -> ErasedF
     | InSet | InType | InQSort -> TypeF
 
 let get_sigmatypes sigma ~sort ~predsort =
@@ -33,6 +34,8 @@ let get_sigmatypes sigma ~sort ~predsort =
   let which, sigsort = match predsort, sort with
     | SPropF, _ | _, SPropF ->
       user_err Pp.(str "SProp arguments not supported by Program Fixpoint yet.")
+    | ErasedF, _ | _, ErasedF ->
+      user_err Pp.(str "Erased arguments not supported by Program Fixpoint yet.")
     | PropF, PropF -> "ex", PropF
     | PropF, TypeF -> "sig", TypeF
     | TypeF, (PropF|TypeF) -> "sigT", TypeF

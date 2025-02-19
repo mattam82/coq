@@ -65,6 +65,7 @@ let functional_induction with_clean c princl pat =
             | InProp -> finfo.prop_lemma
             | InSet -> finfo.rec_lemma
             | InType | InQSort -> finfo.rect_lemma
+            | InErased -> finfo.rect_lemma (* FIXME *)
           in
           let sigma, princ =
             (* then we get the principle *)

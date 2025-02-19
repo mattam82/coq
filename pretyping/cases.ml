@@ -39,6 +39,8 @@ open GlobEnv
 module RelDecl = Context.Rel.Declaration
 module NamedDecl = Context.Named.Declaration
 
+let debug = CDebug.create ~name:"cases"  ()
+
 (* Pattern-matching errors *)
 
 type pattern_matching_error =
@@ -311,6 +313,7 @@ let inductive_template env sigma tmloc ind =
    sigma, applist (mkIndU indu,List.rev evarl)
 
 let try_find_ind env sigma typ realnames =
+  debug Pp.(fun () -> str"Finding inductive type from: " ++ Termops.Internal.print_constr_env env sigma typ);
   let (IndType(indf,realargs) as ind) = find_rectype env sigma typ in
   let names =
     match realnames with
@@ -1920,7 +1923,7 @@ let build_inversion_problem ~program_mode loc env sigma tms t =
       return type of the original problem Xi *)
   let s = Retyping.get_sort_of !!env sigma t in
   let sigma, s = Sorts.(match ESorts.kind sigma s with
-  | SProp | Prop | Set ->
+  | SProp | Prop | Set | Erased _ ->
     (* To anticipate a possible restriction on an elimination from
        SProp, Prop or (impredicative) Set we preserve the sort of the
        main branch, knowing that the default impossible case shall

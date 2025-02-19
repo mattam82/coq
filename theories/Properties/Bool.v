@@ -136,7 +136,11 @@ Qed.
 (************************)
 (** * Order on booleans *)
 (************************)
+Set Debug "ustate".
+Set Debug "cases".
+Set Debug "inductiveops".
 
+(* match b1 return ?X : 𝒰@{s|l} *)
 #[ local ] Definition le (b1 b2:bool) :=
   match b1 with
     | true => b2 = true

@@ -1252,7 +1252,7 @@ let intern_quality ~local_univs q =
   | CQualVar q -> GQualVar (intern_qvar ~local_univs q)
 
 let intern_sort ~local_univs (q,l) =
-  Option.map (intern_qvar ~local_univs) q,
+  Option.map (intern_quality ~local_univs) q,
   map_glob_sort_gen (List.map (on_fst (intern_sort_name ~local_univs))) l
 
 let intern_universe ~local_univs s =

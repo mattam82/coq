@@ -59,7 +59,7 @@ sig
   val prop : t
   val sprop : t
   val set : t
-  val type1 : t
+  val erased1 : t
 
   val super : Evd.evar_map -> t -> t
 
@@ -166,6 +166,7 @@ val mkSProp : t
 val mkProp : t
 val mkSet  : t
 val mkType : Univ.Universe.t -> t
+val mkErased : Univ.Universe.t -> t
 val mkCast : t * cast_kind * t -> t
 val mkProd : Name.t binder_annot * t * t -> t
 val mkLambda : Name.t binder_annot * t * t -> t
@@ -203,7 +204,7 @@ val mkConstruct : constructor -> t
 
 val mkRef : GlobRef.t * EInstance.t -> t
 
-val type1 : t
+val erased1 : t
 
 val applist : t * t list -> t
 val applistc : t -> t list -> t

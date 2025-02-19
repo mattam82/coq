@@ -238,7 +238,7 @@ Section Binary.
   Universe u v.
   Context {A : Type@{s|u}}.
 
-  Definition relation_equivalence : relation@{Type s'|_ _} (relation@{s s'|u v} A)
+  Definition relation_equivalence : relation@{Erased s'|_ _} (relation@{s s'|u v} A)
     := fun R R' => forall x y, iff (R x y) (R' x y).
 
   #[export]

@@ -23,6 +23,7 @@ let ppsort = function
   | Set -> print_string "Set"
   | Prop -> print_string "Prop"
   | Type _ -> print_string "Type"
+  | Erased _ -> print_string "Erased"
   | QSort _ -> print_string "QSort"
 
 let print_idkey idk =

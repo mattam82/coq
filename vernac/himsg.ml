@@ -251,7 +251,7 @@ let explain_elim_arity env sigma ind c okinds =
         let inds, sorts, explain = match squashq with
           | QSProp -> "SProp", "SProp", "strict proofs can be eliminated only to build strict proofs"
           | QProp -> "Prop", "SProp or Prop", "proofs can be eliminated only to build proofs"
-          | QType -> assert false
+          | QErased | QType -> assert false
         in
         hov 0
           (str "the return type has sort" ++ spc () ++ ppt ++ spc () ++
@@ -262,6 +262,15 @@ let explain_elim_arity env sigma ind c okinds =
            str "is not allowed on a predicate in sort " ++ ppt ++ fnl () ++
            str "because" ++ spc () ++
            str explain ++ str ".")
+      | SquashToQuality (QConstant QErased) ->
+        let ppt = ppt ~ppunivs:true () in
+        hov 0
+          (str "the return type has sort" ++ spc () ++ ppt ++ spc () ++
+            str "while it may not be of a variable sort quality.") ++
+        fnl () ++
+        hov 0
+          (str "Elimination of a sort polymorphic inductive object instantiated to sort Erased" ++ spc() ++
+            str "is not allowed on a predicate in a variable sort quality.")
       | SquashToQuality (QConstant QType) ->
         let ppt = ppt ~ppunivs:true () in
         hov 0

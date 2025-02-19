@@ -70,33 +70,39 @@ let enforce_leq u v c =
 let get_algebraic = function
 | Prop | SProp | QSort _ -> assert false
 | Set -> Universe.type0
-| Type u -> u
+| Type u | Erased u -> u
 
 let enforce_eq_sort s1 s2 cst = match s1, s2 with
 | (SProp, SProp) | (Prop, Prop) | (Set, Set) -> cst
-| (((Prop | Set | Type _ | QSort _) as s1), (Prop | SProp as s2))
-| ((Prop | SProp as s1), ((Prop | Set | Type _ | QSort _) as s2)) ->
+| (((Prop | Set | Type _ | Erased _ | QSort _) as s1), (Prop | SProp as s2))
+| ((Prop | SProp as s1), ((Prop | Set | Type _ | Erased _ | QSort _) as s2)) ->
   raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
 | (Set | Type _), (Set | Type _) ->
   enforce_eq (get_algebraic s1) (get_algebraic s2) cst
 | QSort (q1, u1), QSort (q2, u2) ->
   if QVar.equal q1 q2 then enforce_eq u1 u2 cst
   else raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
-| (QSort _, (Set | Type _)) | ((Set | Type _), QSort _) ->
+| Erased u1, Erased u2 -> enforce_eq u1 u2 cst
+| ((Set | Type _), Erased _) | (Erased _, (Set | Type _)) ->
+  raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
+| (QSort _, (Set | Type _ | Erased _)) | ((Set | Type _ | Erased _), QSort _) ->
   raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
 
 let enforce_leq_sort s1 s2 cst = match s1, s2 with
 | (SProp, SProp) | (Prop, Prop) | (Set, Set) -> cst
 | (Prop, (Set | Type _)) -> cst
-| (((Prop | Set | Type _ | QSort _) as s1), (Prop | SProp as s2))
-| ((SProp as s1), ((Prop | Set | Type _ | QSort _) as s2)) ->
+| (((Prop | Set | Type _ | Erased _ | QSort _) as s1), (Prop | SProp as s2))
+| ((SProp as s1), ((Prop | Set | Type _ | Erased _ | QSort _) as s2)) ->
   raise (UGraph.UniverseInconsistency (None, (Le, s1, s2, None)))
 | (Set | Type _), (Set | Type _) ->
   enforce_leq (get_algebraic s1) (get_algebraic s2) cst
+| Erased u1, Erased u2 -> enforce_leq u1 u2 cst
+| ((Prop | Set | Type _), Erased _) | (Erased _, (Set | Type _)) ->
+  raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
 | QSort (q1, u1), QSort (q2, u2) ->
   if QVar.equal q1 q2 then enforce_leq u1 u2 cst
   else raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
-| (QSort _, (Set | Type _)) | ((Prop | Set | Type _), QSort _) ->
+| (QSort _, (Set | Type _ | Erased _)) | ((Prop | Set | Type _ | Erased _), QSort _) ->
   raise (UGraph.UniverseInconsistency (None, (Eq, s1, s2, None)))
 
 let enforce_univ_constraint (u,d,v) =

@@ -368,16 +368,17 @@ let abstract_constructor_type_relatively_to_inductive_types_context ntyps mind t
 
 (* Get type of inductive, with parameters instantiated *)
 
-let quality_leq q q' =
+let quality_leq pq indq =
   let open Sorts.Quality in
-  match q, q' with
+  match pq, indq with
   | QVar q, QVar q' -> Sorts.QVar.equal q q'
-  | QConstant q, QConstant q' ->
-    begin match q, q' with
+  | QConstant pq, QConstant indq' ->
+    begin match pq, indq' with
     | QSProp, _
     | _, QType
     | QProp, QProp
     | QProp, QErased
+    | QErased, QErased
       -> true
     | (QProp|QType|QErased), _ -> false
     end
@@ -410,18 +411,18 @@ let is_squashed ((_,mip),u) =
       then None
       else Some (SquashToQuality indq)
 
-let is_allowed_elimination specifu s =
+let is_allowed_elimination specifu ps =
   let open Sorts in
   match is_squashed specifu with
   | None -> true
   | Some SquashToSet ->
-    begin match s with
+    begin match ps with
       | SProp|Prop|Set -> true
       | QSort _ | Type _ | Erased _ ->
         (* XXX in [Type u] case, should we check [u == set] in the ugraph? *)
         false
     end
-  | Some (SquashToQuality indq) -> quality_leq (Sorts.quality s) indq
+  | Some (SquashToQuality indq) -> quality_leq (Sorts.quality ps) indq
 
 let is_private (mib,_) = mib.mind_private = Some true
 let is_primitive_record (mib,_) =

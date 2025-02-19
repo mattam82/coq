@@ -911,7 +911,7 @@ let extern_glob_levels uvars l =
   else UNamed []
 
 let extern_glob_sort uvars (s:glob_sort) =
-  Option.map (extern_glob_qvar uvars) (fst s), extern_glob_levels uvars (snd s)
+  Option.map (extern_glob_quality uvars) (fst s), extern_glob_levels uvars (snd s)
 
 let extern_instance uvars = function
   | Some (ql,ul) ->
@@ -1579,6 +1579,7 @@ let rec glob_of_pat
   | PSort Sorts.InSProp -> GSort Glob_ops.glob_SProp_sort
   | PSort Sorts.InProp -> GSort Glob_ops.glob_Prop_sort
   | PSort Sorts.InSet -> GSort Glob_ops.glob_Set_sort
+  | PSort Sorts.InErased -> GSort Glob_ops.glob_Erased_sort
   | PSort (Sorts.InType | Sorts.InQSort) -> GSort Glob_ops.glob_Type_sort
   | PInt i -> GInt i
   | PFloat f -> GFloat f

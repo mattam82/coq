@@ -14,6 +14,7 @@ Require Import Typeclasses.
 
 (** listings: empty **)
 Inductive empty@{s| |} : Type@{s|0} :=.
+
 (** listings: end **)
 
 Definition empty_rect@{α | u | } : forall (P : empty@{Type|} -> Type@{α | u }) (e : empty), P e
@@ -38,7 +39,8 @@ Hint Unfold not: core.
 
 
 #[projections(primitive=no)]
-Class ExFalso@{s s'| l|} (empty : Type@{s|0}) : Type := { ex_falso : forall (P : empty -> Type@{s'|l}) u, P u }.
+Class ExFalso@{s s'| l|} (empty : Type@{s|0}) : Type :=
+  { ex_falso : forall (P : empty -> Type@{s'|l}) u, P u }.
 
 Instance ExFalso_Prop@{s|l|} : ExFalso@{Prop s | l } empty := {ex_falso P u := match u with end}.
 

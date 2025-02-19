@@ -579,7 +579,7 @@ let rec compile_lam env cenv lam sz cont =
        evaluation) [Var 0,...,Var n] with values of [arg0,...,argn] *)
     let has_var = match s with
     | Sorts.Set | Sorts.Prop | Sorts.SProp -> false
-    | Sorts.Type u ->
+    | Sorts.Type u | Sorts.Erased u ->
       Univ.Universe.exists (fun (l, _) -> Option.has_some (Univ.Level.var_index l)) u
     | Sorts.QSort (q, u) ->
       Option.has_some (Sorts.QVar.var_index q)

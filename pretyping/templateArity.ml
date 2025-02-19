@@ -40,6 +40,7 @@ let get_template_arity env ind ~ctoropt =
       let template_can_be_prop = match s with
         | SProp | Prop | Set -> None
         | QSort _ -> assert false
+        | Erased _ -> None
         | Type u ->
           (* if all template levels are instantiated to Prop, do we get Prop? *)
           let template_levels = Univ.ContextSet.levels template.template_context in

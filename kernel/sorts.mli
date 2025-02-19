@@ -163,7 +163,7 @@ type t = private
 val sprop : t
 val set  : t
 val prop : t
-val type1  : t
+val erased1  : t
 val qsort : QVar.t -> Univ.Universe.t -> t
 val make : Quality.t -> Univ.Universe.t -> t
 

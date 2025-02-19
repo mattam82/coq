@@ -536,7 +536,7 @@ type ('a,'s,'u,'r) univ_visitor = {
 let univs_and_qvars_visitor =
   let open Univ in
   let visit_sort (qs,us as acc) = function
-    | Sorts.Type u ->
+    | Sorts.Type u | Sorts.Erased u ->
       qs, Universe.levels ~init:us u
     | Sorts.QSort (q,u) ->
       Sorts.QVar.Set.add q qs, Universe.levels ~init:us u

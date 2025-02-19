@@ -123,6 +123,10 @@ let rec_dep =
   declare_individual_scheme_object "rec_dep"
     (optimize_non_type_induction_scheme rect_dep true InSet)
 
+let rece_dep =
+  declare_individual_scheme_object "rece_dep"
+    (optimize_non_type_induction_scheme rect_dep true InErased)
+
 let ind_dep =
   declare_individual_scheme_object "ind_dep"
     (optimize_non_type_induction_scheme rec_dep true InProp)
@@ -143,6 +147,10 @@ let rec_nodep =
   declare_individual_scheme_object "rec_nodep"
     (optimize_non_type_induction_scheme rect_nodep false InSet)
 
+let rece_nodep =
+  declare_individual_scheme_object "rece_nodep"
+    (optimize_non_type_induction_scheme rect_nodep false InErased)
+
 let ind_nodep =
   declare_individual_scheme_object "ind_nodep"
     (optimize_non_type_induction_scheme rec_nodep false InProp)
@@ -157,11 +165,13 @@ let elim_scheme ~dep ~to_kind =
   | false, InProp -> ind_nodep
   | false, InSet -> rec_nodep
   | false, InType -> rect_nodep
+  | false, InErased -> rece_nodep
   | false, InQSort -> poly_nodep
   | true, InSProp -> sind_dep
   | true, InProp -> ind_dep
   | true, InSet -> rec_dep
   | true, InType -> rect_dep
+  | true, InErased -> rece_dep
   | true, InQSort -> poly_dep
 
 (* Case analysis *)

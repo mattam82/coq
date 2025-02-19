@@ -482,7 +482,7 @@ Notation "b1 (+) b2" := (addb b1 b2) : bool_scope.
 Coercion Properties.Bool.is_true : bool >-> Sortclass. (* Prop *)
 
 Lemma prop_congr : forall b b' : bool, b = b' -> b = b' :> Prop.
-Proof. by move=> b b' ->. Qed.
+Proof. now move=> b b' ->. Qed.
 
 Ltac prop_congr := apply: prop_congr.
 
@@ -693,7 +693,7 @@ Lemma elimTFn : b = c -> if c then ~ P else P.
 Proof. by move <-; apply: (elimNTF Hb); case b. Qed.
 
 Lemma equivPifn : (Q -> P) -> (P -> Q) -> if b then ~ Q else Q.
-Proof. by rewrite -if_neg; apply: equivPif. Qed.
+Proof. Print if_neg. rewrite -if_neg. apply: equivPif. Qed.
 
 Lemma xorPifn : Q \/ P -> ~ (Q /\ P) -> if b then Q else ~ Q.
 Proof. by rewrite -if_neg; apply: xorPif. Qed.

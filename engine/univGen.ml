@@ -146,6 +146,9 @@ let fresh_sort_in_family = function
   | InType (* Treat as Type *) ->
     let u = fresh_level () in
       sort_of_univ (Univ.Universe.make u), ((QVar.Set.empty,Level.Set.singleton u),Constraints.empty)
+  | InErased ->
+    let u = fresh_level () in
+      erased_of_univ (Univ.Universe.make u), ((QVar.Set.empty,Level.Set.singleton u),Constraints.empty)
   | InQSort ->
     let q = fresh_sort_quality () in
     let u = fresh_level () in

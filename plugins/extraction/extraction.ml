@@ -72,6 +72,7 @@ type flag = info * scheme
 
 let info_of_family = function
   | InSProp | InProp -> Logic
+  | InErased -> Logic (* FIXME *)
   | InSet | InType | InQSort -> Info
 
 let info_of_sort s = info_of_family (Sorts.family s)
@@ -248,7 +249,7 @@ let check_sort_poly sigma gr u =
   let u = EConstr.EInstance.kind sigma u in
   let qs, _ = UVars.Instance.to_array u in
   if Array.exists (function
-      | Sorts.Quality.QConstant (QSProp|QProp) -> true
+      | Sorts.Quality.QConstant (QSProp|QProp|QErased) -> true
       | QConstant QType | QVar _ -> false)
       qs
   then CErrors.user_err

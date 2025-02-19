@@ -48,4 +48,4 @@ Instance iff_Transitive@{s|u|} : Transitive iff@{s|u u} :=
 (** Logical equivalence [iff] is an equivalence relation. *)
 
 #[export]
-Instance iff_equivalence@{s|u|} : @Equivalence@{Type s | u+1 u} Type@{s | u} iff := {}.
+Instance iff_equivalence@{s|u|} : @Equivalence@{Erased s | u+1 u} Type@{s | u} iff := {}.

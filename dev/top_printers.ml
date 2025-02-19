@@ -403,6 +403,8 @@ let constr_display csr =
     | Prop -> "Prop"
     | Type u -> univ_display u;
         "Type("^(string_of_int !cnt)^")"
+    | Erased u -> univ_display u;
+      "Erased("^(string_of_int !cnt)^")"
     | QSort (q, u) -> univ_display u; Printf.sprintf "QSort(%s, %i)" (Sorts.QVar.to_string q) !cnt
 
   and universes_display l =
@@ -565,6 +567,8 @@ let print_pure_constr csr =
     | Prop -> print_string "Prop"
     | Type u -> open_hbox();
         print_string "Type("; pp (Universe.raw_pr u); print_string ")"; close_box()
+    | Erased u -> open_hbox();
+      print_string "Erased("; pp (Universe.raw_pr u); print_string ")"; close_box()
     | QSort (q, u) -> open_hbox();
         print_string "QSort("; pp (QVar.raw_pr q); print_string ", "; pp (Universe.raw_pr u); print_string ")"; close_box()
 

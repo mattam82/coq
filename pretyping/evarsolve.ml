@@ -119,6 +119,7 @@ let refresh_universes ~status ?(onlyalg=false) ?(refreshset=false)
     let sigma, l = new_univ_level_variable status !evdref in
     let s' = match ESorts.kind sigma s with
       | QSort (q, _) -> Sorts.qsort q (Univ.Universe.make l)
+      | Erased _ -> Sorts.erased_of_univ @@ Univ.Universe.make l
       | _ -> Sorts.sort_of_univ @@ Univ.Universe.make l
     in
     let s' = ESorts.make s' in
@@ -132,7 +133,7 @@ let refresh_universes ~status ?(onlyalg=false) ?(refreshset=false)
     match EConstr.kind !evdref t with
     | Sort s ->
       begin match ESorts.kind !evdref s with
-      | Type u | QSort (_, u) ->
+      | Type u | QSort (_, u) | Erased u ->
          (* TODO: check if max(l,u) is not ok as well *)
         (match Univ.Universe.level u with
         | None -> refresh_sort status ~direction s
@@ -173,7 +174,7 @@ let refresh_universes ~status ?(onlyalg=false) ?(refreshset=false)
       else (evdref := Evd.downcast ev ty' !evdref; t)
     | Sort s ->
        (match ESorts.kind !evdref s with
-        | Type u when not (Univ.Universe.is_levels u) ->
+        | Type u | Erased u when not (Univ.Universe.is_levels u) ->
            refresh_sort Evd.univ_flexible ~direction:false s
         | _ -> t)
     | _ -> EConstr.map !evdref (refresh_term_evars ~onevars ~top:false) t

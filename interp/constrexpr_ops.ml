@@ -58,7 +58,7 @@ let opt_universe_expr_eq u1 u2 =
   Glob_ops.glob_sort_gen_eq universe_expr_eq u1 u2
 
 let sort_expr_eq (q1, l1) (q2, l2) =
-  Option.equal qvar_expr_eq q1 q2 && opt_universe_expr_eq l1 l2
+  Option.equal quality_expr_eq q1 q2 && opt_universe_expr_eq l1 l2
 
 let instance_expr_eq (q1,u1) (q2,u2) =
   List.equal quality_expr_eq q1 q2 && List.equal opt_universe_expr_eq u1 u2

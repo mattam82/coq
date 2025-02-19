@@ -87,7 +87,7 @@ let test_sort_qvar =
   end
 
 type univ_or_quality =
-  | SProp | Prop | Type | Anon of Loc.t | Global of universe_expr
+  | SProp | Prop | Type | Erased | Anon of Loc.t | Global of universe_expr
 
 let force_univ ?loc = function
   | SProp -> UNamed [CSProp,0]
@@ -95,11 +95,13 @@ let force_univ ?loc = function
   | Type -> UAnonymous {rigid=UnivRigid}
   | Anon _ -> UAnonymous {rigid=UnivFlexible}
   | Global u -> UNamed u
+  | Erased -> CErrors.user_err ?loc Pp.(str"Erased cannot be used as a universe expression")
 
 let force_quality ?loc = function
   | SProp -> CQConstant QSProp
   | Prop -> CQConstant QProp
   | Type -> CQConstant QType
+  | Erased -> CQConstant QErased
   | Anon loc -> CQualVar (CQAnon (Some loc))
   | Global u ->
     (match u with
@@ -141,16 +143,26 @@ GRAMMAR EXTEND Gram
       | "Type" -> { None, UAnonymous {rigid=UnivFlexible} }
       | "Type"; "@{"; "_"; "}" -> { None, UAnonymous {rigid=UnivRigid} }
       | "Type"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" ->
-        { Some (CQVar q), u }
-      (*| IDENT "Univ"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" -> { Some (CQVar q), u } *)
-      | IDENT "𝒰"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" -> { Some (CQVar q), u }
+        { Some (CQualVar (CQVar q)), u }
+      | IDENT "𝒰"; "@{"; test_sort_qvar; q = reference; "|"; u = universe_opt; "}" -> {
+          Some (CQualVar (CQVar q)), u }
+      | IDENT "𝒰"; "@{"; q = quality; "|"; u = universe_opt; "}" -> {
+          Some (CQConstant q), u }
       | "Type"; "@{"; u = universe; "}" -> { None, UNamed u } ] ]
+  ;
+  quality:
+    [ [ "Prop" -> { Sorts.Quality.QProp }
+      | "SProp" -> { Sorts.Quality.QSProp }
+      | "Type" -> { Sorts.Quality.QType }
+      | "Erased" -> { Sorts.Quality.QErased }
+     ] ]
   ;
   sort_family:
     [ [ "Set"  -> { Sorts.InSet }
       | "Prop" -> { Sorts.InProp }
       | "SProp" -> { Sorts.InSProp }
       | "Type" -> { Sorts.InType }
+      | "Erased" -> { Sorts.InErased }
       | "Poly" -> { Sorts.InQSort } ] ]
   ;
   universe_opt:
@@ -334,6 +346,7 @@ GRAMMAR EXTEND Gram
     [ [ "SProp" -> { SProp }
       | "Prop" -> { Prop }
       | "Type" -> { Type }
+      | "Erased" -> { Erased }
       | "_" -> { Anon loc }
       | u = universe -> { Global u } ] ]
   ;
