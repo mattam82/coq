@@ -89,7 +89,7 @@ Require Import ssreflect Sigma.
  construction of dependent Records and Structures. For example, if we need
  a structure sT over a type T, we take as arguments T, sT, and a "dummy"
  function T -> sort sT:
-   Definition foo T sT & T -> sort sT := ...
+   Definition foo@{s|l} (T : 𝒰@{s|l}) sT & T -> sort sT := ...
  We can avoid specifying sT directly by calling foo (@id T), or specify
  the call completely while still ensuring the consistency of T and sT, by
  calling @foo T sT idfun. The phant_id type allows us to extend this trick
@@ -342,15 +342,15 @@ Definition all_pair I T U (w : forall i : I, T i * U i) :=
 
 Module Option.
 
-Definition apply aT rT (f : aT -> rT) x u := if u is Some y then f y else x.
+Definition apply@{s|la lr} (aT : 𝒰@{s|la}) (rT : 𝒰@{s|lr}) (f : aT -> rT) x u := if u is Some y then f y else x.
 
-Definition default T := apply (fun x : T => x).
+Definition default@{s|l} (T : 𝒰@{s|l}) := apply (fun x : T => x).
 
-Definition bind aT rT (f : aT -> option rT) := apply f None.
+Definition bind@{s|la lr} (aT : 𝒰@{s|la}) (rT : 𝒰@{s|lr}) (f : aT -> option@{s s|lr} rT) := apply f None.
 
-Definition map aT rT (f : aT -> rT) := bind (fun x => Some (f x)).
+Definition map@{s|la lr} (aT : 𝒰@{s|la}) (rT : 𝒰@{s|lr}) (f : aT -> rT) := bind (fun x => Some (f x)).
 
-Definition lift aT rT (f : aT -> rT) := fun x => Some (f x).
+Definition lift@{s|la lr} (aT : 𝒰@{s|la}) (rT : 𝒰@{s|lr}) (f : aT -> rT) := fun x => Some@{s s|lr} (f x).
 
 End Option.
 
@@ -365,16 +365,16 @@ Notation some := (Some) (only parsing).
 
 Notation erefl := eq_refl@{_ Prop|_}.
 Notation ecast i T e x := (let: erefl in _ = i := e return T in x).
-Definition esym {A x y} := @sym_eq A x y.
-Definition nesym {A x y} := @sym_not_eq A x y.
-Definition etrans {A x y z}:= @trans_eq A x y z.
+Definition esym@{l} {A : Type@{l}} {x y} := @_eq_sym@{l l l} A x y.
+Definition nesym@{l} {A : Type@{l}} {x y} := @not_eq_sym@{Type Prop|l 0} (@eq) _ _ A x y.
+Definition etrans@{l} {A : Type@{l}} {x y z}:= @eq_trans@{Type Prop|l 0} (@eq) _ A x y z.
 Definition congr1 := f_equal@{_ _ Prop|_ _}.
 Definition congr2 := f_equal2@{_ _ _ Prop|_ _ _}.
 (**  Force at least one implicit when used as a view.  **)
 Prenex Implicits esym nesym.
 
 (**  A predicate for singleton types.  **)
-Definition all_equal_to T (x0 : T) := forall x, unkeyed x = x0.
+Definition all_equal_to@{s|l} (T : 𝒰@{s|l}) (x0 : T) := forall x, unkeyed x = x0.
 
 Lemma unitE : all_equal_to tt. Proof. by case. Qed.
 
@@ -401,11 +401,11 @@ Notation "@^~ x" := (fun f => f x) : function_scope.
  Definitions and notation for explicit functions with simplification,
  i.e., which simpl and /= beta expand (this is complementary to nosimpl).  **)
 
-Variant simpl_fun (aT rT : Type) := SimplFun of aT -> rT.
+Variant simpl_fun@{sa sr|la lr} (aT : 𝒰@{sa|la}) (rT : 𝒰@{sr|lr}) : 𝒰@{sr|max(la,lr)} := SimplFun of aT -> rT.
 
 Section SimplFun.
-
-Variables aT rT : Type.
+Sorts sa sr. Universes la lr.
+Variables (aT : 𝒰@{sa|la}) (rT : 𝒰@{sr|lr}).
 
 Definition fun_of_simpl (f : simpl_fun aT rT) := fun x => let: SimplFun lam := f in lam x.
 
@@ -428,22 +428,22 @@ Notation "[ 'fun' ( x : T ) ( y : U ) => E ]" := (fun x : T => [fun y : U => E])
   (only parsing) : function_scope.
 
 (**  For delta functions in eqtype.v.  **)
-Definition SimplFunDelta aT rT (f : aT -> aT -> rT) := [fun z => f z z].
+Definition SimplFunDelta@{sa sr|la lr} (aT : 𝒰@{sa|la}) (rT : 𝒰@{sr|lr}) (f : aT -> aT -> rT) := [fun z => f z z].
 
 (**
  Extensional equality, for unary and binary functions, including syntactic
  sugar.                                                                      **)
 
 Section ExtensionalEquality.
-
-Variables A B C : Type.
+Sorts sa sb sc. Universes la lb lc.
+Variables (A : 𝒰@{sa|la}) (B : 𝒰@{sb|lb}) (C : 𝒰@{sc|lc}).
 
 Definition eqfun (f g : B -> A) : Prop := forall x, f x = g x.
 
 Definition eqrel (r s : C -> B -> A) : Prop := forall x y, r x y = s x y.
 
 Lemma frefl f : eqfun f f. Proof. by []. Qed.
-Lemma fsym f g : eqfun f g -> eqfun g f. Proof. by move=> eq_fg x. Qed.
+Lemma fsym f g : eqfun f g -> eqfun g f. Proof. move=> eq_fg x. by apply symmetry. Qed.
 
 Lemma ftrans f g h : eqfun f g -> eqfun g h -> eqfun f h.
 Proof. by move=> eq_fg eq_gh x; rewrite eq_fg. Qed.
@@ -463,8 +463,8 @@ Notation "f1 =2 f2" := (eqrel f1 f2) : type_scope.
 Notation "f1 =2 f2 :> A" := (f1 =2 (f2 : A)) : type_scope.
 
 Section Composition.
-
-Variables A B C : Type.
+Sorts s. Universes la lb lc.
+Variables (A : 𝒰@{s|la}) (B : 𝒰@{s|lb}) (C : 𝒰@{s|lc}).
 
 Definition comp (f : B -> A) (g : C -> B) x := f (g x).
 Definition catcomp g f := comp f g.
@@ -480,7 +480,8 @@ Arguments catcomp {A B C} g f x /.
 Notation "f1 \o f2" := (comp f1 f2) : function_scope.
 Notation "f1 \; f2" := (catcomp f1 f2) : function_scope.
 
-Lemma compA {A B C D : Type} (f : B -> A) (g : C -> B) (h : D -> C) :
+Lemma compA@{s|la lb lc ld} {A : 𝒰@{s|la}} {B : 𝒰@{s|lb}} {C : 𝒰@{s|lc}} {D : 𝒰@{s|ld}}
+  (f : B -> A) (g : C -> B) (h : D -> C) :
   f \o (g \o h) = (f \o g) \o h.
 Proof. by []. Qed.
 
@@ -492,16 +493,16 @@ Notation id := (fun x => x).
 
 Notation "@ 'id' T" := (fun x : T => x) (only parsing) : function_scope.
 
-Definition idfun T x : T := x.
+Definition idfun@{s|l} (T : 𝒰@{s|l}) x : T := x.
 Arguments idfun {T} x /.
 
-Definition phant_id T1 T2 v1 v2 := phantom T1 v1 -> phantom T2 v2.
+Definition phant_id@{s|l} (T1 : 𝒰@{s|l}) (T2 : 𝒰@{s|l}) v1 v2 := phantom T1 v1 -> phantom T2 v2.
 
 Section OptionTheory.
+Sorts s. Universes la lr ls.
+Variables (aT : 𝒰@{s|la}) (rT : 𝒰@{s|lr}) (sT : 𝒰@{s|ls}) (f : aT -> rT) (g : rT -> sT).
 
-Variables (aT rT sT : Type) (f : aT -> rT) (g : rT -> sT).
-
-Lemma obindEapp (fo : aT -> option rT) : obind fo = oapp fo None.
+Lemma obindEapp (fo : aT -> option@{s s|lr} rT) : obind fo = oapp fo None.
 Proof. by []. Qed.
 
 Lemma omapEbind : omap f = obind (olift f).
@@ -509,6 +510,12 @@ Proof. by []. Qed.
 
 Lemma omapEapp : omap f = oapp (olift f) None.
 Proof. by []. Qed.
+
+End OptionTheory.
+
+Section TypeOptionTheory.
+Universes la lr ls.
+Variables (aT : Type@{la}) (rT : Type@{lr}) (sT : Type@{ls}) (f : aT -> rT) (g : rT -> sT).
 
 Lemma oappEmap (y0 : rT) x : oapp f y0 x = odflt y0 (omap f x).
 Proof. by case: x. Qed.
@@ -525,18 +532,17 @@ Proof. by case. Qed.
 Lemma olift_comp : olift (g \o f) = olift g \o f.
 Proof. by []. Qed.
 
-End OptionTheory.
+End TypeOptionTheory.
 
 (** The empty type. **)
 
 Notation void := empty@{Type|}.
 
-Definition of_void T (x : void) : T := match x with end.
+Definition of_void@{s|l} (T : 𝒰@{s|l}) (x : void) : T := match x with end.
 
 (**  Strong sigma types.  **)
 
 Section Tag.
-
 Sort s.
 Universe l lT lU.
 Variables (I : Type@{s|l}) (i : I)
@@ -674,8 +680,8 @@ Notation "{ 'mono' f : x y /~ a }" :=
  partial function.                                                          **)
 
 Section Injections.
-
-Variables (rT aT : Type) (f : aT -> rT).
+Universes la lr.
+Variables (rT : Type@{lr}) (aT : Type@{la}) (f : aT -> rT).
 
 Definition injective := forall x1 x2, f x1 = f x2 -> x1 = x2.
 
@@ -705,16 +711,17 @@ End Injections.
 Lemma Some_inj {T : nonPropType} : injective (@Some T).
 Proof. by move=> x y []. Qed.
 
-Lemma of_voidK T : pcancel (of_void T) [fun _ => None].
+Lemma of_voidK@{l} (T : Type@{l}) : pcancel (of_void T) [fun _ => None].
 Proof. by case. Qed.
 
 (**  cancellation lemmas for dependent type casts. **)
 (*
-Lemma esymK T x y : cancel (@esym T x y) (@esym T y x).
+Lemma esymK@{s|l} (T : 𝒰@{s|l}) x y : cancel (@esym T x y) (@esym T y x).
 Proof. by case: y /. Qed.
 *)
 
-Lemma etrans_id T x y (eqxy : x = y :> T : Prop) : transitivity _ (reflexivity x) eqxy = eqxy.
+Lemma etrans_id@{s|l} (T : 𝒰@{s|l}) x y (eqxy : @eq@{s Prop|l} T x y) :
+  transitivity _ (reflexivity x) eqxy = eqxy.
 Proof. by case: y / eqxy. Qed.
 
 Section InjectionsTheory.
@@ -746,10 +753,7 @@ Lemma ocan_comp [fo : B -> option A] [ho : C -> option B]
 Proof.
 move=> fK hK c /=; rewrite -[RHS]hK/=. case hcE : (ho c) => [b|]//=.
 by rewrite -[b in RHS]fK; case: (fo b) => //=; have := hK c; rewrite hcE.
-Set Printing All.
-(* Qed. *)
-(* FIXME! something forces an eq@{Type Type} while an eq@{Type Prop} is expected (or the contrary...) *)
-Admitted.
+Qed.
 
 Lemma eq_inj : injective f -> f =1 g -> injective g.
 Proof. by move=> injf eqfg x y; rewrite -2!eqfg; apply: injf. Qed.

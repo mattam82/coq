@@ -589,7 +589,7 @@ Proof. by case: b => // /(_ isT). Qed.
  Coercion of sum-style datatypes into bool, which makes it possible
  to use ssr's boolean if rather than Rocq's "generic" if.             **)
 
-Coercion isSome T (u : option T) := if u is Some _ then true else false.
+Coercion isSome@{s|l} (T : 𝒰@{s|l}) (u : option T) := if u is Some _ then true else false.
 
 Coercion is_left@{s s' s''|u v|} (A : Type@{s|u}) (B : Type@{s'|v}) (u : A + B) := if u is left _ then true@{s''|} else false@{s''}.
 
@@ -824,7 +824,7 @@ Proof.
 by case=> // undecP; apply/undecP; right=> notP; apply/notF/undecP; left.
 Qed.
 
-Lemma classic_pick T P : classically ({x : T | P x} + (forall x, ~ P x)).
+Lemma classic_pick@{s|l} (T : 𝒰@{s|l}) P : classically ({x : T | P x} + (forall x, ~ P x)).
 Proof.
 case=> // undecP; apply/undecP; right=> x Px.
 by apply/notF/undecP; left; exists x.
@@ -836,11 +836,11 @@ move=> iPQ []// notPQ; apply/notPQ=> /iPQ-cQ.
 by case: notF; apply: cQ => hQ; apply: notPQ.
 Qed.
 
-Lemma classic_sigW T (P : T -> Prop) :
+Lemma classic_sigW@{l} (T : Type@{l}) (P : T -> Prop) :
   classically (exists x, P x) <-> classically ({x | P x}).
 Proof. by split; apply: classic_bind => -[x Px]; apply/classicW; exists x. Qed.
 
-Lemma classic_ex T (P : T -> Prop) :
+Lemma classic_ex@{s|l} (T : 𝒰@{s|l}) (P : T -> Prop) :
   ~ (forall x, ~ P x) -> classically (exists x, P x).
 Proof.
 move=> NfNP; apply/classicP => exPF; apply: NfNP => x Px.
@@ -1256,10 +1256,10 @@ Ltac bool_congr :=
 
 (** Boolean predicates. *)
 
-Definition pred@{s | l} (T : 𝒰@{s | l}) := T -> bool.
+Definition pred@{s|l} (T : 𝒰@{s|l}) := T -> bool.
 Identity Coercion fun_of_pred : pred >-> Funclass.
 
-Definition subpred T (p1 p2 : pred T) := forall x : T, p1 x -> p2 x.
+Definition subpred@{s|l} (T : 𝒰@{s|l}) (p1 p2 : pred T) := forall x : T, p1 x -> p2 x.
 
 (* Notation for some manifest predicates. *)
 
@@ -1273,17 +1273,17 @@ Notation xpreim := (fun f (p : pred _) x => p (f x)).
 
 (** The packed class interface for pred-like types. **)
 
-Structure predType@{s s'| l l'} (T : 𝒰@{s | l}) :=
+Structure predType@{s s'| l l'} (T : 𝒰@{s|l}) :=
    PredType {pred_sort :> 𝒰@{s' | l'}; topred : pred_sort -> pred T}.
 
-Definition clone_pred T U :=
-  fun pT & @pred_sort T pT -> U =>
+Definition clone_pred@{st su sp|lt lu lp} (T : 𝒰@{st|lt}) (U : 𝒰@{su|lu}) :=
+  fun (pT : predType@{st sp|lt lp} T) & @pred_sort T pT -> U =>
   fun toP (pT' := @PredType T U toP) & phant_id pT' pT => pT'.
 Notation "[ 'predType' 'of' T ]" := (@clone_pred _ T _ id _ id) : form_scope.
 
-Canonical predPredType T := PredType (@id (pred T)).
+Canonical predPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@id (pred T)).
 Set Warnings "-redundant-canonical-projection".
-Canonical boolfunPredType T := PredType (@id (T -> bool)).
+Canonical boolfunPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@id (T -> bool)).
 Set Warnings "redundant-canonical-projection".
 
 (** The type of abstract collective predicates.
@@ -1311,18 +1311,18 @@ Set Warnings "redundant-canonical-projection".
 Notation "{ 'pred' T }" := (pred_sort (predPredType T)) : type_scope.
 
 (** The type of self-simplifying collective predicates. **)
-Definition simpl_pred T := simpl_fun T bool.
-Definition SimplPred {T} (p : pred T) : simpl_pred T := SimplFun p.
+Definition simpl_pred@{s|l} (T : 𝒰@{s|l}) := simpl_fun T bool.
+Definition SimplPred@{s|l} {T : 𝒰@{s|l}} (p : pred T) : simpl_pred T := SimplFun p.
 
 (** Some simpl_pred constructors. **)
 
-Definition pred0 {T} := @SimplPred T xpred0.
-Definition predT {T} := @SimplPred T xpredT.
-Definition predI {T} (p1 p2 : pred T) := SimplPred (xpredI p1 p2).
-Definition predU {T} (p1 p2 : pred T) := SimplPred (xpredU p1 p2).
-Definition predC {T} (p : pred T) := SimplPred (xpredC p).
-Definition predD {T} (p1 p2 : pred T) := SimplPred (xpredD p1 p2).
-Definition preim {aT rT} (f : aT -> rT) (d : pred rT) := SimplPred (xpreim f d).
+Definition pred0@{s|l} {T : 𝒰@{s|l}} := @SimplPred T xpred0.
+Definition predT@{s|l} {T : 𝒰@{s|l}} := @SimplPred T xpredT.
+Definition predI@{s|l} {T : 𝒰@{s|l}} (p1 p2 : pred T) := SimplPred (xpredI p1 p2).
+Definition predU@{s|l} {T : 𝒰@{s|l}} (p1 p2 : pred T) := SimplPred (xpredU p1 p2).
+Definition predC@{s|l} {T : 𝒰@{s|l}} (p : pred T) := SimplPred (xpredC p).
+Definition predD@{s|l} {T : 𝒰@{s|l}} (p1 p2 : pred T) := SimplPred (xpredD p1 p2).
+Definition preim@{sa sr|la lr} {aT : 𝒰@{sa|la}} {rT : 𝒰@{sr|lr}} (f : aT -> rT) (d : pred rT) := SimplPred (xpreim f d).
 
 Notation "[ 'pred' : T | E ]" := (SimplPred (fun _ : T => E%B)) :
   function_scope.
@@ -1348,14 +1348,14 @@ Notation "[ 'pred' x : T | E1 & E2 ]" :=
  structure for simpl_pred T is _not_ convertible to predPredType T.  **)
 
 Module PredOfSimpl.
-Definition coerce T (sp : simpl_pred T) : pred T := fun_of_simpl sp.
+Definition coerce@{s|l} (T : 𝒰@{s|l}) (sp : simpl_pred T) : pred T := fun_of_simpl sp.
 End PredOfSimpl.
 Notation pred_of_simpl := PredOfSimpl.coerce.
 Coercion pred_of_simpl : simpl_pred >-> pred.
-Canonical simplPredType T := PredType (@pred_of_simpl T).
+Canonical simplPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@pred_of_simpl T).
 
 Module Type PredSortOfSimplSignature.
-Parameter coerce : forall T, simpl_pred T -> {pred T}.
+Parameter coerce@{s|l} : forall (T : 𝒰@{s|l}), simpl_pred T -> {pred T}.
 End PredSortOfSimplSignature.
 Module DeclarePredSortOfSimpl (PredSortOfSimpl : PredSortOfSimplSignature).
 Coercion PredSortOfSimpl.coerce : simpl_pred >-> pred_sort.
@@ -1370,10 +1370,10 @@ Module Export PredSortOfSimplCoercion := DeclarePredSortOfSimpl PredOfSimpl.
  is already fixed (at least, not without redefining bool, true, false and
  all bool operations and lemmas); we provide syntax to recast a given type
  in predArgType as a workaround. **)
-Definition predArgType := Type.
+Definition predArgType@{s|l} := 𝒰@{s|l}.
 Bind Scope type_scope with predArgType.
 Identity Coercion sort_of_predArgType : predArgType >-> Sortclass.
-Coercion pred_of_argType (T : predArgType) : simpl_pred T := predT.
+Coercion pred_of_argType@{s|l} (T : predArgType@{s|l}) : simpl_pred T := predT.
 Notation "{ : T }" := (T%type : predArgType) : type_scope.
 
 (** Boolean relations.
@@ -1385,37 +1385,37 @@ Notation "{ : T }" := (T%type : predArgType) : type_scope.
  should be invisible.
  **)
 
-Definition rel T := T -> pred T.
+Definition rel@{s|l} (T : 𝒰@{s|l}) := T -> pred T.
 Identity Coercion fun_of_rel : rel >-> Funclass.
 
-Definition subrel T (r1 r2 : rel T) := forall x y : T, r1 x y -> r2 x y.
+Definition subrel@{s|l} (T : 𝒰@{s|l}) (r1 r2 : rel T) := forall x y : T, r1 x y -> r2 x y.
 
-Definition simpl_rel T := T -> simpl_pred T.
+Definition simpl_rel@{s|l} (T : 𝒰@{s|l}) := T -> simpl_pred T.
 
-Coercion rel_of_simpl T (sr : simpl_rel T) : rel T := fun x : T => sr x.
+Coercion rel_of_simpl@{s|l} (T : 𝒰@{s|l}) (sr : simpl_rel T) : rel T := fun x : T => sr x.
 Arguments rel_of_simpl {T} sr x /.
 
 Notation xrelU := (fun (r1 r2 : rel _) x y => r1 x y || r2 x y).
 Notation xrelpre := (fun f (r : rel _) x y => r (f x) (f y)).
 
-Definition SimplRel {T} (r : rel T) : simpl_rel T := fun x => SimplPred (r x).
-Definition relU {T} (r1 r2 : rel T) := SimplRel (xrelU r1 r2).
-Definition relpre {aT rT} (f : aT -> rT) (r : rel rT) := SimplRel (xrelpre f r).
+Definition SimplRel@{s|l} {T : 𝒰@{s|l}} (r : rel T) : simpl_rel T := fun x => SimplPred (r x).
+Definition relU@{s|l} {T : 𝒰@{s|l}} (r1 r2 : rel T) := SimplRel (xrelU r1 r2).
+Definition relpre@{sa sr|la lr} {aT : 𝒰@{sa|la}} {rT : 𝒰@{sr|lr}} (f : aT -> rT) (r : rel rT) := SimplRel (xrelpre f r).
 
 Notation "[ 'rel' x y | E ]" := (SimplRel (fun x y => E%B))
   (only parsing) : function_scope.
 Notation "[ 'rel' x y : T | E ]" :=
   (SimplRel (fun x y : T => E%B)) (only parsing) : function_scope.
 
-Lemma subrelUl T (r1 r2 : rel T) : subrel r1 (relU r1 r2).
+Lemma subrelUl@{s|l} (T : 𝒰@{s|l}) (r1 r2 : rel T) : subrel r1 (relU r1 r2).
 Proof. by move=> x y r1xy; apply/orP; left. Qed.
 
-Lemma subrelUr T (r1 r2 : rel T) : subrel r2 (relU r1 r2).
+Lemma subrelUr@{s|l} (T : 𝒰@{s|l}) (r1 r2 : rel T) : subrel r2 (relU r1 r2).
 Proof. by move=> x y r2xy; apply/orP; right. Qed.
 
 (** Variant of simpl_pred specialised to the membership operator. **)
 
-Variant mem_pred@{s | l} (T : 𝒰@{s | l}) := Mem of pred T.
+Variant mem_pred@{s|l} (T : 𝒰@{s|l}) := Mem of pred T.
 
 (**
   We mainly declare pred_of_mem as a coercion so that it is not displayed.
@@ -1431,12 +1431,12 @@ Variant mem_pred@{s | l} (T : 𝒰@{s | l}) := Mem of pred T.
   will be used, resulting in a subgoal that displays as mem A x by simplifies
   to x \in A.
  **)
-Coercion pred_of_mem {T} mp : {pred T} := let: Mem p := mp in [eta p].
-Canonical memPredType T := PredType (@pred_of_mem T).
+Coercion pred_of_mem@{s|l} {T : 𝒰@{s|l}} mp : {pred T} := let: Mem p := mp in [eta p].
+Canonical memPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@pred_of_mem T).
 
-Definition in_mem {T} (x : T) mp := pred_of_mem mp x.
-Definition eq_mem {T} mp1 mp2 := forall x : T, in_mem x mp1 = in_mem x mp2.
-Definition sub_mem {T} mp1 mp2 := forall x : T, in_mem x mp1 -> in_mem x mp2.
+Definition in_mem@{s|l} {T : 𝒰@{s|l}} (x : T) mp := pred_of_mem mp x.
+Definition eq_mem@{s|l} {T : 𝒰@{s|l}} mp1 mp2 := forall x : T, in_mem x mp1 = in_mem x mp2.
+Definition sub_mem@{s|l} {T : 𝒰@{s|l}} mp1 mp2 := forall x : T, in_mem x mp1 -> in_mem x mp2.
 
 Arguments in_mem {T} x mp : simpl never.
 Global Typeclasses Opaque eq_mem sub_mem.
@@ -1445,9 +1445,9 @@ Global Typeclasses Opaque eq_mem sub_mem.
   coercion, but does _not_ override the pred_of_mem : mem_pred >-> pred_sort
   explicit coercion declaration above.
  **)
-Coercion simpl_of_mem {T} mp := SimplPred (fun x : T => in_mem x mp).
+Coercion simpl_of_mem@{s|l} {T : 𝒰@{s|l}} mp := SimplPred (fun x : T => in_mem x mp).
 
-Lemma sub_refl T (mp : mem_pred T) : sub_mem mp mp. Proof. by []. Qed.
+Lemma sub_refl@{s|l} (T : 𝒰@{s|l}) (mp : mem_pred T) : sub_mem mp mp. Proof. by []. Qed.
 Arguments sub_refl {T mp} [x] mp_x.
 
 (**
@@ -1456,7 +1456,7 @@ Arguments sub_refl {T mp} [x] mp_x.
  Mem [eta ?p] sets ?p := toP A (or ?p := P if toP = id and A = [eta P]),
  rather than topred pT A, had we put mem A := Mem (topred A).
 **)
-Definition mem T (pT : predType T) : pT -> mem_pred T :=
+Definition mem@{s|l} (T : 𝒰@{s|l}) (pT : predType@{s s|l l} T) : pT -> mem_pred T :=
   let: PredType toP := pT in fun A => Mem [eta toP A].
 Arguments mem {T pT} A : rename, simpl never.
 
@@ -1497,19 +1497,19 @@ Notation "[ 'rel' x y 'in' A ]" := [rel x y in A & A] : function_scope.
   be convertible to either applicative_of_simpl or pred_of_simpl. Indeed
   they differ here by a commutative conversion (of the match and lambda).
  **)
-Definition applicative_pred T := pred T.
-Definition collective_pred T := pred T.
-Coercion applicative_pred_of_simpl T (sp : simpl_pred T) : applicative_pred T :=
+Definition applicative_pred@{s|l} (T : 𝒰@{s|l}) := pred T.
+Definition collective_pred@{s|l} (T : 𝒰@{s|l}) := pred T.
+Coercion applicative_pred_of_simpl@{s|l} (T : 𝒰@{s|l}) (sp : simpl_pred T) : applicative_pred T :=
   fun_of_simpl sp.
-Coercion collective_pred_of_simpl T (sp : simpl_pred T) : collective_pred T :=
+Coercion collective_pred_of_simpl@{s|l} (T : 𝒰@{s|l}) (sp : simpl_pred T) : collective_pred T :=
   let: SimplFun p := sp in p.
 
 (** Explicit simplification rules for predicate application and membership. **)
 Section PredicateSimplification.
+Sorts s. Universes l.
+Variables T : 𝒰@{s|l}.
 
-Variables T : Type.
-
-Implicit Types (p : pred T) (pT : predType T) (sp : simpl_pred T).
+Implicit Types (p : pred T) (sp : simpl_pred T).
 Implicit Types (mp : mem_pred T).
 
 (**
@@ -1564,7 +1564,7 @@ Structure registered_applicative_pred p := RegisteredApplicativePred {
   _ : applicative_pred_value = p
 }.
 Definition ApplicativePred p := RegisteredApplicativePred (erefl p).
-Canonical applicative_pred_applicative sp :=
+Canonical applicative_pred_applicative (sp : simpl_pred T) :=
   ApplicativePred (applicative_pred_of_simpl sp).
 
 #[projections(primitive=no)]
@@ -1586,10 +1586,10 @@ Structure applicative_mem_pred p :=
 Canonical check_applicative_mem_pred p (ap : registered_applicative_pred p) :=
   [eta @ApplicativeMemPred ap].
 
-Lemma mem_topred pT (pp : pT) : mem (topred pp) = mem pp.
+Lemma mem_topred@{sp|lp} (pT : predType@{s sp|l lp} T) (pp : pT) : mem (topred pp) = mem pp.
 Proof. by case: pT pp. Qed.
 
-Lemma topredE pT x (pp : pT) : topred pp x = (x \in pp).
+Lemma topredE@{sp|lp} (pT : predType@{s sp|l lp} T) x (pp : pT) : topred pp x = (x \in pp).
 Proof. by rewrite -mem_topred. Qed.
 
 Lemma app_predE x p (ap : registered_applicative_pred p) : ap x = (x \in p).
@@ -1613,11 +1613,6 @@ Proof. by case: msp => _ /= ->. Qed.
 Lemma unfold_in x p : (x \in ([eta p] : pred T)) = p x.
 Proof. by []. Qed.
 
-Lemma simpl_predE p : SimplPred p =1 p.
-Proof. by []. Qed.
-
-Definition inE := (in_applicative, in_simpl, simpl_predE). (* to be extended *)
-
 Lemma mem_simpl sp : mem sp = sp :> pred T.
 Proof. by []. Qed.
 
@@ -1626,6 +1621,11 @@ Definition memE := mem_simpl. (* could be extended *)
 Lemma mem_mem mp :
   (mem mp = mp) * (mem (mp : simpl_pred T) = mp) * (mem (mp : pred T) = mp).
 Proof. by case: mp. Qed.
+
+Lemma simpl_predE p : SimplPred p =1 p.
+Proof. by []. Qed.
+
+Definition inE := (in_applicative, in_simpl, simpl_predE). (* to be extended *)
 
 End PredicateSimplification.
 
@@ -1767,7 +1767,8 @@ Section RelationProperties.
  Caveat: reflexive should not be used to state lemmas, as auto and trivial
  will not expand the constant.                                               **)
 
-Variable T : Type.
+Sorts s. Universes l.
+Variable T : 𝒰@{s|l}.
 
 Variable R : rel T.
 
@@ -1813,7 +1814,7 @@ Qed.
 
 End RelationProperties.
 
-Lemma rev_trans T (R : rel T) : transitive R -> transitive (fun x y => R y x).
+Lemma rev_trans@{s|l} (T : 𝒰@{s|l}) (R : rel T) : transitive R -> transitive (fun x y => R y x).
 Proof. by move=> trR x y z Ryx Rzy; apply: trR Rzy Ryx. Qed.
 
 (**  Property localization  **)
@@ -1869,7 +1870,7 @@ Definition prop_on2 Pf P & phantom T3 (Pf f) & ph {all2 P} :=
 End LocalProperties.
 
 Definition inPhantom := Phantom Prop.
-Definition onPhantom {T} P (x : T) := Phantom Prop (P x).
+Definition onPhantom@{s|l} {T : 𝒰@{s|l}} P (x : T) := Phantom Prop (P x).
 
 Definition bijective_in aT rT (d : mem_pred aT) (f : aT -> rT) :=
   exists2 g, prop_in1 d (inPhantom (cancel f g))
@@ -2145,8 +2146,8 @@ Lemma pcan_in_comp [A B C : Type] (D : {pred B}) (D' : {pred C})
   {in D', pcancel (f \o h) (obind h' \o f')}.
 Proof. by move=> hD fK hK c cD /=; rewrite fK/= ?hK ?hD. Qed.
 
-Definition pred_oapp T (D : {pred T}) : pred (option T) :=
-  [pred x | oapp (mem D) false x].
+Definition pred_oapp@{s|l} (T : 𝒰@{s|l}) (D : {pred T}) : pred (option@{s s|l} T) :=
+  [pred x | oapp (pred_of_mem (mem D)) false x].
 
 Lemma ocan_in_comp [A B C : Type] (D : {pred B}) (D' : {pred C})
     [f : B -> option A] [h : C -> option B] [f' : A -> B] [h' : B -> C] :
@@ -2184,25 +2185,25 @@ Arguments in1_sig {T1 D1 P1}.
 Arguments in2_sig {T1 T2 D1 D2 P2}.
 Arguments in3_sig {T1 T2 T3 D1 D2 D3 P3}.
 
-Lemma sub_in2 T d d' (P : T -> T -> Prop) :
+Lemma sub_in2@{s|l} (T : 𝒰@{s|l}) d d' (P : T -> T -> Prop) :
   sub_mem d d' -> forall Ph : ph {all2 P}, prop_in2 d' Ph -> prop_in2 d Ph.
 Proof. by move=> /= sub_dd'; apply: sub_in11. Qed.
 
-Lemma sub_in3 T d d' (P : T -> T -> T -> Prop) :
+Lemma sub_in3@{s|l} (T : 𝒰@{s|l}) d d' (P : T -> T -> T -> Prop) :
   sub_mem d d' -> forall Ph : ph {all3 P}, prop_in3 d' Ph -> prop_in3 d Ph.
 Proof. by move=> /= sub_dd'; apply: sub_in111. Qed.
 
-Lemma sub_in12 T1 T d1 d1' d d' (P : T1 -> T -> T -> Prop) :
+Lemma sub_in12@{s|l} (T : 𝒰@{s|l})1 T d1 d1' d d' (P : T1 -> T -> T -> Prop) :
   sub_mem d1 d1' -> sub_mem d d' ->
   forall Ph : ph {all3 P}, prop_in12 d1' d' Ph -> prop_in12 d1 d Ph.
 Proof. by move=> /= sub1 sub; apply: sub_in111. Qed.
 
-Lemma sub_in21 T T3 d d' d3 d3' (P : T -> T -> T3 -> Prop) :
+Lemma sub_in21@{s|l} (T : 𝒰@{s|l}) T3 d d' d3 d3' (P : T -> T -> T3 -> Prop) :
   sub_mem d d' -> sub_mem d3 d3' ->
   forall Ph : ph {all3 P}, prop_in21 d' d3' Ph -> prop_in21 d d3 Ph.
 Proof. by move=> /= sub sub3; apply: sub_in111. Qed.
 
-Lemma equivalence_relP_in T (R : rel T) (A : pred T) :
+Lemma equivalence_relP_in@{s|l} (T : 𝒰@{s|l}) (R : rel T) (A : pred T) :
   {in A & &, equivalence_rel R}
    <-> {in A, reflexive R} /\ {in A &, forall x y, R x y -> {in A, R x =1 R y}}.
 Proof.
