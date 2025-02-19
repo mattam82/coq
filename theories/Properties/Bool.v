@@ -136,9 +136,6 @@ Qed.
 (************************)
 (** * Order on booleans *)
 (************************)
-Set Debug "ustate".
-Set Debug "cases".
-Set Debug "inductiveops".
 
 (* match b1 return ?X : 𝒰@{s|l} *)
 #[ local ] Definition le (b1 b2:bool) :=
@@ -185,8 +182,6 @@ Register CompGt as core.CompareSpec.CompGt.
 Lemma compare_spec : forall b1 b2,
   CompareSpec (b1 = b2) (lt b1 b2) (lt b2 b1) (compare b1 b2).
 Proof. destruct b1, b2; auto. all:constructor; cbn; eauto. Qed.
-
-
 
 (** Notations *)
 Module BoolNotations.

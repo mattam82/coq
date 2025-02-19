@@ -615,8 +615,8 @@ Definition decidable P := {P} + {~ P}.
      Rewrite if_arg moves an argument inside a function-valued if        **)
 
 Section BoolIf.
-
-Variables (A B : Type) (x : A) (f : A -> B) (b : bool) (vT vF : A).
+Sorts sa sb. Universes la lb.
+Variables (A : 𝒰@{sa | la}) (B : 𝒰@{sb | lb}) (x : A) (f : A -> B) (b : bool) (vT vF : A).
 
 Variant if_spec (not_b : Prop) : bool -> A -> Set :=
   | IfSpecTrue  of      b : if_spec not_b true vT
@@ -693,7 +693,7 @@ Lemma elimTFn : b = c -> if c then ~ P else P.
 Proof. by move <-; apply: (elimNTF Hb); case b. Qed.
 
 Lemma equivPifn : (Q -> P) -> (P -> Q) -> if b then ~ Q else Q.
-Proof. Print if_neg. rewrite -if_neg. apply: equivPif. Qed.
+Proof. by rewrite -if_neg; apply: equivPif. Qed.
 
 Lemma xorPifn : Q \/ P -> ~ (Q /\ P) -> if b then Q else ~ Q.
 Proof. by rewrite -if_neg; apply: xorPif. Qed.
@@ -1256,7 +1256,7 @@ Ltac bool_congr :=
 
 (** Boolean predicates. *)
 
-Definition pred T := T -> bool.
+Definition pred@{s | l} (T : 𝒰@{s | l}) := T -> bool.
 Identity Coercion fun_of_pred : pred >-> Funclass.
 
 Definition subpred T (p1 p2 : pred T) := forall x : T, p1 x -> p2 x.
@@ -1273,8 +1273,8 @@ Notation xpreim := (fun f (p : pred _) x => p (f x)).
 
 (** The packed class interface for pred-like types. **)
 
-Structure predType T :=
-   PredType {pred_sort :> Type; topred : pred_sort -> pred T}.
+Structure predType@{s s'| l l'} (T : 𝒰@{s | l}) :=
+   PredType {pred_sort :> 𝒰@{s' | l'}; topred : pred_sort -> pred T}.
 
 Definition clone_pred T U :=
   fun pT & @pred_sort T pT -> U =>
@@ -1415,7 +1415,7 @@ Proof. by move=> x y r2xy; apply/orP; right. Qed.
 
 (** Variant of simpl_pred specialised to the membership operator. **)
 
-Variant mem_pred T := Mem of pred T.
+Variant mem_pred@{s | l} (T : 𝒰@{s | l}) := Mem of pred T.
 
 (**
   We mainly declare pred_of_mem as a coercion so that it is not displayed.
@@ -1825,7 +1825,10 @@ Local Notation ph := (phantom _).
 
 Section LocalProperties.
 
-Variables T1 T2 T3 : Type.
+Sorts s1 s2 s3.
+Universes l1 l2 l3.
+
+Variables (T1 : 𝒰@{s1 | l1}) (T2 : 𝒰@{s2 | l2}) (T3 : 𝒰@{s3 | l3}).
 
 Variables (d1 : mem_pred T1) (d2 : mem_pred T2) (d3 : mem_pred T3).
 Local Notation ph := (phantom Prop).

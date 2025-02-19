@@ -324,14 +324,14 @@ Notation "{ 'type' 'of' c 'for' s }" := (dependentReturnType c s) : type_scope.
    We also define a simpler version ("phant" / "Phant") of phantom for the
  common case where p_type is Type.                                           **)
 
-Variant phantom T (p : T) : Prop := Phantom.
+Variant phantom@{s | l} (T : 𝒰@{s|l}) (p : T) : Prop := Phantom.
 Arguments phantom : clear implicits.
 Arguments Phantom : clear implicits.
-Variant phant (p : Type) : Prop := Phant.
+Variant phant@{s | l} (T : 𝒰@{s|l}) : Prop := Phant.
 
 (**  Internal tagging used by the implementation of the ssreflect elim.  **)
 
-Definition protect_term@{s|l|} (A : Type@{s | l}) (x : A) : A := x.
+Definition protect_term@{s|l|} (A : 𝒰@{s | l}) (x : A) : A := x.
 
 Register protect_term as plugins.ssreflect.protect_term.
 
