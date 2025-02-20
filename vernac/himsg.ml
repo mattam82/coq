@@ -266,11 +266,11 @@ let explain_elim_arity env sigma ind c okinds =
         let ppt = ppt ~ppunivs:true () in
         hov 0
           (str "the return type has sort" ++ spc () ++ ppt ++ spc () ++
-            str "while it may not be of a variable sort quality.") ++
+            str "while it may only be one of SProp, Prop, or Erased.") ++
         fnl () ++
         hov 0
           (str "Elimination of a sort polymorphic inductive object instantiated to sort Erased" ++ spc() ++
-            str "is not allowed on a predicate in a variable sort quality.")
+            str "is not allowed on a predicate in " ++ ppt)
       | SquashToQuality (QConstant QType) ->
         let ppt = ppt ~ppunivs:true () in
         hov 0

@@ -65,7 +65,7 @@ Section ProjectionsProp.
 
 End ProjectionsProp.
 
-Notation "'Σ' x .. y , B" := (sigma _ (fun x => .. (sigma _ (fun y => B)) ..))
+Notation "'Σ' x .. y , B" := (sigma@{_ _ Type|_ _} _ (fun x => .. (sigma@{_ _ Type| _ _} _ (fun y => B)) ..))
   (at level 200, x binder, right associativity,
    format "'[' 'Σ'  '/  ' x  ..  y ,  '/  ' B ']'")
   : type_scope.
@@ -180,7 +180,6 @@ Notation "{ x : A | P & Q }" := (sig (A:=A) (fun x => P /\ Q)) :
   type_scope.
 Notation "{ x : A & P & Q }" := (sigmaR2 (A:=A) (fun x => P) (fun x => Q)) :
   type_scope.
-
 
 Notation "{ ' pat | P }" := (sig (fun pat => P)) : type_scope.
 Notation "{ ' pat : A | P }" := (sig (A:=A) (fun pat => P)) : type_scope.

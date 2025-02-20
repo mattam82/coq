@@ -1273,17 +1273,17 @@ Notation xpreim := (fun f (p : pred _) x => p (f x)).
 
 (** The packed class interface for pred-like types. **)
 
-Structure predType@{s s'| l l'} (T : 𝒰@{s|l}) :=
+Structure predType@{s s'|l l'} (T : 𝒰@{s|l}) : 𝒰@{Type|max(l,l'+1)}:=
    PredType {pred_sort :> 𝒰@{s' | l'}; topred : pred_sort -> pred T}.
 
-Definition clone_pred@{st su sp|lt lu lp} (T : 𝒰@{st|lt}) (U : 𝒰@{su|lu}) :=
-  fun (pT : predType@{st sp|lt lp} T) & @pred_sort T pT -> U =>
+Definition clone_pred@{s s'|lt lu lp} (T : 𝒰@{s|lt}) (U : 𝒰@{s|lu}) :=
+  fun (pT : predType@{s s'|lt lp} T) & @pred_sort T pT -> U =>
   fun toP (pT' := @PredType T U toP) & phant_id pT' pT => pT'.
 Notation "[ 'predType' 'of' T ]" := (@clone_pred _ T _ id _ id) : form_scope.
 
-Canonical predPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@id (pred T)).
+Canonical predPredType@{s|l} (T : 𝒰@{s|l}) : predType T := PredType (@id (pred T)).
 Set Warnings "-redundant-canonical-projection".
-Canonical boolfunPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@id (T -> bool)).
+Canonical boolfunPredType@{l} (T : Type@{l}) := PredType (@id (T -> bool)).
 Set Warnings "redundant-canonical-projection".
 
 (** The type of abstract collective predicates.
@@ -1348,14 +1348,14 @@ Notation "[ 'pred' x : T | E1 & E2 ]" :=
  structure for simpl_pred T is _not_ convertible to predPredType T.  **)
 
 Module PredOfSimpl.
-Definition coerce@{s|l} (T : 𝒰@{s|l}) (sp : simpl_pred T) : pred T := fun_of_simpl sp.
+Definition coerce@{l} (T : Type@{l}) (sp : simpl_pred T) : pred T := fun_of_simpl sp.
 End PredOfSimpl.
 Notation pred_of_simpl := PredOfSimpl.coerce.
 Coercion pred_of_simpl : simpl_pred >-> pred.
-Canonical simplPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@pred_of_simpl T).
+Canonical simplPredType@{l} (T : Type@{l}) := PredType (@pred_of_simpl T).
 
 Module Type PredSortOfSimplSignature.
-Parameter coerce@{s|l} : forall (T : 𝒰@{s|l}), simpl_pred T -> {pred T}.
+Parameter coerce@{l} : forall (T : Type@{l}), simpl_pred T -> {pred T}.
 End PredSortOfSimplSignature.
 Module DeclarePredSortOfSimpl (PredSortOfSimpl : PredSortOfSimplSignature).
 Coercion PredSortOfSimpl.coerce : simpl_pred >-> pred_sort.
@@ -1392,7 +1392,7 @@ Definition subrel@{s|l} (T : 𝒰@{s|l}) (r1 r2 : rel T) := forall x y : T, r1 x
 
 Definition simpl_rel@{s|l} (T : 𝒰@{s|l}) := T -> simpl_pred T.
 
-Coercion rel_of_simpl@{s|l} (T : 𝒰@{s|l}) (sr : simpl_rel T) : rel T := fun x : T => sr x.
+Coercion rel_of_simpl@{l} (T : Type@{l}) (sr : simpl_rel T) : rel T := fun x : T => sr x.
 Arguments rel_of_simpl {T} sr x /.
 
 Notation xrelU := (fun (r1 r2 : rel _) x y => r1 x y || r2 x y).
@@ -1407,10 +1407,10 @@ Notation "[ 'rel' x y | E ]" := (SimplRel (fun x y => E%B))
 Notation "[ 'rel' x y : T | E ]" :=
   (SimplRel (fun x y : T => E%B)) (only parsing) : function_scope.
 
-Lemma subrelUl@{s|l} (T : 𝒰@{s|l}) (r1 r2 : rel T) : subrel r1 (relU r1 r2).
+Lemma subrelUl@{l} (T : Type@{l}) (r1 r2 : rel T) : subrel r1 (relU r1 r2).
 Proof. by move=> x y r1xy; apply/orP; left. Qed.
 
-Lemma subrelUr@{s|l} (T : 𝒰@{s|l}) (r1 r2 : rel T) : subrel r2 (relU r1 r2).
+Lemma subrelUr@{l} (T : Type@{l}) (r1 r2 : rel T) : subrel r2 (relU r1 r2).
 Proof. by move=> x y r2xy; apply/orP; right. Qed.
 
 (** Variant of simpl_pred specialised to the membership operator. **)
@@ -1431,8 +1431,8 @@ Variant mem_pred@{s|l} (T : 𝒰@{s|l}) := Mem of pred T.
   will be used, resulting in a subgoal that displays as mem A x by simplifies
   to x \in A.
  **)
-Coercion pred_of_mem@{s|l} {T : 𝒰@{s|l}} mp : {pred T} := let: Mem p := mp in [eta p].
-Canonical memPredType@{s|l} (T : 𝒰@{s|l}) := PredType (@pred_of_mem T).
+Coercion pred_of_mem@{s|l} {T : Type@{s|l}} mp : {pred T} := let: Mem p := mp in [eta p].
+Canonical memPredType@{s|l} (T : Type@{s|l}) := PredType (@pred_of_mem T).
 
 Definition in_mem@{s|l} {T : 𝒰@{s|l}} (x : T) mp := pred_of_mem mp x.
 Definition eq_mem@{s|l} {T : 𝒰@{s|l}} mp1 mp2 := forall x : T, in_mem x mp1 = in_mem x mp2.
@@ -1445,9 +1445,9 @@ Global Typeclasses Opaque eq_mem sub_mem.
   coercion, but does _not_ override the pred_of_mem : mem_pred >-> pred_sort
   explicit coercion declaration above.
  **)
-Coercion simpl_of_mem@{s|l} {T : 𝒰@{s|l}} mp := SimplPred (fun x : T => in_mem x mp).
+Coercion simpl_of_mem@{l} {T : Type@{l}} mp := SimplPred (fun x : T => in_mem x mp).
 
-Lemma sub_refl@{s|l} (T : 𝒰@{s|l}) (mp : mem_pred T) : sub_mem mp mp. Proof. by []. Qed.
+Lemma sub_refl@{l} (T : Type@{l}) (mp : mem_pred T) : sub_mem mp mp. Proof. by []. Qed.
 Arguments sub_refl {T mp} [x] mp_x.
 
 (**
@@ -1456,7 +1456,7 @@ Arguments sub_refl {T mp} [x] mp_x.
  Mem [eta ?p] sets ?p := toP A (or ?p := P if toP = id and A = [eta P]),
  rather than topred pT A, had we put mem A := Mem (topred A).
 **)
-Definition mem@{s|l} (T : 𝒰@{s|l}) (pT : predType@{s s|l l} T) : pT -> mem_pred T :=
+Definition mem@{s s'|l l'} (T : 𝒰@{s|l}) (pT : predType@{s s'|l l'} T) : pT -> mem_pred T :=
   let: PredType toP := pT in fun A => Mem [eta toP A].
 Arguments mem {T pT} A : rename, simpl never.
 
@@ -1506,8 +1506,8 @@ Coercion collective_pred_of_simpl@{s|l} (T : 𝒰@{s|l}) (sp : simpl_pred T) : c
 
 (** Explicit simplification rules for predicate application and membership. **)
 Section PredicateSimplification.
-Sorts s. Universes l.
-Variables T : 𝒰@{s|l}.
+Universes l.
+Variables T : Type@{l}.
 
 Implicit Types (p : pred T) (sp : simpl_pred T).
 Implicit Types (mp : mem_pred T).
@@ -1586,10 +1586,10 @@ Structure applicative_mem_pred p :=
 Canonical check_applicative_mem_pred p (ap : registered_applicative_pred p) :=
   [eta @ApplicativeMemPred ap].
 
-Lemma mem_topred@{sp|lp} (pT : predType@{s sp|l lp} T) (pp : pT) : mem (topred pp) = mem pp.
+Lemma mem_topred@{s|l'} (pT : predType@{Type s|l l'} T) (pp : pT) : mem (topred pp) = mem pp.
 Proof. by case: pT pp. Qed.
 
-Lemma topredE@{sp|lp} (pT : predType@{s sp|l lp} T) x (pp : pT) : topred pp x = (x \in pp).
+Lemma topredE@{s|l'} (pT : predType@{Type s|l l'} T) x (pp : pT) : topred pp x = (x \in pp).
 Proof. by rewrite -mem_topred. Qed.
 
 Lemma app_predE x p (ap : registered_applicative_pred p) : ap x = (x \in p).
@@ -1825,11 +1825,10 @@ Local Notation "{ 'all3' P }" := (forall x y z, P x y z: Prop) (at level 0).
 Local Notation ph := (phantom _).
 
 Section LocalProperties.
-
-Sorts s1 s2 s3.
+Sorts s3.
 Universes l1 l2 l3.
 
-Variables (T1 : 𝒰@{s1 | l1}) (T2 : 𝒰@{s2 | l2}) (T3 : 𝒰@{s3 | l3}).
+Variables (T1 : Type@{l1}) (T2 : Type@{l2}) (T3 : 𝒰@{s3|l3}).
 
 Variables (d1 : mem_pred T1) (d2 : mem_pred T2) (d3 : mem_pred T3).
 Local Notation ph := (phantom Prop).
@@ -1861,7 +1860,7 @@ Definition prop_in3 P & ph {all3 P} :=
 
 Variable f : T1 -> T2.
 
-Definition prop_on1 Pf P & phantom T3 (Pf f) & ph {all1 P} :=
+Definition prop_on1@{s|} Pf P & phantom@{s3|l3} T3 (Pf f) & ph {all1 P} :=
   forall x, in_mem (f x) d2 -> P x.
 
 Definition prop_on2 Pf P & phantom T3 (Pf f) & ph {all2 P} :=
@@ -1870,12 +1869,12 @@ Definition prop_on2 Pf P & phantom T3 (Pf f) & ph {all2 P} :=
 End LocalProperties.
 
 Definition inPhantom := Phantom Prop.
-Definition onPhantom@{s|l} {T : 𝒰@{s|l}} P (x : T) := Phantom Prop (P x).
+Definition onPhantom@{l} {T : Type@{l}} P (x : T) := Phantom Prop (P x).
 
-Definition bijective_in aT rT (d : mem_pred aT) (f : aT -> rT) :=
+Definition bijective_in@{la lr} (aT : Type@{la}) (rT : Type@{lr}) (d : mem_pred@{Type|la} aT) (f : aT -> rT) :=
   exists2 g, prop_in1 d (inPhantom (cancel f g))
            & prop_on1 d (Phantom _ (cancel g)) (onPhantom (cancel g) f).
-
+(* FIXME exists2 is not displayed, falling back to "sigma", unless Set Printing Universes is on *)
 Definition bijective_on aT rT (cd : mem_pred rT) (f : aT -> rT) :=
   exists2 g, prop_on1 cd (Phantom _ (cancel f)) (onPhantom (cancel f) g)
            & prop_in1 cd (inPhantom (cancel g f)).
@@ -2146,7 +2145,7 @@ Lemma pcan_in_comp [A B C : Type] (D : {pred B}) (D' : {pred C})
   {in D', pcancel (f \o h) (obind h' \o f')}.
 Proof. by move=> hD fK hK c cD /=; rewrite fK/= ?hK ?hD. Qed.
 
-Definition pred_oapp@{s|l} (T : 𝒰@{s|l}) (D : {pred T}) : pred (option@{s s|l} T) :=
+Definition pred_oapp@{l} (T : Type@{l}) (D : {pred T}) : pred (option T) :=
   [pred x | oapp (pred_of_mem (mem D)) false x].
 
 Lemma ocan_in_comp [A B C : Type] (D : {pred B}) (D' : {pred C})
@@ -2185,25 +2184,25 @@ Arguments in1_sig {T1 D1 P1}.
 Arguments in2_sig {T1 T2 D1 D2 P2}.
 Arguments in3_sig {T1 T2 T3 D1 D2 D3 P3}.
 
-Lemma sub_in2@{s|l} (T : 𝒰@{s|l}) d d' (P : T -> T -> Prop) :
-  sub_mem d d' -> forall Ph : ph {all2 P}, prop_in2 d' Ph -> prop_in2 d Ph.
+Lemma sub_in2@{l} (T : Type@{l}) d d' (P : T -> T -> Prop) :
+  sub_mem d d' -> forall Ph : phantom@{Erased|1} Prop {all2 P}, prop_in2 d' Ph -> prop_in2 d Ph.
 Proof. by move=> /= sub_dd'; apply: sub_in11. Qed.
 
-Lemma sub_in3@{s|l} (T : 𝒰@{s|l}) d d' (P : T -> T -> T -> Prop) :
+Lemma sub_in3@{l} (T : Type@{l}) d d' (P : T -> T -> T -> Prop) :
   sub_mem d d' -> forall Ph : ph {all3 P}, prop_in3 d' Ph -> prop_in3 d Ph.
 Proof. by move=> /= sub_dd'; apply: sub_in111. Qed.
 
-Lemma sub_in12@{s|l} (T : 𝒰@{s|l})1 T d1 d1' d d' (P : T1 -> T -> T -> Prop) :
+Lemma sub_in12 T1 T d1 d1' d d' (P : T1 -> T -> T -> Prop) :
   sub_mem d1 d1' -> sub_mem d d' ->
   forall Ph : ph {all3 P}, prop_in12 d1' d' Ph -> prop_in12 d1 d Ph.
 Proof. by move=> /= sub1 sub; apply: sub_in111. Qed.
 
-Lemma sub_in21@{s|l} (T : 𝒰@{s|l}) T3 d d' d3 d3' (P : T -> T -> T3 -> Prop) :
+Lemma sub_in21 T T3 d d' d3 d3' (P : T -> T -> T3 -> Prop) :
   sub_mem d d' -> sub_mem d3 d3' ->
   forall Ph : ph {all3 P}, prop_in21 d' d3' Ph -> prop_in21 d d3 Ph.
 Proof. by move=> /= sub sub3; apply: sub_in111. Qed.
 
-Lemma equivalence_relP_in@{s|l} (T : 𝒰@{s|l}) (R : rel T) (A : pred T) :
+Lemma equivalence_relP_in T (R : rel T) (A : pred T) :
   {in A & &, equivalence_rel R}
    <-> {in A, reflexive R} /\ {in A &, forall x y, R x y -> {in A, R x =1 R y}}.
 Proof.
