@@ -1,3 +1,5 @@
+Require Import Extraction.
+
 Definition nate := nat@{Erased|}.
 
 Fail Fixpoint id (n : nate) : nat@{Type|} :=
@@ -23,3 +25,5 @@ Proof.
   cbn.
   exact tt.
 Qed.
+
+Extraction ide.
