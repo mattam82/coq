@@ -27,3 +27,9 @@ Proof.
 Qed.
 
 Extraction ide.
+
+Fixpoint bug (n : nat@{Erased|}) : 𝒰@{Type|_} :=
+  match n with
+  | O => nat
+  | S n => list (bug n)
+  end.
