@@ -151,9 +151,13 @@ let check_univ_leq ?(is_real_arg=false) env u info =
     else if is_impredicative_set env
     then { info with ind_squashed = Some AlwaysSquashed }
     else { info with missing = u :: info.missing }
-  | (Type uu | Erased uu), QSort (_, indu) ->
+  | Type uu, QSort (_, indu) ->
     if UGraph.check_leq (universes env) uu indu
     then add_squash qtype info
+    else { info with missing = u :: info.missing }
+  | Erased uu, QSort (_, indu) ->
+    if UGraph.check_leq (universes env) uu indu
+    then add_squash qerased info
     else { info with missing = u :: info.missing }
   | Type uu, Type indu ->
     if UGraph.check_leq (universes env) uu indu
