@@ -170,7 +170,7 @@ val enforce_leq_quality : Quality.t -> Quality.t -> QCumulConstraints.t -> QCumu
 
 module QUConstraints : sig
 
-  type t = QCumulConstraints.t * Univ.Constraints.t
+  type t = QCumulConstraints.t * Univ.UnivConstraints.t
 
   val union : t -> t -> t
 

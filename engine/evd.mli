@@ -274,7 +274,7 @@ val is_defined : evar_map -> Evar.t-> bool
 val is_undefined : evar_map -> Evar.t-> bool
 (** Whether an evar is not defined in an evarmap. *)
 
-val add_constraints : evar_map -> Univ.Constraints.t -> evar_map
+val add_constraints : evar_map -> Univ.UnivConstraints.t -> evar_map
 (** Add universe constraints in an evar map. *)
 
 val add_quconstraints : evar_map -> Sorts.QUConstraints.t -> evar_map
@@ -607,7 +607,7 @@ val set_above_prop : evar_map -> Sorts.Quality.t -> evar_map
 val check_eq : evar_map -> esorts -> esorts -> bool
 val check_leq : evar_map -> esorts -> esorts -> bool
 
-val check_constraints : evar_map -> Univ.Constraints.t -> bool
+val check_constraints : evar_map -> Univ.UnivConstraints.t -> bool
 val check_elim_constraints : evar_map -> Sorts.ElimConstraints.t -> bool
 val check_quconstraints : evar_map -> Sorts.QUConstraints.t -> bool
 

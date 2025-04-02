@@ -74,8 +74,8 @@ type ('constr, 'types, 'r) ptype_error =
   | IllTypedRecBody of
       int * (Name.t,'r) Context.pbinder_annot array * ('constr, 'types) punsafe_judgment array * 'types array
   | UnsatisfiedElimConstraints of Sorts.ElimConstraints.t
-  | UnsatisfiedConstraints of Constraints.t
   | UnsatisfiedQCumulConstraints of Sorts.QCumulConstraints.t
+  | UnsatisfiedUnivConstraints of UnivConstraints.t
   | UndeclaredQualities of Sorts.QVar.Set.t
   | UndeclaredUniverses of Level.Set.t
   | DisallowedSProp
@@ -104,7 +104,7 @@ type inductive_error =
   | NotAnArity of constr
   | BadEntry
   | LargeNonPropInductiveNotInType
-  | MissingConstraints of (Sorts.t list * Sorts.t)
+  | MissingUnivConstraints of (Sorts.t list * Sorts.t)
   (* each universe in the set should have been <= the other one *)
 
 exception InductiveError of env * inductive_error
@@ -155,7 +155,7 @@ val error_ill_typed_rec_body  :
 
 val error_unsatisfied_elim_constraints : env -> Sorts.ElimConstraints.t -> 'a
 
-val error_unsatisfied_constraints : env -> Constraints.t -> 'a
+val error_unsatisfied_constraints : env -> UnivConstraints.t -> 'a
 
 val error_unsatisfied_qcumul_constraints : env -> Sorts.QCumulConstraints.t -> 'a
 

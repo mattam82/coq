@@ -360,12 +360,12 @@ let enforce_leq_quality a b csts =
 
 module QUConstraints = struct
 
-  type t = QCumulConstraints.t * Univ.Constraints.t
+  type t = QCumulConstraints.t * UnivConstraints.t
 
-  let empty = QCumulConstraints.empty, Univ.Constraints.empty
+  let empty = QCumulConstraints.empty, UnivConstraints.empty
 
   let union (qcsts,ucsts) (qcsts',ucsts') =
-    QCumulConstraints.union qcsts qcsts', Constraints.union ucsts ucsts'
+    QCumulConstraints.union qcsts qcsts', UnivConstraints.union ucsts ucsts'
 end
 
 type t =
@@ -570,3 +570,4 @@ let pattern_match ps s qusubst =
   | PSType uio, Type u -> Some (Partial_subst.maybe_add_univ uio (extract_level u) qusubst)
   | PSQSort (qio, uio), s -> Some (qusubst |> Partial_subst.maybe_add_quality qio (quality s) |> Partial_subst.maybe_add_univ uio (extract_sort_level s))
   | (PSProp | PSSProp | PSSet | PSType _), _ -> None
+
