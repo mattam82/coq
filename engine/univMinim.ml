@@ -290,7 +290,7 @@ let new_minimize_weak ctx us weak (g, variances) =
     weak (ctx, us, variances, g)
 
 
-let normalize_context_set ~lbound ~variances ~partial g ctx (us:UnivFlex.t) ?binders {weak_constraints=weak;above_prop} =
+let normalize_context_set ~variances ~partial g ctx (us:UnivFlex.t) ?binders {weak_constraints=weak;above_prop} =
   let prl = UnivNames.pr_level_with_global_universes ?binders in
   debug Pp.(fun () -> str "Minimizing context: " ++ ContextSet.pr prl ctx ++ spc () ++
     UnivFlex.pr Level.raw_pr us ++ fnl () ++

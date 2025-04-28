@@ -122,7 +122,7 @@ val pr_sort                : evar_map -> Sorts.t -> Pp.t
 
 val pr_universe_instance   : evar_map -> UVars.Instance.t -> Pp.t
 val pr_universe_instance_binder : evar_map -> UVars.LevelInstance.t -> Univ.Constraints.t -> Pp.t
-val pr_universe_ctx        : evar_map -> ?variances:UVars.Variance.t array ->
+val pr_universe_ctx        : evar_map -> ?variances:UVars.variances ->
   UVars.UContext.t -> Pp.t
 val pr_abstract_universe_ctx : evar_map -> ?variances:UVars.variances ->
   ?priv:Univ.ContextSet.t -> UVars.AbstractContext.t -> Pp.t

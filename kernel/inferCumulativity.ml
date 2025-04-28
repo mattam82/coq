@@ -252,6 +252,8 @@ end = struct
     position : Position.t;
   }
 
+  let univs (s : status) = s.univs
+
   let get_infer_mode v = v.infer_mode
   let set_infer_mode b v = if v.infer_mode == b then v else {v with infer_mode=b}
 
@@ -259,7 +261,7 @@ end = struct
   let set_position p v = if v.position == p then v else {v with position=p}
 
   let get_variance_at_position variances u =
-    match Level.Map.find_opt u variances.univs with
+    match Level.Map.find_opt u (univs variances) with
     | None -> None
     | Some occ ->
       let open Position in
@@ -320,7 +322,7 @@ end = struct
   let infer_level_leq ~typing_variance q u variances = infer_level_cmp ~typing_variance q Covariant u variances
   let infer_level_geq ~typing_variance q u variances = infer_level_cmp ~typing_variance q Contravariant u variances
 
-  let infer_level_typing_variance ~typing_variance q u variances =
+  let infer_level_typing_variance ~typing_variance q u (variances : status) =
     let upd = function
       | None -> None
       | Some occ -> Some { occ with infer_variance = typing_variance;
@@ -359,11 +361,11 @@ let variance_occurrence_to_variance_pos VarianceOccurrence.{ in_binders; in_term
   let to_variance_opt u expected o =
     Option.cata (fun occ -> variance_of_occ u expected occ) (Irrelevant,Position.InTerm) o
 
-  let inferred variances = variances.univs
+  let inferred (variances : status) = variances.univs
 
-  let pr prl status = pr_variances prl status.univs
+  let pr prl (status : status) = pr_variances prl status.univs
 
-  let finish env variances =
+  let finish env (variances : status) =
     try
       let arr =
         Array.map
@@ -569,7 +571,7 @@ let rec infer_fterm cv_pb (variance : is_type * Variance.t) infos variances hd s
       let nargs = stack_args_size stk in
       infer_inductive_instance cv_pb variance (info_env (fst infos)) variances ind nargs u
     in
-    infer_stack infos variances stk
+    infer_stack variance infos variances stk
   | FConstruct ((ctor,u),args) ->
     assert (List.is_empty stk);
     let variances =

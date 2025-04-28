@@ -409,14 +409,19 @@ let context uctx =
   let qvars = QState.undefined uctx.sort_variables in
   UContext.of_context_set (compute_instance_binders uctx) qvars uctx.local
 
-type named_universes_entry = universes_entry * UnivNames.universe_binders
+type named_universes_entry =
+  { universes_entry_universes : universes_entry;
+    universes_entry_binders : UnivNames.universe_binders }
 
-let univ_entry ~poly uctx =
+let univ_entry ~poly ?variances uctx =
   let (binders, _) = uctx.names in
   let entry =
-    if poly then Polymorphic_entry (context uctx)
-    else Monomorphic_entry (context_set uctx) in
-  entry, binders
+    if poly then Polymorphic_entry (context uctx, variances)
+    else
+      (assert (Option.is_empty variances);
+       Monomorphic_entry (context_set uctx)) in
+  { universes_entry_universes = entry; 
+    universes_entry_binders = binders }
 
 let merge_graph_context g (us, csts) =
   let g = Level.Set.fold (fun v g -> if Level.is_set v then g else
@@ -441,14 +446,14 @@ let merge_constraints uctx cstrs =
 
 (** Merge the given context set in the universe context.
   Does not assume the universes from the context are already declared. *)
-let merge_context_universes ?(lbound=UGraph.Bound.Set) ~strict uctx (us, csts)  =
+let merge_context_universes ~strict uctx (us, csts)  =
   let declarenew g = Level.Set.fold (fun v g -> if Level.is_set v then g else
-    try UGraph.add_universe v ~lbound ~strict g with UGraph.AlreadyDeclared -> g) us g in
+    try UGraph.add_universe v ~strict g with UGraph.AlreadyDeclared -> g) us g in
   merge_constraints { uctx with universes = declarenew uctx.universes;
     initial_universes = declarenew uctx.initial_universes } csts
 
 let of_context_set env ((qs,us),csts) =
-  debug Pp.(fun () -> str"of_context_set: " ++ pr_universe_context_set Level.raw_pr (us, csts));
+  debug Pp.(fun () -> str"of_context_set: " ++ ContextSet.pr Level.raw_pr (us, csts));
   let sort_variables = QState.of_set qs in
   let universes = UGraph.set_local (Environ.universes env) in
   let uctx = { empty with local = (us,csts); initial_universes = universes; universes; sort_variables;} in
@@ -1167,7 +1172,7 @@ let check_poly_univ_decl ~cumulative ~kind uctx decl =
   in
   let variances = check_variances ~cumulative ~kind uctx.names uctx.variances inst decl.univdecl_variances in
   let uctx = UContext.make nas (inst, csts) in
-  uctx
+  uctx, variances
 
 let check_univ_decl ~poly ?(cumulative=true) ~kind uctx decl =
   let (binders, _) = uctx.names in
@@ -1176,7 +1181,8 @@ let check_univ_decl ~poly ?(cumulative=true) ~kind uctx decl =
       let uctx, variances = check_poly_univ_decl ~cumulative ~kind uctx decl in
       Polymorphic_entry (uctx, Option.map (fun v -> Entries.Check_variances v) variances)
     else Monomorphic_entry (check_mono_univ_decl uctx decl) in
-  entry, binders
+  { universes_entry_universes = entry;
+    universes_entry_binders = binders }
 
 let restrict_universe_context (univs, csts) keep =
   debug Pp.(fun () -> str"Restricting universe context: "  ++ ContextSet.pr Level.raw_pr (univs, csts) ++
@@ -1187,7 +1193,7 @@ let restrict_universe_context (univs, csts) keep =
   let allunivs = Constraints.fold (fun (u,_,v) all ->
     Level.Set.union (Level.Set.union (Universe.levels u) (Universe.levels v)) all) csts univs in
   let g = UGraph.initial_universes in
-  let g, _equivs = merge_graph_context g (allunivs, csts) g in
+  let g, _equivs = merge_graph_context g (allunivs, csts) in
   let allkept = Level.Set.union (UGraph.domain UGraph.initial_universes) (Level.Set.diff allunivs removed) in
   let csts = UGraph.constraints_for ~kept:allkept g in
   let csts = Constraints.filter (fun (l,d,r) -> not (Universe.is_type0 l && d == Le)) csts in
@@ -1304,8 +1310,8 @@ let demote_global_univs (lvl_set,csts_set) uctx =
     in
     UGraph.merge_constraints csts_set g
   in
-  let initial_universes = update_ugraph uctx.initial_universes in
-  let universes = update_ugraph uctx.universes in
+  let initial_universes, _equivs = update_ugraph uctx.initial_universes in
+  let universes, _equivs' = update_ugraph uctx.universes in
   { uctx with local = (local_univs, local_constraints); univ_variables; universes; initial_universes }
 
 let demote_global_univ_entry entry uctx = match entry with
@@ -1319,7 +1325,7 @@ let emit_side_effects eff u =
   demote_global_univs uctx u
 
 let merge_seff uctx uctx' =
-  debug Pp.(fun () -> str"Merging: " ++ Univ.pr_universe_context_set Level.raw_pr uctx');
+  debug Pp.(fun () -> str"Merging: " ++ Univ.ContextSet.pr Level.raw_pr uctx');
   let levels = ContextSet.levels uctx' in
   let declare g =
     Level.Set.fold (fun u g ->
@@ -1329,9 +1335,9 @@ let merge_seff uctx uctx' =
   in
   let initial_universes = declare uctx.initial_universes in
   let univs = declare uctx.universes in
-  let universes = merge_constraints uctx (ContextSet.constraints uctx') univs in
-  { uctx with universes; initial_universes }
-
+  let uctx = { uctx with universes = univs; initial_universes } in
+  merge_constraints uctx (ContextSet.constraints uctx')
+  
 let update_sigma_univs uctx univs =
   let eunivs =
     { uctx with

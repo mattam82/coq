@@ -70,14 +70,13 @@ let instance_of_univ_entry = function
     - with named universes *)
 let declare_global ~coe ~try_assum_as_instance ~local ~kind ?user_warns ~univs ~impargs ~inline
     ~name:{CAst.v=name; loc} body typ =
-  let (uentry, ubinders) = univs in
   let inl = let open Declaremods in match inline with
     | NoInline -> None
     | DefaultInline -> Some (Flags.get_inline_level())
     | InlineAt i -> Some i
   in
   let decl = match body with
-    | None -> Declare.ParameterEntry (Declare.parameter_entry ~univs:(uentry, ubinders) ?inline:inl typ)
+    | None -> Declare.ParameterEntry (Declare.parameter_entry ~univs ?inline:inl typ)
     | Some b -> Declare.DefinitionEntry (Declare.definition_entry ~univs ~types:typ b) in
   let kn = Declare.declare_constant ?loc ~name ~local ~kind ?user_warns decl in
   let gr = GlobRef.ConstRef kn in
@@ -232,7 +231,7 @@ let interp_context_gen scope ~program_mode ~kind ~autoimp_enable ~coercions env 
       (CAst.make ?loc id,b,t,data))
       locs ctx
   in
-   sigma, ctx
+  sigma, List.rev ctx
 
 let do_assumptions ~program_mode ~poly ~cumulative ~scope ~kind ?user_warns ~inline l =
   let sec = Lib.sections_are_opened () in
@@ -286,7 +285,7 @@ let do_context ~program_mode ~poly ctx =
     else Global (if Lib.is_modtype () then ImportDefaultBehavior else ImportNeedQualified)
   in
   let sigma, ctx = interp_context_gen scope ~program_mode ~kind:Context ~autoimp_enable:false ~coercions:Id.Set.empty env sigma ctx in
-  let univs = Evd.univ_entry ~poly sigma None in (* No possibility to enforce variances here *)
+  let univs = Evd.univ_entry ~poly sigma in (* No possibility to enforce variances here *)
   declare_context ~try_global_assum_as_instance:true ~scope ~univs ~inline:Declaremods.NoInline ctx
 
 (* API compatibility (used in Elpi) *)

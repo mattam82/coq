@@ -570,8 +570,8 @@ let id_of_class env ref =
     | _ -> assert false
 
 let new_instance_common ~program_mode env instid ctx cl =
-  let ({CAst.loc;v=instid}, pl) = instid in
-  let sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
+  let (instid, pl) = instid in
+  let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     interp_instance_context ~program_mode env ctx pl cl
   in
   (* The name generator should not be here *)
@@ -599,7 +599,7 @@ let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
     new_instance_common ~program_mode:true env instid ctx cl in
   let pm =
     do_instance_program ~pm env env' sigma ?hook ~locality ~poly
-      cty k ctx ctx' pri decl variances imps subst id opt_props in
+      cty k ctx ctx' pri decl imps subst id opt_props in
   pm, id
 
 let new_instance ~locality ~poly instid ctx cl props ?hook pri =
@@ -607,13 +607,13 @@ let new_instance ~locality ~poly instid ctx cl props ?hook pri =
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     new_instance_common ~program_mode:false env instid ctx cl in
   do_instance env env' sigma ?hook ~locality ~poly
-    cty k ctx ctx' pri decl variances imps subst id props;
+    cty k ctx ctx' pri decl imps subst id props;
   id
 
 let declare_new_instance ~locality ~program_mode ~poly instid ctx cl pri =
   let env = Global.env() in
   let (instid, pl) = instid in
-  let sigma, k, u, cty, ctx', ctx, imps, subst, decl, variances =
+  let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
     interp_instance_context ~program_mode env ctx pl cl
   in
   do_declare_instance sigma ~locality ~poly k ctx ctx' pri decl imps subst instid

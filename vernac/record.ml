@@ -243,9 +243,9 @@ let def_class_levels ~def ~env_ar_params sigma aritysorts ctors =
   else
     sigma, s, ctor
 
-let finalize_def_class env sigma ~variances ~params ~sort ~projtyp =
+let finalize_def_class env sigma ~params ~sort ~projtyp =
   let sigma, (params, sort, typ, projtyp) =
-    Evarutil.finalize ~abort_on_undefined_evars:false sigma ~variances (fun nf ->
+    Evarutil.finalize ~abort_on_undefined_evars:false sigma ~partial:false (fun nf ->
         let typ = EConstr.it_mkProd_or_LetIn (EConstr.mkSort sort) params in
         let typ = nf typ in
         (* we know the context is exactly the params because we built typ from mkSort *)
@@ -356,19 +356,19 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   if def then
     (* XXX to fix: if we enter [Class Foo : typ := Bar : nat.], [typ] will get unfolded here *)
     let sigma, sort, projtyp = def_class_levels ~def ~env_ar_params sigma aritysorts fields in
-    let sigma = UnivVariances.register_universe_variances_of_record env0 sigma ~env_ar_pars:env_ar ~params ~fields ~types:[projtyp] in
+    let sigma = UnivVariances.register_universe_variances_of_record env0 sigma ~env_ar_pars:env_ar_params ~params ~fields ~types:[EConstr.mkSort sort] in
     let sigma, params, sort, typ, projtyp =
       (* named and rel context in the env don't matter here
          (they will be replaced by the ones of the unsolved evars in the error message
          which is the env's only use) *)
-      finalize_def_class env_ar_params sigma ~variances:ivariances ~params ~sort ~projtyp
+      finalize_def_class env_ar_params sigma ~params ~sort ~projtyp
     in
     let name, projname = match records with
       | [{name; fs=[AssumExpr (projname, _, _)]}] -> name, projname
       | _ -> assert false
     in
     let projname = CAst.map Nameops.Name.get_id projname in
-    let univs = Evd.check_univ_decl ~poly:flags.poly ~cumulative:flags.cumulative sigma udecl in
+    let univs = Evd.check_univ_decl ~poly:flags.poly ~cumulative:flags.cumulative ~kind:UVars.Definition sigma udecl in
     (* definitional classes are encoded as 1 constructor with 1
        field whose type is the projection type *)
     let projimpls = match field_impls with
@@ -411,11 +411,10 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
         else ComInductive.SyntaxNoTemplatePoly)
         typs
     in
-    let env_ar = Environ.pop_rel_context nparams env_ar_params in
     let default_dep_elim, mie, ubinders, global_univs =
       ComInductive.interp_mutual_inductive_constr ~sigma ~flags ~udecl
         ~ctx_params:params ~indnames ~arities_explicit ~arities:typs ~constructors
-        ~template_syntax ~env_ar ~private_ind:false
+        ~template_syntax ~env_ar_params ~private_ind:false
     in
     let ids, mie = fix_entry_record ~isclass ~primitive_proj records mie in
     RecordEntry {
@@ -569,14 +568,12 @@ let build_named_proj ~primitive ~flags ~univs ~uinstance ~kind env paramdecls
   in
   let proj = it_mkLambda_or_LetIn (mkLambda (x,rp,body)) paramdecls in
   let projtyp = it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
-  let univs = match fst univs with
-  | Entries.Monomorphic_entry ->
-    UState.{ universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty;
-      universes_entry_binders = snd univs }
-  | Entries.Polymorphic_entry (uctx, variances) ->
+  let univs = match univs.UState.universes_entry_universes with
+  | UState.Monomorphic_entry _ ->
+    { univs with universes_entry_universes = UState.Monomorphic_entry Univ.ContextSet.empty }
+  | UState.Polymorphic_entry (uctx, variances) ->
     (* let variances = make_projection_variances (Context.Rel.nhyps paramdecls) variances in *)
-    UState.{ universes_entry_universes = UState.Polymorphic_entry (uctx, None);
-      universes_entry_binders = snd univs }
+    UState.{ univs with universes_entry_universes = UState.Polymorphic_entry (uctx, None) }
   in
   let entry = Declare.definition_entry ~univs ~types:projtyp proj in
   let kind = Decls.IsDefinition kind in
@@ -645,7 +642,8 @@ let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
     | Monomorphic -> UState.Monomorphic_entry Univ.ContextSet.empty
     | Polymorphic (auctx, _variances) -> UState.Polymorphic_entry (UVars.AbstractContext.repr auctx, None)
   in
-  let univs = univs, UnivNames.empty_binders in
+  let univs = UState.{ universes_entry_universes = univs;
+    universes_entry_binders = UnivNames.empty_binders } in
   let fields, _ = mip.mind_nf_lc.(0) in
   let fields = List.firstn mip.mind_consnrealdecls.(0) fields in
   let paramdecls = Inductive.inductive_paramdecls (mib, uinstance) in
@@ -828,7 +826,7 @@ let extract_record_data kind records =
   in
   ps, data, decl_data
 
-let pre_process_structure udecl kind ~poly ~cumulative ~flags ~primitive_proj (records : Ast.t list) =
+let pre_process_structure udecl kind ~flags ~primitive_proj (records : Ast.t list) =
   let def = (kind = Vernacexpr.Class true) in
   let indlocs = check_unique_names ~def records in
   let () = check_priorities kind records in

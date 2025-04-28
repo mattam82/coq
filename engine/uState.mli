@@ -85,8 +85,9 @@ type named_universes_entry =
   { universes_entry_universes : universes_entry;
     universes_entry_binders : UnivNames.universe_binders }
 
-val univ_entry : poly:bool -> t -> Entries.variance_entry -> named_universes_entry
-(** Pick from {!context} or {!context_set} based on [poly]. *)
+val univ_entry : poly:bool -> ?variances:Entries.variance_declaration_entry -> t -> named_universes_entry
+(** Pick from {!context} or {!context_set} based on [poly].
+  Variances can only be non-empty for the [poly = true] case. *)
 
 val universe_binders : t -> UnivNames.universe_binders
 (** Return local names of universes. *)

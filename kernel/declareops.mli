@@ -18,11 +18,6 @@ open UVars
 val universes_context : universes -> AbstractContext.t
 val universes_variances : universes -> UVars.variances option
 
-(** {6 Arities} *)
-
-val map_decl_arity : ('a -> 'c) -> ('b -> 'd) ->
-  ('a, 'b) declaration_arity -> ('c, 'd) declaration_arity
-
 (** {6 Constants} *)
 
 val subst_const_body : substitution -> constant_body -> constant_body

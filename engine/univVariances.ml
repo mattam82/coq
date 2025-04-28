@@ -48,7 +48,7 @@ let compute_variances_constr env ~evars status position cv_pb c =
 let compute_variances_constr env sigma status position variance c =
   let status = compute_variances_constr env ~evars:(Evd.evar_handler sigma) status position variance c in
   debug Pp.(fun () -> str"Variances of " ++ (try Termops.Internal.print_constr_env env sigma (EConstr.of_constr c) with _ -> str"<anomaly in printing>") ++ fnl () ++
-    InferCumulativity.pr_variances (Evd.pr_level sigma) (InferCumulativity.Inf.inferred status));
+    InferCumulativity.pr_variances (Termops.pr_evd_level sigma) (InferCumulativity.Inf.inferred status));
   status
 
 let compute_variances env sigma status position variance c =
@@ -76,7 +76,7 @@ let compute_variances_context env sigma ?(position = fun x -> Position.InBinder 
     in (EConstr.push_rel binder env, status)
   in
   let env, variances = CList.fold_right_i fold_binder 0 ctx (env, status) in
-  debug Pp.(fun () -> str"Variances in context: " ++ Inf.pr (Evd.pr_level sigma) variances);
+  debug Pp.(fun () -> str"Variances in context: " ++ Inf.pr (Termops.pr_evd_level sigma) variances);
   variances
 
 let compute_variances_body_constr env sigma ?(ctx_position = fun i -> Position.InBinder i)  ?(ctx_cumul_pb=InvCumul) ?(cumul_pb=Cumul) status c =
@@ -131,7 +131,7 @@ let init_status ?(position=Position.InType) ?(udecl : UState.universe_decl optio
 let universe_variances_body_ty env sigma status ?typ body =
   let status = Option.fold_left (compute_variances_type env sigma) status typ in
   let variances = compute_variances_body env sigma status body in
-  debug Pp.(fun () -> Inf.pr (Evd.pr_level sigma) variances ++ fnl () ++
+  debug Pp.(fun () -> Inf.pr (Termops.pr_evd_level sigma) variances ++ fnl () ++
     str "Computed from body " ++ Termops.Internal.print_constr_env env sigma body ++ fnl () ++
     str " and type: " ++ Option.cata (Termops.Internal.print_constr_env env sigma) (mt()) typ);
   variances
@@ -161,7 +161,7 @@ let register_universe_variances_of_constr env sigma ?typ body =
 let register_universe_variances_of_type env sigma typ =
   let status = init_status sigma in
   let status = compute_variances_type env sigma status typ in
-  debug Pp.(fun () -> Inf.pr (Evd.pr_level sigma) status ++ fnl () ++
+  debug Pp.(fun () -> Inf.pr (Termops.pr_evd_level sigma) status ++ fnl () ++
     str "Computed from type " ++ Termops.Internal.print_constr_env env sigma typ);
   finalize sigma status
 
@@ -236,5 +236,5 @@ let register_universe_variances_of_named_context env sigma ~as_types ?(cumul_pb=
     Option.cata (compute_variances env sigma status (InBinder i) cumul_pb) status (get_value binder)
   in
   let status = CList.fold_right_i fold_binder 0 ctx status in
-  debug Pp.(fun () -> str"Variances in named context: " ++ Inf.pr (Evd.pr_level sigma) status);
+  debug Pp.(fun () -> str"Variances in named context: " ++ Inf.pr (Termops.pr_evd_level sigma) status);
   finalize sigma status

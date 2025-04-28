@@ -89,7 +89,7 @@ val interp_mutual_inductive_constr
   -> template_syntax:syntax_allows_template_poly list
   -> constructors:(Names.Id.t list * EConstr.constr list) list
   (** Names and types of constructors, not including parameters (as in kernel entries) *)
-  -> env_ar:Environ.env
+  -> env_ar_params:Environ.env
   (** Environment with the inductives in the rel_context *)
   -> private_ind:bool
   -> DeclareInd.default_dep_elim list

@@ -477,7 +477,7 @@ let nparams x = List.length (params x)
 
 let array_ops_univs : AbstractContext.t * Variances.t option =
   let open VarianceOccurrence in
-  AbstractContext.make ([||],Names.[|Name (Id.of_string "u")|]) Constraints.empty,
+  AbstractContext.make { quals = [||]; univs = Names.[|Name (Id.of_string "u")|] } Constraints.empty,
   Some (Variances.make [| { in_binders = Some Variance.Contravariant, [0]; in_term = None; in_type = None;
     under_impred_qvars = Some Predicative } |])
 

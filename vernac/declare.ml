@@ -222,7 +222,7 @@ let make_univs_deferred_private_mono ~initial_euctx ?feedback_id ~uctx ~udecl bo
   UState.check_mono_univ_decl uctx_body udecl
 
 let make_univs_immediate_private_mono ~initial_euctx ~uctx ~udecl ~eff ~used_univs body typ =
-  let utyp = UState.univ_entry ~poly:false initial_euctx None in
+  let utyp = UState.univ_entry ~poly:false initial_euctx in
   let _, used_univs = universes_of_body_type ~used_univs body typ in
   let ubody =
     let uctx = UState.constrain_variables (fst (UState.context_set initial_euctx)) uctx in
@@ -924,7 +924,7 @@ let process_proof ~info:Info.({ udecl; poly; cumulative }) ?(is_telescope=false)
            (* Testing if evar-closed? *)
            let initial_typ = Evarutil.nf_evars_universes sigma (EConstr.Unsafe.to_constr initial_typ) in
            (* The flags keep_body_ucst_separate, opaque, etc. should be consistent with evar-closedness? *)
-           let univs = UState.univ_entry ~poly:false initial_euctx None in
+           let univs = UState.univ_entry ~poly:false initial_euctx in
            let body = Future.chain body_typ_uctx (fun (((body, eff), _typ), uctx) ->
                let uctx = make_univs_deferred_private_mono ~initial_euctx ~uctx ~udecl body (Some initial_typ) in
                ((body, uctx), eff)) in
@@ -1374,7 +1374,7 @@ let declare_obligation prg obl ~uctx ~types ~body =
       else ([], body, types, [||])
     in
     let uctx' = UState.restrict uctx (universes_of_decl body types) in
-    let univs = UState.univ_entry ~poly uctx' None in
+    let univs = UState.univ_entry ~poly uctx' in
     let inst = instance_of_univs univs in
     let ce = definition_entry ?types:ty ~opaque ~univs body in
     (* ppedrot: seems legit to have obligations as local *)

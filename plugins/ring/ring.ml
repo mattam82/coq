@@ -234,7 +234,7 @@ let exec_tactic env sigma n f args =
   (* Evaluate the whole result *)
   let _, pv = Proofview.init sigma [env, EConstr.mkProp] in
   let tac = Tacinterp.eval_tactic_ist ist (ltac_call f (args@[getter])) in
-  let ((), pv, _, _) = Proofview.apply ~name:(Id.of_string "ring") ~poly:false (Global.env ()) tac pv in
+  let ((), pv, _, _, _) = Proofview.apply ~name:(Id.of_string "ring") ~poly:false (Global.env ()) tac pv in
   let sigma = (Proofview.return pv) in
   let nf c = constr_of c in
   let res = Array.map nf !tactic_res in

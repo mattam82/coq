@@ -292,7 +292,6 @@ val in_punivs : 'a -> 'a puniverses
 
 val eq_puniverses : ('a -> 'a -> bool) -> 'a puniverses -> 'a puniverses -> bool
 
-
 type bound_names = {
   quals: Names.Name.t array;
   univs: Names.Name.t array

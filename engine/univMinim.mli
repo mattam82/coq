@@ -49,7 +49,7 @@ val set_variance : InferCumulativity.variances -> Level.t -> InferCumulativity.i
     the constraints w.r.t to the equalities. *)
 
 val normalize_context_set : 
-  variances:InferCumulativity.level_variances ->
+  variances:InferCumulativity.variances ->
   partial:bool ->
   UGraph.t -> ContextSet.t ->
   UnivFlex.t (* The defined and undefined variables *) ->

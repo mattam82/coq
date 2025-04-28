@@ -212,8 +212,7 @@ let build_id_coercion ?loc idf_opt source poly =
           Id.of_string ("Id_"^(ident_key_of_class source)^"_"^
                         (ident_key_of_class cl))
   in
-  (* FIXME compute variance? *)
-  let univs = Evd.univ_entry ~poly sigma None in
+  let univs = Evd.univ_entry ~poly sigma in
   let constr_entry = (* Cast is necessary to express [val_f] is identity *)
     DefinitionEntry
       (definition_entry ~types:typ_f ~univs

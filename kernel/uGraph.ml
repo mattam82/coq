@@ -101,7 +101,7 @@ let merge_constraints csts g =
     let g, equivs' = enforce_constraint cst g in
     g, equivs' @ equivs) csts (g, [])
 
-let check_constraint { graph = g; type_in_type } (u,d,v) =
+let check_constraint { graph = g; type_in_type; _ } (u,d,v) =
   type_in_type
   || match d with
   | Le -> G.check_leq g u v

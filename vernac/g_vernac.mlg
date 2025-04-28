@@ -229,15 +229,23 @@ let test_variance_ident =
     lk_kws ["=";"+";"-";"*"] >> lk_ident
   end
 
+let test_univ_decl_nocstrs =
+  let open Procq.Lookahead in
+  to_entry "test_univ_decl" (lk_ident_list >> lk_kw "|" >> lk_ident_list >> (lk_kw "?" <+> lk_empty) >> lk_kw "}")
+
 let test_univ_decl =
   let open Procq.Lookahead in
   to_entry "test_univ_decl" (lk_ident_list >> lk_kw "|" >> lk_ident_list >> (lk_kw "?" <+> lk_empty) >> (lk_kw "|" <+> lk_kw "|}"))
+
+let test_cumul_univ_decl_nocstrs =
+  let open Procq.Lookahead in
+  let lk_list_variance_ident = lk_list (lk_kw "+" <+> lk_kw "*" <+> lk_kw "=" <+> lk_kw "-" <+> lk_ident) in
+  to_entry "test_cumul_univ_decl" (lk_ident_list >> lk_kw "|" >> lk_list_variance_ident >> (lk_kw "?" <+> lk_empty) >> lk_kw "}")
 
 let test_cumul_univ_decl =
   let open Procq.Lookahead in
   let lk_list_variance_ident = lk_list (lk_kw "+" <+> lk_kw "*" <+> lk_kw "=" <+> lk_kw "-" <+> lk_ident) in
   to_entry "test_cumul_univ_decl" (lk_ident_list >> lk_kw "|" >> lk_list_variance_ident >> (lk_kw "?" <+> lk_empty) >> (lk_kw "|" <+> lk_kw "|}"))
-
 
 }
 
@@ -354,7 +362,17 @@ GRAMMAR EXTEND Gram
       | ext = [ "}" -> { true } | bar_cbrace -> { false } ] -> { ([], ext) } ] ]
   ;
   univ_decl:
-    [ [ "@{" ; test_univ_decl; l0 = LIST0 identref; "|";  l = LIST0 identref; ext = [ "?" -> { true } | -> { false } ];
+    [ [ "@{" ; test_univ_decl_nocstrs; l0 = LIST0 identref; "|";  l = LIST0 identref; ext = [ "?" -> { true } | -> { false } ]; "}"
+         ->
+         { let open UState in
+         { univdecl_qualities = l0;
+           univdecl_extensible_qualities = false;
+           univdecl_instance = l;
+           univdecl_extensible_instance = ext;
+           univdecl_variances = ();
+           univdecl_constraints = [];
+           univdecl_extensible_constraints = false } }
+    | "@{" ; test_univ_decl; l0 = LIST0 identref; "|";  l = LIST0 identref; ext = [ "?" -> { true } | -> { false } ];
          cs = univ_decl_constraints
          ->
          { let open UState in
@@ -386,14 +404,25 @@ GRAMMAR EXTEND Gram
     ] ]
   ;
   variance_identref:
-    [ [ id = identref -> { (id, None) }
-      | test_variance_ident; v = variance; id = identref -> { (id, Some v) }
-        (* We need this test to help the parser avoid the conflict
-           between "+" before ident (covariance) and trailing "+" (extra univs allowed) *)
+    [ [ v = variance; id = identref -> { (id, Some v) }
+      | id = identref -> { (id, None) }
     ] ]
   ;
   cumul_univ_decl:
-    [ [ "@{" ; test_cumul_univ_decl; l0 = LIST0 identref; "|";
+    [ [
+        "@{" ; test_cumul_univ_decl_nocstrs; l0 = LIST0 identref; "|";
+        l = LIST0 variance_identref; ext = [ "?" -> { true } | -> { false } ]; "}"
+         ->
+         { let open UState in
+         { univdecl_qualities = l0;
+           univdecl_extensible_qualities = false;
+           univdecl_instance = l;
+           univdecl_extensible_instance = ext;
+           univdecl_variances = ();
+           univdecl_constraints = [];
+           univdecl_extensible_constraints = false } }
+
+      | "@{" ; test_cumul_univ_decl; l0 = LIST0 identref; "|";
         l = LIST0 variance_identref; ext = [ "?" -> { true } | -> { false } ];
          cs = univ_decl_constraints
          ->
