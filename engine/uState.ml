@@ -45,13 +45,14 @@ module QState : sig
   val repr : elt -> t -> Quality.t
   val is_rigid : t -> QVar.t -> bool
   val unify_quality : fail:(unit -> t) -> Conversion.conv_pb -> Quality.t -> Quality.t -> t -> t
-  val is_above_prop : elt -> t -> bool
+  val eliminates_to_prop : elt -> t -> bool
   val undefined : t -> QVar.Set.t
-  val collapse_above_prop : to_prop:bool -> t -> t
+  val collapse_elim_to_prop : to_prop:bool -> t -> t
   val collapse : ?except:QVar.Set.t -> t -> t
   val pr : (QVar.t -> Libnames.qualid option) -> t -> Pp.t
   val of_set : QVar.Set.t -> t
-  val of_global : QVar.Set.t -> t
+  val of_elims : QGraph.t -> t
+  val elims : t -> QGraph.t
 end =
 struct
 
@@ -63,15 +64,22 @@ type t = {
   (** Rigid variables, may not be set to another *)
   qmap : Quality.t option QMap.t;
   (* TODO: use a persistent union-find structure *)
-  above : QSet.t;
-  (** Set of quality variables known to be either in Prop or Type.
-      If q ∈ above then it must map to None in qmap. *)
+  elims : QGraph.t;
+  (** Elimination graph for quality variables known to be either in Prop or Type.
+      If q ∈ QGraph.qvar_domain elims and it doesn't map to None in qmap, then
+      it is equated to a constant or another qvar in the graph. *)
+  initial_elims : QGraph.t;
+  (** Keep the qvar domain without any constraints to optimize computation. *)
+  elim_to_prop : QSet.t;
+  (** Cache to avoid calling the [eliminates_to_prop] function of the QGraph on
+          one positive check. *)
 }
 
 type elt = QVar.t
 
-let empty = { rigid = QSet.empty; qmap = QMap.empty; above = QSet.empty }
-let is_empty m = QSet.is_empty m.rigid && QMap.is_empty m.qmap && QSet.is_empty m.above
+let empty = { rigid = QSet.empty; qmap = QMap.empty; elims = QGraph.initial_graph
+            ; initial_elims = QGraph.initial_graph; elim_to_prop = QSet.empty }
+let is_empty m = QSet.is_empty m.rigid && QMap.is_empty m.qmap && QSet.is_empty m.elim_to_prop
 
 let rec repr q m = match QMap.find q m.qmap with
 | None -> QVar q
@@ -79,7 +87,9 @@ let rec repr q m = match QMap.find q m.qmap with
 | Some (QConstant _ as q) -> q
 | exception Not_found -> QVar q
 
-let is_above_prop q m = QSet.mem q m.above
+let eliminates_to_prop q m =
+  QSet.mem q m.elim_to_prop ||
+        QGraph.eliminates_to_prop m.elims (QVar q)
 
 let is_rigid m q = QSet.mem q m.rigid || not (QMap.mem q m.qmap)
 
@@ -93,29 +103,36 @@ let set q qv m =
     else
     if QSet.mem q m.rigid then None
     else
-      let above =
-        if QSet.mem q m.above then QSet.add qv (QSet.remove q m.above)
-        else m.above
+      let (elims,elim_to_prop) =
+        if eliminates_to_prop q m
+        then (QGraph.enforce_eq (QVar qv) (QVar q) m.elims,QSet.add qv m.elim_to_prop)
+        else (m.elims,m.elim_to_prop)
       in
-      Some { rigid = m.rigid; qmap = QMap.add q (Some (QVar qv)) m.qmap; above }
+      Some { rigid = m.rigid; qmap = QMap.add q (Some (QVar qv)) m.qmap; elims
+             ; initial_elims = m.initial_elims; elim_to_prop }
   | q, (QConstant qc as qv) ->
-    if qc == QSProp && QSet.mem q m.above then None
+    if qc == QSProp && eliminates_to_prop q m then None
     else if QSet.mem q m.rigid then None
     else
-      Some { rigid = m.rigid; qmap = QMap.add q (Some qv) m.qmap; above = QSet.remove q m.above }
+      Some { m with rigid = m.rigid; qmap = QMap.add q (Some qv) m.qmap;
+                                        elims = QGraph.enforce_eq qv (QVar q) m.elims }
 
-let set_above_prop q m =
+let set_elim_to_prop q m =
   let q = repr q m in
   let q = match q with QVar q -> q | QConstant _ -> assert false in
   if QSet.mem q m.rigid then None
-  else Some { rigid = m.rigid; qmap = m.qmap; above = QSet.add q m.above }
+  else
+    Some { rigid = m.rigid; qmap = m.qmap;
+           elims = QGraph.enforce_eliminates_to QGraph.Internal (QVar q) qprop m.elims;
+           elim_to_prop = QSet.add q m.elim_to_prop;
+           initial_elims = m.initial_elims }
 
 let unify_quality ~fail c q1 q2 local = match q1, q2 with
 | QConstant QType, QConstant QType
 | QConstant QProp, QConstant QProp
 | QConstant QSProp, QConstant QSProp -> local
 | QConstant QProp, QVar q when c == Conversion.CUMUL ->
-  begin match set_above_prop q local with
+  begin match set_elim_to_prop q local with
   | Some local -> local
   | None -> fail ()
   end
@@ -144,6 +161,19 @@ let nf_quality m = function
   | QConstant _ as q -> q
   | QVar q -> repr q m
 
+let add_qvars m qmap qs =
+  let g = m.initial_elims in
+  let filter v = match QMap.find v qmap with
+    | None | exception Not_found -> true
+    | _ -> false in
+  (* Here, we filter instead of enforcing equality due to the collapse:
+     simply enforcing equality may lead to inconsistencies after it *)
+  let qs = QVar.Set.filter filter qs in
+  let fold v g = try QGraph.add_quality (QVar v) g with QGraph.AlreadyDeclared -> g in
+  let fold' v = QGraph.enforce_eliminates_to QGraph.Internal (QVar v) qprop in
+  let g = QVar.Set.fold fold qs g in
+  (g, QVar.Set.fold fold' qs g)
+
 let union ~fail s1 s2 =
   let extra = ref [] in
   let qmap = QMap.union (fun qk q1 q2 ->
@@ -156,13 +186,10 @@ let union ~fail s1 s2 =
       s1.qmap s2.qmap
   in
   let extra = !extra in
-  let filter q = match QMap.find q qmap with
-  | None -> true
-  | Some _ -> false
-  | exception Not_found -> false
-  in
-  let above = QSet.filter filter @@ QSet.union s1.above s2.above in
-  let s = { rigid = QSet.union s1.rigid s2.rigid; qmap; above } in
+  let qs = QVar.Set.union (QGraph.qvar_domain s1.elims) (QGraph.qvar_domain s2.elims) in
+  let initial_elims,elims = add_qvars s2 qmap qs in
+  let elim_to_prop = QSet.union s1.elim_to_prop s2.elim_to_prop in
+  let s = { rigid = QSet.union s1.rigid s2.rigid; qmap; elims; initial_elims; elim_to_prop } in
   List.fold_left (fun s (q1,q2) ->
       let q1 = nf_quality s q1 and q2 = nf_quality s q2 in
       unify_quality ~fail:(fun () -> fail s q1 q2) CONV q1 q2 s)
@@ -173,38 +200,47 @@ let add ~check_fresh ~rigid q m =
   if check_fresh then assert (not (QMap.mem q m.qmap));
   { rigid = if rigid then QSet.add q m.rigid else m.rigid;
     qmap = QMap.add q None m.qmap;
-    above = m.above }
+    elims = QGraph.add_quality (QVar q) m.elims;
+    initial_elims = QGraph.add_quality (QVar q) m.initial_elims;
+        elim_to_prop = m.elim_to_prop }
 
 let of_set qs =
-  { rigid = QSet.empty; qmap = QMap.bind (fun _ -> None) qs; above = QSet.empty }
+  let empty_qmap = QMap.bind (fun _ -> None) qs in
+  let g = QVar.Set.fold (fun v -> QGraph.add_quality (QVar v)) qs QGraph.initial_graph in
+  { rigid = QSet.empty; qmap = empty_qmap;
+    elims = g; initial_elims = g; elim_to_prop = QSet.empty }
 
-let of_global qs =
-  { empty with
-    rigid = qs }
+let of_elims elims =
+  let qs = QGraph.qvar_domain elims in
+  let initial_elims =
+    QVar.Set.fold (fun v -> QGraph.add_quality (QVar v)) qs QGraph.initial_graph in
+  { empty with rigid = qs; elims; initial_elims }
 
-(* XXX what about [above]? *)
+(* XXX what about qvars in the elimination graph? *)
 let undefined m =
   let mq = QMap.filter (fun _ v -> Option.is_empty v) m.qmap in
   QMap.domain mq
 
-let collapse_above_prop ~to_prop m =
-  let map q v = match v with
-    | None ->
-      if not @@ QSet.mem q m.above then None else
-      if to_prop then Some (QConstant QProp)
-      else Some (QConstant QType)
-  | Some _ -> v
-  in
-  { rigid = m.rigid; qmap = QMap.mapi map m.qmap; above = QSet.empty }
+let collapse_elim_to_prop ~to_prop m =
+  QMap.fold (fun q v m ->
+           match v with
+           | Some _ -> m
+           | None ->
+              if not @@ eliminates_to_prop q m then m else
+                if to_prop then Option.get (set q qprop m)
+                else Option.get (set q qtype m)
+         )
+         m.qmap m
 
 let collapse ?(except=QSet.empty) m =
-  let map q v = match v with
-  | None -> if QSet.mem q m.rigid || QSet.mem q except then None else Some (QConstant QType)
-  | Some _ -> v
-  in
-  { rigid = m.rigid; qmap = QMap.mapi map m.qmap; above = QSet.empty }
+  QMap.fold (fun q v m ->
+           match v with
+           | Some _ -> m
+           | None -> if QSet.mem q m.rigid || QSet.mem q except then m
+                    else Option.get (set q qtype m))
+         m.qmap m
 
-let pr prqvar_opt { qmap; above; rigid } =
+let pr prqvar_opt ({ qmap; elims; rigid } as m) =
   let open Pp in
   let prqvar q = match prqvar_opt q with
     | None -> QVar.raw_pr q
@@ -212,7 +248,7 @@ let pr prqvar_opt { qmap; above; rigid } =
   in
   let prbody u = function
   | None ->
-    if QSet.mem u above then str " >= Prop"
+    if eliminates_to_prop u m then str " >= Prop"
     else if QSet.mem u rigid then
       str " (rigid)"
     else mt ()
@@ -226,6 +262,8 @@ let pr prqvar_opt { qmap; above; rigid } =
     | Some qid -> str " (named " ++ Libnames.pr_qualid qid ++ str ")"
   in
   h (prlist_with_sep fnl (fun (u, v) -> QVar.raw_pr u ++ prbody u v ++ prqvar_name u) (QMap.bindings qmap))
+
+let elims m = m.elims
 
 end
 
@@ -298,7 +336,7 @@ let make ~qualities univs =
   { empty with
     universes = univs;
     initial_universes = univs ;
-    sort_variables = QState.of_global qualities
+    sort_variables = QState.of_elims qualities
   }
 
 let id_of_level uctx l =
@@ -575,10 +613,16 @@ let of_context_set env ((qs,us),csts) =
   let uctx = { empty with local_variables = us; initial_universes = universes; universes; sort_variables;} in
   merge_context_universes uctx ~strict:false (us, csts)
 
+let elim_graph uctx = QState.elims uctx.sort_variables
+
+let eliminates_to_prop uctx qv = QState.eliminates_to_prop qv uctx.sort_variables
+
 let of_names (ubind,(revqbind,revubind)) =
   let revqbind = QVar.Map.map (fun id -> { uname = Some id; uloc = None }) revqbind in
   let revubind = Level.Map.map (fun id -> { uname = Some id; uloc = None }) revubind in
-  {empty with names = (ubind,(revqbind,revubind))}
+  let qgraph = QVar.Map.fold (fun v _ -> QGraph.add_quality (QVar v)) revqbind QGraph.initial_graph in
+  { empty with names = (ubind,(revqbind,revubind));
+               sort_variables = QState.of_elims qgraph; }
 
 let universe_of_name uctx s =
   UNameMap.find s (snd (fst uctx.names))
@@ -636,7 +680,7 @@ let nf_relevance uctx r = match r with
   | QVar q' ->
     (* XXX currently not used in nf_evars_and_universes_opt_subst
        does it matter? *)
-    if QState.is_above_prop q' uctx.sort_variables then Relevant
+    if QState.eliminates_to_prop q' uctx.sort_variables then Relevant
     else if QVar.equal q q' then r
     else Sorts.RelevanceVar q'
 
@@ -750,6 +794,7 @@ let add_local_univ fo c local =
 
 let process_universe_constraints uctx cstrs =
   let open UnivProblem in
+  let quals = elim_graph uctx in
   let normalize local u = UGraph.normalize local.universes u in
   let qnormalize local q = QState.repr q local.sort_variables in
   let normalize_univ local u = normalize_universe local.universes u in
@@ -757,6 +802,7 @@ let process_universe_constraints uctx cstrs =
     Sorts.subst_fn ((qnormalize local), UnivSubst.subst_univs_level (normalize local)) s
   in
   let nf_constraint local = function
+    | QElimTo (a, b) -> QElimTo (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)
     | QLeq (a, b) -> QLeq (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)
     | QEq (a, b) -> QEq (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)
     | ULub (c, u, v) -> ULub (c, normalize_univ local u, normalize_univ local v)
@@ -772,7 +818,7 @@ let process_universe_constraints uctx cstrs =
     | UProp -> prop
     | USet -> set
     in
-    if UGraph.check_eq_sort local.universes ls s then local
+    if UGraph.check_eq_sort local.sort_variables local.universes ls s then local
     else if is_uset l then match classify s with
     | USmall _ -> sort_inconsistency Eq set s
     | ULevel (r, _) ->
@@ -869,7 +915,7 @@ let process_universe_constraints uctx cstrs =
           (* l contains a +1 and r=r' small so l <= r impossible *)
           sort_inconsistency Le l r
       | USmall l' ->
-        if UGraph.check_leq_sort local.universes l r then local
+        if UGraph.check_leq_sort local.sort_variables local.universes l r then local
         else sort_inconsistency Le l r
       | ULevel (l', _) ->
         if is_uset r' && is_flexible local l' then
@@ -906,17 +952,12 @@ let process_universe_constraints uctx cstrs =
   let unify_universes cst local =
     let cst = nf_constraint local cst in
     if UnivProblem.is_trivial cst then local
-    else match cst with
-    | QEq (a, b) ->
+    else
       (* TODO sort_inconsistency should be able to handle raw
          qualities instead of having to make a dummy sort *)
       let mk q = Sorts.make q Universe.type0 in
-      unify_quality CONV (mk a) (mk b) local
-    | QLeq (a, b) ->
-      (* TODO sort_inconsistency should be able to handle raw
-         qualities instead of having to make a dummy sort *)
-      let mk q = Sorts.make q Universe.type0 in
-      unify_quality CUMUL (mk a) (mk b) local
+    | QEq (a, b) -> unify_quality univs CONV (mk a) (mk b) local
+    | QElimTo (a, b) -> unify_quality univs CUMUL (mk b) (mk a) local
     | ULe (l, r) -> enforce_le false local l r 
     | ULub (c, l, r) ->
       if all_flexible local l || all_flexible local r then 
@@ -981,24 +1022,21 @@ let add_constraints uctx cstrs =
 
 let add_quconstraints uctx (qcstrs,ucstrs) =
   let cstrs = problem_of_constraints ucstrs in
-  let cstrs = QConstraints.fold (fun (l,d,r) cstrs ->
+  let cstrs = ElimConstraints.fold (fun (l,d,r) cstrs ->
       match d with
       | Equal -> UnivProblem.Set.add (QEq (l,r)) cstrs
-      | Leq -> UnivProblem.Set.add (QLeq (l,r)) cstrs)
+      | ElimTo -> UnivProblem.Set.add (QElimTo (l,r)) cstrs)
       qcstrs cstrs
   in
   add_universe_constraints uctx cstrs
 
-let check_qconstraints uctx csts =
-  Sorts.QConstraints.for_all (fun (l,k,r) ->
+let check_elim_constraints uctx csts =
+  Sorts.ElimConstraints.for_all (fun (l,k,r) ->
       let l = nf_quality uctx l in
       let r = nf_quality uctx r in
-      if Quality.equal l r then true
-      else match l,k,r with
-        | _, Equal, _ -> false
-        | QConstant QProp, Leq, QConstant QType -> true
-        | QConstant QProp, Leq, QVar q -> QState.is_above_prop q uctx.sort_variables
-        | _, Leq, _ -> false)
+      match l,k,r with
+        | _, Equal, _ -> Quality.equal l r
+        | _, ElimTo, _ -> Inductive.eliminates_to (QState.elims uctx.sort_variables) l r)
     csts
 
 let check_universe_constraint uctx (c:UnivProblem.t) =
@@ -1007,15 +1045,11 @@ let check_universe_constraint uctx (c:UnivProblem.t) =
     let a = nf_quality uctx a in
     let b = nf_quality uctx b in
     Quality.equal a b
-  | QLeq (a,b) ->
+  | QElimTo (a,b) ->
     let a = nf_quality uctx a in
     let b = nf_quality uctx b in
-    if Quality.equal a b then true
-    else begin match a, b with
-      | QConstant QProp, QConstant QType -> true
-      | QConstant QProp, QVar q -> QState.is_above_prop q uctx.sort_variables
-      | _ -> false
-    end
+      Quality.equal a b ||
+      Inductive.eliminates_to (QState.elims uctx.sort_variables) a b
   | ULe (u,v) -> UGraph.check_leq_sort uctx.universes u v
   | UEq (u,v) -> UGraph.check_eq_sort uctx.universes u v
   | ULub (Eq,u,v) -> UGraph.check_eq uctx.universes u v
@@ -1609,8 +1643,8 @@ let disable_universe_extension uctx ~with_cstrs =
 
 let normalize_variables uctx = uctx
 
-let collapse_above_prop_sort_variables ~to_prop uctx =
-  { uctx with sort_variables = QState.collapse_above_prop ~to_prop uctx.sort_variables }
+let collapse_elim_to_prop_sort_variables ~to_prop uctx =
+  { uctx with sort_variables = QState.collapse_elim_to_prop ~to_prop uctx.sort_variables }
 
 let collapse_sort_variables ?except uctx =
   { uctx with sort_variables = QState.collapse ?except uctx.sort_variables }

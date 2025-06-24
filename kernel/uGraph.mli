@@ -67,8 +67,16 @@ val merge_constraints : Constraints.t -> t -> t * level_equivalences
 
 val check_constraint  : t -> univ_constraint -> bool
 val check_constraints : Constraints.t -> t -> bool
-val check_eq_sort : t -> Sorts.t  -> Sorts.t -> bool
-val check_leq_sort : t -> Sorts.t -> Sorts.t -> bool
+
+val check_eq_sort : QGraph.t -> t -> Sorts.t -> Sorts.t -> bool
+(** Checks whether (i) the first quality is equal to the second and (ii)
+    that the universe of the first one is equal to the universe of the second one.
+    When [type_in_type], only checks relevance. *)
+
+val check_leq_sort : QGraph.t -> t -> Sorts.t -> Sorts.t -> bool
+(** Checks whether (i) the second quality eliminates into the first and (ii)
+    that the universe of the first one is below the universe of the second one.
+    When [type_in_type], only checks relevance. *)
 
 val normalize : t -> Level.t -> Universe.t option
 
@@ -163,11 +171,3 @@ val pr : ?local:bool -> (Level.t -> Pp.t) -> t -> Pp.t
 
 (** {6 Debugging} *)
 val check_universes_invariants : t -> unit
-
-module Internal : sig
-  (** Makes the qvars treated as above prop.
-      Do not use outside kernel inductive typechecking. *)
-  val add_template_qvars : Sorts.QVar.Set.t -> t -> t
-
-  val is_above_prop : t -> Sorts.QVar.t -> bool
-end

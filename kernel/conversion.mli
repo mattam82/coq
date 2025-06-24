@@ -29,7 +29,7 @@ type ('a, 'err) universe_state = ('a, 'err) UCompare.universe_state
 type ('a, 'err) generic_conversion_function = ('a, 'err) universe_state -> constr -> constr -> ('a, 'err option) result
 
 (** This function never returns an non-empty error. *)
-val checked_universes : (UGraph.t, 'err) universe_compare
+val checked_universes : (UGraph.t * QGraph.t, 'err) universe_compare
 
 (** These two functions can only fail with unit *)
 val conv : constr extended_conversion_function
@@ -44,3 +44,5 @@ val generic_conv : conv_pb -> l2r:bool
 
 val default_conv     : conv_pb -> types kernel_conversion_function
 val default_conv_leq : types kernel_conversion_function
+
+type graph_inconsistency = Univ of UGraph.univ_inconsistency | Qual of QGraph.elimination_error

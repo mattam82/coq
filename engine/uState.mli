@@ -32,10 +32,10 @@ type t
 
 val empty : t
 
-val make : qualities:QVar.Set.t -> UGraph.t -> t
+val make : qualities:QGraph.t -> UGraph.t -> t
 [@@ocaml.deprecated "(8.13) Use from_env"]
 
-val make_with_initial_binders : qualities:QVar.Set.t -> UGraph.t -> lident list -> t
+val make_with_initial_binders : qualities:QGraph.t -> UGraph.t -> lident list -> t
 [@@ocaml.deprecated "(8.13) Use from_env"]
 
 val from_env : ?binders:lident list -> Environ.env -> t
@@ -81,6 +81,11 @@ val nf_universes : t -> Constr.t -> Constr.t
 
 val ugraph : t -> UGraph.t
 (** The current graph extended with the local constraints *)
+
+val elim_graph : t -> QGraph.t
+(** The elimination graph for above prop variables *)
+
+val eliminates_to_prop : t -> Sorts.QVar.t -> bool
 
 val constraints : t -> Univ.Constraints.t
 (** Shorthand for {!context_set} composed with {!ContextSet.constraints}. *)
@@ -130,7 +135,7 @@ val add_universe_constraints : t -> UnivProblem.Set.t -> t
   @raise UniversesDiffer when universes differ
 *)
 
-val check_qconstraints : t -> QConstraints.t -> bool
+val check_elim_constraints : t -> ElimConstraints.t -> bool
 
 val check_universe_constraints : t -> UnivProblem.Set.t -> bool
 
@@ -229,7 +234,7 @@ val set_variances : t -> InferCumulativity.variances -> t
 
 val minimize : partial:bool -> t -> t
 
-val collapse_above_prop_sort_variables : to_prop:bool -> t -> t
+val collapse_elim_to_prop_sort_variables : to_prop:bool -> t -> t
 
 val collapse_sort_variables : ?except:QVar.Set.t -> t -> t
 
