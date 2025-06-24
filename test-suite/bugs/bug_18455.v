@@ -7,11 +7,10 @@ Cumulative Record prod@{s;a b} (A : 𝒰@{s;a}) (B : 𝒰@{s;b}) : 𝒰@{s;max(a
 Definition flip_prod@{s;a b} [A : 𝒰@{s;a}] [B : 𝒰@{s;b}] (v : prod A B) : prod B A
   := {| fst := snd v; snd := fst v |}.
 
-(* We need to specify univs here (maybe will be fixed someday?) *)
-Fail Definition and@{|} : Prop -> Prop -> Prop := prod.
-Definition and@{|} : Prop -> Prop -> Prop := prod@{Prop;Set Set}.
+Definition and@{|} : Prop -> Prop -> Prop := prod.
 
-(* but not here (with minim to set on) *)
+Check prod True Set.
+
 Definition conj@{|} : forall [A B : Prop], A -> B -> and A B := pair.
 Definition proj1@{|} : forall [A B : Prop], and A B -> A := fst.
 Definition proj2@{|} : forall [A B : Prop], and A B -> B := snd.

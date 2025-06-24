@@ -88,8 +88,9 @@ end
 module Info = struct
 
   type t =
-    { poly : bool
-    ; sort_poly : bool
+    { sort_poly : bool
+    ; poly : bool
+    ; cumulative : bool
     ; inline : bool
     ; kind : Decls.logical_kind
     ; udecl : UState.sort_poly_decl
@@ -103,10 +104,10 @@ module Info = struct
 
   (** Note that [opaque] doesn't appear here as it is not known at the
      start of the proof in the interactive case. *)
-  let make ?(poly=false) ?(sort_poly = false) ?(inline=false) ?(kind=Decls.(IsDefinition Definition))
+  let make ?(sort_poly=false) ?(poly=false) ?(cumulative = false) ?(inline=false) ?(kind=Decls.(IsDefinition Definition))
       ?(udecl=UState.default_sort_poly_decl) ?(scope=Locality.default_scope)
       ?(clearbody=false) ?hook ?typing_flags ?user_warns ?(ntns=[]) () =
-    { poly; sort_poly; inline; kind; udecl; scope; hook; typing_flags; clearbody; user_warns; ntns }
+    { sort_poly; poly; cumulative; inline; kind; udecl; scope; hook; typing_flags; clearbody; user_warns; ntns }
 end
 
 module SideEff :
@@ -215,22 +216,30 @@ type symbol_entry = {
 }
 
 let default_univ_entry = UState.Monomorphic_entry PConstraints.ContextSet.empty
-let default_named_univ_entry = default_univ_entry, UnivNames.empty_binders
+let default_named_univ_entry =
+  UState.{ universes_entry_universes = default_univ_entry;
+    universes_entry_binders = UnivNames.empty_binders }
 
-let extract_monomorphic = function
+let extract_monomorphic entry =
+  let open UState in
+  match entry.universes_entry_universes with
   | UState.Monomorphic_entry ctx -> Entries.Monomorphic_entry, ctx
-  | UState.Polymorphic_entry uctx -> Entries.Polymorphic_entry uctx, PConstraints.ContextSet.empty
+  | UState.Polymorphic_entry (uctx, variances) -> Entries.Polymorphic_entry (uctx, variances), PConstraints.ContextSet.empty
 
-let instance_of_univs = function
-  | UState.Monomorphic_entry _, _ -> UVars.Instance.empty
-  | UState.Polymorphic_entry uctx, _ -> UVars.UContext.instance uctx
+let instance_of_univs entry =
+  match entry.UState.universes_entry_universes with
+  | UState.Monomorphic_entry _ -> UVars.Instance.empty
+  | UState.Polymorphic_entry (uctx, _variances) -> UVars.Instance.of_level_instance (UVars.UContext.instance uctx)
 
-let add_mono_uctx uctx = function
-  | UState.Monomorphic_entry ctx, ubinders -> UState.Monomorphic_entry (PConstraints.ContextSet.union (UState.context_set uctx) ctx), ubinders
-  | UState.Polymorphic_entry _, _ as x -> assert (PConstraints.ContextSet.is_empty (UState.context_set uctx)); x
+let add_mono_uctx uctx e =
+  let open UState in
+  match e.universes_entry_universes with
+  | UState.Monomorphic_entry ctx ->
+    { e with universes_entry_universes = UState.Monomorphic_entry (PConstraints.ContextSet.union (UState.context_set uctx) ctx) }
+  | UState.Polymorphic_entry _ -> assert (PConstraints.ContextSet.is_empty (UState.context_set uctx)); e
 
-let make_ubinders uctx (univs, ubinders as u) = match univs with
-  | UState.Monomorphic_entry _ -> (UState.Monomorphic_entry uctx, ubinders)
+let make_ubinders uctx u = match u.UState.universes_entry_universes with
+  | UState.Monomorphic_entry _ -> { u with UState.universes_entry_universes = UState.Monomorphic_entry uctx }
   | UState.Polymorphic_entry _ -> u
 
 let { Goptions.get = private_poly_univs } =
@@ -265,10 +274,10 @@ let make_univs_immediate_private_mono ~initial_euctx ~uctx ~udecl ~eff ~used_uni
     UState.check_mono_sort_poly_decl uctx_body udecl in
   initial_euctx, utyp, used_univs, Default { body; opaque = Opaque (ubody, eff) }
 
-let make_univs_immediate_private_poly ~uctx ~udecl ~eff ~used_univs body typ =
+let make_univs_immediate_private_poly ~sort_poly ~cumulative ~uctx ~udecl ~eff ~used_univs body typ =
   let used_univs_typ, used_univs = universes_of_body_type ~used_univs body typ in
   let uctx' = UState.restrict uctx used_univs_typ in
-  let utyp = UState.check_sort_poly_decl ~poly:true uctx' udecl in
+  let utyp = UState.check_sort_poly_decl ~poly:true ~sort_poly ~cumulative ~kind:UVars.Definition uctx' udecl in
   let ubody =
     let uctx = UState.restrict uctx used_univs in
     PConstraints.ContextSet.diff
@@ -277,7 +286,7 @@ let make_univs_immediate_private_poly ~uctx ~udecl ~eff ~used_univs body typ =
   in
   uctx', utyp, used_univs, Default { body = body; opaque = Opaque (ubody, eff) }
 
-let make_univs_immediate_default ~poly ~opaque ~uctx ~udecl ~eff ~used_univs body typ =
+let make_univs_immediate_default ~poly ~sort_poly ~cumulative ~opaque ~uctx ~udecl ~eff ~used_univs body typ =
   let _, used_univs = universes_of_body_type ~used_univs body typ in
   (* Since the proof is computed now, we can simply have 1 set of
      constraints in which we merge the ones for the body and the ones
@@ -285,8 +294,8 @@ let make_univs_immediate_default ~poly ~opaque ~uctx ~udecl ~eff ~used_univs bod
      the actually used universes.
      TODO: check if restrict is really necessary now. *)
   let uctx = UState.restrict uctx used_univs in
-  let utyp = UState.check_sort_poly_decl ~poly uctx udecl in
-  let utyp = match fst utyp with
+  let utyp = UState.check_sort_poly_decl ~poly ~sort_poly ~cumulative ~kind:UVars.Definition uctx udecl in
+  let utyp = match utyp.universes_entry_universes with
     | Polymorphic_entry _ -> utyp
     | Monomorphic_entry uctx ->
       (* the constraints from the body may depend on universes from
@@ -296,24 +305,47 @@ let make_univs_immediate_default ~poly ~opaque ~uctx ~udecl ~eff ~used_univs bod
          Not sure if it makes more sense to merge them in the ustate
          before restrict/check_univ_decl or here. Since we only do it
          when monomorphic it shouldn't really matter. *)
-      Monomorphic_entry (PConstraints.ContextSet.union uctx (Safe_typing.universes_of_private (SideEff.get eff))), snd utyp
+       { utyp with universes_entry_universes =
+           Monomorphic_entry (PConstraints.ContextSet.union uctx  (Safe_typing.universes_of_private (SideEff.get eff))) }
   in
   uctx, utyp, used_univs, Default { body; opaque = if opaque then Opaque (PConstraints.ContextSet.empty, eff) else Transparent }
 
-let make_univs_immediate ~poly ?keep_body_ucst_separate ~opaque ~uctx ~udecl ~eff ~used_univs body typ =
+let make_univs_immediate ~poly ~sort_poly ~cumulative ?keep_body_ucst_separate ~opaque ~uctx ~udecl ~eff ~used_univs body typ =
   (* allow_deferred case *)
   match keep_body_ucst_separate with
-  | Some initial_euctx when not poly -> make_univs_immediate_private_mono ~initial_euctx ~uctx ~udecl ~eff ~used_univs body typ
+  | Some initial_euctx when not poly ->
+    make_univs_immediate_private_mono ~initial_euctx ~uctx ~udecl ~eff ~used_univs body typ
   | _ ->
   (* private_poly_univs case *)
   if poly && opaque && private_poly_univs ()
-  then make_univs_immediate_private_poly ~uctx ~udecl ~eff ~used_univs body typ
-  else make_univs_immediate_default ~poly ~opaque ~uctx ~udecl ~eff ~used_univs body typ
+  then make_univs_immediate_private_poly ~sort_poly ~cumulative ~uctx ~udecl ~eff ~used_univs body typ
+  else make_univs_immediate_default ~poly ~sort_poly ~cumulative ~opaque ~uctx ~udecl ~eff ~used_univs body typ
+
+let extend_variances univs =
+  let open UState in
+  let us = univs.universes_entry_universes in
+  let universes_entry_universes = match us with
+  | Monomorphic_entry _ -> us
+  | Polymorphic_entry (uctx, variances) ->
+    let _, ulen = UVars.UContext.size uctx in
+    let extend = function
+    | Entries.Check_variances vars ->
+      let avars = UVars.Variances.repr vars in
+      if Array.length avars = ulen then Entries.Check_variances vars
+      else if Array.length avars > ulen then CErrors.user_err Pp.(str"More variance annotations than bound universes")
+      else CErrors.user_err Pp.(str"More bound universes than variance annotations")
+       (* UVars.Variances.of_array (Array.append avars (Array.make (ulen - Array.length avars) (UVars.(VariancePos.make Variance.Invariant Position.InTerm)))) *)
+    | Entries.Infer_variances -> Entries.Infer_variances
+    in
+    Polymorphic_entry (uctx, Option.map extend variances)
+  in
+  { univs with universes_entry_universes }
 
 (** [univsbody] are universe-constraints attached to the body-only,
    used in vio-delayed opaque constants and private poly universes *)
 let definition_entry_core ?using ?(inline=false) ?types
     ?(univs=default_named_univ_entry) body =
+  let univs = extend_variances univs in
   { proof_entry_body = body;
     proof_entry_secctx = using;
     proof_entry_type = types;
@@ -558,7 +590,7 @@ let record_aux env s_ty s_bo =
   Aux_file.record_in_aux "context_used" v
 
 let cast_pure_proof_entry (e : Constr.constr pproof_entry) =
-  let univ_entry, cstrs = extract_monomorphic (fst (e.proof_entry_universes)) in
+  let univ_entry, cstrs = extract_monomorphic e.proof_entry_universes in
   { Entries.definition_entry_body = e.proof_entry_body;
     definition_entry_secctx = e.proof_entry_secctx;
     definition_entry_type = e.proof_entry_type;
@@ -611,7 +643,7 @@ let cast_opaque_proof_entry (type a b) (entry : (a, b) effect_entry) (e : a ppro
   | ImmediateEffectEntry -> ()
   | DeferredEffectEntry -> ()
   in
-  let univ_entry, ctx = extract_monomorphic (fst (e.proof_entry_universes)) in
+  let univ_entry, ctx = extract_monomorphic (e.proof_entry_universes) in
   { Entries.opaque_entry_body = body;
     opaque_entry_secctx = secctx;
     opaque_entry_type = typ;
@@ -631,7 +663,7 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
   let before_qualities = Global.elim_graph () in
   let make_constant = function
   (* Logically define the constant and its subproofs, no libobject tampering *)
-    | DefinitionEntry pe ->
+    | DefinitionEntry de ->
       (* We deal with side effects *)
       (match de.proof_entry_body with
       | Default { body; opaque = Transparent } ->
@@ -640,12 +672,12 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
         let ubinders = make_ubinders ctx de.proof_entry_universes in
         (* We register the global universes after exporting side-effects, since
            the latter depend on the former. *)
-        let ctx = PConstraints.ContextSet.filter_out_constant_qualities cstrs in
+        let ctx = PConstraints.ContextSet.filter_out_constant_qualities ctx in
         let () = Global.push_context_set QGraph.Rigid ctx in
         Entries.DefinitionEntry e, false, ubinders, None, ctx
       | Default { body; opaque = Opaque (body_uctx, eff) } ->
         let body = ((body, body_uctx), SideEff.get eff) in
-        let de = { pe with proof_entry_body = body } in
+        let de = { de with proof_entry_body = body } in
         let cd, ctx = cast_opaque_proof_entry ImmediateEffectEntry de in
         let ubinders = make_ubinders ctx de.proof_entry_universes in
                 let ctx = PConstraints.ContextSet.filter_out_constant_qualities ctx in
@@ -654,14 +686,14 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
       | DeferredOpaque { body; feedback_id } ->
         let map (body, eff) = body, SideEff.get eff in
         let body = Future.chain body map in
-        let de = { pe with proof_entry_body = body } in
+        let de = { de with proof_entry_body = body } in
         let cd, ctx = cast_opaque_proof_entry DeferredEffectEntry de in
         let ubinders = make_ubinders ctx de.proof_entry_universes in
                 let ctx = PConstraints.ContextSet.filter_out_constant_qualities ctx in
         let () = Global.push_context_set QGraph.Rigid ctx in
         Entries.OpaqueEntry cd, false, ubinders, Some (body, feedback_id), ctx)
     | ParameterEntry e ->
-      let univ_entry, ctx = extract_monomorphic (fst e.parameter_entry_universes) in
+      let univ_entry, ctx = extract_monomorphic e.parameter_entry_universes in
       let ubinders = make_ubinders ctx e.parameter_entry_universes in
       let () = Global.push_context_set QGraph.Internal ctx in
       let e = {
@@ -674,9 +706,9 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
     | PrimitiveEntry e ->
       let typ, univ_entry, ctx = match e.prim_entry_type with
       | None ->
-        None, (UState.Monomorphic_entry PConstraints.ContextSet.empty, UnivNames.empty_binders), PConstraints.ContextSet.empty
+        None, default_named_univ_entry, PConstraints.ContextSet.empty
       | Some (typ, entry_univs) ->
-        let univ_entry, ctx = extract_monomorphic (fst entry_univs) in
+        let univ_entry, ctx = extract_monomorphic entry_univs in
         Some (typ, univ_entry), entry_univs, ctx
       in
       let () = Global.push_context_set QGraph.Internal ctx in
@@ -687,7 +719,7 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
       let ubinders = make_ubinders ctx univ_entry in
       Entries.PrimitiveEntry e, false, ubinders, None, ctx
     | SymbolEntry { symb_entry_type=typ; symb_entry_unfold_fix=un_fix; symb_entry_universes=entry_univs } ->
-      let univ_entry, ctx = extract_monomorphic (fst entry_univs) in
+      let univ_entry, ctx = extract_monomorphic entry_univs in
       let () = Global.push_context_set QGraph.Internal ctx in
       let e = {
         Entries.symb_entry_type = typ;
@@ -717,7 +749,7 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
       | Error _ -> true
     in
     let is_new_lvl_constraint = is_new_constraint before_univs UGraph.check_declared_universes
-                                                  UGraph.check_constraint (fun u1 u2 -> Univ.Level.Set.(add u1 (singleton u2))) in
+                                                  UGraph.check_constraint (fun u1 u2 -> Univ.Level.Set.(union (Univ.Universe.levels u1) (Univ.Universe.levels u2))) in
     let is_new_quality_constraint = is_new_constraint before_qualities QGraph.check_declared_qualities
                                                       QGraph.check_constraint (fun q1 q2 -> Sorts.Quality.Set.(add q1 (singleton q2))) in
     let ctx = on_snd (PConstraints.filter_constraints is_new_quality_constraint is_new_lvl_constraint) ctx in
@@ -770,16 +802,16 @@ let inVariable v = Libobject.Dyn.Easy.inj v objVariable
 let declare_variable ~name ~kind ~typing_flags d =
   (* Variables are distinguished by only short names *)
   if Decls.variable_exists name then
-    raise (DeclareUniv.AlreadyDeclared (None, name));
+      raise (DeclareUniv.AlreadyDeclared (None, name));
 
   let impl,opaque = match d with (* Fails if not well-typed *)
     | SectionLocalAssum {typ;impl;univs} ->
-      let () = match fst univs with
+      let () = match univs.universes_entry_universes with
         | UState.Monomorphic_entry uctx ->
           (* XXX [snd univs] is ignored, should we use it? *)
           DeclareUniv.name_mono_section_univs (fst uctx);
           Global.push_context_set QGraph.Static uctx
-        | UState.Polymorphic_entry uctx -> Global.push_section_context uctx
+        | UState.Polymorphic_entry (uctx, _) -> Global.push_section_context uctx
       in
       let () = Global.push_named_assum (name,typ) in
       impl, true
@@ -790,20 +822,21 @@ let declare_variable ~name ~kind ~typing_flags d =
       let () = export_side_effects eff in
       (* We must declare the universe constraints before type-checking the
          term. *)
-      let univs = match fst de.proof_entry_universes with
+      let peunivs = de.proof_entry_universes in
+      let univs = match peunivs.universes_entry_universes with
         | UState.Monomorphic_entry uctx ->
           DeclareUniv.name_mono_section_univs (fst uctx);
           Global.push_context_set QGraph.Static (PConstraints.ContextSet.union uctx body_uctx);
-          UState.Monomorphic_entry PConstraints.ContextSet.empty, UnivNames.empty_binders
-        | UState.Polymorphic_entry uctx ->
+          UState.{ universes_entry_universes = UState.Monomorphic_entry PConstraints.ContextSet.empty; universes_entry_binders = UnivNames.empty_binders }
+        | UState.Polymorphic_entry (uctx, _variances) ->
           Global.push_section_context uctx;
           let mk_anon_names u =
-            let qs, us = UVars.Instance.to_array u in
+            let qs, us = UVars.LevelInstance.to_array u in
             {UVars.quals = Array.make (Array.length qs) Anonymous; UVars.univs = Array.make (Array.length us) Anonymous}
           in
           Global.push_section_context
             (UVars.UContext.of_context_set mk_anon_names Sorts.QVar.Set.empty body_uctx);
-          UState.Polymorphic_entry UVars.UContext.empty, UnivNames.empty_binders
+            UState.{ universes_entry_universes = Polymorphic_entry (UVars.UContext.empty, None); universes_entry_binders = UnivNames.empty_binders }
       in
       let se = if opaque then
           let cname = Id.of_string (Id.to_string name ^ "_subproof") in
@@ -904,7 +937,7 @@ type proof_object =
 let future_map2_pair_list_distribute p l f =
   List.map_i (fun i c -> f (Future.chain p (fun p -> (List.nth p.output_entries i, p.output_ustate, p.output_sideff))) c) 0 l
 
-let process_proof ~info:Info.({ udecl; poly }) ?(is_telescope=false) = function
+let process_proof ~info:Info.({ udecl; poly; sort_poly; cumulative }) ?(is_telescope=false) = function
   | DefaultProof { proof; opaque; using; keep_body_ucst_separate } ->
     let { output_entries = entries; output_ustate = uctx; output_sideff = eff } = proof in
     (* Force transparency for Derive-like dependent statements *)
@@ -921,8 +954,9 @@ let process_proof ~info:Info.({ udecl; poly }) ?(is_telescope=false) = function
     let exported_effects = if List.exists not opaques then eff else SideEff.empty in
     exported_effects,
     snd (List.fold_left2_map (fun used_univs (body, typ) opaque ->
+        let sigma = UnivVariances.register_universe_variances_of_constr (Global.env ()) (Evd.from_ctx uctx) ?typ body in
         let uctx, univs, used_univs, body =
-          make_univs_immediate ~poly ?keep_body_ucst_separate ~opaque ~uctx ~udecl ~eff ~used_univs body typ in
+          make_univs_immediate ~poly ~sort_poly ~cumulative ?keep_body_ucst_separate ~opaque ~uctx:(Evd.ustate sigma) ~udecl ~eff ~used_univs body typ in
         (used_univs, (definition_entry_core ?using ~univs ?types:typ body, uctx))) Univ.Level.Set.empty entries opaques)
   | DeferredOpaqueProof { deferred_proof = bodies; using; initial_proof_data; feedback_id; initial_euctx } ->
     let { Proof.poly; entry; sigma } = initial_proof_data in
@@ -1053,11 +1087,12 @@ let declare_possibly_mutual_definitions ~info ~cinfo ~obls ?(is_telescope=false)
 let declare_possibly_mutual_parameters ~info ~cinfo ?(mono_uctx_extra=UState.empty) ~sec_vars typs =
   (* Note, if an initial uctx, minimize and restrict have not been done *)
   (* if the uctx of an abandonned proof, minimize is redundant (see close_proof) *)
-  let { Info.scope; poly; hook; udecl } = info in
+  let { Info.scope; poly; sort_poly; cumulative; hook; udecl } = info in
   pi3 (List.fold_left2 (
     fun (i, subst, csts) { CInfo.name; loc; impargs } (typ, uctx) ->
       let uctx' = UState.restrict uctx (Vars.universes_of_constr typ) in
-      let univs = UState.check_sort_poly_decl ~poly uctx' udecl in
+      let sigma = UnivVariances.register_universe_variances_of_type (Global.env ()) (Evd.from_ctx uctx') (EConstr.of_constr typ) in
+      let univs = UState.check_sort_poly_decl ~poly ~sort_poly ~cumulative ~kind:Assumption (Evd.ustate sigma) udecl in
       let univs = if i = 0 then add_mono_uctx mono_uctx_extra univs else univs in
       let typ = Vars.replace_vars subst typ in
       let pe = {
@@ -1134,14 +1169,14 @@ let error_unresolved_evars env sigma t evars =
 let check_evars_are_solved env sigma t =
   let evars = Evarutil.undefined_evars_of_term sigma t in
   if not (Evar.Set.is_empty evars) then error_unresolved_evars env sigma t evars
-
-
-let declare_definition ~info ~cinfo ~opaque ~sort_poly ~obls ~body ?using sigma =
+    
+let declare_definition ~info ~cinfo ~opaque ~obls ~body ?using sigma =
   let { CInfo.name; typ; _ } = cinfo in
   let env = Global.env () in
   Option.iter (check_evars_are_solved env sigma) typ;
   check_evars_are_solved env sigma body;
-  let sigma = Evd.minimize_universes ~to_type:(not sort_poly) sigma in
+  let sigma = UnivVariances.register_universe_variances_of env sigma ?typ body in
+  let sigma = Evd.minimize_universes ~to_type:(not info.Info.sort_poly) sigma in
   let body = EConstr.to_constr sigma body in
   let typ = Option.map (EConstr.to_constr sigma) typ in
   let uctx = Evd.ustate sigma in
@@ -1152,14 +1187,14 @@ let declare_definition ~info ~cinfo ~opaque ~sort_poly ~obls ~body ?using sigma 
   let gref = List.hd (declare_possibly_mutual_definitions ~info ~cinfo:[cinfo] ~obls obj) in
   gref, uctx
 
-let prepare_obligations ~name ?types ~body env sigma =
+let prepare_obligations ~name ~poly ~sort_poly ?types ~body env sigma =
   let env = Global.env () in
   let types = match types with
     | Some t -> t
     | None -> Retyping.get_type_of env sigma body
   in
-  (* TODO: Default to Type or use sort poly flag? *)
-  let sigma, (body, types) = Evarutil.finalize ~abort_on_undefined_evars:false
+  let sigma = UnivVariances.register_universe_variances_of env sigma ~typ:types body in
+  let sigma, (body, types) = Evarutil.finalize ~abort_on_undefined_evars:false ~to_type:(not sort_poly)
       sigma (fun nf -> nf body, nf types)
   in
   RetrieveObl.check_evars env sigma;
@@ -1168,13 +1203,14 @@ let prepare_obligations ~name ?types ~body env sigma =
   let uctx = Evd.ustate sigma in
   body, cty, uctx, evmap, obls
 
-let prepare_parameter ~poly ~sort_poly ~udecl ~types sigma =
+let prepare_parameter ~poly ~sort_poly ~cumulative ~udecl ~types sigma =
   let env = Global.env () in
   Pretyping.check_evars_are_solved ~program_mode:false env sigma;
+  let sigma = UnivVariances.register_universe_variances_of_type env sigma types in
   let sigma, typ = Evarutil.finalize ~abort_on_undefined_evars:true ~to_type:(not sort_poly)
       sigma (fun nf -> nf types)
   in
-  let univs = Evd.check_sort_poly_decl ~poly sigma udecl in
+  let univs = Evd.check_sort_poly_decl ~poly ~sort_poly ~cumulative ~kind:UVars.Assumption sigma udecl in
   let pe = {
       parameter_entry_secctx = None;
       parameter_entry_type = typ;
@@ -1253,7 +1289,7 @@ module ProgramDecl = struct
         , b )
     in
     let prg_uctx =
-      if info.Info.poly then UState.make_flexible_nonalgebraic uctx
+      if info.Info.poly then uctx
       else
         (* declare global univs of the main constant before we do obligations *)
         let uctx = UState.collapse_sort_variables uctx in
@@ -1587,8 +1623,8 @@ let declare_definition ~pm prg =
   let name, info, opaque, using = prg.prg_cinfo.CInfo.name, prg.prg_info, prg.prg_opaque, prg.prg_using in
   let obls = List.map (fun (id, (_, c)) -> (id, c)) varsubst in
   (* XXX: This is doing normalization twice *)
-    (* TODO: Double check sort poly flag -- how to get in obligations? *)
-  let kn, uctx = declare_definition ~cinfo ~info ~obls ~body ~opaque ~sort_poly:false ?using sigma in
+    (* TODO: Double check sort poly flag *)
+  let kn, uctx = declare_definition ~cinfo ~info ~obls ~body ~opaque ?using sigma in
   (* XXX: We call the obligation hook here, by consistency with the
      previous imperative behaviour, however I'm not sure this is right *)
   let pm = State.call_prg_hook prg
@@ -1617,11 +1653,13 @@ let declare_mutual_definitions ~pm l =
       CInfo.make ?loc ~name ~typ ~impargs ()) defs first.prg_deps in
   let fixdefs, fixtypes, _ = List.split3 defs in
   let possible_guard = Option.get first.prg_possible_guard in
+  let sigma = UnivVariances.register_universe_variances_of_fix (Global.env ()) (Evd.from_ctx first.prg_uctx) (List.map EConstr.of_constr fixtypes)
+    (List.map (fun x -> Some (EConstr.of_constr x)) fixdefs) in
   (* Declare the recursive definitions *)
   let kns =
     declare_mutual_definitions ~info:first.prg_info
       ~eff:Evd.empty_side_effects (* FIXME? *)
-      ~uctx:first.prg_uctx ~bodies:fixdefs ~possible_guard ~opaque:first.prg_opaque
+      ~uctx:(Evd.ustate sigma) ~bodies:fixdefs ~possible_guard ~opaque:first.prg_opaque
       ~cinfo:fixitems ?using:first.prg_using ()
   in
   (* Only for the first constant *)
@@ -1905,8 +1943,8 @@ let start_core ~info ~cinfo ?proof_ending ?using sigma =
 let start = start_core ?proof_ending:None
 
 let start_dependent ~info ~cinfo ~name ~proof_ending goals =
-    let { Info.poly; Info.sort_poly; typing_flags; _ } = info in
-  let proof = Proof.dependent_start ~name ~poly ~sort_poly ?typing_flags goals in
+    let { Info.sort_poly; Info.poly; typing_flags; _ } = info in
+  let proof = Proof.dependent_start ~name ~sort_poly ~poly ?typing_flags goals in
   let initial_euctx = Evd.ustate Proof.((data proof).sigma) in
   let pinfo = Proof_info.make ~info ~cinfo ~proof_ending () in
   { proof
@@ -2127,7 +2165,7 @@ let check_incomplete_proof evd =
 
 (* XXX: This is still separate from close_proof below due to drop_pt in the STM *)
 let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
-    let Proof.{ name = pid; entry; poly; sort_poly; sigma = evd } = Proof.data proof in
+    let Proof.{ name = pid; entry; sort_poly; sigma = evd } = Proof.data proof in
   let initial_goals = Proofview.initial_goals entry in
   let () = if not @@ Proof.is_done proof then raise (OpenProof (pid, OpenGoals)) in
   let _ : Proof.t =
@@ -2135,13 +2173,15 @@ let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
     Proof.unfocus_all proof
   in
   let eff = SideEff.make @@ Evd.eval_side_effects evd in
-  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
   let to_constr c =
     match EConstr.to_constr_opt evd c with
     | Some p -> p
     | None -> raise_non_ground_proof evd pid c
   in
   let proofs = List.map (fun (_, body, typ) -> (to_constr body, to_constr typ)) initial_goals in
+  let evd = UnivVariances.register_universe_variances_of_proofs (Global.env()) evd proofs in
+  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
+  let proofs = List.map (fun (body, typ) -> (Evarutil.nf_evars_universes evd body, Evarutil.nf_evars_universes evd typ)) proofs in
   let proofs = match pinfo.possible_guard with
     | None -> proofs
     | Some (possible_guard, fixrelevances) ->
@@ -2373,8 +2413,9 @@ let save_admitted ~pm ~proof =
   let Proof.{ entry; sort_poly } = Proof.data iproof in
   let typs = List.map pi3 (Proofview.initial_goals entry) in
   let sigma = Evd.from_ctx proof.initial_euctx in
-  List.iter (check_type_evars_solved (Global.env()) sigma) typs;
+  List.iter (check_type_evars_solved (Global.env ()) sigma) typs;
   let sec_vars = compute_proof_using_for_admitted proof.pinfo proof typs iproof in
+  let sigma = UnivVariances.register_universe_variances_of_proof_statements (Global.env ()) sigma typs in
   let sigma = Evd.minimize_universes ~to_type:(not sort_poly) sigma in
   let uctx = Evd.ustate sigma in
   let typs = List.map (fun typ -> (EConstr.to_constr sigma typ, uctx)) typs in
@@ -2697,8 +2738,10 @@ let solve_obligation ?check_final prg num tac =
     let name = Internal.get_name prg in
     Proof_ending.End_obligation {name; num; auto; check_final}
   in
+  let etyp = EConstr.of_constr obl.obl_type in
+  let evd = UnivVariances.register_universe_variances_of_type (Global.env ()) evd etyp in
   let cinfo = CInfo.make ?loc:(fallback_loc ~warn:false obl.obl_name None)
-      ~name:obl.obl_name ~typ:(EConstr.of_constr obl.obl_type) ()
+      ~name:obl.obl_name ~typ:etyp ()
   in
   let using =
     let using = Internal.get_using prg in
@@ -2921,7 +2964,7 @@ let program_inference_hook env sigma ev =
       (* XXX: Should sort poly be enabled? *)
       let c, sigma =
         Proof_.refine_by_tactic ~name:(Id.of_string "program_subproof")
-          ~poly:false ~sort_poly:false env sigma concl (Tacticals.tclSOLVE [tac])
+          ~sort_poly:false ~poly:false env sigma concl (Tacticals.tclSOLVE [tac])
       in
       Some (sigma, c)
   with
@@ -2952,9 +2995,9 @@ let declare_constant ?loc ?local ~name ~kind ?typing_flags =
 let declare_entry ?loc ~name ?scope ~kind ?user_warns ?hook ~impargs ~uctx entry =
   declare_entry ~loc ~name ?scope ~kind ~typing_flags:None ?clearbody:None ~user_warns ?hook ~impargs ~uctx entry
 
-let declare_definition_full ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma =
-  let c, uctx = declare_definition ~obls:[] ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma in
+let declare_definition_full ~info ~cinfo ~opaque ~body ?using sigma =
+  let c, uctx = declare_definition ~obls:[] ~info ~cinfo ~opaque ~body ?using sigma in
   c, if info.poly then PConstraints.ContextSet.empty else UState.context_set uctx
 
-let declare_definition ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma =
-  declare_definition ~obls:[] ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma |> fst
+let declare_definition ~info ~cinfo ~opaque ~poly ~body ?using sigma =
+  declare_definition ~obls:[] ~info ~cinfo ~opaque ~body ?using sigma |> fst

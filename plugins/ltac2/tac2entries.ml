@@ -1264,8 +1264,8 @@ let perform_eval ~pstate e =
     match pstate with
     | None ->
       let sigma = Evd.from_env env in
-      let name, poly = Id.of_string "ltac2", false in
-      Proof.start ~name ~poly ~sort_poly:false sigma []
+      let name, sort_poly, poly = Id.of_string "ltac2", false, false in
+      Proof.start ~name ~sort_poly ~poly sigma []
     | Some pstate ->
       Declare.Proof.get pstate
   in

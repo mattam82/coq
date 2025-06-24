@@ -152,7 +152,7 @@ let lookup_eliminator env ind s =
 
 let build_case_analysis_scheme_in_type env dep sort ind =
   let sigma = Evd.from_env env in
-  let (sigma, indu) = Evd.fresh_inductive_instance env sigma ind in
+  let (sigma, indu) = Evd.fresh_inductive_instance ~rigid:UnivRigid env sigma ind in
   let sigma, sort = Evd.fresh_sort_in_quality ~rigid:UnivRigid sigma sort in
   let (sigma, c) = build_case_analysis_scheme env sigma indu dep sort in
   let (c, _) = Indrec.eval_case_analysis c in

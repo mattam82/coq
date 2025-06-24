@@ -3,6 +3,7 @@ val do_symbols : poly:bool -> sort_poly:bool -> unfold_fix:bool ->
   -> unit
 
 val do_rules :
+  poly:bool ->
   sort_poly:bool ->
   Names.Id.t ->
   (Constrexpr.sort_poly_decl_expr option * Constrexpr.constr_expr * Constrexpr.constr_expr) list ->

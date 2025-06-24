@@ -108,7 +108,7 @@ let new_evar env sigma ?src ?rrpat ?(naming = Namegen.IntroAnonymous) ?relevance
   (sigma, mkEvar (evk, instance))
 
 let new_type_evar env sigma ~src =
-  let sigma, s = Evd.new_sort_variable Evd.univ_flexible_alg sigma in
+  let sigma, s = Evd.new_sort_variable Evd.univ_flexible sigma in
   new_evar env sigma ~src (EConstr.mkSort s) ~relevance:ERelevance.relevant
 
 let hide_variable env id =
@@ -186,7 +186,7 @@ let lookup_renamed globenv id =
     Evarutil.ext_rev_subst ext id
 
 type 'a obj_interp_fun =
-  ?loc:Loc.t -> poly:bool -> sort_poly:bool -> t -> Evd.evar_map -> Evardefine.type_constraint ->
+  ?loc:Loc.t -> sort_poly:bool -> poly:bool -> t -> Evd.evar_map -> Evardefine.type_constraint ->
   'a -> unsafe_judgment * Evd.evar_map
 
 module ConstrInterpObj =
@@ -200,8 +200,8 @@ module ConstrInterp = Genarg.Register(ConstrInterpObj)
 
 let register_constr_interp0 = ConstrInterp.register0
 
-let interp_glob_genarg ?loc ~poly env sigma ty arg ~sort_poly =
+let interp_glob_genarg ?loc ~sort_poly ~poly env sigma ty arg =
   let open Genarg in
   let GenArg (Glbwit tag, arg) = arg in
   let interp = ConstrInterp.obj tag in
-  interp ?loc ~poly ~sort_poly env sigma ty arg
+  interp ?loc ~sort_poly ~poly env sigma ty arg

@@ -228,7 +228,7 @@ let () =
 (** Ltac2 in terms *)
 
 let () =
-  let interp ?loc ~poly ~sort_poly env sigma tycon (ids, tac) =
+  let interp ?loc ~sort_poly ~poly env sigma tycon (ids, tac) =
     (* Syntax prevents bound notation variables in constr quotations *)
     let ist = Tac2interp.get_env @@ GlobEnv.lfun env in
     let () = assert (Id.Set.subset ids (Id.Map.domain ist.env_ist)) in
@@ -309,7 +309,7 @@ let interp_hyp_var_as_constr ?loc globenv sigma tycon id0 =
   check_judge ?loc env sigma tycon j
 
 let () =
-  let interp ?loc ~poly ~sort_poly env sigma tycon (kind,id) =
+  let interp ?loc ~sort_poly ~poly env sigma tycon (kind,id) =
     let f = match kind with
       | ConstrVar -> interp_constr_var_as_constr
       | PretermVar -> interp_preterm_var_as_constr
