@@ -47,7 +47,7 @@ end
 
 val definition_structure
   : flags:ComInductive.flags
-  -> cumul_univ_decl_expr option
+  -> sort_poly_decl_expr option
   -> inductive_kind
   -> primitive_proj:bool
   -> Ast.t list
@@ -81,14 +81,14 @@ module Record_decl : sig
     records : Data.t list;
     projections_kind : Decls.definition_object_kind;
     indlocs : DeclareInd.indlocs;
-    sort_poly : bool
+    poly : bool
   }
 end
 
 (** Ast.t list at the constr level *)
 val interp_structure
   : flags:ComInductive.flags
-  -> cumul_univ_decl_expr option
+  -> sort_poly_decl_expr option
   -> inductive_kind
   -> primitive_proj:bool
   -> Ast.t list

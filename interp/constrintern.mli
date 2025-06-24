@@ -125,11 +125,11 @@ val interp_type_evars : ?program_mode:bool -> env -> evar_map ->
 
 (** Accepting unresolved evars and giving back the manual implicit arguments *)
 
-val interp_constr_evars_impls : ?program_mode:bool -> ?sort_poly:bool -> env -> evar_map ->
+val interp_constr_evars_impls : ?program_mode:bool -> ?poly:bool -> env -> evar_map ->
   ?impls:internalization_env -> constr_expr ->
   evar_map * (constr * Impargs.manual_implicits)
 
-val interp_casted_constr_evars_impls : ?program_mode:bool -> ?sort_poly:bool -> env -> evar_map ->
+val interp_casted_constr_evars_impls : ?program_mode:bool -> ?poly:bool -> env -> evar_map ->
   ?impls:internalization_env -> constr_expr -> types ->
   evar_map * (constr * Impargs.manual_implicits)
 
@@ -173,14 +173,14 @@ val interp_binder_evars : env -> evar_map -> Name.t -> constr_expr -> evar_map *
 *)
 
 val interp_context_evars :
-  ?program_mode:bool -> ?unconstrained_sorts:bool -> ?sort_poly:bool -> ?impl_env:internalization_env ->
+  ?program_mode:bool -> ?unconstrained_sorts:bool -> ?poly:bool -> ?sort_poly:bool -> ?impl_env:internalization_env ->
   env -> evar_map -> local_binder_expr list ->
   evar_map * (internalization_env * ((env * rel_context) * Impargs.manual_implicits * Loc.t option list))
 
 (** Interpret named contexts *)
 
 val interp_named_context_evars :
-  ?program_mode:bool -> ?unconstrained_sorts:bool -> ?sort_poly:bool -> ?impl_env:internalization_env -> ?autoimp_enable:bool ->
+  ?program_mode:bool -> ?unconstrained_sorts:bool -> ?poly:bool -> ?sort_poly:bool -> ?impl_env:internalization_env -> ?autoimp_enable:bool ->
   env -> evar_map -> local_binder_expr list ->
   evar_map * (internalization_env * ((env * named_context) * Impargs.manual_implicits * Loc.t option list))
 
@@ -215,7 +215,7 @@ val check_duplicate : ?loc:Loc.t -> (qualid * constr_expr) list -> unit
 
 val interp_univ_constraint
   : Evd.evar_map
-  -> sort_name_expr * Univ.UnivConstraint.kind * sort_name_expr
+  -> universe_expr * (Univ.UnivConstraint.kind * bool) * universe_expr
   -> Univ.UnivConstraint.t
 
 val interp_elim_constraint
@@ -229,10 +229,7 @@ val interp_sort_poly_decl : Environ.env -> sort_poly_decl_expr ->
 
 val interp_sort_poly_decl_opt : Environ.env -> sort_poly_decl_expr option ->
                                 Evd.evar_map * UState.sort_poly_decl
-
-val interp_cumul_sort_poly_decl_opt : Environ.env -> cumul_univ_decl_expr option ->
-  Evd.evar_map * UState.sort_poly_decl * Entries.variance_entry
-(** BEWARE the variance entry needs to be adjusted by
+(** BEWARE the variance entry in the declaration needs to be adjusted by
    [ComInductive.variance_of_entry] if the instance is extensible. *)
 
 val interp_mutual_sort_poly_decl_opt : Environ.env -> sort_poly_decl_expr option list ->

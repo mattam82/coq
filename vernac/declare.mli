@@ -100,8 +100,9 @@ module Info : sig
   (** Note that [opaque] doesn't appear here as it is not known at the
      start of the proof in the interactive case. *)
   val make
-    : ?poly:bool
-    -> ?sort_poly:bool
+   : ?sort_poly:bool
+    -> ?poly:bool
+    -> ?cumulative:bool
     -> ?inline : bool
     -> ?kind : Decls.logical_kind
     (** Theorem, etc... *)
@@ -128,7 +129,7 @@ val declare_definition
   :  info:Info.t
   -> cinfo:EConstr.t option CInfo.t
   -> opaque:bool
-  -> sort_poly:bool
+  -> poly:bool
   -> body:EConstr.t
   -> ?using:Vernacexpr.section_subset_expr
   -> Evd.evar_map
@@ -438,7 +439,7 @@ type constant_entry =
 
 val prepare_parameter
   : poly:bool
-  -> sort_poly:bool
+  -> cumulative:bool
   -> udecl:UState.sort_poly_decl
   -> types:EConstr.types
   -> Evd.evar_map
@@ -467,7 +468,7 @@ val declare_definition_full
   :  info:Info.t
   -> cinfo:EConstr.t option CInfo.t
   -> opaque:bool
-  -> sort_poly:bool
+  -> poly:bool
   -> body:EConstr.t
   -> ?using:Vernacexpr.section_subset_expr
   -> Evd.evar_map
@@ -559,6 +560,7 @@ type progress =
 (** Prepare API, to be removed once we provide the corresponding 1-step API *)
 val prepare_obligations
   :  name:Id.t
+  -> poly:bool
   -> ?types:EConstr.t
   -> body:EConstr.t
   -> Environ.env

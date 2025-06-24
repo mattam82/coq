@@ -45,10 +45,10 @@ type data = private
   (** A representation of the focus stack *)
   ; name : Names.Id.t
   (** The name of the theorem whose proof is being constructed *)
-  ; poly : bool
-  (** polymorphism *)
   ; sort_poly : bool
   (** Sort polymorphism *)
+  ; poly : bool
+  (** polymorphism *)
   }
 
 val data : t -> data

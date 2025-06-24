@@ -1,4 +1,4 @@
 let declare_definition ~poly name sigma body =
   let cinfo = Declare.CInfo.make ~name ~typ:None () in
   let info = Declare.Info.make ~poly () in
-  Declare.declare_definition ~info ~cinfo ~opaque:false ~sort_poly:false ~body sigma
+  Declare.declare_definition ~info ~cinfo ~opaque:false ~poly ~body sigma

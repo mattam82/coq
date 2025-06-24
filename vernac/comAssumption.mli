@@ -23,7 +23,7 @@ val declare_variable
   -> impl:Glob_term.binding_kind
   -> name:variable
   -> Constr.types
-  -> GlobRef.t * UVars.Instance.t
+  -> GlobRef.t * UVars.LevelInstance.t
 
 (** Declaration of a local construction (Variable/Hypothesis/Let) *)
 val declare_local
@@ -36,7 +36,7 @@ val declare_local
   -> name:variable
   -> Constr.constr option
   -> Constr.types
-  -> GlobRef.t * UVars.Instance.t
+  -> GlobRef.t * UVars.LevelInstance.t
 
 (** Declaration of a global assumption (Axiom/Parameter) *)
 val declare_axiom
@@ -49,7 +49,7 @@ val declare_axiom
   -> inline:Declaremods.inline
   -> name:lident
   -> Constr.types
-  -> GlobRef.t * UVars.Instance.t
+  -> GlobRef.t * UVars.LevelInstance.t
 
 (** Declaration of a global construction (Axiom/Parameter/Definition) *)
 val declare_global
@@ -64,13 +64,14 @@ val declare_global
   -> name:lident
   -> Constr.constr option
   -> Constr.types
-  -> GlobRef.t * UVars.Instance.t
+  -> GlobRef.t * UVars.LevelInstance.t
 
 (** Interpret the commands Variable/Hypothesis/Axiom/Parameter *)
 val do_assumptions
   :  program_mode:bool
   -> poly:bool
   -> sort_poly:bool
+  -> cumulative:bool
   -> scope:Locality.definition_scope
   -> kind:Decls.assumption_object_kind
   -> ?user_warns:Globnames.extended_global_reference UserWarn.with_qf
@@ -82,13 +83,13 @@ val do_assumptions
 val do_context
   :  program_mode:bool
   -> poly:bool
-  -> sort_poly:bool
   -> local_binder_expr list
   -> unit
 
 (** Interpret a declaration of the form [binders |- typ] as a type *)
 val interp_assumption
   :  program_mode:bool
+  -> poly:bool
   -> sort_poly:bool
   -> Environ.env
   -> Evd.evar_map

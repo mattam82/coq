@@ -40,17 +40,18 @@ let do_symbol ~poly ~sort_poly ~unfold_fix udecl (id, typ) =
   let id = id.CAst.v in
   let env = Global.env () in
   let evd, udecl = Constrintern.interp_sort_poly_decl_opt env udecl in
-  let flags = { Pretyping.all_no_fail_flags with sort_polymorphic = sort_poly } in
+  let flags = { Pretyping.all_no_fail_flags with polymorphic = poly; sort_polymorphic = sort_poly } in
   let evd, (typ, impls) =
     Constrintern.(interp_type_evars_impls ~flags ~impls:empty_internalization_env)
       env evd typ
   in
   Pretyping.check_evars_are_solved ~program_mode:false env evd;
-  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
+  let evd = UnivVariances.register_universe_variances_of_type env evd typ in
+  let evd = Evd.minimize_universes ~to_type:(not poly) evd in
   let _qvars, uvars = EConstr.universes_of_constr evd typ in
   let evd = Evd.restrict_universe_context evd uvars in
   let typ = EConstr.to_constr evd typ in
-  let univs = Evd.check_sort_poly_decl ~poly evd udecl in
+  let univs = Evd.check_sort_poly_decl ~poly ~cumulative:false ~kind:UVars.Assumption evd udecl in
   let entry = Declare.symbol_entry ~univs ~unfold_fix typ in
   let kn = Declare.declare_constant ?loc ~name:id ~kind:Decls.IsSymbol (Declare.SymbolEntry entry) in
   let () = Impargs.maybe_declare_manual_implicits false (GlobRef.ConstRef kn) impls in
@@ -94,7 +95,7 @@ let update_invtblu1 ~loc evd lvlold lvl (curvaru, tbl) =
     | Some k ->
         CErrors.user_err ?loc
           Pp.(str "Universe variable "
-            ++ Termops.pr_evd_level evd lvlold
+            ++ Termops.pr_evd_universe evd lvlold
             ++ str" is bound multiple times in the pattern (holes number "
             ++ int k ++ str" and " ++ int curvaru ++ str").")
 
@@ -122,7 +123,8 @@ let update_invtblu ~loc evd (qsubst, usubst) (state, stateq, stateu : state) u :
   let stateq, maskq = Array.fold_left_map (safe_quality_pattern_of_quality ~loc evd qsubst) stateq q
   in
   let stateu, masku = Array.fold_left_map (fun stateu lvlold ->
-      let lvlnew = Univ.Level.var_index @@ UVars.subst_univs_level_level usubst lvlold in
+      (* MS TODO Check correctness of Option.get *)
+      let lvlnew = Univ.Level.var_index @@ Option.get (Univ.Universe.level (UVars.subst_univs_level_universe usubst lvlold)) in
       Option.fold_right (update_invtblu1 ~loc evd lvlold) lvlnew stateu, lvlnew
     ) stateu u
   in
@@ -133,7 +135,8 @@ let universe_level_subst_var_index usubst u =
     | None -> None
     | Some lvlold ->
         let lvl = UVars.subst_univs_level_level usubst lvlold in
-        Option.map (fun lvl -> lvlold, lvl) @@ Univ.Level.var_index lvl
+        let optl = Option.cata Univ.Level.var_index None (Univ.Universe.level lvl) in
+        Option.map (fun lvl -> lvlold, lvl) optl
 
 let safe_sort_pattern_of_sort ~loc evd (qsubst, usubst) (st, sq, su as state) s =
   let open Sorts in
@@ -142,7 +145,7 @@ let safe_sort_pattern_of_sort ~loc evd (qsubst, usubst) (st, sq, su as state) s 
       begin match universe_level_subst_var_index usubst u with
       | None -> state, PSType None
       | Some (lvlold, lvl) ->
-        (st, sq, update_invtblu1 ~loc evd lvlold lvl su), PSType (Some lvl)
+        (st, sq, update_invtblu1 ~loc evd (Univ.Universe.make lvlold) lvl su), PSType (Some lvl)
       end
   | SProp -> state, PSSProp
   | Prop -> state, PSProp
@@ -155,7 +158,7 @@ let safe_sort_pattern_of_sort ~loc evd (qsubst, usubst) (st, sq, su as state) s 
       in
       let su, ba =
         match universe_level_subst_var_index usubst u with
-        | Some (lvlold, lvl) -> update_invtblu1 ~loc evd lvlold lvl su, Some lvl
+        | Some (lvlold, lvl) -> update_invtblu1 ~loc evd (Univ.Universe.make lvlold) lvl su, Some lvl
         | None -> su, None
       in
       (st, sq, su), PSQSort (bq, ba)
@@ -369,7 +372,7 @@ let warn_rewrite_rules_break_SR =
     Pp.(fun reason ->
         str "This rewrite rule breaks subject reduction" ++ spc() ++ reason)
 
-let interp_rule ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr option * _ * _) =
+let interp_rule ~poly ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr option * _ * _) =
   let env = Global.env () in
   let evd = Evd.from_env env in
 
@@ -406,6 +409,7 @@ let interp_rule ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr opti
       sort_poly_decl_elim_constraints = elim_cstrs;
       sort_poly_decl_instance = instance;
       sort_poly_decl_extensible_instance = udecl.sort_poly_decl_extensible_instance;
+      sort_poly_decl_variances = None; (* FIXME: MS *)
       sort_poly_decl_univ_constraints = univ_cstrs;
       sort_poly_decl_extensible_constraints = udecl.sort_poly_decl_extensible_constraints;
     } in
@@ -424,9 +428,11 @@ let interp_rule ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr opti
   let lhs = Constrintern.(intern_gen WithoutTypeConstraint env evd lhs) in
   let flags = { Pretyping.no_classes_no_fail_inference_flags with
     undeclared_evars_rr = true; expand_evars = false;
-    solve_unification_constraints = false; sort_polymorphic = sort_poly } in
+    solve_unification_constraints = false; polymorphic = poly;
+    sort_polymorphic = sort_poly } in
   let evd, lhs, typ = Pretyping.understand_tcc_ty ~flags env evd lhs in
-  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
+  let evd = UnivVariances.register_universe_variances_of env evd ~typ lhs in
+  let evd = Evd.minimize_universes ~to_type:(not poly) evd in
   let _qvars, uvars = EConstr.universes_of_constr evd lhs in
   let evd = Evd.restrict_universe_context evd uvars in
   let uctx, uctx' = UState.check_sort_poly_decl_rev (Evd.ustate evd) udecl in
@@ -468,7 +474,8 @@ let interp_rule ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr opti
   (* The udecl constraints (or, if none, the lhs constraints) must imply those of the rhs *)
   let evd = Evd.set_universe_context evd uctx in
   let rhs = Constrintern.(intern_gen WithoutTypeConstraint env evd rhs) in
-  let flags = { Pretyping.no_classes_no_fail_inference_flags with sort_polymorphic = sort_poly } in
+  let flags = { Pretyping.no_classes_no_fail_inference_flags with
+                polymorphic = poly; sort_polymorphic = sort_poly } in
   let evd', rhs =
     try Pretyping.understand_tcc ~flags env evd ~expected_type:(OfType typ) rhs
     with Pretype_errors.PretypeError (env', evd', e) ->
@@ -476,7 +483,8 @@ let interp_rule ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr opti
         Pp.(surround (str "the replacement term doesn't have the type of the pattern") ++ str "." ++ fnl () ++ Himsg.explain_pretype_error env' evd' e);
       Pretyping.understand_tcc ~flags env evd rhs
   in
-  let evd' = Evd.minimize_universes ~to_type:(not sort_poly) evd' in
+  let evd' = UnivVariances.register_universe_variances_of env evd' rhs in
+  let evd' = Evd.minimize_universes ~to_type:(not poly) evd' in
   let _qvars', uvars' = EConstr.universes_of_constr evd' rhs in
   let evd' = Evd.restrict_universe_context evd' (Univ.Level.Set.union uvars uvars') in
   let fail pp = warn_rewrite_rules_break_SR ?loc:rhs_loc Pp.(surround (str "universe inconsistency") ++ str"." ++ spc() ++ str "Missing constraints: " ++ pp) in
@@ -541,8 +549,8 @@ let interp_rule ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr opti
 
   head_symbol, { nvars = (nvars' - 1, nvarqs', nvarus'); lhs_pat = head_umask, elims; rhs }
 
-let do_rules ~sort_poly id rules =
+let do_rules ~poly ~sort_poly id rules =
   let env = Global.env () in
   if not @@ Environ.rewrite_rules_allowed env then raise Environ.(RewriteRulesNotAllowed Rule);
-  let body = { rewrules_rules = List.map (interp_rule ~sort_poly) rules } in
+  let body = { rewrules_rules = List.map (interp_rule ~poly ~sort_poly) rules } in
   Global.add_rewrite_rules id body

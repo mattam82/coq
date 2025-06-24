@@ -114,10 +114,10 @@ type t =
      list is empty when the proof is fully unfocused. *)
   ; name : Names.Id.t
   (** the name of the theorem whose proof is being constructed *)
-  ; poly : bool
-  (** polymorphism *)
   ; sort_poly : bool
   (** Sort polymorphism *)
+  ; poly : bool
+  (** polymorphism *)
   ; typing_flags : Declarations.typing_flags option
   }
 
@@ -280,8 +280,8 @@ let start ~name ~poly ~sort_poly ?typing_flags sigma goals =
     ; entry
     ; focus_stack = []
     ; name
-    ; poly
     ; sort_poly
+    ; poly
     ; typing_flags
   } in
   _focus end_of_stack () 1 (List.length goals) pr
@@ -293,8 +293,8 @@ let dependent_start ~name ~poly ~sort_poly ?typing_flags goals =
     ; entry
     ; focus_stack = []
     ; name
-    ; poly
     ; sort_poly
+    ; poly
     ; typing_flags
   } in
   let number_of_goals = List.length (Proofview.initial_goals pr.entry) in
@@ -368,13 +368,13 @@ type data =
   (** A representation of the focus stack *)
   ; name : Names.Id.t
   (** The name of the theorem whose proof is being constructed *)
-  ; poly : bool
-  (** Locality, polymorphism, and "kind" [Coercion, Definition, etc...] *)
   ; sort_poly : bool
-  (** Sort polymorphic *)
+  (** Sort Polymorphism *)
+  ; poly : bool
+  (** Universe Polymorphism *)
   }
 
-let data { proofview; focus_stack; entry; name; poly; sort_poly } =
+let data { proofview; focus_stack; entry; name; sort_poly; poly } =
   let goals, sigma = Proofview.proofview proofview in
   (* spiwack: beware, the bottom of the stack is used by [Proof]
      internally, and should not be exposed. *)
@@ -385,7 +385,7 @@ let data { proofview; focus_stack; entry; name; poly; sort_poly } =
   in
   let map (FocusElt (_, _, c)) = Proofview.focus_context sigma c in
   let stack = map_minus_one map focus_stack in
-  { sigma; goals; entry; stack; name; poly; sort_poly }
+  { sigma; goals; entry; stack; name; sort_poly; poly }
 
 let pr_goal e = Pp.(str "GOAL:" ++ int (Evar.repr e))
 

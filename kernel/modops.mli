@@ -105,7 +105,7 @@ type signature_mismatch_error =
   | IncompatibleQualities of QGraph.elimination_error
   | IncompatiblePolymorphism of env * types * types
   | IncompatibleUnivConstraints of { got : UVars.AbstractContext.t; expect : UVars.AbstractContext.t }
-  | IncompatibleVariance
+  | IncompatibleVariance of { got : UVars.Variances.t; expect : UVars.Variances.t }
   | NoRewriteRulesSubtyping
 
 type subtyping_trace_elt =

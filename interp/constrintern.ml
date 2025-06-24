@@ -1266,12 +1266,16 @@ let intern_sort ~local_univs (q,l) =
   Option.map (intern_qvar ~local_univs) q,
   map_glob_sort_gen (List.map (on_fst (intern_sort_name ~local_univs))) l
 
+let intern_universe ~local_univs s =
+  let map l = List.map (on_fst (intern_sort_name ~local_univs)) l in
+  map_glob_sort_gen map s
+
 let intern_instance ~local_univs = function
-  | None -> None
-  | Some (qs, us) ->
-    let qs = List.map (intern_quality ~local_univs) qs in
-    let us = List.map (map_glob_sort_gen (intern_sort_name ~local_univs)) us in
-    Some (qs, us)
+| None -> None
+| Some (qs, us) ->
+  let qs = List.map (intern_quality ~local_univs) qs in
+  let us = List.map (intern_universe ~local_univs) us in
+  Some (qs, us)
 
 let intern_name_alias = function
   | { CAst.v = CRef(qid,u) } ->
@@ -1354,10 +1358,7 @@ let find_projection_data c =
   | GRef (GlobRef.ConstRef cst,us) -> Some (cst, us, [], Structure.projection_nparams (Global.env ()) cst)
   | _ -> None
 
-let glob_sort_of_level (level: glob_level) : glob_sort =
-  match level with
-  | UAnonymous _ as l -> None, l
-  | UNamed id -> None, UNamed [id, 0]
+let glob_sort_of_level (univ: glob_univ) : glob_sort = None, univ
 
 (* Is it a global reference or a syntactic definition? *)
 let intern_qualid ?(no_secvar=false) qid intern env ntnvars us args =
@@ -2752,12 +2753,12 @@ let interp_constr_evars_gen_impls ?(flags=Pretyping.all_no_fail_flags) env sigma
   let sigma, c = understand_tcc ~flags env sigma ~expected_type c in
   sigma, (c, imps)
 
-let interp_constr_evars_impls ?(program_mode=false) ?(sort_poly= false) env sigma ?(impls=empty_internalization_env) c =
-  let flags = { Pretyping.all_no_fail_flags with program_mode ; sort_polymorphic = sort_poly } in
+let interp_constr_evars_impls ?(program_mode=false) ?(poly= false) env sigma ?(impls=empty_internalization_env) c =
+  let flags = { Pretyping.all_no_fail_flags with program_mode ; polymorphic = poly } in
   interp_constr_evars_gen_impls ~flags env sigma ~impls WithoutTypeConstraint c
 
-let interp_casted_constr_evars_impls ?(program_mode=false) ?(sort_poly= false) env evdref ?(impls=empty_internalization_env) c typ =
-  let flags = { Pretyping.all_no_fail_flags with program_mode ; sort_polymorphic = sort_poly } in
+let interp_casted_constr_evars_impls ?(program_mode=false) ?(poly= false) env evdref ?(impls=empty_internalization_env) c typ =
+  let flags = { Pretyping.all_no_fail_flags with program_mode ; polymorphic = poly } in
   interp_constr_evars_gen_impls ~flags env evdref ~impls (OfType typ) c
 
 let interp_type_evars_impls ?(flags=Pretyping.all_no_fail_flags) env sigma ?(impls=empty_internalization_env) c =
@@ -2883,14 +2884,14 @@ let push_auto_implicit env sigma t int_env id =
   let imps = compute_internalization_data env sigma ~silent:false id var_info.var_intern_typ t imps in (* add automatic implicit arguments to manual ones *)
   { int_env with impls = Id.Map.add id imps int_env.impls }
 
-let interp_context_evars_gen ?(program_mode=false) ?(unconstrained_sorts = false) ?(sort_poly = false) ?(impl_env=empty_internalization_env) ?(autoimp_enable=true) ~dump env sigma make_decl push_decl bl =
+let interp_context_evars_gen ?(program_mode=false) ?(unconstrained_sorts = false) ?(poly = false) ?(sort_poly = false) ?(impl_env=empty_internalization_env) ?(autoimp_enable=true) ~dump env sigma make_decl push_decl bl =
   let lvar = (empty_ltac_sign, Id.Map.empty) in
   let ids =
     (* We assume all ids around are parts of the prefix of the current
        context being interpreted *)
      extract_ids env in
   let int_env = default_internalization_env ids (bound_univs sigma) impl_env in
-  let flags = { Pretyping.all_no_fail_flags with program_mode; unconstrained_sorts; sort_polymorphic = sort_poly } in
+  let flags = { Pretyping.all_no_fail_flags with program_mode; unconstrained_sorts; polymorphic = poly; sort_polymorphic = poly } in
   let (int_env, (env, sigma, bl, impls, locs)) =
     List.fold_left
       (fun (int_env, acc) b ->
@@ -2921,13 +2922,13 @@ let interp_context_evars_gen ?(program_mode=false) ?(unconstrained_sorts = false
   in
   sigma, (int_env.impls, ((env, bl), List.rev impls, locs))
 
-let interp_named_context_evars ?program_mode ?unconstrained_sorts ?sort_poly ?impl_env ?autoimp_enable env sigma bl =
+let interp_named_context_evars ?program_mode ?unconstrained_sorts ?poly ?sort_poly ?impl_env ?autoimp_enable env sigma bl =
   let extract_name ?loc = function Name id -> id | Anonymous -> user_err ?loc Pp.(str "Unexpected anonymous variable.") in
   let make_decl ?loc = Context.Named.Declaration.of_rel_decl (extract_name ?loc) in
-  interp_context_evars_gen ?program_mode ?unconstrained_sorts ?sort_poly ?impl_env ?autoimp_enable ~dump:false env sigma make_decl EConstr.push_named bl
+  interp_context_evars_gen ?program_mode ?unconstrained_sorts ?poly ?sort_poly ?impl_env ?autoimp_enable ~dump:false env sigma make_decl EConstr.push_named bl
 
-let interp_context_evars ?program_mode ?unconstrained_sorts ?sort_poly ?impl_env env sigma bl =
-  interp_context_evars_gen ?program_mode ?unconstrained_sorts ?sort_poly ?impl_env ~autoimp_enable:false ~dump:true env sigma (fun ?loc d -> d) EConstr.push_rel bl
+let interp_context_evars ?program_mode ?unconstrained_sorts ?poly ?sort_poly ?impl_env env sigma bl =
+  interp_context_evars_gen ?program_mode ?unconstrained_sorts ?poly ?sort_poly ?impl_env ~autoimp_enable:false ~dump:true env sigma (fun ?loc d -> d) EConstr.push_rel bl
 
 (** Local universe and constraint declarations. *)
 
@@ -2953,10 +2954,14 @@ let interp_known_level evd u =
   let u = intern_sort_name ~local_univs:{bound = bound_univs evd; unb_univs=false} u in
   known_glob_level evd u
 
-let interp_univ_constraint evd (u,c,v) =
-  let u = interp_known_level evd u in
-  let v = interp_known_level evd v in
-  u,c,v
+let interp_universe evd u =
+  let le = List.map (on_fst (interp_known_level evd)) u in
+  Univ.Universe.of_list le
+
+let interp_univ_constraint evd (u,(c, b) ,v) =
+  let u = interp_universe evd u in
+  let v = interp_universe evd v in
+  (if b then Univ.Universe.super u else u),c,v
 
 let interp_univ_constraints env evd cstrs =
   let interp (evd,cstrs) cstr =
@@ -3001,34 +3006,8 @@ let interp_elim_constraints env evd cstrs =
 
 let interp_sort_poly_decl env decl =
   let open UState in
-  let evd = Evd.from_env env in
-  let evd, qualities = List.fold_left_map (fun evd lid ->
-      Evd.new_quality_variable ?loc:lid.loc ~name:lid.v evd)
-      evd
-      decl.sort_poly_decl_qualities
-  in
-  let evd, instance = List.fold_left_map (fun evd lid ->
-      Evd.new_univ_level_variable ?loc:lid.loc univ_rigid ~name:lid.v evd)
-      evd
-      decl.sort_poly_decl_instance
-  in
-  let evd, univ_cstrs = interp_univ_constraints env evd decl.sort_poly_decl_univ_constraints in
-  let evd, elim_cstrs = interp_elim_constraints env evd decl.sort_poly_decl_elim_constraints in
-  let decl = {
-    sort_poly_decl_qualities = qualities;
-    sort_poly_decl_extensible_qualities = decl.sort_poly_decl_extensible_qualities;
-    sort_poly_decl_elim_constraints = elim_cstrs;
-    sort_poly_decl_instance = instance;
-    sort_poly_decl_extensible_instance = decl.sort_poly_decl_extensible_instance;
-    sort_poly_decl_univ_constraints = univ_cstrs;
-    sort_poly_decl_extensible_constraints = decl.sort_poly_decl_extensible_constraints;
-  }
-  in evd, decl
-
-let interp_cumul_sort_poly_decl env decl =
-  let open UState in
-  let binders = List.map fst decl.sort_poly_decl_instance in
-  let variances = Array.map_of_list snd decl.sort_poly_decl_instance in
+  let binders = decl.sort_poly_decl_instance in
+  let variances = decl.sort_poly_decl_variances in
   let evd = Evd.from_env env in
   let evd, qualities = List.fold_left_map (fun evd lid ->
       Evd.new_quality_variable ?loc:lid.loc ~name:lid.v evd)
@@ -3048,20 +3027,21 @@ let interp_cumul_sort_poly_decl env decl =
     sort_poly_decl_elim_constraints = elim_cstrs;
     sort_poly_decl_instance = instance;
     sort_poly_decl_extensible_instance = decl.sort_poly_decl_extensible_instance;
+    sort_poly_decl_variances = variances;
     sort_poly_decl_univ_constraints = univ_cstrs;
     sort_poly_decl_extensible_constraints = decl.sort_poly_decl_extensible_constraints;
   }
   in
-  evd, decl, variances
+  let evd =
+    if not decl.sort_poly_decl_extensible_instance then
+      Evd.disable_universe_extension evd ~with_cstrs:(not decl.sort_poly_decl_extensible_constraints)
+    else evd
+  in
+  evd, decl
 
-let interp_sort_poly_decl_opt env l =
-  match l with
+let interp_sort_poly_decl_opt env = function
   | None -> Evd.from_env env, UState.default_sort_poly_decl
   | Some decl -> interp_sort_poly_decl env decl
-
-let interp_cumul_sort_poly_decl_opt env = function
-  | None -> Evd.from_env env, UState.default_sort_poly_decl, [| |]
-  | Some decl -> interp_cumul_sort_poly_decl env decl
 
 let interp_mutual_sort_poly_decl_opt env udecls =
   let udecl =
@@ -3073,6 +3053,9 @@ let interp_mutual_sort_poly_decl_opt env udecls =
         let open UState in
         let lsu = ls.sort_poly_decl_instance and usu = us.sort_poly_decl_instance in
         if not (CList.for_all2eq (fun x y -> Id.equal x.CAst.v y.CAst.v) lsu usu) then
+          CErrors.user_err Pp.(str "Mutual definitions should all have the same universe binders.");
+        let lsv = ls.sort_poly_decl_variances and usv = us.sort_poly_decl_variances in
+        if not (Option.equal (CList.for_all2eq (Option.equal UVars.Variance.equal)) lsv usv) then
           CErrors.user_err Pp.(str "Mutual definitions should all have the same universe binders.");
         Some us) udecls None
   in

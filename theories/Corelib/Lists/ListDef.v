@@ -9,7 +9,8 @@
 (************************************************************************)
 
 Set Implicit Arguments.
-(* Set Universe Polymorphism. *)
+
+Set Universe Polymorphism.
 
 (******************************************************************)
 (** * Basics: definition of polymorphic lists and some operations *)

@@ -28,6 +28,7 @@ val new_instance_interactive
   : locality:Hints.hint_locality
   -> poly:bool
   -> sort_poly:bool
+  -> cumulative:bool
   -> name_decl
   -> local_binder_expr list
   -> constr_expr
@@ -41,6 +42,7 @@ val new_instance
   : locality:Hints.hint_locality
   -> poly:bool
   -> sort_poly:bool
+  -> cumulative:bool
   -> name_decl
   -> local_binder_expr list
   -> constr_expr
@@ -54,6 +56,7 @@ val new_instance_program
   -> pm:Declare.OblState.t
   -> poly:bool
   -> sort_poly:bool
+  -> cumulative:bool
   -> name_decl
   -> local_binder_expr list
   -> constr_expr
@@ -67,6 +70,7 @@ val declare_new_instance
   -> program_mode:bool
   -> poly:bool
   -> sort_poly:bool
+  -> cumulative:bool
   -> ident_decl
   -> local_binder_expr list
   -> constr_expr

@@ -14,6 +14,8 @@ Require Import Notations.
 Require Import Ltac.
 Require Import Logic.
 
+Set Universe Polymorphism.    
+
 (********************************************************************)
 (** * Datatypes with zero and one element *)
 
@@ -154,7 +156,7 @@ Proof.
 Defined.
 
 Lemma eq_true_rect_r :
-  forall (P : bool -> Type) (b : bool), P b -> eq_true b -> P true.
+  forall (P : bool -> 𝒰) (b : bool), P b -> eq_true b -> P true.
 Proof.
   intros P b H H0; destruct H0 in H; assumption.
 Defined.
@@ -208,7 +210,7 @@ Register S as num.nat.S.
 (** [option A] is the extension of [A] with an extra element [None] *)
 
 #[universes(template)]
-Inductive option (A:Type) : Type :=
+Monomorphic Inductive option (A:Type) : Type :=
   | Some : A -> option A
   | None : option A.
 
@@ -219,7 +221,9 @@ Register option as core.option.type.
 Register Some as core.option.Some.
 Register None as core.option.None.
 
-Definition option_map (A B:Type) (f:A->B) (o : option A) : option B :=
+
+
+Definition option_map (A B:𝒰) (f:A->B) (o : option A) : option B :=
   match o with
     | Some a => @Some B (f a)
     | None => @None B
@@ -241,7 +245,7 @@ Register sum as core.sum.type.
 Register inl as core.sum.inl.
 Register inr as core.sum.inr.
 
-Inductive result (A E : Type) :=
+Inductive result (A E : 𝒰) :=
 | Ok (_:A)
 | Error (_:E).
 
@@ -253,8 +257,7 @@ Register result as core.result.type.
 (** [prod A B], written [A * B], is the product of [A] and [B];
     the pair [pair A B a b] of [a] and [b] is abbreviated [(a,b)] *)
 
-#[universes(template)]
-Inductive prod (A B:Type) : Type :=
+Inductive prod (A B:𝒰) : 𝒰 :=
   pair : A -> B -> A * B
 
 where "x * y" := (prod x y) : type_scope.
@@ -270,7 +273,7 @@ Register pair as core.prod.intro.
 Register prod_rect as core.prod.rect.
 
 Section projections.
-  Context {A : Type} {B : Type}.
+  Context {A : 𝒰} {B : 𝒰}.
 
   Definition fst (p:A * B) := match p with (x, y) => x end.
   Definition snd (p:A * B) := match p with (x, y) => y end.
@@ -283,19 +286,19 @@ End projections.
 #[global]
 Hint Resolve pair inl inr: core.
 
-Lemma surjective_pairing (A B:Type) (p:A * B) : p = (fst p, snd p).
+Lemma surjective_pairing (A B:𝒰) (p:A * B) : p = (fst p, snd p).
 Proof.
   destruct p; reflexivity.
 Qed.
 
-Lemma injective_projections (A B:Type) (p1 p2:A * B) :
+Lemma injective_projections (A B:𝒰) (p1 p2:A * B) :
     fst p1 = fst p2 -> snd p1 = snd p2 -> p1 = p2.
 Proof.
   destruct p1; destruct p2; simpl; intros Hfst Hsnd.
   rewrite Hfst; rewrite Hsnd; reflexivity.
 Qed.
 
-Lemma pair_equal_spec (A B : Type) (a1 a2 : A) (b1 b2 : B) :
+Lemma pair_equal_spec (A B : 𝒰) (a1 a2 : A) (b1 b2 : B) :
     (a1, b1) = (a2, b2) <-> a1 = a2 /\ b1 = b2.
 Proof.
   split; intro H.
@@ -307,15 +310,15 @@ Proof.
   - destruct H; subst; auto.
 Qed.
 
-Definition curry {A B C:Type} (f:A * B -> C)
+Definition curry {A B C:𝒰} (f:A * B -> C)
   (x:A) (y:B) : C := f (x,y).
 
-Definition uncurry {A B C:Type} (f:A -> B -> C)
+Definition uncurry {A B C:𝒰} (f:A -> B -> C)
   (p:A * B) : C := match p with (x, y) => f x y end.
 
 Import EqNotations.
 
-Lemma rew_pair A (P Q : A->Type) x1 x2 (y1:P x1) (y2:Q x1) (H:x1=x2) :
+Lemma rew_pair A (P Q : A->𝒰) x1 x2 (y1:P x1) (y2:Q x1) (H:x1=x2) :
   (rew H in y1, rew H in y2) = rew [fun x => (P x * Q x)%type] H in (y1,y2).
 Proof.
   destruct H. reflexivity.
@@ -324,7 +327,7 @@ Defined.
 (** Polymorphic lists and some operations *)
 
 #[universes(template)]
-Inductive list (A : Type) : Type :=
+Monomorphic Inductive list (A : Type) : Type :=
  | nil : list A
  | cons : A -> list A -> list A.
 
@@ -343,7 +346,7 @@ Register cons as core.list.cons.
 
 Local Open Scope list_scope.
 
-Definition length (A : Type) : list A -> nat :=
+Definition length (A : 𝒰) : list A -> nat :=
   fix length l :=
   match l with
    | nil => O
@@ -352,7 +355,7 @@ Definition length (A : Type) : list A -> nat :=
 
 (** Concatenation of two lists *)
 
-Definition app (A : Type) : list A -> list A -> list A :=
+Definition app (A : 𝒰) : list A -> list A -> list A :=
   fix app l m :=
   match l with
    | nil => m
@@ -424,7 +427,7 @@ Register CompGt as core.CompareSpec.CompGt.
     in Prop. For some situations, it is nonetheless useful to have a
     version in Type. Interestingly, these two versions are equivalent. *)
 
-Inductive CompareSpecT (Peq Plt Pgt : Prop) : comparison -> Type :=
+Inductive CompareSpecT (Peq Plt Pgt : Prop) : comparison -> 𝒰 :=
  | CompEqT : Peq -> CompareSpecT Peq Plt Pgt Eq
  | CompLtT : Plt -> CompareSpecT Peq Plt Pgt Lt
  | CompGtT : Pgt -> CompareSpecT Peq Plt Pgt Gt.
@@ -508,7 +511,7 @@ Abbreviation sym_not_id := not_eq_sym (only parsing).
 
 (** Identity type *)
 
-Definition ID := forall A:Type, A -> A.
+Definition ID := forall A:𝒰, A -> A.
 Definition id : ID := fun A x => x.
 
 Definition IDProp := forall A:Prop, A -> A.

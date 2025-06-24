@@ -1271,7 +1271,7 @@ let rec rebuild_return_type rt =
     @@ Constrexpr.CProdN
          ( [ Constrexpr.CLocalAssum
                ([CAst.make Anonymous], None, Constrexpr.Default Explicit, rt) ]
-         , CAst.make @@ Constrexpr.CSort Constrexpr_ops.expr_Type_sort )
+         , CAst.make @@ Constrexpr.CSort (Constrexpr_ops.expr_Type_sort UState.univ_flexible) )
 
 let do_build_inductive evd (funconstants : pconstant list)
     (funsargs : (Name.t * glob_constr * glob_constr option) list list)
@@ -1519,8 +1519,8 @@ let do_build_inductive evd (funconstants : pconstant list)
   (*   in *)
   try
     let flags = {
-      ComInductive.poly = false;
       ComInductive.sort_poly = false;
+      poly = false;
       cumulative = false;
       template = Some false;
       finite = Finite;
