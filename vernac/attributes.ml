@@ -285,7 +285,7 @@ let is_universe_polymorphism =
         optdepr  = None;
         optkey   = universe_polymorphism_option_name;
         optread  = (fun () -> !b);
-        optwrite = ((:=) b) }
+        optwrite = (:=) b }
   in
   fun () -> !b
 

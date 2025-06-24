@@ -284,43 +284,43 @@ let seff id = VtSideff ([id.CAst.v], VtLater)
 }
 
 VERNAC COMMAND EXTEND DeriveInversionClear
-| #[ polymorphic; ] [ "Derive" "Inversion_clear" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
+| #[ sort_polymorphic; polymorphic; ] [ "Derive" "Inversion_clear" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
   => { seff na }
-  -> { let poly = SortPolyFlags.of_poly polymorphic in
+  -> { let poly = SortPolyFlags.make ~sort_polymorphic ~level_polymorphic:polymorphic ~cumulative:false in
       add_inversion_lemma_exn ~poly na c s false inv_clear_tac }
 
-| #[ polymorphic; ] [ "Derive" "Inversion_clear" identref(na) "with" constr(c) ] => { seff na }
+| #[ sort_polymorphic; polymorphic; ] [ "Derive" "Inversion_clear" identref(na) "with" constr(c) ] => { seff na }
   -> {
-  let poly = SortPolyFlags.of_poly polymorphic in
+  let poly = SortPolyFlags.make ~sort_polymorphic ~level_polymorphic:polymorphic ~cumulative:false in
    add_inversion_lemma_exn ~poly na c UnivGen.QualityOrSet.prop false inv_clear_tac }
 END
 
 VERNAC COMMAND EXTEND DeriveInversion
-| #[ polymorphic; ] [ "Derive" "Inversion" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
+| #[ sort_polymorphic; polymorphic; ] [ "Derive" "Inversion" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
   => { seff na }
   -> {
-  let poly = SortPolyFlags.of_poly polymorphic in
+  let poly = SortPolyFlags.make ~sort_polymorphic ~level_polymorphic:polymorphic ~cumulative:false in
   add_inversion_lemma_exn ~poly na c s false inv_tac }
 
-| #[ polymorphic; ] [ "Derive" "Inversion" identref(na) "with" constr(c) ] => { seff na }
+| #[ sort_polymorphic; polymorphic; ] [ "Derive" "Inversion" identref(na) "with" constr(c) ] => { seff na }
   -> {
-  let poly = SortPolyFlags.of_poly polymorphic in
+  let poly = SortPolyFlags.make ~sort_polymorphic ~level_polymorphic:polymorphic ~cumulative:false in
   add_inversion_lemma_exn ~poly na c UnivGen.QualityOrSet.prop false inv_tac }
 END
 
 VERNAC COMMAND EXTEND DeriveDependentInversion
-| #[ polymorphic; ] [ "Derive" "Dependent" "Inversion" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
+| #[ sort_polymorphic; polymorphic; ] [ "Derive" "Dependent" "Inversion" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
   => { seff na }
   -> {
-  let poly = SortPolyFlags.of_poly polymorphic in
+  let poly = SortPolyFlags.make ~sort_polymorphic ~level_polymorphic:polymorphic ~cumulative:false in
   add_inversion_lemma_exn ~poly na c s true dinv_tac }
 END
 
 VERNAC COMMAND EXTEND DeriveDependentInversionClear
-| #[ polymorphic; ] [ "Derive" "Dependent" "Inversion_clear" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
+| #[ sort_polymorphic; polymorphic; ] [ "Derive" "Dependent" "Inversion_clear" identref(na) "with" constr(c) "Sort" sort_quality_or_set(s) ]
   => { seff na }
   -> {
-  let poly = SortPolyFlags.of_poly polymorphic in
+  let poly = SortPolyFlags.make ~sort_polymorphic ~level_polymorphic:polymorphic ~cumulative:false in
   add_inversion_lemma_exn ~poly na c s true dinv_clear_tac }
 END
 

@@ -1,6 +1,6 @@
 Set Universe Polymorphism.
 
-Inductive path@{i} {A : Type@{i}} (x : A) : A -> Type@{i} := refl : path x x.
+Cumulative Inductive path@{i} {A : Type@{i}} (x : A) : A -> Type@{i} := refl : path x x.
 Inductive unit@{i} : Type@{i} := tt.
 
 Scheme Rewriting for path.

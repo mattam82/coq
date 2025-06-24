@@ -1,5 +1,4 @@
 Set Universe Polymorphism.
-Set Sort Polymorphism.
 Set Printing Universes.
 
 
