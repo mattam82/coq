@@ -143,13 +143,6 @@ let check_leq_sort quals univs s1 s2 =
       | QSort (q, _), Type _ -> elim_prop q && check_leq univs u1 u2
       | _ -> false
 
-let leq_expr (u,m) (v,n) =
-  let d = match m - n with
-    | 1 -> Lt
-    | diff -> assert (diff <= 0); Le
-  in
-  (u,d,v)
-
 exception InconsistentEquality = G.InconsistentEquality
 exception OccurCheck = G.OccurCheck
 

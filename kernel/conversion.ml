@@ -908,15 +908,15 @@ let check_convert_instances ~flex:_ u u' (univs,elims) =
   then Result.Ok (univs,elims)
   else Result.Error None
 
-let check_cumul_instances_univs ~flex:_ cv_pb ~nargs variance u1 u2 univs =
+let check_cumul_instances_univs ~flex:_ cv_pb ~nargs variance u1 u2 (univs, elims) =
   let qcsts, ucsts = get_cumulativity_constraints cv_pb ~nargs variance u1 u2 in
-  Sorts.QConstraints.trivial qcsts && (UGraph.check_constraints ucsts univs)
+  QGraph.check_constraints qcsts elims && (UGraph.check_constraints ucsts univs)
 
 (* general conversion and inference functions *)
 let check_cumul_instances ~flex:_ ~nargs cv_pb variance u1 u2 (univs, elims) =
   let qcsts, ucsts = get_cumulativity_constraints cv_pb ~nargs variance u1 u2 in
   if QGraph.check_constraints qcsts elims && UGraph.check_constraints ucsts univs 
-  then Result.Ok univs
+  then Result.Ok (univs, elims)
   else Result.Error None
 
 let checked_universes =
@@ -946,11 +946,17 @@ let () =
 let to_bool = function
   Result.Ok _ -> true | Result.Error () -> false
 
-let conv_inst u1 u2 univs = if UGraph.check_eq_instances univs u1 u2 then Result.Ok univs else Result.Error ()
-let cumul_inst ~nargs cv_pb variances u1 u2 univs =
-  if check_cumul_instances_univs ~flex:false cv_pb ~nargs variances u1 u2 univs then Result.Ok univs else Result.Error ()
+let conv_inst u1 u2 (univs, elims) = 
+  if UGraph.check_eq_instances univs u1 u2 
+  then Result.Ok (univs, elims)
+else Result.Error ()
 
-let cumul_head_instances env quals univs cv_pb head u1 u2 =
+let cumul_inst ~nargs cv_pb variances u1 u2 univs =
+  if check_cumul_instances_univs ~flex:false cv_pb ~nargs variances u1 u2 univs 
+  then Result.Ok univs 
+  else Result.Error ()
+
+let cumul_head_instances env univs cv_pb head u1 u2 =
   match head with
   | Some (gr, nargs) ->
     debug Pp.(fun () -> str"cumul_head_instances for " ++ GlobRef.print gr ++ str " applied to " ++ int nargs ++ str "arguments");
@@ -962,9 +968,9 @@ let cumul_head_instances env quals univs cv_pb head u1 u2 =
       to_bool @@ UCompare.convert_inductives_gen conv_inst cumul_inst env cv_pb ind ~nargs u1 u2 univs
     | GlobRef.ConstructRef cst ->
       to_bool @@ UCompare.convert_constructors_gen conv_inst cumul_inst env cst ~nargs u1 u2 univs
-    | GlobRef.VarRef _ -> UGraph.check_eq_instances univs u1 u2
+    | GlobRef.VarRef _ -> UGraph.check_eq_instances (fst univs) u1 u2
     with UCompare.MustExpand -> false)
-  | None -> UGraph.check_eq_instances univs u1 u2
+  | None -> UGraph.check_eq_instances (fst univs) u1 u2
 
 let eq_existential eq (evk1, args1) (evk2, args2) =
   Evar.equal evk1 evk2 && SList.equal eq args1 args2
@@ -973,8 +979,8 @@ let eq_constr_univs env m n =
   if m == n then true
   else
     let univs = Environ.universes env in
-    let quals = Environ.qualities env in 
-    let eq_instances = cumul_head_instances env quals univs CONV in
+    let quals = Environ.qualities env in
+    let eq_instances = cumul_head_instances env (univs, quals) CONV in
     let eq_sorts s1 s2 = s1 == s2 || UGraph.check_eq_sort quals univs s1 s2 in
     let rec eq_constr' nargs m n =
       m == n ||	compare_head_gen eq_instances eq_sorts (eq_existential (eq_constr' 0)) eq_constr' nargs m n
@@ -984,12 +990,13 @@ let leq_constr_univs env m n =
   if m == n then true
   else
     let univs = Environ.universes env in
-    let eq_instances = cumul_head_instances env univs CONV in
-    let leq_instances = cumul_head_instances env univs CUMUL in
+    let quals = Environ.qualities env in 
+    let eq_instances = cumul_head_instances env (univs, quals) CONV in
+    let leq_instances = cumul_head_instances env (univs, quals) CUMUL in
     let eq_sorts s1 s2 = s1 == s2 ||
-      UGraph.check_eq_sort univs s1 s2 in
+      UGraph.check_eq_sort quals univs s1 s2 in
     let leq_sorts s1 s2 = s1 == s2 ||
-      UGraph.check_leq_sort univs s1 s2 in
+      UGraph.check_leq_sort quals univs s1 s2 in
     let rec eq_constr' nargs m n =
       m == n || compare_head_gen eq_instances eq_sorts (eq_existential (eq_constr' 0)) eq_constr' nargs m n
     in

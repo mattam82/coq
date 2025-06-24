@@ -802,8 +802,7 @@ let process_universe_constraints uctx cstrs =
     Sorts.subst_fn ((qnormalize local), UnivSubst.subst_univs_level (normalize local)) s
   in
   let nf_constraint local = function
-    | QElimTo (a, b) -> QElimTo (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)
-    | QLeq (a, b) -> QLeq (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)
+    | QElimTo (a, b) -> QElimTo (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)     
     | QEq (a, b) -> QEq (Quality.subst (qnormalize local) a, Quality.subst (qnormalize local) b)
     | ULub (c, u, v) -> ULub (c, normalize_univ local u, normalize_univ local v)
     | UWeak (u, v) -> UWeak (normalize_univ local u, normalize_univ local v)
@@ -818,7 +817,7 @@ let process_universe_constraints uctx cstrs =
     | UProp -> prop
     | USet -> set
     in
-    if UGraph.check_eq_sort local.sort_variables local.universes ls s then local
+    if UGraph.check_eq_sort quals local.universes ls s then local
     else if is_uset l then match classify s with
     | USmall _ -> sort_inconsistency Eq set s
     | ULevel (r, _) ->
@@ -915,7 +914,7 @@ let process_universe_constraints uctx cstrs =
           (* l contains a +1 and r=r' small so l <= r impossible *)
           sort_inconsistency Le l r
       | USmall l' ->
-        if UGraph.check_leq_sort local.sort_variables local.universes l r then local
+        if UGraph.check_leq_sort quals local.universes l r then local
         else sort_inconsistency Le l r
       | ULevel (l', _) ->
         if is_uset r' && is_flexible local l' then
@@ -956,8 +955,9 @@ let process_universe_constraints uctx cstrs =
       (* TODO sort_inconsistency should be able to handle raw
          qualities instead of having to make a dummy sort *)
       let mk q = Sorts.make q Universe.type0 in
-    | QEq (a, b) -> unify_quality univs CONV (mk a) (mk b) local
-    | QElimTo (a, b) -> unify_quality univs CUMUL (mk b) (mk a) local
+      match cst with
+    | QEq (a, b) -> unify_quality CONV (mk a) (mk b) local
+    | QElimTo (a, b) -> unify_quality CUMUL (mk b) (mk a) local
     | ULe (l, r) -> enforce_le false local l r 
     | ULub (c, l, r) ->
       if all_flexible local l || all_flexible local r then 
@@ -1050,8 +1050,8 @@ let check_universe_constraint uctx (c:UnivProblem.t) =
     let b = nf_quality uctx b in
       Quality.equal a b ||
       Inductive.eliminates_to (QState.elims uctx.sort_variables) a b
-  | ULe (u,v) -> UGraph.check_leq_sort uctx.universes u v
-  | UEq (u,v) -> UGraph.check_eq_sort uctx.universes u v
+  | ULe (u,v) -> UGraph.check_leq_sort (elim_graph uctx) uctx.universes u v
+  | UEq (u,v) -> UGraph.check_eq_sort (elim_graph uctx) uctx.universes u v
   | ULub (Eq,u,v) -> UGraph.check_eq uctx.universes u v
   | ULub (Le,u,v) -> UGraph.check_leq uctx.universes u v
   | UWeak _ -> true
