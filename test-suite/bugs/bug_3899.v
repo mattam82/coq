@@ -7,5 +7,5 @@ Fail Check fun x y : unit => eq_refl : x = y.
 
 Record ok : Set := tt' { a : unit }.
 
-Record nonprim : Prop := { undef : unit }.
+Fail Record nonprim : Prop := { undef : unit }.
 Record prim : Prop := { def : True }.

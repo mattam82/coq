@@ -90,7 +90,7 @@ Module WhyNotPrim.
 
   Set Primitive Projections.
 
-  Record squashed : Prop := { x : nat }.
+  Fail Record squashed : Prop := { x : nat }.
 
   Record noprojs := { y := 0 }.
 

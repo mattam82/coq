@@ -6,10 +6,10 @@ Set Printing Universes.
 Module Reduction.
 
   Definition qsort := 𝒰.
-  (* qsort@{α | u |} = Type@{α | u} : Type@{u+1} *)
+  (* qsort@{α | u |} = 𝒰@{α | u} : 𝒰@{u+1} *)
 
-  Definition qsort' : 𝒰 := Type.
-  (* qsort'@{α | u u0 |} = Type@{α | u0} : Type@{u} *)
+  Definition qsort' : 𝒰 := 𝒰.
+  (* qsort'@{α | u u0 |} = 𝒰@{α | u0} : 𝒰@{u} *)
 
   Monomorphic Universe U.
 
@@ -26,7 +26,7 @@ Module Reduction.
   Check eq_refl : q3 = tU.
 
   Definition exfalso (A:𝒰) (H:False) : A := match H with end.
-  (* exfalso@{α | u |} : forall A : Type@{α | _}, False -> A *)
+  (* exfalso@{α | u |} : forall A : 𝒰@{α | _}, False -> A *)
 
   Definition exfalsoVM := Eval vm_compute in exfalso@{Type|Set}.
   Definition exfalsoNative := Eval native_compute in exfalso@{Type|Set}.
@@ -36,7 +36,7 @@ Module Reduction.
     | 0 => x
     | S k => iter A f k (f x)
     end.
-  (* iter@{α | u |} : forall (A : Type@{α | u}) (_ : forall _ : A, A) (_ : nat) (_ : A), A *)
+  (* iter@{α | u |} : forall (A : 𝒰@{α | u}) (_ : forall _ : A, A) (_ : nat) (_ : A), A *)
 
   Definition iterType := Eval lazy in iter@{Type;_}.
 
@@ -47,15 +47,16 @@ End Reduction.
 Module Conversion.
 
   Inductive Box (A:𝒰) := box (_:A).
-  (* Box@{α α0 | u |} (A : Type@{α | u}) : Type@{α0 | u} *)
+  (* Box@{α α0 | u |} (A : 𝒰@{α | u}) : 𝒰@{α0 | u} *)
+
 
   Definition t1 (A:𝒰) (x y : A) := box _ x.
-  (* t1@{α α0 | u |} : forall (A : Type@{α | u}) (_ : A) (_ : A), Box@{α α0 | u} A *)
+  (* t1@{α α0 | u |} : forall (A : 𝒰@{α | u}) (_ : A) (_ : A), Box@{α α0 | u} A *)
   Definition t2 (A:𝒰) (x y : A) := box _ y.
-  (* t2@{α α0 | u |} : forall (A : Type@{α | u}) (_ : A) (_ : A), Box@{α α0 | u} A *)
+  (* t2@{α α0 | u |} : forall (A : 𝒰@{α | u}) (_ : A) (_ : A), Box@{α α0 | u} A *)
 
   Definition t1' (A:𝒰) (x y : A) := x.
-  (* t1'@{α | u |} : forall (A : Type@{α | u}) (_ : A) (_ : A), A *)
+  (* t1'@{α | u |} : forall (A : 𝒰@{α | u}) (_ : A) (_ : A), A *)
   Definition t2' (A:𝒰) (x y : A) := y.
 
   Fail Check eq_refl : t1 nat = t2 nat.
@@ -77,10 +78,10 @@ Module Conversion.
             (t2'@{SProp | sort_poly_elab.482} A)) *)
 
   Definition ignore {A:𝒰} (x:A) := tt.
-  (* ignore@{α | u |} : forall {A : Type@{α | u}} (_ : A), unit *)
+  (* ignore@{α | u |} : forall {A : 𝒰@{α | u}} (_ : A), unit *)
 
   Definition unfold_ignore (A:𝒰) : ignore (t1 A) = ignore (t2 A) := eq_refl.
-  (* unfold_ignore@{α α0 α1 | u |} : forall A : Type@{α | u},
+  (* unfold_ignore@{α α0 α1 | u |} : forall A : 𝒰@{α | u},
        @eq unit
          (@ignore@{α0 | u} (forall (_ : A) (_ : A), Box@{α α0 | u} A)
             (t1@{α α0 | u} A))
@@ -100,15 +101,15 @@ End Conversion.
 
 Module Inference.
   Definition zog (A:𝒰) := A.
-  (* zog@{α | u |} : Type@{α | _} -> Type@{α | _} *)
+  (* zog@{α | u |} : 𝒰@{α | _} -> 𝒰@{α | _} *)
 
   (* implicit instance of zog gets a variable which then gets unified with s from the type of A *)
   Definition zag (A:𝒰) := zog A.
-  (* zag@{α | u |} : Type@{α | _} -> Type@{α | _} *)
+  (* zag@{α | u |} : 𝒰@{α | _} -> 𝒰@{α | _} *)
 
-  (* implicit type of A gets unified to Type@{s|u} *)
+  (* implicit type of A gets unified to 𝒰@{s|u} *)
   Definition zig A := zog A.
-  (* zig@{α | u |} : Type@{α | _} -> Type@{α | _} *)
+  (* zig@{α | u |} : 𝒰@{α | _} -> 𝒰@{α | _} *)
 
   (* different manually bound sort variables don't unify *)
   Fail Definition zog'@{s s'; |} (A:𝒰@{s;Set}) := zog@{s';} A.
@@ -140,7 +141,7 @@ Module Inductives.
   Check foo3_rect.
 
   Inductive foo5 (A : 𝒰) : Prop := Foo5 (_ : A).
-  (* foo5@{α | u |} (A : Type@{α | u}) : Prop := *)
+  (* foo5@{α | u |} (A : 𝒰@{α | u}) : Prop := *)
 
   Definition foo5_ind' : forall (A : 𝒰) (P : Prop), (A -> P) -> foo5 A -> P
     := foo5_ind.
@@ -198,18 +199,40 @@ Module Inductives.
   Set Primitive Projections.
   Set Warnings "+records".
 
-  (* the SProp instantiation may not be primitive so the whole thing must be nonprimitive *)
   Fail Record R1 : 𝒰 := {}.
+  (* The record R1 could not be defined as a primitive record because it has no projections. *)
+  
+  Record R2 (A:SProp) : 𝒰 := { R2f1 : A }.
 
-  (* the Type instantiation may not be primitive *)
-  Fail Record R2 (A:SProp) : Type := { R2f1 : A }.
+  Goal forall (A:SProp) (r2 : R2@{Type;0} A), r2 = {| R2f1 := r2.(R2f1 A) |}.
+  Proof. intros A r2. Fail reflexivity. Abort.
+  (* The command has indeed failed with message:
+      In environment
+      A : SProp
+      r2 : R2 A
+      Unable to unify "{| R2f1 := R2f1 _ r2 |}" with "r2". *)
+
+  Fail Goal forall (A:SProp) (r2 : R2@{SProp;0} A), r2 = {| R2f1 := r2.(R2f1 A) |}. (* FIXME *)
+  (* Proof. intros A r2. reflexivity. Abort. *)
 
   (* R3@{SProp Type|} may not be primitive  *)
-  Fail Record R3 (A:𝒰) : 𝒰 := { R3f1 : A }.
-  Record R4@{s| |} (A:𝒰@{s;Set}) : 𝒰@{s;Set} := { R4f1 : A}.
+  Record R3 (A:𝒰) : 𝒰 := { R3f1 : A }.
+
+  Fail Example R3_same_sort@{s;u} (A :𝒰@{s;u}) : forall (r3 : R3@{s s;u} A), r3 = {| R3f1 := r3.(R3f1 A) |}. (* FIXME *)
+  (* Proof. intros r3. reflexivity. Qed. *)
+
+  Goal forall (A:SProp) (r3 : R3@{_ Type;0} A), r3 = {| R3f1 := r3.(R3f1 A) |}.
+  Proof. intros A r3. Fail reflexivity. Abort.
+
+  Fail Goal forall (A:SProp) (r3 : R3@{_ SProp;u} A), r3 = {| R3f1 := r3.(R3f1 A) |}. (* FIXME *)
+  (* Proof. intros A r3. reflexivity. Abort. *)
+
+  Record R4@{s; |} (A:𝒰@{s;Set}) : 𝒰@{s;Set} := { R4f1 : A}.
 
   (* non SProp instantiation must be squashed *)
-  Fail Record R5@{+} (A:𝒰) : SProp := { R5f1 : A}. (* FIXME *)
+  Fail Record R5@{s;u} (A:𝒰@{s;u}) : SProp := { R5f1 : A}.
+  (* The command has indeed failed with message:
+     The record R5 could not be defined as a primitive record because it is squashed. *)
   Fail #[warnings="-non-primitive-record"]
     Record R5 (A:𝒰) : SProp := { R5f1 : A}.
   (* This expression would enforce an elimination constraint between SProp and
@@ -220,21 +243,30 @@ Module Inductives.
   (* This expression would enforce an elimination constraint between SProp and
   β0 that is not allowed. *)
 
-  Fail Record R6@{s| |} (A:𝒰@{s;Set}) : Set := { R6f1 : A; R6f2 : nat }.
+  Record R6@{s;u} (A:𝒰@{s;0}) : 𝒰@{s;0} := { R6f1 : A; R6f2 : nat }.
+  (* s ; u |= s -> Type *)
+  
+  Fail Check fun (A:SProp) (x y : R6@{SProp;_} A) =>
+          eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
+  (* The command has indeed failed with message:
+      The quality constraints are inconsistent: cannot enforce SProp -> Type because it would identify Type and SProp which is inconsistent.
+      This is introduced by the constraints SProp -> Type *)
+  Fail Check fun (A:Prop) (x y : R6@{Prop;_} A) =>
+          eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
+  (* The command has indeed failed with message:
+      The quality constraints are inconsistent: cannot enforce Prop -> Type because it would identify Type and Prop which is inconsistent.
+      This is introduced by the constraints Prop -> Type *)
 
   Fail Check fun (A:SProp) (x y : R6 A) =>
-          eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
-  Fail Check fun (A:Prop) (x y : R6 A) =>
-          eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
-  Fail Check fun (A:SProp) (x y : R6 A) =>
           eq_refl : Conversion.box _ x.(R6f2 _) = Conversion.box _ y.(R6f2 _).
+(* The term "A" has type "SProp" while it is expected to have type "𝒰@{α148 ; Set}" (universe inconsistency: Cannot enforce SProp <= Type@{α148 | Set}). *)
 
   (* Elimination constraints are accumulated by fields, even on independent fields *)
   #[projections(primitive=no)] Record R7 (A:𝒰) := { R7f1 : A; R7f2 : nat }.
-  (* Record R7@{α α0 | u |} (A : Type@{α | u}) : Type@{α0 | max(Set,u)}  *)
-  (* R7f1@{α α0 | u |} : forall A : Type@{α | u}, R7@{α α0 | u} A -> A
+  (* Record R7@{α α0 | u |} (A : 𝒰@{α | u}) : 𝒰@{α0 | max(Set,u)}  *)
+  (* R7f1@{α α0 | u |} : forall A : 𝒰@{α | u}, R7@{α α0 | u} A -> A
       α α0 | u |= α0 ~> α *)
-  (* R7f2@{α α0 | u |} : forall A : Type@{α | u}, R7@{α α0 | u} A -> nat
+  (* R7f2@{α α0 | u |} : forall A : 𝒰@{α | u}, R7@{α α0 | u} A -> nat
       α α0 | u |= α0 ~> α
                   α0 ~> Type *)
 
@@ -245,8 +277,8 @@ Module Inductives.
     R8f1 : 𝒰;
     R8f2 : R8f1
   }.
-  (* Record R8@{α α0 | u |} : Type@{α | u+1}. *)
-  (* R8f1@{α α0 | u |} : R8@{α α0 | u} -> Type@{α0 | u}
+  (* Record R8@{α α0 | u |} : 𝒰@{α | u+1}. *)
+  (* R8f1@{α α0 | u |} : R8@{α α0 | u} -> 𝒰@{α0 | u}
       α α0 | u |= α ~> Type *)
   (* R8f2@{α α0 | u |} : forall r : R8@{α α0 | u}, R8f1@{α α0 | u} r
       α α0 | u |= α ~> α0
@@ -254,7 +286,7 @@ Module Inductives.
 
   Inductive sigma (A:𝒰) (B:A -> 𝒰) : 𝒰
     := pair : forall x : A, B x -> sigma A B.
-  (* Inductive sigma@{α α0 α1 | u u0 |} (A : Type@{α | u}) (B : A -> Type@{α0 | u0}) : Type@{α1 | max(u,u0)} *)
+  (* Inductive sigma@{α α0 α1 | u u0 |} (A : 𝒰@{α | u}) (B : A -> 𝒰@{α0 | u0}) : 𝒰@{α1 | max(u,u0)} *)
 
   Definition sigma_srect A B
     (P : sigma A B -> 𝒰)
@@ -274,7 +306,7 @@ Module Inductives.
                        α1 ~> α0 *)
 
   Inductive seq (A:𝒰) (a:A) : A -> Prop := seq_refl : seq A a a.
-  (* Inductive seq@{α | u |} (A : Type@{α | u}) (a : A) : A -> Prop *)
+  (* Inductive seq@{α | u |} (A : 𝒰@{α | u}) (a : A) : A -> Prop *)
   Arguments seq_refl {_ _}.
 
   Definition eta A B (s:sigma A B) : seq _ s (pair A B (pr1 s) (pr2 s)).
@@ -285,20 +317,16 @@ Module Inductives.
   Set Primitive Projections.
   Set Warnings "+records".
   (* sigma as a primitive record works better *)
-  Record Rsigma@{s|u v|} (A:𝒰@{s;u}) (B:A -> 𝒰@{s;v}) : 𝒰@{s;max(u,v)}
+  Record Rsigma (A:𝒰) (B:A -> 𝒰) : 𝒰
     := Rpair { Rpr1 : A; Rpr2 : B Rpr1 }.
 
   (* match desugared to primitive projections using definitional eta *)
-  Definition Rsigma_srect A B
+  Fail Definition Rsigma_srect A B
     (P : Rsigma A B -> 𝒰)
     (H : forall x b, P (Rpair _ _ x b))
     (s:Rsigma A B)
     : P s
     := match s with Rpair _ _ x b => H x b end.
-  (* Rsigma_srect@{α α0 | u u0 u1 |} : forall (A : Type@{α0 | _}) (B : A -> Type@{α0 | _})
-         (P : Rsigma A B -> Type@{α | _}),
-       (forall (x : A) (b : B x), P {| Rpr1 := x; Rpr2 := b |}) ->
-       forall s : Rsigma A B, P s *)
 
   (* sort polymorphic exists (we could also make B sort poly)
      can't be a primitive record since the first projection isn't defined at all sorts *)

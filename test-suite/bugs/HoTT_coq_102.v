@@ -3,7 +3,7 @@ Require Import TestSuite.admit.
 Set Implicit Arguments.
 Set Universe Polymorphism.
 Generalizable All Variables.
-Record SpecializedCategory (obj : Type) := { Object :> _ := obj }.
+Record SpecializedCategory (obj : Type) : Type := { Object :> _ := obj }.
 
 Record > Category :=
   { CObject : Type;

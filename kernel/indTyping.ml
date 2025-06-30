@@ -68,7 +68,11 @@ let mind_check_names env mie =
 (************************************************************************)
 
 type record_arg_info =
-  | NoRelevantArg
+  | OnlySPropArg
+  (** All arguments arg in SProp, therefore we might forbid primitive projections *)
+  | HasQSortArg
+  (** At least one arg is a QSort, therefore we postpone the elimination constraint check until eta conversion *)
+  (* We could keep the list of fields that need a recheck to optimize? *)
   | HasRelevantArg
   (** HasRelevantArg means when the record is relevant at least one arg is relevant.
       When the record is in a polymorphic sort this can mean one arg is in the same sort. *)
@@ -89,18 +93,19 @@ let add_squash q info =
     (* XXX dedup insertion *)
     { info with ind_squashed = Some (SometimesSquashed (Sorts.Quality.Set.add q qs)) }
 
-let compute_elim_squash ?(is_real_arg=false) env sort info =
+let compute_elim_squash ?(is_real_arg=false) env out_sort info =
   let open Sorts.Quality in
   let info = if not is_real_arg then info
     else match info.record_arg_info with
       | HasRelevantArg -> info
-      | NoRelevantArg -> match sort with
-        | Sorts.SProp -> info
+      | HasQSortArg -> info
+      | OnlySPropArg -> match out_sort with
+        | Sorts.SProp -> { info with record_arg_info = OnlySPropArg }
         | QSort (q, _) ->
            if Environ.Internal.is_above_prop env q
               || equal (QVar q) (Sorts.quality info.ind_univ)
           then { info with record_arg_info = HasRelevantArg }
-          else info
+          else { info with record_arg_info = HasQSortArg }
         | Prop | Set | Type _ -> { info with record_arg_info = HasRelevantArg }
   in
   if (Environ.type_in_type env) then info
@@ -109,21 +114,26 @@ let compute_elim_squash ?(is_real_arg=false) env sort info =
     and check_univ_consistency f induu uu =
       if UGraph.check_leq (universes env) uu induu
       then f info
-      else { info with missing = sort :: info.missing } in
-    if Inductive.eliminates_to (Environ.qualities env) (Sorts.quality ind_sort) (Sorts.quality sort) then
+      else { info with missing = out_sort :: info.missing } in
+    if Inductive.eliminates_to (Environ.qualities env) (Sorts.quality ind_sort) (Sorts.quality out_sort) then
           if Sorts.Quality.is_impredicative (Sorts.quality ind_sort)
           then
-            match sort with
+            match out_sort with
             | Type _ | Set -> { info with ind_squashed = Some AlwaysSquashed }
             | QSort (q, _) -> add_squash (Sorts.Quality.QVar q) info
             | SProp | Prop -> info
           else check_univ_consistency (fun x -> x)
                  (Sorts.univ_of_sort ind_sort)
-                 (Sorts.univ_of_sort sort)
+                 (Sorts.univ_of_sort out_sort)
+    (*   else { info with missing = out_sort :: info.missing } in *)
+    (* if Inductive.eliminates_to (Environ.qualities env) (Sorts.quality ind_sort) (Sorts.quality out_sort) then *)
+    (*   check_univ_consistency (fun x -> x) *)
+    (*     (Sorts.univ_of_sort ind_sort) *)
+    (*     (Sorts.univ_of_sort out_sort) *)
     else
       let check_univ_consistency_squash quality =
         check_univ_consistency (add_squash quality) in
-      match ind_sort, sort with
+      match ind_sort, out_sort with
       | QSort (_, indu), Type uu ->
          check_univ_consistency_squash qtype indu uu
       | QSort (_, indu), QSort (cq, uu) ->
@@ -139,7 +149,7 @@ let compute_elim_squash ?(is_real_arg=false) env sort info =
         (* Morally, this checks if q is "above Prop" (Template poly),
            and if so, squashing info remains the same *)
          if Environ.Internal.is_above_prop env q then info
-         else add_squash (Sorts.quality sort) info
+         else add_squash (Sorts.quality out_sort) info
       | _, _ -> { info with ind_squashed = Some AlwaysSquashed }
 
 let check_context_univs ~ctor env info ctx =
@@ -165,7 +175,7 @@ let check_arity ~template env_params env_ar ind =
   let indices, ind_sort = Reduction.dest_arity env_params arity in
   let univ_info = {
     ind_squashed=None;
-    record_arg_info=NoRelevantArg;
+    record_arg_info = OnlySPropArg;
     ind_template = template;
     ind_univ=ind_sort;
     missing=[];
@@ -233,10 +243,12 @@ end
 
 let check_record data =
   let open NotPrimRecordReason in
-  List.find_map (fun (_,(_,splayed_lc),info) ->
+  List.fold_left (fun (reason, recheck_at_eta as check_result) (_, (_, splayed_lc), info) ->
+      if Option.has_some reason then check_result
+      else
       if Option.has_some info.ind_squashed
       (* records must have all projections definable -> equivalent to not being squashed *)
-      then Some MustNotBeSquashed
+      then Some MustNotBeSquashed, recheck_at_eta
       else
         let res = match splayed_lc with
           (* records must have 1 constructor with at least 1 argument, and no anonymous fields *)
@@ -244,7 +256,7 @@ let check_record data =
              but the condition does not seem useful for SProp records.
              Should we allow 0-projection SProp records? *)
           (* XXX if we stop needing compatibility constants we could allow anonymous projections *)
-          | [|ctx,_|] ->
+          | [|ctx, _|] ->
             let module D = Context.Rel.Declaration in
             if not @@ List.exists D.is_local_assum ctx
             then Some MustHaveProj
@@ -253,13 +265,21 @@ let check_record data =
             else None
           | _ -> CErrors.anomaly ~label:"Indtyping.check_record" Pp.(str "not 1 constructor")
         in
-        if Option.has_some res then res
+        if Option.has_some res then res, recheck_at_eta
         else (* relevant records must have at least 1 relevant argument *)
-        if (match info.record_arg_info with
-            | HasRelevantArg -> false
-            | NoRelevantArg -> not @@ Sorts.is_sprop info.ind_univ)
-        then Some MustHaveRelevantProj
-        else None)
+          let can_be_primitive, recheck_at_eta =
+            match info.record_arg_info with
+            | HasRelevantArg -> true, false
+            | HasQSortArg -> true, true
+            | OnlySPropArg ->
+              let is_qsort = Sorts.is_qsort info.ind_univ in
+              Sorts.is_sprop info.ind_univ || is_qsort, is_qsort
+          in
+          if can_be_primitive
+          then None, recheck_at_eta
+          else Some MustHaveRelevantProj, recheck_at_eta
+    )
+    (None, false)
     data
 
 (* Template univs must be unbounded from below for subject reduction
@@ -556,29 +576,29 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
   let env_ar_par = push_rel_context params env_ar in
 
   (* Constructors *)
-  let isrecord = match mie.mind_entry_record with
+  let is_record = match mie.mind_entry_record with
     | Some (Some _) -> true
     | Some None | None -> false
   in
   let data = List.map2 (fun ind data ->
-      check_constructors env_ar_par isrecord params ind.mind_entry_lc data)
+      check_constructors env_ar_par is_record params ind.mind_entry_lc data)
       mie.mind_entry_inds data
   in
 
   let record = mie.mind_entry_record in
-  let data, record, why_not_prim_record = match record with
-    | None | Some None -> data, record, None
+  let data, record, why_not_prim_record, recheck_at_eta_conv = match record with
+    | None | Some None -> data, record, None, false
     | Some (Some _) ->
       match check_record data with
-      | None -> data, record, None
-      | Some _ as reason ->
+      | None, recheck_at_eta_conv -> data, record, None, recheck_at_eta_conv
+      | Some _ as reason, _ ->
         (* if someone tried to declare a record as SProp but it can't
            be primitive we must squash. *)
-        let data = List.map (fun (a,b,univs) ->
-            a,b,compute_elim_squash env_ar_par Sorts.prop univs)
+        let data = List.map (fun (a, b, univs) ->
+            a, b, compute_elim_squash  env_ar_par Sorts.prop univs)
             data
         in
-        data, Some None, reason
+        data, None, reason, false
   in
 
   let variance = match mie.mind_entry_variance with
@@ -629,4 +649,4 @@ let typecheck_inductive env ~sec_univs (mie:mutual_inductive_entry) =
     Environ.push_rel_context ctx env
   in
 
-  env_ar_par, univs, template, variance, record, why_not_prim_record, params, Array.of_list data
+  env_ar_par, univs, template, variance, record, why_not_prim_record, recheck_at_eta_conv, params, Array.of_list data

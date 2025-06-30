@@ -206,12 +206,10 @@ Module Inductives.
   (* non SProp instantiation must be squashed *)
   Fail Record R5@{s; |} (A:𝒰@{s;Set}) : SProp := { R5f1 : A}.
   Fail #[warnings="-non-primitive-record"]
-    Record R5@{s; |} (A:𝒰@{s;Set}) : SProp := { R5f1 : A}.
-  #[warnings="-non-primitive-record,-cannot-define-projection"]
-    Record R5@{s; |} (A:𝒰@{s;Set}) : SProp := { R5f1 : A}.
+    Record R5@{s| |} (A:Type@{s|Set}) : SProp := { R5f1 : A}.
+  Fail #[warnings="-non-primitive-record,-cannot-define-projection"]
+    Record R5@{s| |} (A:Type@{s|Set}) : SProp := { R5f1 : A}.
   Fail Check R5f1.
-  Definition R5f1_sprop (A:SProp) (r:R5 A) : A := let (f) := r in f.
-  Fail Definition R5f1_prop (A:Prop) (r:R5 A) : A := let (f) := r in f.
 
   Fail Record R6@{s; |} (A:𝒰@{s;Set}) := { R6f1 : A; R6f2 : nat }.
   Fail Check fun (A:SProp) (x y : R6 A) =>

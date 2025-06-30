@@ -4,7 +4,7 @@ Module Version1.
   Set Universe Polymorphism.
   Generalizable All Variables.
 
-  Record SpecializedCategory (obj : Type) :=
+  Record SpecializedCategory (obj : Type) : Type :=
     {
       Object :> _ := obj
     }.
@@ -60,7 +60,7 @@ Module Version2.
   Set Implicit Arguments.
   Set Universe Polymorphism.
 
-  Record SpecializedCategory (obj : Type) :=
+  Record SpecializedCategory (obj : Type) : Type :=
     {
       Object : _ := obj
     }.

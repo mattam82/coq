@@ -36,7 +36,7 @@ let do_primitive id udecl prim typopt =
     let evd, u = Evd.with_sort_context_set UState.univ_flexible QGraph.Internal evd (UnivGen.fresh_instance auctx) in
     let expected_typ = EConstr.of_constr @@ Typeops.type_of_prim_or_type env u prim in
     let evd, (typ,impls) =
-      (* TODO: Missing sort poly *)
+      (* TODO: Do we want to allow for sort poly and unconstrained_sorts ? *)
       Constrintern.(interp_type_evars_impls ~impls:empty_internalization_env)
         env evd typ
     in
@@ -47,7 +47,7 @@ let do_primitive id udecl prim typopt =
             PretypeError (env,evd,CannotUnify (typ,expected_typ,Some e)),info))
     in
     Pretyping.check_evars_are_solved ~program_mode:false env evd;
-    (* TODO: Missing sort poly elab *)
+    (* TODO: Do we care about sort poly elab at this point ? *)
     let evd = Evd.minimize_universes evd in
     let _qvars, uvars = EConstr.universes_of_constr evd typ in
     let evd = Evd.restrict_universe_context evd uvars in

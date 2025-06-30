@@ -127,8 +127,9 @@ let print_one_inductive env sigma mib ((_,i) as ind) =
   let cstrtypes = Array.map (fun c -> snd (Term.decompose_prod_n_decls nparamdecls c)) cstrtypes in
   let isrecord = match mip.mind_record with
     | NotRecord -> None
-    | FakeRecord -> Some Anonymous
-    | PrimRecord (id,_,_,_) -> Some (Name id)
+    | FakeRecord -> (* FIXME: MS: are we sure we want to add that? *)
+       if !Flags.raw_print then None else Some Anonymous
+    | PrimRecord (id, _, _, _, _) -> Some (Name id)
   in
   if Option.has_some isrecord then assert (Array.length cstrtypes = 1);
   let inst =
