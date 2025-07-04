@@ -146,9 +146,8 @@ let intern_ind_arity env sigma ind =
   let template_syntax = if pseudo_poly then SyntaxAllowsTemplatePoly else SyntaxNoTemplatePoly in
   (constr_loc ind.ind_arity, c, impls, template_syntax)
 
-  (* TODO: Add sort poly *)
-let pretype_ind_arity ~unconstrained_sorts env sigma (loc, c, impls, template_syntax) =
-  let flags = { Pretyping.all_no_fail_flags with unconstrained_sorts } in
+let pretype_ind_arity ~unconstrained_sorts ~sort_poly env sigma (loc, c, impls, template_syntax) =
+  let flags = { Pretyping.all_no_fail_flags with unconstrained_sorts ; sort_polymorphic = sort_poly } in
   let sigma,t = understand_tcc ~flags env sigma ~expected_type:IsType c in
   match Reductionops.sort_of_arity env sigma t with
   | exception Reduction.NotArity ->
@@ -688,12 +687,12 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
   in
   default_dep_elim, mind_entry, ubinders, global_cstrs
 
-let interp_params ~unconstrained_sorts env udecl uparamsl paramsl =
+let interp_params ~unconstrained_sorts ~sort_poly env udecl uparamsl paramsl =
   let sigma, udecl, variances = interp_cumul_sort_poly_decl_opt env udecl in
   let sigma, (uimpls, ((env_uparams, ctx_uparams), useruimpls, _locs)) =
-    interp_context_evars ~program_mode:false ~unconstrained_sorts env sigma uparamsl in
+    interp_context_evars ~program_mode:false ~unconstrained_sorts ~sort_poly env sigma uparamsl in
   let sigma, (impls, ((env_params, ctx_params), userimpls, _locs)) =
-    interp_context_evars ~program_mode:false ~unconstrained_sorts ~impl_env:uimpls env_uparams sigma paramsl
+    interp_context_evars ~program_mode:false ~unconstrained_sorts ~sort_poly ~impl_env:uimpls env_uparams sigma paramsl
   in
   (* Names of parameters as arguments of the inductive type (defs removed) *)
   sigma, env_params, (ctx_params, env_uparams, ctx_uparams,
@@ -738,16 +737,17 @@ let interp_mutual_inductive_gen env0 ~flags udecl (uparamsl,paramsl,indl) notati
 
   (* In case of template polymorphism, we need to compute more constraints *)
   (* Keeping the disjunction for backward compatibility reasons *)
-  let unconstrained_sorts = not flags.poly || flags.sort_poly in
+  let unconstrained_sorts = not flags.poly in
+  let sort_poly = flags.sort_poly in
 
   let sigma, env_params, (ctx_params, env_uparams, ctx_uparams, userimpls, useruimpls, impls, udecl, variances) =
-    interp_params ~unconstrained_sorts env0 udecl uparamsl paramsl
+    interp_params ~unconstrained_sorts ~sort_poly env0 udecl uparamsl paramsl
   in
 
   (* Interpret the arities *)
   let arities = List.map (intern_ind_arity env_params sigma) indl in
 
-  let sigma, arities = List.fold_left_map (pretype_ind_arity ~unconstrained_sorts env_params) sigma arities in
+  let sigma, arities = List.fold_left_map (pretype_ind_arity ~unconstrained_sorts ~sort_poly env_params) sigma arities in
   let arities, relevances, template_syntax, indimpls = List.split4 arities in
 
   let lift_ctx n ctx =

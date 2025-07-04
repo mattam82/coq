@@ -163,7 +163,7 @@ let do_definition_interactive ?loc ~program_mode ?hook ~name ~scope ?clearbody ~
   let typ = EConstr.to_constr evd typ in
   Evd.check_sort_poly_decl_early ~poly ~sort_poly ~with_obls:false evd udecl [typ];
   let typ = EConstr.of_constr typ in
-  let info = Declare.Info.make ?hook ~poly ~scope ?clearbody ~kind ~udecl ?typing_flags ?user_warns () in
+  let info = Declare.Info.make ?hook ~poly ~sort_poly ~scope ?clearbody ~kind ~udecl ?typing_flags ?user_warns () in
   let cinfo = Declare.CInfo.make ?loc ~name ~typ ~args ~impargs () in
   let evd = if poly then evd else Evd.fix_undefined_variables evd in
   Declare.Proof.start_definition ~info ~cinfo ?using evd

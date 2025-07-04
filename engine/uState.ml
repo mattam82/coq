@@ -320,7 +320,8 @@ let normalize_elim_constraints m cstrs =
   let cannot_be_dropped (q1, _, q2) = not (is_instantiated q1 && is_instantiated q2) in
   let subst_cst (q1, c, q2) = (subst q1, c, subst q2) in
   let cstrs = ElimConstraints.map subst_cst cstrs in
-  ElimConstraints.filter cannot_be_dropped cstrs
+  let cstrs = ElimConstraints.filter cannot_be_dropped cstrs in
+  ElimConstraints.filter (fun (q1, _, q2) -> not @@ Quality.equal q1 q2) cstrs
 end
 
 module UPairSet = UnivMinim.UPairSet

@@ -186,7 +186,7 @@ let lookup_renamed globenv id =
     Evarutil.ext_rev_subst ext id
 
 type 'a obj_interp_fun =
-  ?loc:Loc.t -> poly:bool -> t -> Evd.evar_map -> Evardefine.type_constraint ->
+  ?loc:Loc.t -> poly:bool -> sort_poly:bool -> t -> Evd.evar_map -> Evardefine.type_constraint ->
   'a -> unsafe_judgment * Evd.evar_map
 
 module ConstrInterpObj =
@@ -200,8 +200,8 @@ module ConstrInterp = Genarg.Register(ConstrInterpObj)
 
 let register_constr_interp0 = ConstrInterp.register0
 
-let interp_glob_genarg ?loc ~poly env sigma ty arg =
+let interp_glob_genarg ?loc ~poly env sigma ty arg ~sort_poly =
   let open Genarg in
   let GenArg (Glbwit tag, arg) = arg in
   let interp = ConstrInterp.obj tag in
-  interp ?loc ~poly env sigma ty arg
+  interp ?loc ~poly ~sort_poly env sigma ty arg

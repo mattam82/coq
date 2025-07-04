@@ -89,6 +89,7 @@ module Info = struct
 
   type t =
     { poly : bool
+    ; sort_poly : bool
     ; inline : bool
     ; kind : Decls.logical_kind
     ; udecl : UState.sort_poly_decl
@@ -102,10 +103,10 @@ module Info = struct
 
   (** Note that [opaque] doesn't appear here as it is not known at the
      start of the proof in the interactive case. *)
-  let make ?(poly=false) ?(inline=false) ?(kind=Decls.(IsDefinition Definition))
+  let make ?(poly=false) ?(sort_poly = false) ?(inline=false) ?(kind=Decls.(IsDefinition Definition))
       ?(udecl=UState.default_sort_poly_decl) ?(scope=Locality.default_scope)
       ?(clearbody=false) ?hook ?typing_flags ?user_warns ?(ntns=[]) () =
-    { poly; inline; kind; udecl; scope; hook; typing_flags; clearbody; user_warns; ntns }
+    { poly; sort_poly; inline; kind; udecl; scope; hook; typing_flags; clearbody; user_warns; ntns }
 end
 
 module SideEff :
@@ -1877,11 +1878,11 @@ let start_proof_core ~name ~pinfo ?using sigma goals =
      marked "opaque", this is a hack tho, see #10446, and
      build_constant_by_tactic uses a different method that would break
      program_inference_hook *)
-  let { Proof_info.info = { Info.poly; typing_flags; _ }; _ } = pinfo in
+    let { Proof_info.info = { Info.poly; Info.sort_poly; typing_flags; _ }; _ } = pinfo in
   let goals = List.map (fun (sign, typ) ->
       let sign = match sign with None -> initialize_named_context_for_proof () | Some sign -> sign in
       (Global.env_of_context sign, typ)) goals in
-  let proof = Proof.start ~name ~poly ?typing_flags sigma goals in
+  let proof = Proof.start ~name ~poly ~sort_poly ?typing_flags sigma goals in
   let initial_euctx = Evd.ustate Proof.((data proof).sigma) in
   { proof
   ; endline_tactic = None
@@ -1904,8 +1905,8 @@ let start_core ~info ~cinfo ?proof_ending ?using sigma =
 let start = start_core ?proof_ending:None
 
 let start_dependent ~info ~cinfo ~name ~proof_ending goals =
-  let { Info.poly; typing_flags; _ } = info in
-  let proof = Proof.dependent_start ~name ~poly ?typing_flags goals in
+    let { Info.poly; Info.sort_poly; typing_flags; _ } = info in
+  let proof = Proof.dependent_start ~name ~poly ~sort_poly ?typing_flags goals in
   let initial_euctx = Evd.ustate Proof.((data proof).sigma) in
   let pinfo = Proof_info.make ~info ~cinfo ~proof_ending () in
   { proof
@@ -2126,7 +2127,7 @@ let check_incomplete_proof evd =
 
 (* XXX: This is still separate from close_proof below due to drop_pt in the STM *)
 let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
-  let Proof.{name=pid;entry;poly;sigma=evd} = Proof.data proof in
+    let Proof.{ name = pid; entry; poly; sort_poly; sigma = evd } = Proof.data proof in
   let initial_goals = Proofview.initial_goals entry in
   let () = if not @@ Proof.is_done proof then raise (OpenProof (pid, OpenGoals)) in
   let _ : Proof.t =
@@ -2134,8 +2135,7 @@ let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
     Proof.unfocus_all proof
   in
   let eff = SideEff.make @@ Evd.eval_side_effects evd in
-  (* TODO: Should consider sort poly elab? *)
-  let evd = Evd.minimize_universes ~to_type:true evd in
+  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
   let to_constr c =
     match EConstr.to_constr_opt evd c with
     | Some p -> p
@@ -2150,7 +2150,7 @@ let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
       let fixrelevances = List.map (EConstr.ERelevance.kind evd) fixrelevances in
       let rec_declaration = prepare_recursive_declaration pinfo.cinfo fixtypes fixrelevances fixbodies in
       let typing_flags = pinfo.info.typing_flags in
-      fst (make_recursive_bodies env ~typing_flags ~possible_guard ~rec_declaration) in
+      fst (make_recursive_bodies ~sigma:evd env ~typing_flags ~possible_guard ~rec_declaration) in
   let proofs = List.map (fun (body, typ) -> (body, Some typ)) proofs in
   let () = if warn_incomplete then check_incomplete_proof evd in
   { output_entries = proofs; output_ustate = Evd.ustate evd; output_sideff = SideEff.concat eff sideff }
@@ -2370,13 +2370,12 @@ let finish_admitted ~pm ~pinfo ~sec_vars typs =
 
 let save_admitted ~pm ~proof =
   let iproof = get proof in
-  let Proof.{ entry } = Proof.data iproof in
+  let Proof.{ entry; sort_poly } = Proof.data iproof in
   let typs = List.map pi3 (Proofview.initial_goals entry) in
   let sigma = Evd.from_ctx proof.initial_euctx in
   List.iter (check_type_evars_solved (Global.env()) sigma) typs;
   let sec_vars = compute_proof_using_for_admitted proof.pinfo proof typs iproof in
-  (* TODO: Should consider sort poly elab? *)
-  let sigma = Evd.minimize_universes ~to_type:true sigma in
+  let sigma = Evd.minimize_universes ~to_type:(not sort_poly) sigma in
   let uctx = Evd.ustate sigma in
   let typs = List.map (fun typ -> (EConstr.to_constr sigma typ, uctx)) typs in
   finish_admitted ~pm ~pinfo:proof.pinfo ~sec_vars typs
@@ -2919,9 +2918,10 @@ let program_inference_hook env sigma ev =
             Evarutil.is_ground_term sigma concl)
     then None
     else
+      (* XXX: Should sort poly be enabled? *)
       let c, sigma =
         Proof_.refine_by_tactic ~name:(Id.of_string "program_subproof")
-          ~poly:false env sigma concl (Tacticals.tclSOLVE [tac])
+          ~poly:false ~sort_poly:false env sigma concl (Tacticals.tclSOLVE [tac])
       in
       Some (sigma, c)
   with

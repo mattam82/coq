@@ -819,7 +819,7 @@ struct
     sigma, { uj_val; uj_type }
 
   let pretype_genarg self arg ?loc ~flags tycon env sigma =
-    let j, sigma = GlobEnv.interp_glob_genarg ?loc ~poly:flags.poly env sigma tycon arg in
+    let j, sigma = GlobEnv.interp_glob_genarg ?loc ~poly:flags.poly ~sort_poly:flags.sort_poly env sigma tycon arg in
     sigma, j
 
   let pretype_rec self (fixkind, names, bl, lar, vdef) =

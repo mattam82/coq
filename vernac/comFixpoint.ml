@@ -352,7 +352,7 @@ let interp_rec_annot ~program_mode ~function_mode env sigma fixl ctxl ccll rec_o
     | CUnknownRecOrder -> nowf (), RecLemmas.find_mutually_recursive_statements sigma ctxl ccll
 
 let interp_fix_context ~program_mode ~sort_poly env sigma {Vernacexpr.binders} =
-  let sigma, (impl_env, ((env', ctx), imps, _locs)) = interp_context_evars ~program_mode ~unconstrained_sorts:sort_poly env sigma binders in
+  let sigma, (impl_env, ((env', ctx), imps, _locs)) = interp_context_evars ~program_mode ~sort_poly env sigma binders in
   sigma, (env', ctx, impl_env, imps)
 
 let interp_fix_ccl ~program_mode ~sort_poly sigma impls env fix =

@@ -95,7 +95,7 @@ let declare_axiom ~coe ~local ~kind ?user_warns ~univs ~impargs ~inline ~name ty
 
 let interp_assumption ~program_mode ~sort_poly env sigma impl_env bl c =
   let flags = { Pretyping.all_no_fail_flags with program_mode; sort_polymorphic = sort_poly } in
-  let sigma, (impls, ((env_bl, ctx), impls1, _locs)) = interp_context_evars ~program_mode ~unconstrained_sorts:sort_poly ~impl_env env sigma bl in
+  let sigma, (impls, ((env_bl, ctx), impls1, _locs)) = interp_context_evars ~program_mode ~sort_poly ~impl_env env sigma bl in
   let sigma, (ty, impls2) = interp_type_evars_impls ~flags env_bl sigma ~impls c in
   let ty = EConstr.it_mkProd_or_LetIn ty ctx in
   sigma, ty, impls1@impls2
@@ -187,7 +187,7 @@ let find_binding_kind id impls =
 
 let interp_context_gen ~program_mode ~sort_poly ~kind ~autoimp_enable ~coercions env sigma l =
   let initial = sigma in
-  let sigma, (ienv, ((env, ctx), impls, locs)) = interp_named_context_evars ~program_mode ~unconstrained_sorts:sort_poly ~autoimp_enable env sigma l in
+  let sigma, (ienv, ((env, ctx), impls, locs)) = interp_named_context_evars ~program_mode ~sort_poly ~autoimp_enable env sigma l in
   (* Note, we must use the normalized evar from now on! *)
   let sigma = solve_remaining_evars all_and_fail_flags env ~initial sigma in
   let sigma, ctx = Evarutil.finalize ~to_type:(not sort_poly) sigma @@ fun nf ->

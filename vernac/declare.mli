@@ -101,6 +101,7 @@ module Info : sig
      start of the proof in the interactive case. *)
   val make
     : ?poly:bool
+    -> ?sort_poly:bool
     -> ?inline : bool
     -> ?kind : Decls.logical_kind
     (** Theorem, etc... *)

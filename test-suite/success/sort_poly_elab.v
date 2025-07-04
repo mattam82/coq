@@ -1,5 +1,6 @@
 Set Universe Polymorphism.
 Set Sort Polymorphism.
+Set Printing Universes.
 
 
 Module Reduction.
@@ -497,3 +498,17 @@ Defined.
 
 Inductive unit@{s;u} : Type@{s;u} := tt.
 Fail Compute idV@{Prop Type Prop Type|Set Set} (inl I).
+
+(* Interactive definition *)
+Inductive FooNat :=
+| FO : FooNat
+| FS : FooNat -> FooNat.
+
+Definition Foo (n : FooNat) : FooNat.
+  destruct n.
+  - exact FO.
+  - exact FO.
+Defined.
+
+Check Foo@{Type Prop|}.
+Fail Check Foo@{Prop Type|}.
