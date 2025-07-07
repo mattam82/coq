@@ -13,7 +13,7 @@ Check ! nat.
 Check foo Set nat.
 
 Sort s.
-Axiom S : Type@{s;Set}.
+Axiom S : 𝒰@{s;Set}.
 
 (* rigid sorts (here global sort) should not match Type but currently do *)
 Check foo _ S.

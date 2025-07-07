@@ -38,9 +38,9 @@ Module Reduction.
     end.
   (* iter@{α | u |} : forall (A : Type@{α | u}) (_ : forall _ : A, A) (_ : nat) (_ : A), A *)
 
-  Definition iterType := Eval lazy in iter@{Type|_}.
+  Definition iterType := Eval lazy in iter@{Type;_}.
 
-  Definition iterSProp := Eval lazy in iter@{SProp|_}.
+  Definition iterSProp := Eval lazy in iter@{SProp;_}.
 
 End Reduction.
 
@@ -88,10 +88,10 @@ Module Conversion.
             (t2@{α α1 | u} A)) *)
 
   Definition t (A:SProp) := Eval lazy in t1 A.
-  (* t@{α | u |} : forall (A : SProp) (_ : A) (_ : A), Box@{SProp α | u} A *)
+  (* t@{α ; u |} : forall (A : SProp) (_ : A) (_ : A), Box@{SProp α ; u} A *)
 
   Axiom v : forall (A:𝒰), bool -> A.
-  Fail Check fun P (x:P (v@{Type|_} nat true)) => x : P (v nat false).
+  Fail Check fun P (x:P (v@{Type;_} nat true)) => x : P (v nat false).
   Check fun (A:SProp) P (x:P (v A true)) => x : P (v A false).
     (* : forall (A : SProp) (P : A -> Type@{sort_poly_elab.105}),
        P (v@{SProp | sort_poly_elab.104} A true) ->
@@ -111,19 +111,20 @@ Module Inference.
   (* zig@{α | u |} : Type@{α | _} -> Type@{α | _} *)
 
   (* different manually bound sort variables don't unify *)
-  Fail Definition zog'@{s s'| |} (A:𝒰@{s;Set}) := zog@{s';} A.
+  Fail Definition zog'@{s s'; |} (A:𝒰@{s;Set}) := zog@{s';} A.
 End Inference.
 
 Module Inductives.
   Inductive foo1 : 𝒰 := .
-  (* foo1@{α | u |} : Type@{α | _} :=  . *)
+  (* foo1@{α | u |} : 𝒰@{α | _} :=  . *)
+
   Fail Check foo1_sind.
 
   (* Fails if constraints cannot be extended *)
-  Fail Definition foo1_False@{s|+|} (x : foo1@{s|_}) : False := match x return False with end.
+  Fail Definition foo1_False@{s;+|} (x : foo1@{s;_}) : False := match x return False with end.
   (* Elimination constraints are not implied by the ones declared: s ~> Prop *)
 
-  Definition foo1_False@{s|+|+} (x : foo1@{s|_}) : False := match x return False with end.
+  Definition foo1_False@{s;+|+} (x : foo1@{s;_}) : False := match x return False with end.
   (* s | u |= s ~> Prop *)
 
   Definition foo1_False' (x : foo1) : False := match x return False with end.
@@ -132,11 +133,11 @@ Module Inductives.
 
   Inductive foo2 := Foo2 : 𝒰 -> foo2.
   (* foo2@{α | u |} : Type@{α | u+1} *)
-  Fail Check foo2_rect.
+  Check foo2_rect.
 
   Inductive foo3 (A : 𝒰) := Foo3 : A -> foo3 A.
-  (* foo3@{α α0 | u |} (A : Type@{α | u}) : Type@{α0 | u} *)
-  Fail Check foo3_rect.
+  (* foo3@{α α0 ; u |} (A : Type@{α | u}) : Type@{α0 | u} *)
+  Check foo3_rect.
 
   Inductive foo5 (A : 𝒰) : Prop := Foo5 (_ : A).
   (* foo5@{α | u |} (A : Type@{α | u}) : Prop := *)
@@ -308,7 +309,7 @@ Module Inductives.
   Check sexists_ind.
 
 
-  Definition π1 {A:𝒰} {P:A -> 𝒰} (p : sigma@{_ _ Type|_ _} A P) : A :=
+  Definition π1 {A:𝒰} {P:A -> 𝒰} (p : sigma@{_ _ Type;_ _ _} A P) : A :=
     match p return A with pair _ _ a _ => a end.
 
 End Inductives.
@@ -319,7 +320,7 @@ Set Universe Polymorphism.
 Inductive sigma (A:𝒰) (P:A -> 𝒰) : 𝒰
   :=  exist : forall x:A, P x -> sigma A P.
 
-Inductive sum@{sl sr s|ul ur|} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) : 𝒰@{s;max(ul,ur)} :=
+Inductive sum@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) : 𝒰@{s;max(ul,ur)} :=
 | inl : A -> sum A B
 | inr : B -> sum A B.
 
@@ -345,7 +346,7 @@ Definition sum_elim@{sl sr s0 s0';ul ur v|+}
   | inl a => fl a
   | inr b => fr b
   end.
-(* sl sr s0 s0' ; ul ur v |= s0->s0' *)
+(* sl sr s0 s0' ; ul ur v |= s0 -> s0' *)
 
 Definition sum_sind := sum_elim@{Type Type Type SProp;_ _ _}.
 Definition sum_rect := sum_elim@{Type Type Type Type;_ _ _}.
@@ -371,7 +372,7 @@ Definition idT@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum@{s
   | inl a => inl a
   | inr b => inr b
   end.
-(* sl sr s ; ul ur |= s->Type *)
+(* sl sr s ; ul ur |= s -> Type *)
 
 (* Implicit constraints are elaborated *)
 Definition idP@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum@{sl sr s;ul ur} A B)
@@ -380,7 +381,7 @@ Definition idP@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum@{s
   | inl a => inl a
   | inr b => inr b
   end.
-(* sl sr s ; ul ur |= s->Prop *)
+(* sl sr s ; ul ur |= s -> Prop *)
 
 (* Implicit constraints are elaborated *)
 Definition idS@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum@{sl sr s;ul ur} A B)
@@ -389,7 +390,7 @@ Definition idS@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum@{s
   | inl a => inl a
   | inr b => inr b
   end.
-(* sl sr s ; ul ur |= s->SProp *)
+(* sl sr s ; ul ur |= s -> SProp *)
 
 (* Implicit constraints are elaborated *)
 Definition idV@{sl sr s s';ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum@{sl sr s;ul ur} A B)
@@ -400,7 +401,7 @@ Definition idV@{sl sr s s';ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) (x : sum
   end.
 (* sl sr s s' ; ul ur |= s->s' *)
 
-Fail Compute idV@{Prop Type Prop Type|Set Set} (inl I).
+Fail Compute idV@{Prop Type Prop Type;Set Set} (inl I).
 
 Inductive List'@{s s';l} (A : 𝒰@{s;l}) : 𝒰@{s';l} :=
 | nil' : List' A
@@ -496,7 +497,7 @@ Sort Test.
 Fail Check (match true@{Test;Set} return ?[P] with true => tt | false => tt end).
 
 (* Interactive definition *)
-Inductive FooNat :=
+Inductive FooNat : 𝒰 :=
 | FO : FooNat
 | FS : FooNat -> FooNat.
 
@@ -506,5 +507,5 @@ Definition Foo (n : FooNat) : FooNat.
   - exact FO.
 Defined.
 
-Check Foo@{Type Prop|}.
-Fail Check Foo@{Prop Type|}.
+Check Foo@{Type Prop;}.
+Fail Check Foo@{Prop Type;}.

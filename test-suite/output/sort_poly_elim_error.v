@@ -1,5 +1,5 @@
 Set Universe Polymorphism.
-Inductive sum@{s;u v|} (A : Type@{s;u}) (B : Type@{s;v}) : Type@{s;max(u,v)} :=
+Inductive sum@{s;u v|} (A : 𝒰@{s;u}) (B : 𝒰@{s;v}) : 𝒰@{s;max(u,v)} :=
   | inl : A -> sum A B
   | inr : B -> sum A B.
 Arguments inl {A B}.
@@ -12,16 +12,16 @@ This is introduced by the constraints Prop -> Type
 *)
 
 
-Inductive sBox@{s s';u|} (A:Type@{s;u}) : Type@{s';u} := sbox (_:A).
+Inductive sBox@{s s';u|} (A:𝒰@{s;u}) : 𝒰@{s';u} := sbox (_:A).
 
-Fail Definition elim@{s s';u|} (A:Type@{s;u}) (x:sBox@{s s';u} A) : A :=
+Fail Definition elim@{s s';u|} (A:𝒰@{s;u}) (x:sBox@{s s';u} A) : A :=
   match x with sbox _ v => v end.
 (* Error: Elimination constraints are not implied by the ones declared: s' -> s *)
 
 Inductive sP : SProp := sC.
 
 Fail Check match sC with sC => I end.
-(* 
+(*
 Error: The quality constraints are inconsistent: cannot enforce SProp -> Prop because it would identify Prop and SProp which is inconsistent.
 This is introduced by the constraints SProp -> Prop
 *)

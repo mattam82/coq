@@ -1,14 +1,14 @@
 Type
-Type@{α1 ; SortQuality.21}
-Type@{α1 ; SortQuality.21}
+𝒰@{α1 ; SortQuality.21}
+𝒰@{α1 ; SortQuality.21}
 Type
 A
-     : Type@{s ; _}
+     : 𝒰@{s ; _}
 A
-     : Type@{s ; u}
+     : 𝒰@{s ; u}
 (* {u} |=  *)
 A
-     : Type@{s ; u}
+     : 𝒰@{s ; u}
 (* {u} |=  *)
 A
-     : Type@{s ; _}
+     : 𝒰@{s ; _}
