@@ -82,11 +82,11 @@ let protect_pattern_in_binder bl c ctypopt =
   else
     (bl, c, ctypopt, fun f env evd c -> f env evd c)
 
-let interp_definition ~program_mode env evd impl_env bl red_option c ctypopt =
-  let flags = Pretyping.{ all_no_fail_flags with program_mode } in
+let interp_definition ~program_mode ~sort_poly env evd impl_env bl red_option c ctypopt =
+  let flags = Pretyping.{ all_no_fail_flags with program_mode; sort_polymorphic = sort_poly } in
   let (bl, c, ctypopt, apply_under_binders) = protect_pattern_in_binder bl c ctypopt in
   (* Build the parameters *)
-  let evd, (impls, ((env_bl, ctx), imps1, _locs)) = interp_context_evars ~program_mode ~impl_env env evd bl in
+  let evd, (impls, ((env_bl, ctx), imps1, _locs)) = interp_context_evars ~program_mode ~unconstrained_sorts:sort_poly ~sort_poly ~impl_env env evd bl in
   (* Build the type *)
   let evd, tyopt = Option.fold_left_map
       (interp_type_evars_impls ~flags ~impls env_bl)
@@ -96,10 +96,10 @@ let interp_definition ~program_mode env evd impl_env bl red_option c ctypopt =
   let evd, c, imps, tyopt =
     match tyopt with
     | None ->
-      let evd, (c, impsbody) = interp_constr_evars_impls ~program_mode ~impls env_bl evd c in
+      let evd, (c, impsbody) = interp_constr_evars_impls ~program_mode ~sort_poly ~impls env_bl evd c in
       evd, c, imps1@impsbody, None
     | Some (ty, impsty) ->
-      let evd, (c, impsbody) = interp_casted_constr_evars_impls ~program_mode ~impls env_bl evd c ty in
+      let evd, (c, impsbody) = interp_casted_constr_evars_impls ~program_mode ~sort_poly ~impls env_bl evd c ty in
       check_imps ~impsty ~impsbody;
       evd, c, imps1@impsty, Some ty
   in
@@ -112,69 +112,69 @@ let interp_definition ~program_mode env evd impl_env bl red_option c ctypopt =
   evd, (c, tyopt), imps
 
 let interp_statement ~program_mode env evd ~flags ~scope name bl typ  =
-  let evd, (impls, ((env, ctx), imps, _locs)) = Constrintern.interp_context_evars ~program_mode env evd bl in
+  let evd, (impls, ((env, ctx), imps, _locs)) = Constrintern.interp_context_evars ~unconstrained_sorts:(Pretyping.(flags.sort_polymorphic)) ~program_mode env evd bl in
   let evd, (t', imps') = Constrintern.interp_type_evars_impls ~flags ~impls env evd typ in
   let ids = List.map Context.Rel.Declaration.get_name ctx in
   evd, ids, EConstr.it_mkProd_or_LetIn t' ctx, imps @ imps'
 
-let do_definition ?loc ?hook ~name ?scope ?clearbody ~poly ?typing_flags ~kind ?using ?user_warns udecl bl red_option c ctypopt =
+let do_definition ?loc ?hook ~name ?scope ?clearbody ~poly ~sort_poly ?typing_flags ~kind ?using ?user_warns udecl bl red_option c ctypopt =
   let program_mode = false in
   let env = Global.env() in
   let env = Environ.update_typing_flags ?typing_flags env in
   (* Explicitly bound universes and constraints *)
   let evd, udecl = interp_sort_poly_decl_opt env udecl in
   let evd, (body, types), impargs =
-    interp_definition ~program_mode env evd empty_internalization_env bl red_option c ctypopt
+    interp_definition ~program_mode ~sort_poly env evd empty_internalization_env bl red_option c ctypopt
   in
   let kind = Decls.IsDefinition kind in
   let cinfo = Declare.CInfo.make ?loc ~name ~impargs ~typ:types () in
   let info = Declare.Info.make ?scope ?clearbody ~kind ?hook ~udecl ~poly ?typing_flags ?user_warns () in
   let _ : Names.GlobRef.t =
-    Declare.declare_definition ~info ~cinfo ~opaque:false ~body ?using evd
+    Declare.declare_definition ~info ~cinfo ~opaque:false ~sort_poly:(List.is_empty udecl.sort_poly_decl_qualities && sort_poly) ~body ?using evd
   in ()
 
-let do_definition_program ?loc ?hook ~pm ~name ~scope ?clearbody ~poly ?typing_flags ~kind ?using ?user_warns udecl bl red_option c ctypopt =
+let do_definition_program ?loc ?hook ~pm ~name ~scope ?clearbody ~poly ~sort_poly ?typing_flags ~kind ?using ?user_warns udecl bl red_option c ctypopt =
   let env = Global.env() in
   let env = Environ.update_typing_flags ?typing_flags env in
   (* Explicitly bound universes and constraints *)
   let evd, udecl = interp_sort_poly_decl_opt env udecl in
   let evd, (body, types), impargs =
-    interp_definition ~program_mode:true env evd empty_internalization_env bl red_option c ctypopt
+    interp_definition ~program_mode:true ~sort_poly env evd empty_internalization_env bl red_option c ctypopt
   in
   let body, typ, uctx, _, obls = Declare.Obls.prepare_obligations ~name ~body ?types env evd in
-  Evd.check_sort_poly_decl_early ~poly ~with_obls:true evd udecl [body; typ];
+  Evd.check_sort_poly_decl_early ~poly ~sort_poly ~with_obls:true evd udecl [body; typ];
   let pm, _ =
     let cinfo = Declare.CInfo.make ?loc ~name ~typ ~impargs () in
     let info = Declare.Info.make ~udecl ~scope ?clearbody ~poly ~kind ?hook ?typing_flags ?user_warns () in
     Declare.Obls.add_definition ~pm ~info ~cinfo ~opaque:false ~body ~uctx ?using obls
   in pm
 
-let do_definition_interactive ?loc ~program_mode ?hook ~name ~scope ?clearbody ~poly ~typing_flags ~kind ?using ?user_warns udecl bl t =
+let do_definition_interactive ?loc ~program_mode ?hook ~name ~scope ?clearbody ~poly ~sort_poly ~typing_flags ~kind ?using ?user_warns udecl bl t =
   let env = Global.env () in
   let env = Environ.update_typing_flags ?typing_flags env in
-  let flags = Pretyping.{ all_no_fail_flags with program_mode } in
+  let flags = Pretyping.{ all_no_fail_flags with program_mode; sort_polymorphic = sort_poly } in
   let evd, udecl = Constrintern.interp_sort_poly_decl_opt env udecl in
-  let evd, args, typ,impargs = interp_statement ~program_mode ~flags ~scope env evd name bl t in
+  let evd, args, typ, impargs = interp_statement ~program_mode ~flags ~scope env evd name bl t in
   let evd =
     let inference_hook = if program_mode then Some Declare.Obls.program_inference_hook else None in
     Pretyping.solve_remaining_evars ?hook:inference_hook flags env evd in
-  let evd = Evd.minimize_universes evd in
+  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
   Pretyping.check_evars_are_solved ~program_mode env evd;
   let typ = EConstr.to_constr evd typ in
-  Evd.check_sort_poly_decl_early ~poly ~with_obls:false evd udecl [typ];
+  Evd.check_sort_poly_decl_early ~poly ~sort_poly ~with_obls:false evd udecl [typ];
   let typ = EConstr.of_constr typ in
   let info = Declare.Info.make ?hook ~poly ~scope ?clearbody ~kind ~udecl ?typing_flags ?user_warns () in
   let cinfo = Declare.CInfo.make ?loc ~name ~typ ~args ~impargs () in
   let evd = if poly then evd else Evd.fix_undefined_variables evd in
   Declare.Proof.start_definition ~info ~cinfo ?using evd
 
-let do_definition_refine ?loc ?hook ~name ~scope ?clearbody ~poly ~typing_flags ~kind ?using ?user_warns udecl bl c ctypopt =
+let do_definition_refine ?loc ?hook ~name ~scope ?clearbody ~poly ~sort_poly ~typing_flags ~kind ?using ?user_warns udecl bl c ctypopt =
   let env = Global.env() in
   let env = Environ.update_typing_flags ?typing_flags env in
   (* Explicitly bound universes and constraints *)
   let evd, udecl = interp_sort_poly_decl_opt env udecl in
   let evd, (body, typ), impargs =
-    interp_definition ~program_mode:false env evd empty_internalization_env bl None c ctypopt
+    interp_definition ~program_mode:false ~sort_poly env evd empty_internalization_env bl None c ctypopt
   in
   let typ = match typ with Some typ -> typ | None -> Retyping.get_type_of env evd body in
 

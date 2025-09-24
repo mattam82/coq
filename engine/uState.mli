@@ -237,7 +237,7 @@ val minimize : t -> t
 
 val collapse_above_prop_sort_variables : to_prop:bool -> t -> t
 
-val collapse_sort_variables : ?except:QVar.Set.t -> t -> t
+val collapse_sort_variables : ?except:QVar.Set.t -> ?to_type:bool -> t -> t
 
 type ('a, 'b, 'c, 'd) gen_sort_poly_decl = {
   sort_poly_decl_qualities : 'a;

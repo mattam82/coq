@@ -346,7 +346,7 @@ let qualities env = env.env_qualities
 let qvars env = QGraph.qvar_domain @@ qualities env
 
 let set_qualities g env =
-  {env with env_qualities=g}
+  {env with env_qualities = g}
 
 let named_context env = env.env_named_context.env_named_ctx
 let named_context_val env = env.env_named_context

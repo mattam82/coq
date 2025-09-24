@@ -583,6 +583,7 @@ val universe_binders : evar_map -> UnivNames.universe_binders
 
 val new_univ_level_variable : ?loc:Loc.t -> ?name:Id.t -> rigid -> evar_map -> evar_map * Univ.Level.t
 val new_quality_variable : ?loc:Loc.t -> ?name:Id.t -> evar_map -> evar_map * Sorts.QVar.t
+val new_univ_variable : ?loc:Loc.t -> ?name:Id.t -> rigid -> evar_map -> evar_map * Univ.Universe.t
 val new_sort_variable : ?loc:Loc.t -> rigid -> evar_map -> evar_map * esorts
 
 val add_forgotten_univ : evar_map -> Univ.Level.t -> evar_map
@@ -635,7 +636,7 @@ val check_sort_poly_decl : poly:bool -> evar_map -> UState.sort_poly_decl -> USt
 
 (** An early check of compatibility of the universe declaration before
     starting to build a declaration interactively *)
-val check_sort_poly_decl_early : poly:bool -> with_obls:bool -> evar_map -> UState.sort_poly_decl -> Constr.t list -> unit
+val check_sort_poly_decl_early : poly:bool -> sort_poly:bool -> with_obls:bool -> evar_map -> UState.sort_poly_decl -> Constr.t list -> unit
 
 val merge_universe_context : evar_map -> UState.t -> evar_map
 val set_universe_context : evar_map -> UState.t -> evar_map
@@ -652,12 +653,12 @@ val with_sort_context_set : ?loc:Loc.t -> rigid -> QGraph.constraint_source -> e
 
 val nf_univ_variables : evar_map -> evar_map
 
-val collapse_sort_variables : ?except:Sorts.QVar.Set.t -> evar_map -> evar_map
+val collapse_sort_variables : ?except:Sorts.QVar.Set.t -> ?to_type:bool -> evar_map -> evar_map
 
 val fix_undefined_variables : evar_map -> evar_map
 
 (** Universe minimization (collapse_sort_variables is true by default) *)
-val minimize_universes : ?collapse_sort_variables:bool -> evar_map -> evar_map
+val minimize_universes : ?collapse_sort_variables:bool -> ?to_type:bool -> evar_map -> evar_map
 
 (** Lift [UState.update_sigma_univs] *)
 val update_sigma_univs : UGraph.t -> evar_map -> evar_map

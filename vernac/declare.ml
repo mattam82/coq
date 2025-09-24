@@ -1070,13 +1070,20 @@ let declare_possibly_mutual_parameters ~info ~cinfo ?(mono_uctx_extra=UState.emp
       (i+1, (name, Constr.mkConstU (cst,inst))::subst, (cst, univs)::csts)
   ) (0, [], []) cinfo typs)
 
-let make_recursive_bodies ?elim_to env ~typing_flags ~possible_guard ~rec_declaration =
+
+let make_recursive_bodies ?sigma env ~typing_flags ~possible_guard ~rec_declaration =
   let env = Environ.update_typing_flags ?typing_flags env in
-  let indexes = Pretyping.search_guard ?elim_to env possible_guard rec_declaration in
-  let mkbody i = match indexes with
-  | Some indexes -> Constr.mkFix ((indexes,i), rec_declaration)
-  | None -> Constr.mkCoFix (i, rec_declaration) in
-  List.map_i (fun i typ -> (mkbody i, typ)) 0 (Array.to_list (pi2 rec_declaration)), indexes
+  (* We need sigma to check for elimination constraints. In most cases it's None, except for
+     [declare_mutual_definitions] where we get it from UState. *)
+  let sigma = match sigma with
+    | None -> Evd.from_env env
+    | Some sigma -> sigma
+  in
+  let _, indices = Pretyping.search_guard env sigma possible_guard rec_declaration in
+  let mkbody i = match indices with
+    | Some indices -> Constr.mkFix ((indices,i), rec_declaration)
+    | None -> Constr.mkCoFix (i, rec_declaration) in
+  List.map_i (fun i typ -> (mkbody i, typ)) 0 (Array.to_list (pi2 rec_declaration)), indices
 
 let prepare_recursive_declaration cinfo fixtypes fixrs fixdefs =
   let fixnames = List.map (fun CInfo.{name} -> name) cinfo in
@@ -1097,8 +1104,8 @@ let declare_mutual_definitions ~info ~cinfo ~opaque ~eff ~uctx ~bodies ~possible
   let possible_guard, fixrelevances = possible_guard in
   let fixtypes = List.map (fun CInfo.{typ} -> typ) cinfo in
   let rec_declaration = prepare_recursive_declaration cinfo fixtypes fixrelevances bodies in
-  let elim_to = Inductive.eliminates_to @@ UState.elim_graph uctx in
-  let bodies_types, indexes = make_recursive_bodies ~elim_to env ~typing_flags ~rec_declaration ~possible_guard in
+  let sigma = Some (Evd.from_ctx uctx) in
+  let bodies_types, indexes = make_recursive_bodies ?sigma env ~typing_flags ~rec_declaration ~possible_guard in
   let entries = List.map (fun (body, typ) -> (body, Some typ)) bodies_types in
   let entries_for_using = List.map (fun (body, typ) -> (body, Some typ)) bodies_types in
   let using = interp_mutual_using env cinfo entries_for_using using in
@@ -1127,12 +1134,13 @@ let check_evars_are_solved env sigma t =
   let evars = Evarutil.undefined_evars_of_term sigma t in
   if not (Evar.Set.is_empty evars) then error_unresolved_evars env sigma t evars
 
-let declare_definition ~info ~cinfo ~opaque ~obls ~body ?using sigma =
+
+let declare_definition ~info ~cinfo ~opaque ~sort_poly ~obls ~body ?using sigma =
   let { CInfo.name; typ; _ } = cinfo in
   let env = Global.env () in
   Option.iter (check_evars_are_solved env sigma) typ;
   check_evars_are_solved env sigma body;
-  let sigma = Evd.minimize_universes sigma in
+  let sigma = Evd.minimize_universes ~to_type:(not sort_poly) sigma in
   let body = EConstr.to_constr sigma body in
   let typ = Option.map (EConstr.to_constr sigma) typ in
   let uctx = Evd.ustate sigma in
@@ -1149,6 +1157,7 @@ let prepare_obligations ~name ?types ~body env sigma =
     | Some t -> t
     | None -> Retyping.get_type_of env sigma body
   in
+  (* TODO: Default to Type or use sort poly flag? *)
   let sigma, (body, types) = Evarutil.finalize ~abort_on_undefined_evars:false
       sigma (fun nf -> nf body, nf types)
   in
@@ -1158,10 +1167,10 @@ let prepare_obligations ~name ?types ~body env sigma =
   let uctx = Evd.ustate sigma in
   body, cty, uctx, evmap, obls
 
-let prepare_parameter ~poly ~udecl ~types sigma =
+let prepare_parameter ~poly ~sort_poly ~udecl ~types sigma =
   let env = Global.env () in
   Pretyping.check_evars_are_solved ~program_mode:false env sigma;
-  let sigma, typ = Evarutil.finalize ~abort_on_undefined_evars:true
+  let sigma, typ = Evarutil.finalize ~abort_on_undefined_evars:true ~to_type:(not sort_poly)
       sigma (fun nf -> nf types)
   in
   let univs = Evd.check_sort_poly_decl ~poly sigma udecl in
@@ -1577,7 +1586,8 @@ let declare_definition ~pm prg =
   let name, info, opaque, using = prg.prg_cinfo.CInfo.name, prg.prg_info, prg.prg_opaque, prg.prg_using in
   let obls = List.map (fun (id, (_, c)) -> (id, c)) varsubst in
   (* XXX: This is doing normalization twice *)
-  let kn, uctx = declare_definition ~cinfo ~info ~obls ~body ~opaque ?using sigma in
+    (* TODO: Double check sort poly flag -- how to get in obligations? *)
+  let kn, uctx = declare_definition ~cinfo ~info ~obls ~body ~opaque ~sort_poly:false ?using sigma in
   (* XXX: We call the obligation hook here, by consistency with the
      previous imperative behaviour, however I'm not sure this is right *)
   let pm = State.call_prg_hook prg
@@ -2124,7 +2134,8 @@ let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
     Proof.unfocus_all proof
   in
   let eff = SideEff.make @@ Evd.eval_side_effects evd in
-  let evd = Evd.minimize_universes evd in
+  (* TODO: Should consider sort poly elab? *)
+  let evd = Evd.minimize_universes ~to_type:true evd in
   let to_constr c =
     match EConstr.to_constr_opt evd c with
     | Some p -> p
@@ -2139,7 +2150,7 @@ let prepare_proof ?(warn_incomplete=true) { proof; pinfo; sideff } =
       let fixrelevances = List.map (EConstr.ERelevance.kind evd) fixrelevances in
       let rec_declaration = prepare_recursive_declaration pinfo.cinfo fixtypes fixrelevances fixbodies in
       let typing_flags = pinfo.info.typing_flags in
-      fst (make_recursive_bodies ~elim_to:(Inductive.eliminates_to (Evd.elim_graph evd)) env ~typing_flags ~possible_guard ~rec_declaration) in
+      fst (make_recursive_bodies env ~typing_flags ~possible_guard ~rec_declaration) in
   let proofs = List.map (fun (body, typ) -> (body, Some typ)) proofs in
   let () = if warn_incomplete then check_incomplete_proof evd in
   { output_entries = proofs; output_ustate = Evd.ustate evd; output_sideff = SideEff.concat eff sideff }
@@ -2364,7 +2375,8 @@ let save_admitted ~pm ~proof =
   let sigma = Evd.from_ctx proof.initial_euctx in
   List.iter (check_type_evars_solved (Global.env()) sigma) typs;
   let sec_vars = compute_proof_using_for_admitted proof.pinfo proof typs iproof in
-  let sigma = Evd.minimize_universes sigma in
+  (* TODO: Should consider sort poly elab? *)
+  let sigma = Evd.minimize_universes ~to_type:true sigma in
   let uctx = Evd.ustate sigma in
   let typs = List.map (fun typ -> (EConstr.to_constr sigma typ, uctx)) typs in
   finish_admitted ~pm ~pinfo:proof.pinfo ~sec_vars typs
@@ -2940,9 +2952,9 @@ let declare_constant ?loc ?local ~name ~kind ?typing_flags =
 let declare_entry ?loc ~name ?scope ~kind ?user_warns ?hook ~impargs ~uctx entry =
   declare_entry ~loc ~name ?scope ~kind ~typing_flags:None ?clearbody:None ~user_warns ?hook ~impargs ~uctx entry
 
-let declare_definition_full ~info ~cinfo ~opaque ~body ?using sigma =
-  let c, uctx = declare_definition ~obls:[] ~info ~cinfo ~opaque ~body ?using sigma in
+let declare_definition_full ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma =
+  let c, uctx = declare_definition ~obls:[] ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma in
   c, if info.poly then PConstraints.ContextSet.empty else UState.context_set uctx
 
-let declare_definition ~info ~cinfo ~opaque ~body ?using sigma =
-  declare_definition ~obls:[] ~info ~cinfo ~opaque ~body ?using sigma |> fst
+let declare_definition ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma =
+  declare_definition ~obls:[] ~info ~cinfo ~opaque ~sort_poly ~body ?using sigma |> fst

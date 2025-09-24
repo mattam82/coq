@@ -46,7 +46,7 @@ let { Goptions.get = typeclasses_default_mode } =
     ~value:Hints.ModeOutput
     ()
 
-let interp_fields_evars env sigma ~ninds ~nparams impls_env fld_notations flds =
+let interp_fields_evars ~sort_poly env sigma ~ninds ~nparams impls_env fld_notations flds =
   let _, sigma, impls, locs, newfs, _ =
     List.fold_left2
       (fun (env, sigma, uimpls, locs, params, impls_env) fld_notation d ->
@@ -57,11 +57,11 @@ let interp_fields_evars env sigma ~ninds ~nparams impls_env fld_notations flds =
             (* before the one of t otherwise (see #13166) *)
             let t = if bl = [] then t else mkCProdN bl t in
             let sigma, t, impl =
-              ComAssumption.interp_assumption ~program_mode:false env sigma impls_env [] t in
+              ComAssumption.interp_assumption ~program_mode:false ~sort_poly env sigma impls_env [] t in
             sigma, (id, None, t), impl, loc
           | Vernacexpr.DefExpr({CAst.v=id; loc},bl,b,t) ->
             let sigma, (b, t), impl =
-              ComDefinition.interp_definition ~program_mode:false env sigma impls_env bl None b t in
+              ComDefinition.interp_definition ~program_mode:false ~sort_poly:false env sigma impls_env bl None b t in
             let t = match t with Some t -> t | None -> Retyping.get_type_of env sigma b in
             sigma, (id, Some b, t), impl, loc
         in
@@ -164,13 +164,15 @@ let build_type_telescope ~unconstrained_sorts newps env0 sigma { DataI.arity; _ 
   | Some { CAst.v = CSort s; loc } when Constrexpr_ops.(sort_expr_eq expr_Type_sort s) ->
     (* special case: the user wrote ": Type". We want to allow it to become algebraic
        (and Prop but that may change in the future) *)
-    let sigma, s = Evd.new_sort_variable ?loc UState.univ_flexible_alg sigma in
+    let sigma, u = Evd.new_univ_variable ?loc UState.univ_flexible_alg sigma in
+    let s = EConstr.ESorts.make @@ Sorts.sort_of_univ u in
     sigma, (EConstr.mkSort s, s)
   | Some t ->
     let env = EConstr.push_rel_context newps env0 in
     let impls = Constrintern.empty_internalization_env in
     let sigma, s =
       let t = Constrintern.intern_gen IsType ~impls env sigma t in
+      (* TODO: Add soprt poly *)
       let flags = { Pretyping.all_no_fail_flags with program_mode = false; unconstrained_sorts } in
       Pretyping.understand_tcc ~flags env sigma ~expected_type:IsType t
     in
@@ -250,9 +252,9 @@ let def_class_levels ~def ~env_ar_params sigma aritysorts ctors =
   else
     sigma, s, ctor
 
-let finalize_def_class env sigma ~params ~sort ~projtyp =
+let finalize_def_class ~sort_poly env sigma ~params ~sort ~projtyp =
   let sigma, (params, sort, typ, projtyp) =
-    Evarutil.finalize ~abort_on_undefined_evars:false sigma (fun nf ->
+    Evarutil.finalize ~abort_on_undefined_evars:false ~to_type:(not sort_poly) sigma (fun nf ->
         let typ = EConstr.it_mkProd_or_LetIn (EConstr.mkSort sort) params in
         let typ = nf typ in
         (* we know the context is exactly the params because we built typ from mkSort *)
@@ -337,7 +339,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
      any Set <= i constraint for universes that might actually be instantiated with Prop. *)
   let is_template =
     List.exists (fun { DataI.arity; _} -> Option.cata check_anonymous_type true arity) records in
-  let unconstrained_sorts = not flags.poly && not def && is_template in
+  let unconstrained_sorts = (not flags.poly && not def && is_template) || flags.sort_poly in
   let sigma, udecl, variances = Constrintern.interp_cumul_sort_poly_decl_opt env0 udecl in
   let () = List.iter check_parameters_must_be_named params in
   let sigma, (impls_env, ((_env1,params), impls, _paramlocs)) =
@@ -358,7 +360,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   let ninds = List.length arities in
   let nparams = List.length params in
   let fold sigma { DataI.nots; fs; _ } =
-    interp_fields_evars env_ar_params sigma ~ninds ~nparams impls_env nots fs
+    interp_fields_evars ~sort_poly:flags.sort_poly env_ar_params sigma ~ninds ~nparams impls_env nots fs
   in
   let (sigma, fields) = List.fold_left_map fold sigma records in
   let field_impls, locs, fields = List.split3 fields in
@@ -372,7 +374,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
       (* named and rel context in the env don't matter here
          (they will be replaced by the ones of the unsolved evars in the error message
          which is the env's only use) *)
-      finalize_def_class env_ar_params sigma ~params ~sort ~projtyp
+      finalize_def_class ~sort_poly:(flags.sort_poly) env_ar_params sigma ~params ~sort ~projtyp
     in
     let name, projname = match records with
       | [{name; fs=[AssumExpr (projname, _, _)]}] -> name, projname
@@ -551,6 +553,52 @@ let declare_proj_coercion_instance ~flags ref from =
   in
   ()
 
+(* Checks whether the record's quality can be eliminated into the projection's
+   quality. If not, then it adds the elimination constraint. *)
+let check_add_elimination_constraints ~sort_poly env univs record_q proj_typ =
+  (* Each field is assigned the elimination constraints from its own definition, plus the
+     constraints from previous fields.
+     We accumulate these constraints in case a field depends on a previous field.
+     This accumulation is an over-approximation, since a field may be independent from the rest,
+     but checking for dependence at this point seems more complicated and costly. *)
+  if not sort_poly
+  then univs
+  else
+    let open QGraph in
+    let evd = Evd.from_env env in
+    let proj_q = EConstr.ESorts.quality evd @@ Retyping.get_sort_of env evd @@ EConstr.of_constr proj_typ in
+    let qgraph = Environ.qualities env in
+    let qgraph = try add_quality record_q qgraph with AlreadyDeclared -> qgraph in
+    let qgraph = try add_quality proj_q qgraph with AlreadyDeclared -> qgraph in
+    if eliminates_to qgraph record_q proj_q
+    then univs
+    else
+      let open Sorts in
+      let new_elim_cstr = record_q, ElimConstraint.ElimTo, proj_q in
+      let (entry, binders) = univs in
+      let entry = match entry with
+        | UState.Polymorphic_entry uctx ->
+          let open UVars.UContext in
+          let (elim_cstrs, univ_cstrs) = constraints uctx in
+          let elim_cstrs' = ElimConstraints.add new_elim_cstr elim_cstrs  in
+          let uctx' = make (names uctx) (instance uctx, (elim_cstrs', univ_cstrs)) in
+          UState.Polymorphic_entry uctx'
+        | _ -> entry
+      in
+      (entry, binders)
+
+let update_env ~sort_poly env kn =
+  (* We need to update the env with the newest declared projection in order to elaborate the correct
+     elimination constraints for the following field (see retyping of a field in [check_add_elimination_constraints]).
+     This is only necessary when there are dependencies between fields. *)
+  if not sort_poly
+  then env
+  else
+    (* TODO: There must be a better way to do this... *)
+    (* let env = Global.env () in *) (* Might as well just do this tbh... *)
+    let const_body = Global.lookup_constant kn in
+    Environ.add_constant kn const_body env
+
 (* TODO: refactor the declaration part here; this requires some
    surgery as Evarutil.finalize is called too early in the path *)
 (** This builds and _declares_ a named projection, the code looks
@@ -558,8 +606,8 @@ let declare_proj_coercion_instance ~flags ref from =
    implicits parameters, coercion status, etc... of the projection;
    this could be refactored as noted above by moving to the
    higher-level declare constant API *)
-let build_named_proj ~primitive ~flags ~univs ~uinstance ~kind env paramdecls
-    paramargs decl impls {CAst.v=fid; loc} subst nfi ti i indsp mib lifted_fields x rp =
+let build_named_proj ~primitive ~flags ~sort_poly ~univs ~uinstance ~kind env paramdecls
+    paramargs decl impls {CAst.v=fid; loc} subst nfi ti i indsp mib lifted_fields x rp record_q =
   let ccl = subst_projection fid subst ti in
   let body, p_opt = match decl with
     | LocalDef (_,ci,_) -> subst_projection fid subst ci, None
@@ -580,8 +628,9 @@ let build_named_proj ~primitive ~flags ~univs ~uinstance ~kind env paramdecls
         mkCase (Inductive.contract_case env (ci, (p, rci), NoInvert, mkRel 1, [|branch|])), None
   in
   let proj = it_mkLambda_or_LetIn (mkLambda (x,rp,body)) paramdecls in
-  let projtyp = it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
-  let entry = Declare.definition_entry ~univs ~types:projtyp proj in
+  let proj_typ = it_mkProd_or_LetIn (mkProd (x,rp,ccl)) paramdecls in
+  let univs = check_add_elimination_constraints ~sort_poly env univs record_q proj_typ in
+  let entry = Declare.definition_entry ~univs ~types:proj_typ proj in
   let kind = Decls.IsDefinition kind in
   let kn =
     (* XXX more precise loc *)
@@ -590,6 +639,7 @@ let build_named_proj ~primitive ~flags ~univs ~uinstance ~kind env paramdecls
       let _, info = Exninfo.capture exn in
       Exninfo.iraise (NotDefinable (BadTypedProj (fid,ctx,te)),info)
   in
+  let env = update_env ~sort_poly env kn in
   Declare.definition_message fid;
   let term = match p_opt with
     | Some (p,r) ->
@@ -605,29 +655,29 @@ let build_named_proj ~primitive ~flags ~univs ~uinstance ~kind env paramdecls
   Impargs.maybe_declare_manual_implicits false refi impls;
   declare_proj_coercion_instance ~flags refi (GlobRef.IndRef indsp);
   let i = if is_local_assum decl then i+1 else i in
-  (Some kn, i, Projection term::subst)
+  (env, univs, Some kn, i, Projection term::subst)
 
 (** [build_proj] will build a projection for each field, or skip if
    the field is anonymous, i.e. [_ : t] *)
-let build_proj env mib indsp primitive x rp lifted_fields paramdecls paramargs ~uinstance ~kind ~univs
-    (nfi,i,kinds,subst) flags loc decl impls =
+let build_proj mib indsp primitive x rp lifted_fields paramdecls paramargs sort ~sort_poly ~uinstance ~kind
+    (env, univs, nfi, i, kinds, subst) flags loc decl impls =
   let fi = RelDecl.get_name decl in
   let ti = RelDecl.get_type decl in
-  let (sp_proj,i,subst) =
+  let (env, univs, sp_proj, i, subst) =
     match fi with
     | Anonymous ->
-      (None,i,NoProjection fi::subst)
+      (env, univs, None, i, NoProjection fi::subst)
     | Name fid ->
       let fid = CAst.make ?loc fid in
       try build_named_proj
-            ~primitive ~flags ~univs ~uinstance ~kind env paramdecls paramargs decl impls fid
-            subst nfi ti i indsp mib lifted_fields x rp
+            ~primitive ~flags ~sort_poly ~univs ~uinstance ~kind env paramdecls paramargs decl impls fid
+            subst nfi ti i indsp mib lifted_fields x rp sort
       with NotDefinable why as exn ->
         let _, info = Exninfo.capture exn in
         warning_or_error ?loc ~info flags indsp why;
-        (None,i,NoProjection fi::subst)
+        (env, univs, None, i, NoProjection fi::subst)
   in
-  (nfi - 1, i,
+  (env, univs, nfi - 1, i,
    { Structure.proj_name = fi
    ; proj_true = is_local_assum decl
    ; proj_canonical = flags.Data.pf_canonical
@@ -636,7 +686,7 @@ let build_proj env mib indsp primitive x rp lifted_fields paramdecls paramargs ~
 
 (** [declare_projections] prepares the common context for all record
    projections and then calls [build_proj] for each one. *)
-let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
+let declare_projections indsp ~kind ~inhabitant_id flags ~sort_poly ?fieldlocs fieldimpls =
   let env = Global.env() in
   let (mib, mip) = Global.lookup_inductive indsp in
   let uinstance =
@@ -649,6 +699,7 @@ let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
     | Polymorphic auctx -> UState.Polymorphic_entry (UVars.AbstractContext.repr auctx)
   in
   let univs = univs, UnivNames.empty_binders in
+  let record_q = Sorts.quality mip.mind_sort in
   let fields, _ = mip.mind_nf_lc.(0) in
   let fields = List.firstn mip.mind_consnrealdecls.(0) fields in
   let paramdecls = Inductive.inductive_paramdecls (mib, uinstance) in
@@ -667,10 +718,10 @@ let declare_projections indsp ~kind ~inhabitant_id flags ?fieldlocs fieldimpls =
     | None -> List.make (List.length fields) None
     | Some fieldlocs -> fieldlocs
   in
-  let (_,_,canonical_projections,_) =
+  let (_, _, _, _, canonical_projections, _) =
     List.fold_left4
-      (build_proj env mib indsp primitive x rp lifted_fields paramdecls paramargs ~uinstance ~kind ~univs)
-      (List.length fields,0,[],[]) flags (List.rev fieldlocs) (List.rev fields) (List.rev fieldimpls)
+      (build_proj mib indsp primitive x rp lifted_fields paramdecls paramargs record_q ~sort_poly ~uinstance ~kind)
+      (env, univs, List.length fields,0,[],[]) flags (List.rev fieldlocs) (List.rev fields) (List.rev fieldimpls)
   in
     List.rev canonical_projections
 
@@ -720,6 +771,7 @@ module Record_decl = struct
     records : Data.t list;
     projections_kind : Decls.definition_object_kind;
     indlocs : DeclareInd.indlocs;
+    sort_poly : bool
   }
 end
 
@@ -811,12 +863,13 @@ let pre_process_structure udecl kind ~flags ~primitive_proj (records : Ast.t lis
     Decls.(match kind_class kind with NotClass -> StructureComponent | _ -> Method) in
   entry, projections_kind, decl_data, indlocs
 
-let interp_structure_core (entry:RecordEntry.t) ~projections_kind ~indlocs data =
+let interp_structure_core (entry:RecordEntry.t) ~projections_kind ~indlocs ~sort_poly data =
   let open Record_decl in
   { entry;
     projections_kind;
     records = data;
     indlocs;
+    sort_poly
   }
 
 let interp_structure ~flags udecl kind ~primitive_proj records =
@@ -826,7 +879,7 @@ let interp_structure ~flags udecl kind ~primitive_proj records =
   match entry with
   | DefclassEntry _ -> assert false
   | RecordEntry entry ->
-    interp_structure_core entry ~projections_kind ~indlocs data
+    interp_structure_core entry ~projections_kind ~indlocs ~sort_poly:flags.sort_poly data
 
 module Declared = struct
   type t =
@@ -851,7 +904,7 @@ let declare_structure (decl:Record_decl.t) ~schemes =
     let rsp = (kn, i) in (* This is ind path of idstruc *)
     let cstr = (rsp, 1) in
     let kind = decl.projections_kind in
-    let projections = declare_projections rsp ~kind ~inhabitant_id proj_flags ~fieldlocs implfs in
+    let projections = declare_projections rsp ~kind ~inhabitant_id proj_flags ~sort_poly:decl.sort_poly ~fieldlocs implfs in
     let build = GlobRef.ConstructRef cstr in
     let () = match is_coercion with
       | NoCoercion -> ()
@@ -1074,7 +1127,7 @@ let definition_structure ~flags udecl kind ~primitive_proj (records : Ast.t list
       let data = match data with [x] -> x | _ -> assert false in
       declare_class_constant entry data
     | RecordEntry entry ->
-      let structure = interp_structure_core entry ~projections_kind ~indlocs data in
+      let structure = interp_structure_core entry ~projections_kind ~indlocs ~sort_poly:flags.sort_poly data in
       declare_structure structure ~schemes:flags.schemes
   in
   if kind_class kind <> NotClass then declare_class ~mode:flags.mode declared;

@@ -136,6 +136,7 @@ let tactic_infer_flags with_evar = Pretyping.{
   expand_evars = true;
   program_mode = false;
   polymorphic = false;
+  sort_polymorphic = false;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }

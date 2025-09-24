@@ -51,6 +51,7 @@ end
 
 val raw_attributes : vernac_flags attribute
 
+val sort_polymorphic : bool attribute
 val polymorphic : bool attribute
 val program : bool attribute
 val template : bool option attribute

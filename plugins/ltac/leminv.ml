@@ -212,6 +212,7 @@ let inversion_scheme ~name ~poly env sigma t sort dep_option inv_op =
   end in
   let avoid = ref Id.Set.empty in
   let Proof.{sigma} = Proof.data pf in
+  (* TODO: Default to Type or use sort poly flag? *)
   let sigma = Evd.minimize_universes sigma in
   let rec fill_holes c =
     match EConstr.kind sigma c with
@@ -233,7 +234,7 @@ let add_inversion_lemma ~poly (name:lident) env sigma t sort dep inv_op =
   let cinfo = Declare.CInfo.make ?loc:name.loc ~name:name.v ~typ:None () in
   let info = Declare.Info.make ~poly ~kind:Decls.(IsProof Lemma) () in
   let _ : Names.GlobRef.t =
-    Declare.declare_definition ~cinfo ~info ~opaque:false ~body:invProof sigma
+    Declare.declare_definition ~cinfo ~info ~opaque:false ~sort_poly:false ~body:invProof sigma
   in
   ()
 

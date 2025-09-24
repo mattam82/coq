@@ -124,7 +124,7 @@ Module Inductives.
     (f : foo5 A)
     : P f
     := match f with Foo5 _ a => H a end.
-    (* 
+    (*
     Error: The quality constraints are inconsistent: cannot enforce Prop -> Type because it would identify Type and Prop which is inconsistent.
     This is introduced by the constraints Prop -> Type
     *)
@@ -145,7 +145,7 @@ Module Inductives.
     : P f
     := match f with Foo6 => H end.
   (* s ; u |= s -> Type *)
-  
+
   Definition foo6_prop_rect (P:foo6 -> Type)
     (H : P Foo6)
     (f : foo6@{Prop;})
@@ -169,6 +169,9 @@ Module Inductives.
     (f : foo6@{s';})
     : P f
     := match f with Foo6 => H end.
+  (* The command has indeed failed with message:
+     Elimination constraints are not implied by the ones declared:
+     s' ~> s *)
 
   Inductive foo7@{s; |} : Type@{s;Set} := Foo7_1 | Foo7_2.
   Fail Check foo7_sind.
@@ -247,7 +250,7 @@ Module Inductives.
   Definition pr2@{s;+|} {A B} (s:sigma@{s;_ _} A B) : B (pr1 s)
     := match s with pair _ _ _ y => y end.
 
-  (* And we can prove eta with implicit elaboration of elimination constraints. 
+  (* And we can prove eta with implicit elaboration of elimination constraints.
     We can't prove eta without the constraints. *)
   Inductive seq@{s;u|} (A:Type@{s;u}) (a:A) : A -> Prop := seq_refl : seq A a a.
   Arguments seq_refl {_ _}.

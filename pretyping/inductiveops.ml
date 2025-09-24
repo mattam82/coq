@@ -245,29 +245,32 @@ let inductive_has_local_defs env ind =
   let l2 = mib.mind_nparams + mip.mind_nrealargs in
   not (Int.equal l1 l2)
 
-let squash_elim_sort sigma squash rtnsort =
+let squash_elim_sort sigma squash rtn_sort =
   let open Inductive in
-  let add_unif_if_cannot_elim_into pb starget =
-    let q = Sorts.quality starget in
-    let q' = ESorts.quality sigma rtnsort in
+  let add_unif_if_cannot_elim_into pb src_sort =
+    let q = Sorts.quality src_sort in
+    let q' = ESorts.quality sigma rtn_sort in
     if Inductive.eliminates_to (Evd.elim_graph sigma) q q'
     then sigma
-    else pb sigma (ESorts.make starget) rtnsort in
+    else pb sigma (ESorts.make src_sort) rtn_sort in
   match squash with
   | SquashToSet ->
-         add_unif_if_cannot_elim_into Evd.set_eq_sort Sorts.set
-     (* Squashed inductive in Set, only happens with impredicative Set *)
+    add_unif_if_cannot_elim_into Evd.set_eq_sort Sorts.set
+  (* Squashed inductive in Set, only happens with impredicative Set *)
   | SquashToQuality (QConstant QProp) ->
-     add_unif_if_cannot_elim_into Evd.set_eq_sort Sorts.prop
-     (* Squashed inductive in Prop, return sort must be Prop or SProp *)
+    add_unif_if_cannot_elim_into Evd.set_eq_sort Sorts.prop
+  (* Squashed inductive in Prop, return sort must be Prop or SProp *)
   | SquashToQuality (QConstant QSProp) ->
-     add_unif_if_cannot_elim_into Evd.set_eq_sort Sorts.sprop
-     (* Squashed inductive in SProp, return sort must be SProp. *)
+    add_unif_if_cannot_elim_into Evd.set_eq_sort Sorts.sprop
+  (* Squashed inductive in SProp, return sort must be SProp. *)
   | SquashToQuality (QConstant QType) ->
-         add_unif_if_cannot_elim_into Evd.set_leq_sort Sorts.set
-     (* Sort poly squash to type *)
+    add_unif_if_cannot_elim_into Evd.set_leq_sort Sorts.set
+  (* Sort poly squash to type *)
   | SquashToQuality (QVar q) ->
-     add_unif_if_cannot_elim_into Evd.set_leq_sort (Sorts.qsort q Univ.Universe.type0)
+    let q' = ESorts.quality sigma rtn_sort in
+    if Inductive.eliminates_to (Evd.elim_graph sigma) (QVar q) q'
+    then sigma
+    else Evd.set_elim_to sigma (QVar q) q'
 
 (* [s] is the sort of an inductive definition. *)
 let loc_indsort_to_quality sigma u s =
@@ -312,7 +315,6 @@ let make_allowed_elimination_actions sigma s =
       if Inductive.eliminates_to (Evd.elim_graph sigma) indq sq
       then Some sigma
       else
-        (* XXX Probably behind the Sort Poly flag? *)
         try Some (Evd.set_elim_to sigma indq sq)
         with UGraph.UniverseInconsistency _ -> None }
 
@@ -766,6 +768,7 @@ let control_only_guard env sigma c =
     | CoFix (_,(_,_,_) as cofix) ->
       Inductive.check_cofix ~evars e cofix
     | Fix fix ->
+      (* TODO: Should this add new elimination constraints ? I don't think so *)
       Inductive.check_fix ~evars e fix
     | _ -> ()
   in

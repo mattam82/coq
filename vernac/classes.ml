@@ -296,6 +296,7 @@ let type_ctx_instance ~program_mode env sigma ctx inst subst =
     | LocalAssum (_,t) :: ctx, c :: l ->
       let t' = substl subst t in
       let (sigma, c') =
+        (* TODO: Double check missing sort poly flag *)
         interp_casted_constr_evars ~program_mode env sigma c t'
       in
       aux (sigma, c' :: subst) l ctx
@@ -313,11 +314,11 @@ let instance_hook info global ?hook cst =
   declare_instance env sigma (Some info) global cst;
   (match hook with Some h -> h cst | None -> ())
 
-let declare_instance_constant iinfo global impargs ?hook (name:lident) udecl poly sigma term termtype =
+let declare_instance_constant iinfo global impargs ?hook (name:lident) udecl poly sort_poly sigma term termtype =
   let kind = Decls.(IsDefinition Instance) in
   let cinfo = Declare.CInfo.make ?loc:name.loc ~name:name.v ~impargs ~typ:(Some termtype) () in
   let info = Declare.Info.make ~kind ~poly ~udecl () in
-  let kn = Declare.declare_definition ~cinfo ~info ~opaque:false ~body:term sigma in
+  let kn = Declare.declare_definition ~cinfo ~info ~opaque:false ~sort_poly ~body:term sigma in
   instance_hook iinfo global ?hook kn
 
 let instance_type cl args =
@@ -325,14 +326,14 @@ let instance_type cl args =
   let pars = List.firstn lenpars args in
   applist (mkRef (cl.clu_impl,cl.clu_univs), pars)
 
-let do_declare_instance sigma ~locality ~poly k ctx ctx' pri udecl impargs subst (name:lident) =
+let do_declare_instance sigma ~locality ~poly ~sort_poly k ctx ctx' pri udecl impargs subst (name:lident) =
   let subst = List.fold_left2
       (fun subst' s decl -> if is_local_assum decl then s :: subst' else subst')
       [] subst k.clu_context
   in
   let ty_constr = instance_type k subst in
   let termtype = it_mkProd_or_LetIn ty_constr (ctx' @ ctx) in
-  let sigma, entry = Declare.prepare_parameter ~poly sigma ~udecl ~types:termtype in
+  let sigma, entry = Declare.prepare_parameter ~poly ~sort_poly sigma ~udecl ~types:termtype in
   let cst = Declare.declare_constant ?loc:name.loc ~name:name.v
       ~kind:Decls.(IsAssumption Logical) (Declare.ParameterEntry entry) in
   let cst = (GlobRef.ConstRef cst) in
@@ -416,14 +417,14 @@ let do_instance_subst_constructor_and_ty subst k ctx =
   let term = it_mkLambda_or_LetIn app ctx in
   term, termtype
 
-let do_instance_resolve_TC termtype sigma env =
+let do_instance_resolve_TC ~sort_poly termtype sigma env =
   let sigma = Evarutil.nf_evar_map sigma in
   let sigma = Typeclasses.resolve_typeclasses ~filter:Typeclasses.no_goals_or_obligations ~fail:true env sigma in
   (* Try resolving fields that are typeclasses automatically. *)
   let sigma = Typeclasses.resolve_typeclasses ~filter:Typeclasses.all_evars ~fail:false env sigma in
   let sigma = Evarutil.nf_evar_map_undefined sigma in
   (* Beware of this step, it is required as to minimize universes. *)
-  let sigma = Evd.minimize_universes sigma in
+  let sigma = Evd.minimize_universes ~to_type:(not sort_poly) sigma in
   (* Check that the type is free of evars now. *)
   Pretyping.check_evars env sigma termtype;
   termtype, sigma
@@ -475,7 +476,7 @@ let interp_props ~program_mode env' cty k ctx ctx' subst sigma = function
     let term = it_mkLambda_or_LetIn def ctx in
     term, termtype, sigma
 
-let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx ctx' pri decl imps subst id opt_props =
+let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly ~sort_poly cty k ctx ctx' pri decl imps subst id opt_props =
   let term, termtype, sigma = match opt_props with
     | Some props ->
       on_pi1 (fun x -> Some x)
@@ -489,7 +490,7 @@ let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx 
         else
           None, it_mkProd_or_LetIn cty ctx
       in
-      let termtype, sigma = do_instance_resolve_TC termtype sigma env in
+      let termtype, sigma = do_instance_resolve_TC ~sort_poly termtype sigma env in
       term, termtype, sigma
   in
   Flags.silently (fun () ->
@@ -497,15 +498,15 @@ let do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly cty k ctx 
         id pri imps decl (List.map RelDecl.get_name ctx) term termtype)
     ()
 
-let do_instance env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl imps subst id props =
+let do_instance env env' sigma ?hook ~locality ~poly ~sort_poly cty k ctx ctx' pri decl imps subst id props =
   let term, termtype, sigma =
     interp_props ~program_mode:false env' cty k ctx ctx' subst sigma props
   in
-  let termtype, sigma = do_instance_resolve_TC termtype sigma env in
+  let termtype, sigma = do_instance_resolve_TC ~sort_poly termtype sigma env in
   Pretyping.check_evars_are_solved ~program_mode:false env sigma;
-  declare_instance_constant pri locality imps ?hook id decl poly sigma term termtype
+  declare_instance_constant pri locality imps ?hook id decl poly sort_poly sigma term termtype
 
-let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' pri decl imps subst id opt_props =
+let do_instance_program ~pm env env' sigma ?hook ~locality ~poly ~sort_poly cty k ctx ctx' pri decl imps subst id opt_props =
   let term, termtype, sigma =
     match opt_props with
     | Some props ->
@@ -516,9 +517,9 @@ let do_instance_program ~pm env env' sigma ?hook ~locality ~poly cty k ctx ctx' 
       let term, termtype =
         do_instance_subst_constructor_and_ty subst k (ctx' @ ctx) in
       term, termtype, sigma in
-  let termtype, sigma = do_instance_resolve_TC termtype sigma env in
+  let termtype, sigma = do_instance_resolve_TC ~sort_poly termtype sigma env in
   if not (Evd.has_undefined sigma) && not (Option.is_empty opt_props) then
-    let () = declare_instance_constant pri locality imps ?hook id decl poly sigma term termtype in
+    let () = declare_instance_constant pri locality imps ?hook id decl poly sort_poly sigma term termtype in
     pm
   else
     declare_instance_program pm env sigma ~locality ~poly id pri imps decl term termtype
@@ -542,10 +543,10 @@ let typeclass_univ_instance env (cl, u) =
     clu_projs = cl.cl_projs;
   }
 
-let interp_instance_context ~program_mode env ctx pl tclass =
+let interp_instance_context ~program_mode ~sort_poly env ctx pl tclass =
   let sigma, decl = interp_sort_poly_decl_opt env pl in
-  let sigma, (impls, ((env', ctx), imps, _locs)) = interp_context_evars ~program_mode env sigma ctx in
-  let flags = Pretyping.{ all_no_fail_flags with program_mode } in
+  let sigma, (impls, ((env', ctx), imps, _locs)) = interp_context_evars ~program_mode ~unconstrained_sorts:sort_poly env sigma ctx in
+  let flags = Pretyping.{ all_no_fail_flags with program_mode ; sort_polymorphic = sort_poly } in
   let sigma, (c', imps') = interp_type_evars_impls ~flags ~impls env' sigma tclass in
   let imps = imps @ imps' in
   let ctx', c = decompose_prod_decls sigma c' in
@@ -573,10 +574,10 @@ let id_of_class env ref =
           mip.(0).Declarations.mind_typename
     | _ -> assert false
 
-let new_instance_common ~program_mode env instid ctx cl =
+let new_instance_common ~program_mode ~sort_poly env instid ctx cl =
   let (instid, pl) = instid in
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    interp_instance_context ~program_mode env ctx pl cl
+    interp_instance_context ~program_mode ~sort_poly env ctx pl cl
   in
   (* The name generator should not be here *)
   let id = instid |> CAst.map (function
@@ -588,39 +589,39 @@ let new_instance_common ~program_mode env instid ctx cl =
   let env' = push_rel_context ctx env in
   id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl
 
-let new_instance_interactive ~locality ~poly instid ctx cl
+let new_instance_interactive ~locality ~poly ~sort_poly instid ctx cl
     ?(tac:unit Proofview.tactic option) ?hook
     pri opt_props =
   let env = Global.env() in
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    new_instance_common ~program_mode:false env instid ctx cl in
-  id, do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly
+    new_instance_common ~program_mode:false ~sort_poly env instid ctx cl in
+  id, do_instance_interactive env env' sigma ?hook ~tac ~locality ~poly ~sort_poly
     cty k ctx ctx' pri decl imps subst id opt_props
 
-let new_instance_program ~locality ~pm ~poly instid ctx cl opt_props ?hook pri =
+let new_instance_program ~locality ~pm ~poly ~sort_poly instid ctx cl opt_props ?hook pri =
   let env = Global.env() in
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    new_instance_common ~program_mode:true env instid ctx cl in
+    new_instance_common ~program_mode:true ~sort_poly env instid ctx cl in
   let pm =
-    do_instance_program ~pm env env' sigma ?hook ~locality ~poly
+    do_instance_program ~pm env env' sigma ?hook ~locality ~poly ~sort_poly
       cty k ctx ctx' pri decl imps subst id opt_props in
   pm, id
 
-let new_instance ~locality ~poly instid ctx cl props ?hook pri =
+let new_instance ~locality ~poly ~sort_poly instid ctx cl props ?hook pri =
   let env = Global.env() in
   let id, env', sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    new_instance_common ~program_mode:false env instid ctx cl in
-  do_instance env env' sigma ?hook ~locality ~poly
+    new_instance_common ~program_mode:false ~sort_poly env instid ctx cl in
+  do_instance env env' sigma ?hook ~locality ~poly ~sort_poly
     cty k ctx ctx' pri decl imps subst id props;
   id
 
-let declare_new_instance ~locality ~program_mode ~poly instid ctx cl pri =
+let declare_new_instance ~locality ~program_mode ~poly ~sort_poly instid ctx cl pri =
   let env = Global.env() in
   let (instid, pl) = instid in
   let sigma, k, u, cty, ctx', ctx, imps, subst, decl =
-    interp_instance_context ~program_mode env ctx pl cl
+    interp_instance_context ~program_mode ~sort_poly env ctx pl cl
   in
-  do_declare_instance sigma ~locality ~poly k ctx ctx' pri decl imps subst instid
+  do_declare_instance sigma ~locality ~poly ~sort_poly k ctx ctx' pri decl imps subst instid
 
 let refine_att =
   let open Attributes in

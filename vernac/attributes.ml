@@ -274,6 +274,26 @@ let locality =
     ("global", single_key_parser ~name ~key:"global" false);
   ]
 
+let sort_key = "sorts"
+
+let sort_polymorphism_option_name = ["Sort"; "Polymorphism"]
+let is_sort_polymorphism =
+  let b = ref false in
+  let () = let open Goptions in
+    declare_bool_option
+      { optstage = Summary.Stage.Interp;
+        optdepr  = None;
+        optkey   = sort_polymorphism_option_name;
+        optread  = (fun () -> !b);
+        optwrite = ((:=) b) }
+  in
+  fun () -> !b
+
+let sort_polymorphic =
+  qualify_attribute sort_key (bool_attribute ~name:"sort_polymorphic") >>= function
+  | Some b -> return b
+  | None -> return (is_sort_polymorphism())
+
 let ukey = "universes"
 
 let universe_polymorphism_option_name = ["Universe"; "Polymorphism"]

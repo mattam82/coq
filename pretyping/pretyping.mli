@@ -43,8 +43,8 @@ type possible_guard = {
 
 val search_guard :
   ?loc:Loc.t -> ?evars:CClosure.evar_handler ->
-  ?elim_to:(Sorts.Quality.t -> Sorts.Quality.t -> bool) -> env ->
-  possible_guard -> Constr.rec_declaration -> int array option
+  env -> evar_map ->
+  possible_guard -> Constr.rec_declaration -> evar_map * int array option
 
 val search_fix_guard : (* For Fixpoints only *)
   ?loc:Loc.t -> ?evars:CClosure.evar_handler -> env ->
@@ -52,13 +52,15 @@ val search_fix_guard : (* For Fixpoints only *)
 
 val esearch_guard :
   ?loc:Loc.t -> env -> evar_map -> possible_guard ->
-  EConstr.rec_declaration -> int array option
+  EConstr.rec_declaration -> evar_map * int array option
 
 val esearch_fix_guard : (* For Fixpoints only *)
   ?loc:Loc.t -> env -> evar_map -> possible_fix_indices ->
-  EConstr.rec_declaration -> int array
+  EConstr.rec_declaration -> evar_map * int array
 
-val esearch_cofix_guard : ?loc:Loc.t -> env -> evar_map -> EConstr.rec_declaration -> unit
+val esearch_cofix_guard :
+  ?loc:Loc.t -> env -> evar_map ->
+  EConstr.rec_declaration -> evar_map
 
 type typing_constraint =
   | IsType (** Necessarily a type *)
@@ -82,6 +84,7 @@ type inference_flags = {
   expand_evars : bool;
   program_mode : bool;
   polymorphic : bool;
+  sort_polymorphic : bool;
   undeclared_evars_rr : bool;
   unconstrained_sorts : bool;
 }
@@ -177,6 +180,7 @@ val ise_pretype_gen :
 
 type pretype_flags = {
   poly : bool;
+  sort_poly : bool;
   resolve_tc : bool;
   program_mode : bool;
   use_coercions : bool;
