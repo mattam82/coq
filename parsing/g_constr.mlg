@@ -156,7 +156,10 @@ GRAMMAR EXTEND Gram
       | "Type"; "@{"; test_sort_qvar; q = reference; ";"; u = universe; "}" -> {
           Some (CQVar q), u
         }
-      | "Type"; "@{"; u = universe; "}" -> { None, u } ] ]
+      | "Type"; "@{"; u = universe; "}" -> { None, u }
+      | "𝒰"; "@{"; test_sort_qvar; q = reference; ";"; u = universe; "}" -> { Some (CQVar q), u }
+      | "𝒰"; "@{"; u = universe; "}" -> { None, u }
+      | "𝒰" -> { None, UAnonymous {rigid=UnivRigid} } ] ]
   ;
   sort_quality_or_set:
     [ [ "Prop" -> { UnivGen.QualityOrSet.prop }
