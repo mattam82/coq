@@ -76,6 +76,8 @@ Declare ML Module "rocq-runtime.plugins.ssreflect".
  More information about these definitions and their use can be found in the
  ssreflect manual, and in specific comments below.                           **)
 
+Set Universe Polymorphism.
+(* Test Sort Polymorphism. off for now. TODO remove this line *)
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -402,7 +404,6 @@ Ltac ssrdone0 :=
    | match goal with H : ~ _ |- _ => solve [case H; trivial] end ].
 
 (**  To unlock opaque constants.  **)
-#[universes(template)]
 Structure unlockable T v := Unlockable {unlocked : T; _ : unlocked = v}.
 Lemma unlock T x C : @unlocked T x C = x. Proof. by case: C. Qed.
 
@@ -472,6 +473,7 @@ Qed.
 
 Lemma ssr_congr_arrow Plemma Pgoal : Plemma = Pgoal -> Plemma -> Pgoal.
 Proof. by move->. Qed.
+
 Arguments ssr_congr_arrow : clear implicits.
 
 Register nary_congruence as plugins.ssreflect.nary_congruence.
