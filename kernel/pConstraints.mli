@@ -48,6 +48,8 @@ val elements : t -> ElimConstraint.t list * UnivConstraint.t list
 val filter_qualities : (ElimConstraints.elt -> bool) -> t -> t
 val filter_univs : (UnivConstraints.elt -> bool) -> t -> t
 
+val filter_constraints : (ElimConstraints.elt -> bool) -> (UnivConstraints.elt -> bool) -> t -> t
+
 val pr : (QVar.t -> Pp.t) -> (Level.t -> Pp.t) -> t -> Pp.t
 
 val hcons : t Hashcons.f

@@ -59,9 +59,12 @@ let filter_qualities f (qc, lc) =
 let filter_univs f (qc, lc) =
   make qc @@ UnivConstraints.filter f lc
 
+let filter_constraints fq fl (qc, lc) =
+  make (ElimConstraints.filter fq qc) @@ (UnivConstraints.filter fl lc)
+
 let pr prv prl (qc, lc) =
   let open Pp in
-  let sep = if ElimConstraints.is_empty qc || UnivConstraints.is_empty lc 
+  let sep = if ElimConstraints.is_empty qc || UnivConstraints.is_empty lc
             then mt()
             else str ", " in
   v 0 (ElimConstraints.pr prv qc ++ sep ++ UnivConstraints.pr prl lc)

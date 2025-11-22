@@ -213,6 +213,8 @@ let check_constraint g (q1, k, q2) = check_func k g.graph q1 q2
 
 let check_constraints csts g = ElimConstraints.for_all (check_constraint g) csts
 
+let check_declared_qualities g qs = G.check_declared g.graph qs
+
 exception AlreadyDeclared = G.AlreadyDeclared
 
 let add_quality q g =

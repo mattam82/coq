@@ -57,25 +57,19 @@ Expands to: Constant SchemeNames.fooSProp_inds_nodep
 Declared in library SchemeNames, line 22, characters 7-49
 File "./output/SchemeNames.v", line 32, characters 2-49:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooSProp":
-the return type has sort "Prop" while it should be SProp.
-Elimination of an inductive object of sort SProp
-is not allowed on a predicate in sort "Prop"
-because strict proofs can be eliminated only to build strict proofs.
+The quality constraints are inconsistent: cannot enforce SProp -> Prop
+because it would identify Prop and SProp which is inconsistent.
+This is introduced by the constraints SProp -> Prop
 File "./output/SchemeNames.v", line 33, characters 2-48:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooSProp":
-the return type has sort "Set" while it should be SProp.
-Elimination of an inductive object of sort SProp
-is not allowed on a predicate in sort "Set"
-because strict proofs can be eliminated only to build strict proofs.
+The quality constraints are inconsistent: cannot enforce SProp -> Type
+because it would identify Type and SProp which is inconsistent.
+This is introduced by the constraints SProp -> Type
 File "./output/SchemeNames.v", line 34, characters 2-49:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooSProp":
-the return type has sort "Type" while it should be SProp.
-Elimination of an inductive object of sort SProp
-is not allowed on a predicate in sort "Type"
-because strict proofs can be eliminated only to build strict proofs.
+The quality constraints are inconsistent: cannot enforce SProp -> Type
+because it would identify Type and SProp which is inconsistent.
+This is introduced by the constraints SProp -> Type
 fooSProp_cases :
 forall P : fooSProp -> SProp, P aSP -> P bSP -> forall f : fooSProp, P f
 
@@ -86,25 +80,19 @@ Expands to: Constant SchemeNames.fooSProp_cases
 Declared in library SchemeNames, line 31, characters 7-50
 File "./output/SchemeNames.v", line 41, characters 2-42:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooSProp":
-the return type has sort "Prop" while it should be SProp.
-Elimination of an inductive object of sort SProp
-is not allowed on a predicate in sort "Prop"
-because strict proofs can be eliminated only to build strict proofs.
+The quality constraints are inconsistent: cannot enforce SProp -> Prop
+because it would identify Prop and SProp which is inconsistent.
+This is introduced by the constraints SProp -> Prop
 File "./output/SchemeNames.v", line 42, characters 2-41:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooSProp":
-the return type has sort "Set" while it should be SProp.
-Elimination of an inductive object of sort SProp
-is not allowed on a predicate in sort "Set"
-because strict proofs can be eliminated only to build strict proofs.
+The quality constraints are inconsistent: cannot enforce SProp -> Type
+because it would identify Type and SProp which is inconsistent.
+This is introduced by the constraints SProp -> Type
 File "./output/SchemeNames.v", line 43, characters 2-42:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooSProp":
-the return type has sort "Type" while it should be SProp.
-Elimination of an inductive object of sort SProp
-is not allowed on a predicate in sort "Type"
-because strict proofs can be eliminated only to build strict proofs.
+The quality constraints are inconsistent: cannot enforce SProp -> Type
+because it would identify Type and SProp which is inconsistent.
+This is introduced by the constraints SProp -> Type
 fooSProp_cases_nodep : forall P : SProp, P -> P -> fooSProp -> P
 
 fooSProp_cases_nodep is not universe polymorphic
@@ -176,18 +164,14 @@ Expands to: Constant SchemeNames.fooProp_ind
 Declared in library SchemeNames, line 70, characters 7-47
 File "./output/SchemeNames.v", line 81, characters 2-47:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooProp":
-the return type has sort "Set" while it should be SProp or Prop.
-Elimination of an inductive object of sort Prop
-is not allowed on a predicate in sort "Set"
-because proofs can be eliminated only to build proofs.
+The quality constraints are inconsistent: cannot enforce Prop -> Type
+because it would identify Type and Prop which is inconsistent.
+This is introduced by the constraints Prop -> Type
 File "./output/SchemeNames.v", line 82, characters 2-48:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooProp":
-the return type has sort "Type" while it should be SProp or Prop.
-Elimination of an inductive object of sort Prop
-is not allowed on a predicate in sort "Type"
-because proofs can be eliminated only to build proofs.
+The quality constraints are inconsistent: cannot enforce Prop -> Type
+because it would identify Type and Prop which is inconsistent.
+This is introduced by the constraints Prop -> Type
 fooProp_cases_dep :
 forall P : fooProp -> SProp, P aP -> P bP -> forall f : fooProp, P f
 
@@ -206,18 +190,14 @@ Expands to: Constant SchemeNames.fooProp_case_dep
 Declared in library SchemeNames, line 80, characters 7-48
 File "./output/SchemeNames.v", line 91, characters 2-40:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooProp":
-the return type has sort "Set" while it should be SProp or Prop.
-Elimination of an inductive object of sort Prop
-is not allowed on a predicate in sort "Set"
-because proofs can be eliminated only to build proofs.
+The quality constraints are inconsistent: cannot enforce Prop -> Type
+because it would identify Type and Prop which is inconsistent.
+This is introduced by the constraints Prop -> Type
 File "./output/SchemeNames.v", line 92, characters 2-41:
 The command has indeed failed with message:
-Incorrect elimination in the inductive type "fooProp":
-the return type has sort "Type" while it should be SProp or Prop.
-Elimination of an inductive object of sort Prop
-is not allowed on a predicate in sort "Type"
-because proofs can be eliminated only to build proofs.
+The quality constraints are inconsistent: cannot enforce Prop -> Type
+because it would identify Type and Prop which is inconsistent.
+This is introduced by the constraints Prop -> Type
 fooProp_cases : forall P : SProp, P -> P -> fooProp -> P
 
 fooProp_cases is not universe polymorphic

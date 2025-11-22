@@ -627,6 +627,7 @@ let is_unsafe_typing_flags flags =
 
 let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind ~typing_flags ?user_warns cd =
   let before_univs = Global.universes () in
+  let before_qualities = Global.elim_graph () in
   let make_constant = function
   (* Logically define the constant and its subproofs, no libobject tampering *)
     | DefinitionEntry pe ->
@@ -709,12 +710,16 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
   let decl, unsafe, ubinders, delayed, ctx = make_constant cd in
   let kn = Global.add_constant ?typing_flags name decl in
   let () =
-    let is_new_constraint (u,_,v as c) =
-      match UGraph.check_declared_universes before_univs Univ.Level.Set.(add u (add v empty)) with
-      | Ok () -> not (UGraph.check_constraint before_univs c)
+    let is_new_constraint base are_declared constraint_exists to_set (x, _, y as cstr) =
+      match are_declared base (to_set x y) with
+      | Ok () -> not (constraint_exists base cstr)
       | Error _ -> true
     in
-    let ctx = on_snd (PConstraints.filter_univs is_new_constraint) ctx in
+    let is_new_lvl_constraint = is_new_constraint before_univs UGraph.check_declared_universes
+                                                  UGraph.check_constraint (fun u1 u2 -> Univ.Level.Set.(add u1 (singleton u2))) in
+    let is_new_quality_constraint = is_new_constraint before_qualities QGraph.check_declared_qualities
+                                                      QGraph.check_constraint (fun q1 q2 -> Sorts.Quality.Set.(add q1 (singleton q2))) in
+    let ctx = on_snd (PConstraints.filter_constraints is_new_quality_constraint is_new_lvl_constraint) ctx in
     DeclareUniv.add_constraint_source (ConstRef kn) ctx
   in
   let () = DeclareUniv.declare_univ_binders (GlobRef.ConstRef kn) ubinders in
