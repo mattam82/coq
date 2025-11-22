@@ -497,14 +497,14 @@ let template_polymorphic_univs sigma ~params ~arity ~constructors =
   let template_univs = Univ.Level.Map.domain template_univs in
   pseudo_sort_poly, template_univs
 
-let split_universe_context subset (univs, (elim_csts,univ_csts)) =
+let split_universe_context subset (univs, (elim_csts, univ_csts)) =
   let rem = Univ.Level.Set.diff univs subset in
   let subfilter (l, _, r) =
     let () = assert (not @@ Univ.Level.Set.mem r subset) in
     Univ.Level.Set.mem l subset
   in
-  let subcst, remcst = Univ.UnivConstraints.partition subfilter univ_csts in
-  (subset, PConstraints.make elim_csts subcst), (rem, PConstraints.of_univs remcst)
+  let sub_cstr, rem_cstr = Univ.UnivConstraints.partition subfilter univ_csts in
+  (subset, PConstraints.make elim_csts sub_cstr), (rem, PConstraints.of_univs rem_cstr)
 
 let warn_no_template_universe =
   CWarnings.create ~name:"no-template-universe"
@@ -649,7 +649,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
   let sigma = Evd.minimize_universes ~collapse_sort_variables:false sigma in
   let sigma = restrict_inductive_universes sigma ctx_params arities constructors in
 
-  let sigma, univ_entry, ubinders, global_univs =
+  let sigma, univ_entry, ubinders, global_cstrs =
     inductive_univs sigma ~user_template:template ~poly udecl
       ~indnames ~ctx_params ~arities ~constructors template_syntax
   in
@@ -670,7 +670,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
   in
   let variance = variance_of_entry ~cumulative ~variances univ_entry in
   (* Build the mutual inductive entry *)
-  let mind_ent =
+  let mind_entry =
     { mind_entry_params = ctx_params;
       mind_entry_record = None;
       mind_entry_finite = finite;
@@ -680,7 +680,7 @@ let interp_mutual_inductive_constr ~sigma ~flags ~udecl ~variances ~ctx_params ~
       mind_entry_variance = variance;
     }
   in
-  default_dep_elim, mind_ent, ubinders, global_univs
+  default_dep_elim, mind_entry, ubinders, global_cstrs
 
 let interp_params ~unconstrained_sorts env udecl uparamsl paramsl =
   let sigma, udecl, variances = interp_cumul_sort_poly_decl_opt env udecl in
@@ -811,8 +811,10 @@ let interp_mutual_inductive_gen env0 ~flags udecl (uparamsl,paramsl,indl) notati
       indimpls cimpls
   in
   let arities_explicit = List.map (fun ar -> ar.ind_arity_explicit) indl in
-  let default_dep_elim, mie, binders, ctx = interp_mutual_inductive_constr ~flags ~sigma ~ctx_params ~udecl ~variances ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar ~private_ind ~indnames in
-  (default_dep_elim, mie, binders, impls, ctx)
+  let default_dep_elim, mie, binders, global_cstrs =
+    interp_mutual_inductive_constr ~flags ~sigma ~ctx_params ~udecl ~variances ~arities_explicit ~arities ~template_syntax ~constructors ~env_ar ~private_ind ~indnames
+  in
+  (default_dep_elim, mie, binders, impls, global_cstrs)
 
 
 (* Very syntactical equality *)
@@ -923,9 +925,9 @@ let interp_mutual_inductive ~env ~flags ?typing_flags udecl indl ~private_ind ~u
       | NonUniformParameters -> ([], params, indl), None
   in
   let env = Environ.update_typing_flags ?typing_flags env in
-  let default_dep_elim, mie, univ_binders, implicits, uctx = interp_mutual_inductive_gen ~flags env udecl indl where_notations ~private_ind in
+  let default_dep_elim, mie, univ_binders, implicits, global_cstrs = interp_mutual_inductive_gen ~flags env udecl indl where_notations ~private_ind in
   let open Mind_decl in
-  { mie; default_dep_elim; nuparams; univ_binders; implicits; uctx; where_notations; coercions; indlocs }
+  { mie; default_dep_elim; nuparams; univ_binders; implicits; uctx = global_cstrs; where_notations; coercions; indlocs }
 
 let do_mutual_inductive ~flags ?typing_flags udecl indl ~private_ind ~uniform =
   let open Mind_decl in
@@ -933,6 +935,7 @@ let do_mutual_inductive ~flags ?typing_flags udecl indl ~private_ind ~uniform =
   let { mie; default_dep_elim; univ_binders; implicits; uctx; where_notations; coercions; indlocs} =
     interp_mutual_inductive ~flags ~env udecl indl ?typing_flags ~private_ind ~uniform in
   (* Declare the global universes *)
+  (* uctx is the set of global constraints *)
   Global.push_context_set QGraph.Static uctx;
   (* Declare the mutual inductive block with its associated schemes *)
   ignore (DeclareInd.declare_mutual_inductive_with_eliminations ~default_dep_elim ?typing_flags ~indlocs mie univ_binders implicits ~schemes:flags.schemes);

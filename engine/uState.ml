@@ -299,15 +299,16 @@ let merge_constraints f m =
   { m with elims = f m.elims }
 
 let normalize_elim_constraints m cstrs =
+  let open Quality in
   let subst q = match q with
     | QConstant _ -> q
     | QVar qv -> repr qv m
   in
   let is_instantiated q = is_qconst q || is_qglobal q in
-  let can_drop (q1,_,q2) = not (is_instantiated q1 && is_instantiated q2) in
-  let subst_cst (q1,c,q2) = (subst q1,c,subst q2) in
+  let cannot_be_dropped (q1, _, q2) = not (is_instantiated q1 && is_instantiated q2) in
+  let subst_cst (q1, c, q2) = (subst q1, c, subst q2) in
   let cstrs = ElimConstraints.map subst_cst cstrs in
-  ElimConstraints.filter can_drop cstrs
+  ElimConstraints.filter cannot_be_dropped cstrs
 end
 
 module UPairSet = UnivMinim.UPairSet
@@ -1129,7 +1130,7 @@ let check_mono_sort_poly_decl uctx decl =
 
 let check_sort_poly_univ_decl uctx decl =
   (* Note: if [decl] is [default_univ_decl], behave like [context uctx] *)
-  let levels, (elim_csts,univ_csts) = uctx.local in
+  let levels, (elim_csts, univ_csts) = uctx.local in
   let qvars = QState.undefined uctx.sort_variables in
   let inst = universe_context_inst decl qvars levels uctx.names in
   let nas = compute_instance_binders uctx inst in
@@ -1149,8 +1150,7 @@ let check_sort_poly_univ_decl uctx decl =
       decl.sort_poly_decl_elim_constraints
     end
   in
-  let uctx = UContext.make nas (inst, (elim_csts,univ_csts)) in
-  uctx
+  UContext.make nas (inst, (elim_csts, univ_csts))
 
 let check_sort_poly_decl ~poly uctx decl =
   let (binders, _) = uctx.names in
@@ -1246,7 +1246,7 @@ let merge ?loc ~sideff rigid uctx uctx' =
   { uctx with names; local; universes;
               initial_universes = initial }
 
-let merge_sort_variables ?loc ~sideff uctx src qvars csts =
+let merge_sort_variables ?loc ~sideff uctx src qvars cstrs =
   let sort_variables =
     QVar.Set.fold (fun qv qstate -> QState.add ~check_fresh:(not sideff) ~rigid:false qv qstate)
       qvars
@@ -1265,7 +1265,7 @@ let merge_sort_variables ?loc ~sideff uctx src qvars csts =
     let qrev = QVar.Set.fold fold qvars (fst (snd uctx.names)) in
     (fst uctx.names, (qrev, snd (snd uctx.names)))
   in
-  let sort_variables = QState.merge_constraints (merge_elim_constraints src uctx csts) sort_variables in
+  let sort_variables = QState.merge_constraints (merge_elim_constraints src uctx cstrs) sort_variables in
   { uctx with sort_variables; names }
 
 let merge_sort_context ?loc ~sideff rigid src uctx ((qvars,levels),csts) =

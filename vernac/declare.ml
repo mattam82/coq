@@ -557,14 +557,14 @@ let record_aux env s_ty s_bo =
   Aux_file.record_in_aux "context_used" v
 
 let cast_pure_proof_entry (e : Constr.constr pproof_entry) =
-  let univ_entry, ctx = extract_monomorphic (fst (e.proof_entry_universes)) in
+  let univ_entry, cstrs = extract_monomorphic (fst (e.proof_entry_universes)) in
   { Entries.definition_entry_body = e.proof_entry_body;
     definition_entry_secctx = e.proof_entry_secctx;
     definition_entry_type = e.proof_entry_type;
     definition_entry_universes = univ_entry;
     definition_entry_inline_code = e.proof_entry_inline_code;
   },
-  ctx
+  cstrs
 
 type ('a, 'b) effect_entry =
 | ImmediateEffectEntry : (private_constants Entries.proof_output, unit) effect_entry
@@ -629,7 +629,7 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
   let before_univs = Global.universes () in
   let make_constant = function
   (* Logically define the constant and its subproofs, no libobject tampering *)
-    | DefinitionEntry de ->
+    | DefinitionEntry pe ->
       (* We deal with side effects *)
       (match de.proof_entry_body with
       | Default { body; opaque = Transparent } ->
@@ -638,12 +638,12 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
         let ubinders = make_ubinders ctx de.proof_entry_universes in
         (* We register the global universes after exporting side-effects, since
            the latter depend on the former. *)
-                let ctx = PConstraints.ContextSet.filter_out_constant_qualities ctx in
+        let ctx = PConstraints.ContextSet.filter_out_constant_qualities cstrs in
         let () = Global.push_context_set QGraph.Rigid ctx in
         Entries.DefinitionEntry e, false, ubinders, None, ctx
       | Default { body; opaque = Opaque (body_uctx, eff) } ->
         let body = ((body, body_uctx), SideEff.get eff) in
-        let de = { de with proof_entry_body = body } in
+        let de = { pe with proof_entry_body = body } in
         let cd, ctx = cast_opaque_proof_entry ImmediateEffectEntry de in
         let ubinders = make_ubinders ctx de.proof_entry_universes in
                 let ctx = PConstraints.ContextSet.filter_out_constant_qualities ctx in
@@ -652,7 +652,7 @@ let declare_constant ~loc ?(local = Locality.ImportDefaultBehavior) ~name ~kind 
       | DeferredOpaque { body; feedback_id } ->
         let map (body, eff) = body, SideEff.get eff in
         let body = Future.chain body map in
-        let de = { de with proof_entry_body = body } in
+        let de = { pe with proof_entry_body = body } in
         let cd, ctx = cast_opaque_proof_entry DeferredEffectEntry de in
         let ubinders = make_ubinders ctx de.proof_entry_universes in
                 let ctx = PConstraints.ContextSet.filter_out_constant_qualities ctx in
