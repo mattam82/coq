@@ -220,9 +220,9 @@ Module Inductives.
   (* This expression would enforce an elimination constraint between SProp and
   β0 that is not allowed. *)
 
-  Record R6@{s| |} (A:𝒰@{s;Set}) : Set := { R6f1 : A; R6f2 : nat }.
+  Fail Record R6@{s| |} (A:𝒰@{s;Set}) : Set := { R6f1 : A; R6f2 : nat }.
 
-  Check fun (A:SProp) (x y : R6 A) =>
+  Fail Check fun (A:SProp) (x y : R6 A) =>
           eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
   Fail Check fun (A:Prop) (x y : R6 A) =>
           eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).

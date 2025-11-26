@@ -109,7 +109,7 @@ Module Inductives.
   Inductive foo2@{s; |} := Foo2 : 𝒰@{s;Set} -> foo2.
   Check foo2_rect.
 
-  Inductive foo3@{s; |} (A:𝒰@{s;Set}) := Foo3 : A -> foo3 A.
+  Inductive foo3@{s; u|} (A:𝒰@{s;u}) : Type@{u} := Foo3 : A -> foo3 A.
   Check foo3_rect.
 
   Fail Inductive foo4@{s;u v|v < u} : 𝒰@{v} := C (_:𝒰@{s;u}).
@@ -213,17 +213,17 @@ Module Inductives.
   Definition R5f1_sprop (A:SProp) (r:R5 A) : A := let (f) := r in f.
   Fail Definition R5f1_prop (A:Prop) (r:R5 A) : A := let (f) := r in f.
 
-  Record R6@{s; |} (A:𝒰@{s;Set}) := { R6f1 : A; R6f2 : nat }.
-  Check fun (A:SProp) (x y : R6 A) =>
+  Fail Record R6@{s; |} (A:𝒰@{s;Set}) := { R6f1 : A; R6f2 : nat }.
+  Fail Check fun (A:SProp) (x y : R6 A) =>
           eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
   Fail Check fun (A:Prop) (x y : R6 A) =>
           eq_refl : Conversion.box _ x.(R6f1 _) = Conversion.box _ y.(R6f1 _).
   Fail Check fun (A:SProp) (x y : R6 A) =>
           eq_refl : Conversion.box _ x.(R6f2 _) = Conversion.box _ y.(R6f2 _).
 
-  #[projections(primitive=no)] Record R7@{s; |} (A:𝒰@{s;Set}) := { R7f1 : A; R7f2 : nat }.
-  Check R7@{SProp;} : SProp -> Set.
-  Check R7@{Type;} : Set -> Set.
+  Fail #[projections(primitive=no)] Record R7@{s; |} (A:𝒰@{s;Set}) := { R7f1 : A; R7f2 : nat }.
+  Fail Check R7@{SProp;} : SProp -> Set.
+  Fail Check R7@{Type;} : Set -> Set.
 
   Inductive sigma@{s;u v|} (A:𝒰@{s;u}) (B:A -> 𝒰@{s;v}) : 𝒰@{s;max(u,v)}
     := pair : forall x : A, B x -> sigma A B.
@@ -286,7 +286,7 @@ Module Inductives.
 
   Arguments exist3 {_ _}.
 
-  Definition π1@{s s';u v|} {A:𝒰@{s;u}} {P:A -> 𝒰@{s';v}} (p : sigma3@{_ _ Type;_ _} A P) : A :=
+  Definition π1@{s s';u v|+} {A:𝒰@{s;u}} {P:A -> 𝒰@{s';v}} (p : sigma3@{_ _ Type;_ _} A P) : A :=
     match p return A with exist3 a _ => a end.
-
+  (* s s' ; u v |= Type -> s *)
 End Inductives.
