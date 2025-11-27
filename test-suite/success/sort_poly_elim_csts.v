@@ -13,10 +13,6 @@ Section Global.
 
   Polymorphic Axiom ad@{s;u} : forall A : 𝒰@{s;u}, A.
 
-  (* Fails because Type does not eliminate to s by default *)
-  Fail Polymorphic Definition t@{s s';u v|+} (A : 𝒰@{s;u}) (B : 𝒰@{s';v}) : A := ad A.
-  
-  Constraint Type -> s.
   Polymorphic Definition t@{s s';u v|s -> s'} (A : 𝒰@{s;u}) (B : 𝒰@{s';v}) : A := ad A.
 
   Fail Check t@{s s';Set Set}.

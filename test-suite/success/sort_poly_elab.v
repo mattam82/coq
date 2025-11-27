@@ -202,9 +202,15 @@ Module Inductives.
   Fail Record R1 : 𝒰 := {}.
   (* The record R1 could not be defined as a primitive record because it has no projections. *)
   
-  Record R2 (A:SProp) : 𝒰 := { R2f1 : A }.
+  Inductive seq {A:𝒰} (a:A) : A -> Prop := seq_refl : seq a a.
+  (* Inductive seq@{α | u |} (A : 𝒰@{α | u}) (a : A) : A -> Prop *)
 
-  Goal forall (A:SProp) (r2 : R2@{Type;0} A), r2 = {| R2f1 := r2.(R2f1 A) |}.
+  Record R2 (A:SProp) : 𝒰 := { R2f1 : A }.
+  (* R2@{α ; u} : forall _ : SProp, 𝒰@{α ; u} *)
+  (* α ; u |= α -> SProp *)
+  
+  (* Conversion when record is in Type and field in SProp fails correctly *)
+  Goal forall (A:SProp) (r2 : R2@{Type;0} A), seq r2 {| R2f1 := r2.(R2f1 A) |}.
   Proof. intros A r2. Fail reflexivity. Abort.
   (* The command has indeed failed with message:
       In environment
@@ -212,20 +218,25 @@ Module Inductives.
       r2 : R2 A
       Unable to unify "{| R2f1 := R2f1 _ r2 |}" with "r2". *)
 
-  Fail Goal forall (A:SProp) (r2 : R2@{SProp;0} A), r2 = {| R2f1 := r2.(R2f1 A) |}. (* FIXME *)
-  (* Proof. intros A r2. reflexivity. Abort. *)
+  (* Conversion when record and field are instantiated to SProp checks correctly *)
+  Goal forall (A:SProp) (r2 : R2@{SProp;0} A), seq r2 {| R2f1 := r2.(R2f1 A) |}. 
+  Proof. intros A r2. reflexivity. Qed.
 
   (* R3@{SProp Type|} may not be primitive  *)
   Record R3 (A:𝒰) : 𝒰 := { R3f1 : A }.
+  (* R3@{α α0 ; u} : forall _ : 𝒰@{α ; u}, 𝒰@{α0 ; u} *)
+  (* α α0 ; u |= α0 -> α *)
 
-  Fail Example R3_same_sort@{s;u} (A :𝒰@{s;u}) : forall (r3 : R3@{s s;u} A), r3 = {| R3f1 := r3.(R3f1 A) |}. (* FIXME *)
-  (* Proof. intros r3. reflexivity. Qed. *)
+  (* Conversion when instantiated to the same sort in the record and fields checks correctly *)
+  Example R3_same_sort@{s;u} (A :𝒰@{s;u}) : forall (r3 : R3@{s s;u} A), seq r3 {| R3f1 := r3.(R3f1 A) |}. 
+  Proof. intros r3. reflexivity. Qed. 
 
-  Goal forall (A:SProp) (r3 : R3@{_ Type;0} A), r3 = {| R3f1 := r3.(R3f1 A) |}.
+  (* Conversion when record is in Type and field in SProp fails correctly *)
+  Goal forall (A:SProp) (r3 : R3@{_ Type;0} A), seq r3 {| R3f1 := r3.(R3f1 A) |}.
   Proof. intros A r3. Fail reflexivity. Abort.
 
-  Fail Goal forall (A:SProp) (r3 : R3@{_ SProp;u} A), r3 = {| R3f1 := r3.(R3f1 A) |}. (* FIXME *)
-  (* Proof. intros A r3. reflexivity. Abort. *)
+  Goal forall (A:SProp) (r3 : R3@{_ SProp;Set} A), seq r3 {| R3f1 := r3.(R3f1 A) |}. 
+  Proof. intros A r3. reflexivity. Qed.
 
   Record R4@{s; |} (A:𝒰@{s;Set}) : 𝒰@{s;Set} := { R4f1 : A}.
 
@@ -305,11 +316,7 @@ Module Inductives.
   (* α α0 α1 | u u0 |= α1 ~> α
                        α1 ~> α0 *)
 
-  Inductive seq (A:𝒰) (a:A) : A -> Prop := seq_refl : seq A a a.
-  (* Inductive seq@{α | u |} (A : 𝒰@{α | u}) (a : A) : A -> Prop *)
-  Arguments seq_refl {_ _}.
-
-  Definition eta A B (s:sigma A B) : seq _ s (pair A B (pr1 s) (pr2 s)).
+  Definition eta A B (s:sigma A B) : seq s (pair A B (pr1 s) (pr2 s)).
   Proof.
     destruct s. simpl. reflexivity.
   Qed.
@@ -342,11 +349,6 @@ Module Inductives.
 
 End Inductives.
 
-
-Set Universe Polymorphism.
-
-Inductive sigma (A:𝒰) (P:A -> 𝒰) : 𝒰
-  :=  exist : forall x:A, P x -> sigma A P.
 
 Inductive sum@{sl sr s;ul ur} (A : 𝒰@{sl;ul}) (B : 𝒰@{sr;ur}) : 𝒰@{s;max(ul,ur)} :=
 | inl : A -> sum A B
