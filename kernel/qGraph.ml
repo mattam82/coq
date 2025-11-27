@@ -118,9 +118,22 @@ let get_new_rigid_path g p dom =
     | [] -> None
     | x :: _ -> Some x
 
+(* Generating the transitive closure of rigid paths that results from
+   adding the new rigid path q1 -> q2 *)
 let add_transitive_rigid_paths q1 q2 p =
-  let transitive_set = RigidPaths.filter (fun (q,_) -> Quality.equal q2 q) p in
-  RigidPaths.fold (fun (_,q) p -> RigidPaths.add (q1,q) p) transitive_set p
+  (* all rigid paths starting from q2 : q2 -> ... -> ... *)
+  let transitive_set_downward = RigidPaths.filter (fun (q,_) -> Quality.equal q q2) p in
+  (* all rigid paths ending in q1 : ... -> ... -> q1 *)
+  let transitive_set_upward = RigidPaths.filter (fun (_,q) -> Quality.equal q q1) p in
+  RigidPaths.fold (fun (to_q1, _) p ->
+    (* Connecting all the "upward" closure with q2 *)
+    let with_q2 = RigidPaths.add (to_q1, q2) p in
+    RigidPaths.fold (fun (_, from_q2) p ->
+      (* Connecting all the "downward" closure with q1 *)
+      let with_q1 = RigidPaths.add (q1, from_q2) p in
+      (* Connecting the "upward" with the "downward" closures *)
+      RigidPaths.add (to_q1, from_q2) with_q1) transitive_set_downward with_q2)
+    transitive_set_upward p
 
 let set_dominant g qv q =
   { g with dominant = QMap.add qv q g.dominant }
@@ -199,7 +212,7 @@ let enforce_constraint src (q1, k, q2) g =
           if (Quality.is_qconst q1 && Quality.is_qconst q2) ||
                (Quality.is_qsprop q1 && not (Quality.is_qsprop q2))
           then raise (EliminationError (IllegalConstraint (q1, q2)))
-          else { g with graph; rigid_paths = RigidPaths.add (q1, q2) @@ add_transitive_rigid_paths q1 q2 g.rigid_paths }
+          else { g with graph; rigid_paths = add_transitive_rigid_paths q1 q2 @@ RigidPaths.add (q1, q2) g.rigid_paths }
        | Internal ->
           match get_new_rigid_path g.graph g.rigid_paths g.ground_and_global_sorts with
           | None -> { g with graph }
