@@ -24,31 +24,16 @@ Require Import Corelib.Program.Tactics.
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
 Set Universe Polymorphism.
-Set Polymorphic Inductive Cumulativity.
-Set Polymorphic Definitions Cumulativity.
 
-Definition crelation@{=a +ra} (A : Type@{a}) := A -> A -> Type@{ra}.
-Definition arrow@{=a =b} (A : Type@{a}) (B : Type@{b}) := A -> B.
+Definition crelation (A : Type) := A -> A -> Type.
 
-Definition flip@{=a =b =c} {A : Type@{a}} {B : Type@{b}} {C : Type@{c}} (f : A -> B -> C) := fun x y => f y x.
+Definition arrow (A B : Type) := A -> B.
 
-Class subrelation@{=a =ra =ra'} {A : Type@{a}} (R : crelation@{a ra} A) (R' : crelation@{a ra'} A) :=
-  is_subrelation : forall {x y}, R x y -> R' x y.
+Definition flip {A B C : Type} (f : A -> B -> C) := fun x y => f y x.
 
-Module Import TypeProduct.
+Definition iffT (A B : Type) := ((A -> B) * (B -> A))%type.
 
-Cumulative Record prodT A B :=
- { fst : A; snd : B }.
-Arguments fst {A B}.
-Arguments snd {A B}.
-
-End TypeProduct.
-
-Definition iffT@{=a =b} (A : Type@{a}) (B : Type@{b}) := (prodT@{max(a,b) max(a,b)} (A -> B) (B -> A))%type.
-
-Cumulative Inductive sumT A B :=
-| inlt : A -> sumT A B
-| inrt : B -> sumT A B.
+Global Typeclasses Opaque flip arrow iffT.
 
 (** We allow to unfold the [crelation] definition while doing morphism search. *)
 
@@ -82,19 +67,17 @@ Section Defs.
   Class Transitive (R : crelation A) :=
     transitivity : forall {x y z}, R x y -> R y z -> R x z.
 
-  Arguments transitivity {R Transitive x} y {z}.
-
   (** Various combinations of reflexivity, symmetry and transitivity. *)
   
   (** A [PreOrder] is both Reflexive and Transitive. *)
 
-  Cumulative Class PreOrder (R : crelation A)  := {
+  Class PreOrder (R : crelation A)  := {
     #[global] PreOrder_Reflexive :: Reflexive R | 2 ;
     #[global] PreOrder_Transitive :: Transitive R | 2 }.
 
   (** A [StrictOrder] is both Irreflexive and Transitive. *)
 
-  Cumulative Class StrictOrder (R : crelation A)  := {
+  Class StrictOrder (R : crelation A)  := {
     #[global] StrictOrder_Irreflexive :: Irreflexive R ;
     #[global] StrictOrder_Transitive :: Transitive R }.
 
@@ -104,13 +87,13 @@ Section Defs.
 
   (** A partial equivalence crelation is Symmetric and Transitive. *)
   
-  Cumulative Class PER (R : crelation A)  := {
+  Class PER (R : crelation A)  := {
     #[global] PER_Symmetric :: Symmetric R | 3 ;
     #[global] PER_Transitive :: Transitive R | 3 }.
 
   (** Equivalence crelations. *)
 
-  Cumulative Class Equivalence (R : crelation A)  := {
+  Class Equivalence (R : crelation A)  := {
     #[global] Equivalence_Reflexive :: Reflexive R ;
     #[global] Equivalence_Symmetric :: Symmetric R ;
     #[global] Equivalence_Transitive :: Transitive R }.
@@ -125,6 +108,9 @@ Section Defs.
   
   Class Antisymmetric eqA `{equ : Equivalence eqA} (R : crelation A) :=
     antisymmetry : forall {x y}, R x y -> R y x -> eqA x y.
+
+  Class subrelation (R R' : crelation A) :=
+    is_subrelation : forall {x y}, R x y -> R' x y.
   
   (** Any symmetric crelation is equal to its inverse. *)
   
@@ -146,7 +132,7 @@ Section Defs.
       fun x y H H' => asymmetry (R:=R) H H'.
     
     Program Definition flip_Transitive `(Transitive R) : Transitive (flip R) :=
-      fun x y z H H' => transitivity (R:=R) _ H' H.
+      fun x y z H H' => transitivity (R:=R) H' H.
 
     Program Lemma flip_Antisymmetric `(Antisymmetric eqA R) :
       Antisymmetric eqA (flip R).
@@ -209,8 +195,6 @@ Section Defs.
   End Leibniz.
   
 End Defs.
-
-Global Arguments transitivity {A R Transitive x} y {z}.
 
 (** Default rewrite crelations handled by [setoid_rewrite]. *)
 #[global]
@@ -320,7 +304,7 @@ Instance iff_Transitive : Transitive iff := iff_trans.
 (** Logical equivalence [iff] is an equivalence crelation. *)
 
 #[global]
-Program Instance iff_equivalence : Equivalence iff.
+Program Instance iff_equivalence : Equivalence iff. 
 #[global]
 Program Instance arrow_Reflexive : Reflexive arrow.
 #[global]
@@ -343,32 +327,27 @@ Proof. firstorder. Defined.
 Local Open Scope list_scope.
 
 (** A compact representation of non-dependent arities, with the codomain singled-out. *)
-(* Set Debug "ustate".
-Set Debug "uCompare".
-Set Debug "conversion". *)
-
-(* Set Debug "UnivVariances". *)
-
-Definition relation_equivalence@{a ra} {A : Type@{a}} : crelation@{max(a,ra+1) max(a,ra)} (crelation@{a ra} A) :=
-  fun R R' : crelation@{a ra} A => forall x y : A, iffT@{ra ra} (R x y) (R' x y).
 
 (** We define the various operations which define the algebra on binary crelations *)
 Section Binary.
   Context {A : Type}.
 
-  Global Instance: RewriteRelation (@relation_equivalence A).
+  Definition relation_equivalence : crelation (crelation A) :=
+    fun R R' => forall x y, iffT (R x y) (R' x y).
+
+  Global Instance: RewriteRelation relation_equivalence.
   Defined.
 
   Definition relation_conjunction (R : crelation A) (R' : crelation A) : crelation A :=
-    fun x y => prodT (R x y) (R' x y).
+    fun x y => prod (R x y) (R' x y).
 
   Definition relation_disjunction (R : crelation A) (R' : crelation A) : crelation A :=
-    fun x y => sumT (R x y) (R' x y).
+    fun x y => sum (R x y) (R' x y).
   
   (** Relation equivalence is an equivalence, and subrelation defines a partial order. *)
 
   Global Instance relation_equivalence_equivalence :
-    Equivalence (@relation_equivalence A).
+    Equivalence relation_equivalence.
   Proof.
     split; red; unfold relation_equivalence, iffT.
     - firstorder.
