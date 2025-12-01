@@ -24,6 +24,7 @@ Require Import Corelib.Program.Tactics.
 Generalizable Variables A B C D R S T U l eqA eqB eqC eqD.
 
 Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 
 Definition crelation (A : Type) := A -> A -> Type.
 

@@ -24,6 +24,7 @@ Local Obligation Tactic := try solve [ simpl_crelation ].
 Local Arguments transitivity {A R Transitive x} y {z}.
 
 Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 
 (** * Morphisms.
 
