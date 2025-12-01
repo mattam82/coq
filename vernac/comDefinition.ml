@@ -128,7 +128,7 @@ let do_definition ?loc ?hook ~name ?scope ?clearbody ~poly ~sort_poly ~cumulativ
   in
   let kind = Decls.IsDefinition kind in
   let cinfo = Declare.CInfo.make ?loc ~name ~impargs ~typ:types () in
-  let info = Declare.Info.make ?scope ?clearbody ~kind ?hook ~udecl ~poly ~cumulative ?typing_flags ?user_warns () in
+  let info = Declare.Info.make ?scope ?clearbody ~kind ?hook ~udecl ~poly ~sort_poly ~cumulative ?typing_flags ?user_warns () in
   let _ : Names.GlobRef.t =
     (* Declare.declare_definition ~info ~cinfo ~opaque:false ~poly:(List.is_empty udecl.sort_poly_decl_qualities) ~body ?using evd *)
     Declare.declare_definition ~info ~cinfo ~opaque:false ~poly:(List.is_empty udecl.sort_poly_decl_qualities && poly) ~body ?using evd
@@ -142,7 +142,7 @@ let do_definition_program ?loc ?hook ~pm ~name ~scope ?clearbody ~poly ~sort_pol
   let evd, (body, types), impargs =
     interp_definition ~program_mode:true ~poly ~sort_poly env evd empty_internalization_env bl red_option c ctypopt
   in
-  let body, typ, uctx, _, obls = Declare.Obls.prepare_obligations ~name ~poly ~body ?types env evd in
+  let body, typ, uctx, _, obls = Declare.Obls.prepare_obligations ~name ~poly ~sort_poly ~body ?types env evd in
   Evd.check_sort_poly_decl_early ~poly ~cumulative ~with_obls:true (Evd.from_ctx uctx) udecl [body; typ];
   let pm, _ =
     let cinfo = Declare.CInfo.make ?loc ~name ~typ ~impargs () in

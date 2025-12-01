@@ -439,6 +439,7 @@ type constant_entry =
 
 val prepare_parameter
   : poly:bool
+  -> sort_poly:bool
   -> cumulative:bool
   -> udecl:UState.sort_poly_decl
   -> types:EConstr.types
@@ -468,7 +469,6 @@ val declare_definition_full
   :  info:Info.t
   -> cinfo:EConstr.t option CInfo.t
   -> opaque:bool
-  -> poly:bool
   -> body:EConstr.t
   -> ?using:Vernacexpr.section_subset_expr
   -> Evd.evar_map
@@ -561,6 +561,7 @@ type progress =
 val prepare_obligations
   :  name:Id.t
   -> poly:bool
+  -> sort_poly:bool
   -> ?types:EConstr.t
   -> body:EConstr.t
   -> Environ.env

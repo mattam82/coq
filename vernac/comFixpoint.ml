@@ -231,7 +231,7 @@ let encapsulate_Fix_sub env sigma recname ctx body ccl (extradecl, rel, relargty
   let sigma, fix_sub = Typing.solve_evars env sigma fix_sub in
   sigma, tupled_ctx, tuple_value, mkApp (fix_sub, [|intern_body_lam|])
 
-let build_wellfounded env sigma poly cumulative udecl {CAst.v=recname; loc} ctx body ccl impls rel_measure =
+let build_wellfounded env sigma ~poly ~sort_poly ~cumulative udecl {CAst.v=recname; loc} ctx body ccl impls rel_measure =
   let len = Context.Rel.length ctx in
   (* Restore body in the context of binders + extradecl *)
   let _, body = decompose_lambda_n_decls sigma (len + 1) body in
@@ -251,7 +251,7 @@ let build_wellfounded env sigma poly cumulative udecl {CAst.v=recname; loc} ctx 
     else
       recname, it_mkProd_or_LetIn ccl ctx in
   let body, typ, _uctx, evmap, obls =
-    Declare.Obls.prepare_obligations ~name:recname_func ~poly ~body:def ~types:typ env sigma in
+    Declare.Obls.prepare_obligations ~name:recname_func ~poly ~sort_poly ~body:def ~types:typ env sigma in
   let hook, impls =
     if len > 1 then
       let hook { Declare.Hook.S.dref; uctx; obls; _ } =
@@ -549,10 +549,10 @@ let build_program_fixpoint env sigma rec_sign possible_guard fixnames fixrs fixd
     ignore (Pretyping.esearch_guard env sigma possible_guard fixdecls) in
   List.split3 (List.map3 (collect_evars env sigma rec_sign) fixnames fixdefs fixtypes)
 
-let finish_obligations env sigma rec_sign possible_guard poly cumulative udecl = function
+let finish_obligations env sigma rec_sign possible_guard ~poly ~sort_poly ~cumulative udecl = function
   | {fixnames=[recname];fixrs;fixdefs=[body];fixtypes=[ccl];fixctxs=[ctx];fiximps=[imps];fixntns;fixwfs=[Some wf]} ->
     let sigma = Evarutil.nf_evar_map sigma in (* use nf_evar_map_undefined?? *)
-    let sigma, recname, body, ccl, impls, obls, hook = build_wellfounded env sigma poly cumulative udecl recname ctx (Option.get body) ccl imps wf in
+    let sigma, recname, body, ccl, impls, obls, hook = build_wellfounded env sigma ~poly ~sort_poly ~cumulative udecl recname ctx (Option.get body) ccl imps wf in
     let fixrs = List.map (EConstr.ERelevance.kind sigma) fixrs in
     sigma, {fixnames=[recname];fixrs;fixdefs=[Some body];fixtypes=[ccl];fixctxs=[ctx];fiximps=[impls];fixntns;fixwfs=[Some wf]}, [obls], hook
   | {fixnames;fixrs;fixdefs;fixtypes;fixctxs;fiximps;fixntns;fixwfs} ->
@@ -565,7 +565,7 @@ let finish_regular env sigma use_inference_hook fix =
   let sigma = Pretyping.(solve_remaining_evars ?hook:inference_hook all_no_fail_flags env sigma) in
   sigma, ground_fixpoint env sigma fix, [], None
 
-let do_mutually_recursive ?pm ~refine ~program_mode ?(use_inference_hook=false) ?scope ?clearbody ~kind ~poly ~cumulative ?typing_flags ?user_warns ?using (rec_order, fixl)
+let do_mutually_recursive ?pm ~refine ~program_mode ?(use_inference_hook=false) ?scope ?clearbody ~kind ~poly ~sort_poly ~cumulative ?typing_flags ?user_warns ?using (rec_order, fixl)
   : Declare.OblState.t option * Declare.Proof.t option =
   let env = Global.env () in
   let env = Environ.update_typing_flags ?typing_flags env in
@@ -586,7 +586,7 @@ let do_mutually_recursive ?pm ~refine ~program_mode ?(use_inference_hook=false) 
 
   let sigma, ({fixdefs=bodies;fixrs;fixtypes;fixwfs} as fix), obls, hook =
     match pm with
-    | Some pm -> finish_obligations env sigma rec_sign possible_guard poly cumulative udecl fix
+    | Some pm -> finish_obligations env sigma rec_sign possible_guard ~poly ~sort_poly ~cumulative udecl fix
     | None -> finish_regular env sigma use_inference_hook fix in
   let info = Declare.Info.make ?scope ?clearbody ~kind ~poly ~cumulative ~udecl ?hook ?typing_flags ?user_warns ~ntns:fix.fixntns () in
   let cinfo = build_recthms fix in

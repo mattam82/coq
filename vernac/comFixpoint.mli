@@ -35,6 +35,8 @@ val do_mutually_recursive
      (* Logical kind: Theorem, Definition, Fixpoint, etc.*)
   -> poly:bool
      (* Use universe polymorphism *)
+  -> sort_poly:bool
+     (* Use sort polymorphism *)
   -> cumulative:bool
      (* Use cumulativity *)
   -> ?typing_flags:Declarations.typing_flags

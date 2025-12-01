@@ -957,7 +957,7 @@ let vernac_start_proof ~atts kind l =
         { fname; binders; rtype; body_def = None; univs; notations = []}) l in
     let pm, proof =
       ComFixpoint.do_mutually_recursive ~refine:false ~program_mode ~use_inference_hook:program_mode
-        ~scope ?clearbody ~kind:(Decls.IsProof kind) ~poly ~cumulative ?typing_flags
+        ~scope ?clearbody ~kind:(Decls.IsProof kind) ~poly ~sort_poly ~cumulative ?typing_flags
         ?user_warns ?using (CUnknownRecOrder, fix) in
     assert (Option.is_empty pm);
     Option.get proof
@@ -1398,15 +1398,15 @@ let with_obligations program_mode f pm =
 let vernac_fixpoint ~atts ~refine ~pm (rec_order,fixl) =
   let open DefAttributes in
   let scope = vernac_fixpoint_common ~atts fixl in
-  let poly, cumulative, typing_flags, program_mode, clearbody, using, user_warns =
-    atts.polymorphic, atts.cumulative, atts.typing_flags, atts.program, atts.clearbody, atts.using, atts.user_warns in
+  let poly, sort_poly, cumulative, typing_flags, program_mode, clearbody, using, user_warns =
+    atts.polymorphic, atts.sort_polymorphic, atts.cumulative, atts.typing_flags, atts.program, atts.clearbody, atts.using, atts.user_warns in
   let () =
     if program_mode then
       (* XXX: Switch to the attribute system and match on ~atts *)
       let opens = List.exists (fun { body_def } -> Option.is_empty body_def) fixl in
       if opens then CErrors.user_err Pp.(str"Program Fixpoint requires a body.") in
   with_obligations program_mode
-    (fun pm -> ComFixpoint.do_mutually_recursive ?pm ~refine ~scope ?clearbody ~kind:(IsDefinition Fixpoint) ~poly ~cumulative ?typing_flags ?user_warns ?using (CFixRecOrder rec_order, fixl))
+    (fun pm -> ComFixpoint.do_mutually_recursive ?pm ~refine ~scope ?clearbody ~kind:(IsDefinition Fixpoint) ~poly ~sort_poly ~cumulative ?typing_flags ?user_warns ?using (CFixRecOrder rec_order, fixl))
     pm
 
 let vernac_cofixpoint_common ~atts l =
@@ -1419,15 +1419,15 @@ let vernac_cofixpoint_common ~atts l =
 let vernac_cofixpoint ~pm ~refine ~atts cofixl =
   let open DefAttributes in
   let scope = vernac_cofixpoint_common ~atts cofixl in
-  let poly, cumulative, typing_flags, program_mode, clearbody, using, user_warns =
-    atts.polymorphic, atts.cumulative, atts.typing_flags, atts.program, atts.clearbody, atts.using, atts.user_warns in
+  let poly, sort_poly, cumulative, typing_flags, program_mode, clearbody, using, user_warns =
+    atts.polymorphic, atts.sort_polymorphic, atts.cumulative, atts.typing_flags, atts.program, atts.clearbody, atts.using, atts.user_warns in
   let () =
     if program_mode then
       let opens = List.exists (fun { body_def } -> Option.is_empty body_def) cofixl in
       if opens then
         CErrors.user_err Pp.(str"Program CoFixpoint requires a body.") in
   with_obligations program_mode
-    (fun pm -> ComFixpoint.do_mutually_recursive ?pm ~refine ~scope ?clearbody ~kind:(IsDefinition CoFixpoint) ~poly ~cumulative ?typing_flags ?user_warns ?using (CCoFixRecOrder, cofixl))
+    (fun pm -> ComFixpoint.do_mutually_recursive ?pm ~refine ~scope ?clearbody ~kind:(IsDefinition CoFixpoint) ~poly ~sort_poly ~cumulative ?typing_flags ?user_warns ?using (CCoFixRecOrder, cofixl))
     pm
 
 let vernac_scheme atts l =

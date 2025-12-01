@@ -1169,13 +1169,13 @@ let check_evars_are_solved env sigma t =
   let evars = Evarutil.undefined_evars_of_term sigma t in
   if not (Evar.Set.is_empty evars) then error_unresolved_evars env sigma t evars
     
-let declare_definition ~info ~cinfo ~opaque ~poly ~obls ~body ?using sigma =
+let declare_definition ~info ~cinfo ~opaque ~obls ~body ?using sigma =
   let { CInfo.name; typ; _ } = cinfo in
   let env = Global.env () in
   Option.iter (check_evars_are_solved env sigma) typ;
   check_evars_are_solved env sigma body;
   let sigma = UnivVariances.register_universe_variances_of env sigma ?typ body in
-  let sigma = Evd.minimize_universes ~to_type:(not poly) sigma in
+  let sigma = Evd.minimize_universes ~to_type:(not info.Info.sort_poly) sigma in
   let body = EConstr.to_constr sigma body in
   let typ = Option.map (EConstr.to_constr sigma) typ in
   let uctx = Evd.ustate sigma in
@@ -1184,14 +1184,14 @@ let declare_definition ~info ~cinfo ~opaque ~poly ~obls ~body ?using sigma =
   let gref = List.hd (declare_possibly_mutual_definitions ~info ~cinfo:[cinfo] ~obls obj) in
   gref, uctx
 
-let prepare_obligations ~name ~poly ?types ~body env sigma =
+let prepare_obligations ~name ~poly ~sort_poly ?types ~body env sigma =
   let env = Global.env () in
   let types = match types with
     | Some t -> t
     | None -> Retyping.get_type_of env sigma body
   in
   let sigma = UnivVariances.register_universe_variances_of env sigma ~typ:types body in
-  let sigma, (body, types) = Evarutil.finalize ~abort_on_undefined_evars:false ~to_type:(not poly)
+  let sigma, (body, types) = Evarutil.finalize ~abort_on_undefined_evars:false ~to_type:(not sort_poly)
       sigma (fun nf -> nf body, nf types)
   in
   RetrieveObl.check_evars env sigma;
@@ -1200,11 +1200,11 @@ let prepare_obligations ~name ~poly ?types ~body env sigma =
   let uctx = Evd.ustate sigma in
   body, cty, uctx, evmap, obls
 
-let prepare_parameter ~poly ~cumulative ~udecl ~types sigma =
+let prepare_parameter ~poly ~sort_poly ~cumulative ~udecl ~types sigma =
   let env = Global.env () in
   Pretyping.check_evars_are_solved ~program_mode:false env sigma;
   let sigma = UnivVariances.register_universe_variances_of_type env sigma types in
-  let sigma, typ = Evarutil.finalize ~abort_on_undefined_evars:true ~to_type:(not poly)
+  let sigma, typ = Evarutil.finalize ~abort_on_undefined_evars:true ~to_type:(not sort_poly)
       sigma (fun nf -> nf types)
   in
   let univs = Evd.check_sort_poly_decl ~poly ~cumulative ~kind:UVars.Assumption sigma udecl in
@@ -1621,7 +1621,7 @@ let declare_definition ~pm prg =
   let obls = List.map (fun (id, (_, c)) -> (id, c)) varsubst in
   (* XXX: This is doing normalization twice *)
     (* TODO: Double check sort poly flag *)
-  let kn, uctx = declare_definition ~cinfo ~info ~obls ~body ~opaque ~poly:false ?using sigma in
+  let kn, uctx = declare_definition ~cinfo ~info ~obls ~body ~opaque ?using sigma in
   (* XXX: We call the obligation hook here, by consistency with the
      previous imperative behaviour, however I'm not sure this is right *)
   let pm = State.call_prg_hook prg
@@ -2993,9 +2993,9 @@ let declare_constant ?loc ?local ~name ~kind ?typing_flags =
 let declare_entry ?loc ~name ?scope ~kind ?user_warns ?hook ~impargs ~uctx entry =
   declare_entry ~loc ~name ?scope ~kind ~typing_flags:None ?clearbody:None ~user_warns ?hook ~impargs ~uctx entry
 
-let declare_definition_full ~info ~cinfo ~opaque ~poly ~body ?using sigma =
-  let c, uctx = declare_definition ~obls:[] ~info ~cinfo ~opaque ~poly ~body ?using sigma in
+let declare_definition_full ~info ~cinfo ~opaque ~body ?using sigma =
+  let c, uctx = declare_definition ~obls:[] ~info ~cinfo ~opaque ~body ?using sigma in
   c, if info.poly then PConstraints.ContextSet.empty else UState.context_set uctx
 
 let declare_definition ~info ~cinfo ~opaque ~poly ~body ?using sigma =
-  declare_definition ~obls:[] ~info ~cinfo ~opaque ~poly ~body ?using sigma |> fst
+  declare_definition ~obls:[] ~info ~cinfo ~opaque ~body ?using sigma |> fst

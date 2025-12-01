@@ -71,9 +71,10 @@ let declare_an_instance {CAst.v=n; loc} s args =
 let declare_instance a aeq n s = declare_an_instance n s [a;aeq]
 
 let anew_instance atts binders (name,t) fields =
-  let _id = Classes.new_instance ~poly:atts.polymorphic ~cumulative:atts.cumulative
-      name binders t (true, CAst.make @@ CRecord (fields))
-      Hints.empty_hint_info
+  let _id = Classes.new_instance ~poly:atts.polymorphic ~sort_poly:atts.sort_polymorphic ~cumulative:atts.cumulative
+    ~locality:atts.locality
+    name binders t (true, CAst.make @@ CRecord (fields))
+    Hints.empty_hint_info
   in
   ()
 
@@ -203,7 +204,7 @@ let add_morphism_as_parameter atts m n : unit =
   let kind = Decls.(IsAssumption Logical) in
   let impargs, udecl = [], UState.default_sort_poly_decl in
   let evd, types = Rewrite.Internal.build_morphism_signature env evd m in
-  let evd, pe = Declare.prepare_parameter ~poly ~cumulative:atts.cumulative ~udecl ~types evd in
+  let evd, pe = Declare.prepare_parameter ~poly ~sort_poly:atts.sort_polymorphic ~cumulative:atts.cumulative ~udecl ~types evd in
   let cst = Declare.declare_constant ?loc:instance_id.loc ~name:instance_id.v ~kind (Declare.ParameterEntry pe) in
   let cst = GlobRef.ConstRef cst in
   Classes.Internal.add_instance
