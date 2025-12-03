@@ -1,3 +1,32 @@
+From Stdlib Require Import CRelationClasses.
+
+Definition Tnat : Type := nat.
+Inductive Trel : crelation Tnat := Tdiag a : Trel a a.
+Instance Trel_refl : Reflexive Trel := Tdiag.
+
+Definition Snat : Set := nat.
+Inductive Srel : crelation Snat := Sdiag a : Srel a a.
+Instance Srel_refl : Reflexive Srel := Sdiag.
+
+Check Trel 0.
+Check Srel 0.
+
+Section Morph.
+
+  Variable F : forall {A}, crelation A -> crelation unit.
+  Variable F_refl : forall A (R : crelation A), Reflexive R -> Reflexive (F R).
+
+  Lemma FT : F Trel tt tt.
+  Proof. reflexivity. Qed.
+
+  Lemma FS : F Srel tt tt.
+  Proof.
+  Fail reflexivity.
+  apply F_refl. exact Sdiag.
+  Qed.
+
+End Morph.
+
 Require Import TestSuite.admit.
 Require Import Setoid.
 

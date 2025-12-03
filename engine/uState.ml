@@ -105,7 +105,6 @@ type elt = QVar.t
 let empty = { rigid = QSet.empty; qmap = QMap.empty; above_prop = QSet.empty;
               elims = QGraph.initial_graph; initial_elims = QGraph.initial_graph }
 
-(* FIXME: check if still used *)
 let is_empty m = QSet.is_empty m.rigid && QMap.is_empty m.qmap && QSet.is_empty m.above_prop
 
 let rec repr q m = match QMap.find q m.qmap with
@@ -651,10 +650,10 @@ type named_universes_entry =
   { universes_entry_universes : universes_entry;
     universes_entry_binders : UnivNames.universe_binders }
 
-let univ_entry ~poly ?variances uctx =
+let univ_entry ~poly_flags ?variances uctx =
   let (binders, _) = uctx.names in
   let entry =
-    if poly then Polymorphic_entry (context uctx, variances)
+    if SortPolyFlags.level_polymorphic poly_flags then Polymorphic_entry (context uctx, variances)
     else
       (assert (Option.is_empty variances);
        Monomorphic_entry (context_set uctx)) in
@@ -1510,11 +1509,12 @@ let check_sort_poly_univ_decl ~cumulative ~kind uctx decl =
   let uctx = UContext.make nas (inst, (elim_csts, univ_csts)) in
   uctx, variances
 
-let check_sort_poly_decl ~poly ~sort_poly ~cumulative ~kind uctx decl =
+let check_sort_poly_decl poly_flags ~kind uctx decl =
+  let open SortPolyFlags in
   let (binders, _) = uctx.names in
   let entry =
-    if poly then
-      let uctx, variances = check_sort_poly_univ_decl ~cumulative ~kind uctx decl in
+    if level_polymorphic poly_flags then
+      let uctx, variances = check_sort_poly_univ_decl ~cumulative:(cumulative poly_flags) ~kind uctx decl in
       Polymorphic_entry (uctx, Option.map (fun v -> Entries.Check_variances v) variances)
     else
       if not (Option.is_empty decl.sort_poly_decl_variances) then

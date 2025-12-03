@@ -16,8 +16,7 @@ open Constrexpr
 
 val interp_definition
   :  program_mode:bool
-  -> poly:bool
-  -> sort_poly:bool
+  -> poly_flags:SortPolyFlags.t
   -> Environ.env
   -> Evd.evar_map
   -> Constrintern.internalization_env
@@ -33,9 +32,7 @@ val do_definition
   -> name:Id.t
   -> ?scope:Locality.definition_scope
   -> ?clearbody:bool
-  -> poly:bool
-  -> sort_poly:bool
-  -> cumulative:bool
+  -> poly_flags:SortPolyFlags.t
   -> ?typing_flags:Declarations.typing_flags
   -> kind:Decls.definition_object_kind
   -> ?using:Vernacexpr.section_subset_expr
@@ -54,9 +51,7 @@ val do_definition_program
   -> name:Id.t
   -> scope:Locality.definition_scope
   -> ?clearbody:bool
-  -> poly:bool
-  -> sort_poly:bool
-  -> cumulative:bool
+  -> poly_flags:SortPolyFlags.t
   -> ?typing_flags:Declarations.typing_flags
   -> kind:Decls.logical_kind
   -> ?using:Vernacexpr.section_subset_expr
@@ -75,9 +70,7 @@ val do_definition_interactive
   -> name:Id.t
   -> scope:Locality.definition_scope
   -> ?clearbody:bool
-  -> poly:bool
-  -> sort_poly:bool
-  -> cumulative:bool
+  -> poly_flags:SortPolyFlags.t
   -> typing_flags:Declarations.typing_flags option
   -> kind:Decls.logical_kind
   -> ?using:Vernacexpr.section_subset_expr
@@ -93,8 +86,7 @@ val do_definition_refine
   -> name:Id.t
   -> scope:Locality.definition_scope
   -> ?clearbody:bool
-  -> poly:bool
-  -> sort_poly:bool
+  -> poly_flags:SortPolyFlags.t
   -> typing_flags:Declarations.typing_flags option
   -> kind:Decls.logical_kind
   -> ?using:Vernacexpr.section_subset_expr

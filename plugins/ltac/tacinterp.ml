@@ -146,7 +146,7 @@ let f_loc : Loc.t TacStore.field = TacStore.field "f_loc"
 (* Signature for interpretation: val_interp and interpretation functions *)
 type interp_sign = Geninterp.interp_sign =
   { lfun : value Id.Map.t
-  ; poly : bool
+  ; poly_flags : SortPolyFlags.t
   ; extra : TacStore.t }
 
 let add_extra_trace trace extra = TacStore.set extra f_trace trace
@@ -619,15 +619,14 @@ let constr_flags () = {
   fail_evar = true;
   expand_evars = true;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly_flags = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
 
 (* Interprets a constr; expects evars to be solved *)
 let interp_constr_gen kind ist env sigma c =
-  let flags = { (constr_flags ()) with polymorphic = ist.Geninterp.poly } in
+  let flags = { (constr_flags ()) with poly_flags = ist.Geninterp.poly_flags } in
   interp_gen kind ist false flags env sigma c
 
 let interp_constr = interp_constr_gen WithoutTypeConstraint
@@ -641,8 +640,7 @@ let open_constr_use_classes_flags () = {
   fail_evar = false;
   expand_evars = false;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly_flags = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
@@ -654,8 +652,7 @@ let open_constr_no_classes_flags () = {
   fail_evar = false;
   expand_evars = false;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly_flags = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
@@ -667,8 +664,7 @@ let pure_open_constr_flags = {
   fail_evar = false;
   expand_evars = false;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly_flags = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
@@ -1074,7 +1070,7 @@ let rec read_match_rule ist env sigma = function
 (* Fully evaluate an untyped constr *)
 let type_uconstr ?(flags = (constr_flags ()))
   ?(expected_type = WithoutTypeConstraint) ist c =
-  let flags = { flags with polymorphic = ist.Geninterp.poly } in
+  let flags = { flags with poly_flags = ist.Geninterp.poly_flags } in
   begin fun env sigma ->
     Pretyping.understand_uconstr ~flags ~expected_type env sigma c
   end
@@ -1198,7 +1194,7 @@ and eval_tactic_ist ist tac : unit Proofview.tactic =
   (* For extensions *)
   | TacAlias (s,l) ->
       let alias = Tacenv.interp_alias s in
-      Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
+      Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly_flags) ->
       let (>>=) = Ftactic.bind in
       let interp_vars = Ftactic.List.map (fun v -> interp_tacarg ist v) l in
       let tac l =
@@ -1207,7 +1203,7 @@ and eval_tactic_ist ist tac : unit Proofview.tactic =
         let trace = push_trace (loc,LtacNotationCall s) ist in
         let ist = {
           lfun
-        ; poly
+        ; poly_flags
         ; extra = add_extra_loc loc (add_extra_trace trace ist.extra) } in
         val_interp ist alias.Tacenv.alias_body >>= fun v ->
         Ftactic.lift (tactic_of_value ist v)
@@ -1262,13 +1258,13 @@ and interp_ltac_reference ?loc' mustbetac ist r : Val.t Ftactic.t =
       if mustbetac then Ftactic.return (coerce_to_tactic loc id v) else Ftactic.return v
       end
   | ArgArg (loc,r) ->
-      Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
+      Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly_flags) ->
       let ids = extract_ids [] ist.lfun Id.Set.empty in
       let loc_info = (Option.default loc loc',LtacNameCall r) in
       let extra = TacStore.set ist.extra f_avoid_ids ids in
       let trace = push_trace loc_info ist in
       let extra = TacStore.set extra f_trace trace in
-      let ist = { lfun = Id.Map.empty; poly; extra } in
+      let ist = { lfun = Id.Map.empty; poly_flags; extra } in
       let appl = GlbAppl[r,[]] in
       (* We call a global ltac reference: add a loc on its executation only if not
          already in another global reference *)
@@ -1323,7 +1319,7 @@ and interp_tacarg ist arg : Val.t Ftactic.t =
 
 (* Interprets an application node *)
 and interp_app loc ist fv largs : Val.t Ftactic.t =
-  Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
+  Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly_flags) ->
   let (>>=) = Ftactic.bind in
   match to_tacvalue fv with
   | None | Some (VRec _) -> Tacticals.tclZEROMSG (str "Illegal tactic application.")
@@ -1346,7 +1342,7 @@ and interp_app loc ist fv largs : Val.t Ftactic.t =
           begin
             let ist =
               { lfun = newlfun
-              ; poly
+              ; poly_flags
               ; extra = TacStore.set ist.extra f_trace trace
               } in
             let (stack, _) = trace in
@@ -1388,10 +1384,10 @@ and tactic_of_value ist vle =
   | Some vle ->
   begin match vle with
   | VFun (appl,trace,loc,lfun,[],t) ->
-    Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
+    Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly_flags) ->
       let ist = {
         lfun = lfun;
-        poly;
+        poly_flags;
         (* todo: debug stack needs "trace" but that gives incorrect results for profiling
            Couldn't figure out how to make them play together.  Currently no way both can
            be enabled. Perhaps profiling should be redesigned as suggested in profile_ltac.mli *)
@@ -1473,7 +1469,7 @@ and interp_letin ist llc u =
 (** [interp_match_success lz ist succ] interprets a single matching success
     (of type {!Tactic_matching.t}). *)
 and interp_match_success ist { Tactic_matching.subst ; context ; terms ; lhs } =
-  Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
+  Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly_flags) ->
   let (>>=) = Ftactic.bind in
   let lctxt = Id.Map.map Value.of_constr_context context in
   let hyp_subst = Id.Map.map Value.of_constr terms in
@@ -1484,7 +1480,7 @@ and interp_match_success ist { Tactic_matching.subst ; context ; terms ; lhs } =
   | Some (VFun (appl,trace,loc,lfun,[],t)) ->
       let ist =
         { lfun = lfun
-        ; poly
+        ; poly_flags
         ; extra = TacStore.set ist.extra f_trace trace
         } in
       let tac = eval_tactic_ist ist t in
@@ -1969,7 +1965,7 @@ and interp_atomic ist tac : unit Proofview.tactic =
 
 let default_ist () =
   let extra = TacStore.set TacStore.empty f_debug (get_debug ()) in
-  { lfun = Id.Map.empty; poly = false; extra = extra }
+  { lfun = Id.Map.empty; poly_flags = SortPolyFlags.default; extra = extra }
 
 let eval_tactic t =
   if get_debug () <> DebugOff then
@@ -2021,12 +2017,12 @@ end
 
 
 let interp_tac_gen lfun avoid_ids debug t =
-  Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly) ->
+  Proofview.tclProofInfo [@ocaml.warning "-3"] >>= fun (_name, poly_flags) ->
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
   let extra = TacStore.set TacStore.empty f_debug debug in
   let extra = TacStore.set extra f_avoid_ids avoid_ids in
-  let ist = { lfun; poly; extra } in
+  let ist = { lfun; poly_flags; extra } in
   let ltacvars = Id.Map.domain lfun in
   eval_tactic_ist ist
     (intern_pure_tactic { (Genintern.empty_glob_sign ~strict:false env) with ltacvars } t)
@@ -2170,11 +2166,11 @@ let interp_ltac_constr ist c k = Ftactic.run (interp_ltac_constr ist c) k
 (* Backwarding recursive needs of tactic glob/interp/eval functions *)
 
 let () =
-  let eval ?loc ~sort_poly ~poly env sigma tycon (used_ntnvars,tac) =
+  let eval ?loc poly_flags env sigma tycon (used_ntnvars,tac) =
     let lfun = GlobEnv.lfun env in
     let () = assert (Id.Set.subset used_ntnvars (Id.Map.domain lfun)) in
     let extra = TacStore.set TacStore.empty f_debug (get_debug ()) in
-    let ist = { lfun; poly; extra; } in
+    let ist = { lfun; poly_flags; extra; } in
     let tac = eval_tactic_ist ist tac in
     (* EJGA: We should also pass the proof name if desired, for now
        poly seems like enough to get reasonable behavior in practice
@@ -2184,7 +2180,7 @@ let () =
     | Some ty -> sigma, ty
     | None -> GlobEnv.new_type_evar env sigma ~src:(loc,Evar_kinds.InternalHole)
     in
-    let (c, sigma) = Proof.refine_by_tactic ~name ~sort_poly ~poly (GlobEnv.renamed_env env) sigma ty tac in
+    let (c, sigma) = Proof.refine_by_tactic ~name poly_flags (GlobEnv.renamed_env env) sigma ty tac in
     let j = { Environ.uj_val = c; uj_type = ty } in
     (j, sigma)
   in

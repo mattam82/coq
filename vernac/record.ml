@@ -55,7 +55,7 @@ let check_add_elim_constraint ~primitive_proj env sigma record_quality fld_sort 
   else
     sigma
 
-let interp_fields_evars ~primitive_proj ~poly ~sort_poly env sigma ~ninds ~nparams record_sort impls_env fld_notations flds =
+let interp_fields_evars ~primitive_proj poly_flags env sigma ~ninds ~nparams record_sort impls_env fld_notations flds =
   let record_quality = EConstr.ESorts.quality sigma record_sort in
   let _, sigma, impls, locs, newfs, _ =
     List.fold_left2
@@ -67,13 +67,13 @@ let interp_fields_evars ~primitive_proj ~poly ~sort_poly env sigma ~ninds ~npara
             (* before the one of t otherwise (see #13166) *)
             let t = if bl = [] then t else mkCProdN bl t in
             let sigma, t, impl =
-              ComAssumption.interp_assumption ~program_mode:false ~poly ~sort_poly env sigma impls_env [] t in
+              ComAssumption.interp_assumption ~program_mode:false ~poly_flags env sigma impls_env [] t in
             let fld_sort = Retyping.get_sort_of env sigma t in
             let sigma = check_add_elim_constraint ~primitive_proj env sigma record_quality fld_sort in
             sigma, (id, None, t), impl, loc
           | Vernacexpr.DefExpr({CAst.v=id; loc},bl,b,t) ->
             let sigma, (b, t), impl =
-              ComDefinition.interp_definition ~program_mode:false ~poly ~sort_poly env sigma impls_env bl None b t in
+              ComDefinition.interp_definition ~program_mode:false ~poly_flags env sigma impls_env bl None b t in
             let t = match t with Some t -> t | None -> Retyping.get_type_of env sigma b in
             sigma, (id, Some b, t), impl, loc
         in
@@ -263,9 +263,9 @@ let def_class_levels ~def ~env_ar_params sigma aritysorts ctors =
   else
     sigma, s, ctor
 
-let finalize_def_class ~sort_poly env sigma ~params ~sort ~projtyp =
+let finalize_def_class ~poly_flags env sigma ~params ~sort ~projtyp =
   let sigma, (params, sort, typ, projtyp) =
-    Evarutil.finalize ~abort_on_undefined_evars:false ~to_type:(not sort_poly) sigma ~partial:false (fun nf ->
+    Evarutil.finalize ~abort_on_undefined_evars:false ~to_type:(not (SortPolyFlags.sort_polymorphic poly_flags)) sigma ~partial:false (fun nf ->
         let typ = EConstr.it_mkProd_or_LetIn (EConstr.mkSort sort) params in
         let typ = nf typ in
         (* we know the context is exactly the params because we built typ from mkSort *)
@@ -350,11 +350,11 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
      any Set <= i constraint for universes that might actually be instantiated with Prop. *)
   let is_template =
     List.exists (fun { DataI.arity; _} -> Option.cata check_anonymous_type true arity) records in
-  let unconstrained_sorts = (not flags.poly && not def && is_template) in
+  let unconstrained_sorts = (not (SortPolyFlags.level_polymorphic flags.poly_flags) && not def && is_template) in
   let sigma, udecl = Constrintern.interp_sort_poly_decl_opt env0 udecl in
   let () = List.iter check_parameters_must_be_named params in
   let sigma, (impls_env, ((_env1, params), impls, _paramlocs)) =
-    Constrintern.interp_context_evars ~program_mode:false ~unconstrained_sorts ~poly:flags.poly env0 sigma params in
+    Constrintern.interp_context_evars ~program_mode:false ~unconstrained_sorts ~poly_flags:flags.poly_flags env0 sigma params in
   let sigma, typs =
     List.fold_left_map (build_type_telescope ~unconstrained_sorts params env0) sigma records in
   let typs, arity_sorts = List.split typs in
@@ -371,7 +371,7 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
   let ninds = List.length arities in
   let nparams = List.length params in
   let fold sigma { DataI.nots; fs; _ } record_sort =
-    interp_fields_evars ~primitive_proj ~poly:flags.poly ~sort_poly:flags.sort_poly env_ar_params sigma ~ninds ~nparams record_sort impls_env nots fs
+    interp_fields_evars ~primitive_proj flags.poly_flags env_ar_params sigma ~ninds ~nparams record_sort impls_env nots fs
   in
   let (sigma, fields) = List.fold_left2_map fold sigma records arity_sorts in
   let field_impls, locs, fields = List.split3 fields in
@@ -385,14 +385,14 @@ let typecheck_params_and_fields ~kind ~(flags:ComInductive.flags) ~primitive_pro
       (* named and rel context in the env don't matter here
          (they will be replaced by the ones of the unsolved evars in the error message
          which is the env's only use) *)
-      finalize_def_class ~sort_poly:(flags.sort_poly) env_ar_params sigma ~params ~sort ~projtyp
+      finalize_def_class ~poly_flags:flags.poly_flags env_ar_params sigma ~params ~sort ~projtyp
     in
     let name, projname = match records with
       | [{name; fs=[AssumExpr (projname, _, _)]}] -> name, projname
       | _ -> assert false
     in
     let projname = CAst.map Nameops.Name.get_id projname in
-    let univs = Evd.check_sort_poly_decl ~poly:flags.poly ~sort_poly:flags.sort_poly ~cumulative:flags.cumulative ~kind:UVars.Definition sigma udecl in
+    let univs = Evd.check_sort_poly_decl flags.poly_flags ~kind:UVars.Definition sigma udecl in
     (* definitional classes are encoded as 1 constructor with 1
        field whose type is the projection type *)
     let projimpls = match field_impls with
@@ -886,7 +886,7 @@ let interp_structure ~flags udecl kind ~primitive_proj records =
   match entry with
   | DefclassEntry _ -> assert false
   | RecordEntry entry ->
-    interp_structure_core entry ~projections_kind ~indlocs ~poly:flags.poly data
+    interp_structure_core entry ~projections_kind ~indlocs ~poly:(SortPolyFlags.level_polymorphic flags.poly_flags) data
 
 module Declared = struct
   type t =
@@ -1150,7 +1150,8 @@ let definition_structure ~flags udecl kind ~primitive_proj (records : Ast.t list
       let data = match data with [x] -> x | _ -> assert false in
       declare_class_constant entry data
     | RecordEntry entry ->
-      let structure = interp_structure_core entry ~projections_kind ~indlocs ~poly:flags.poly data in
+       let structure = interp_structure_core entry ~projections_kind ~indlocs
+                         ~poly:(SortPolyFlags.cumulative flags.poly_flags) data in
       declare_structure structure ~schemes:flags.schemes
   in
   if kind_class kind <> NotClass then declare_class ~mode:flags.mode declared;

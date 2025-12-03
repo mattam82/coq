@@ -114,9 +114,7 @@ type t =
      list is empty when the proof is fully unfocused. *)
   ; name : Names.Id.t
   (** the name of the theorem whose proof is being constructed *)
-  ; sort_poly : bool
-  (** Sort polymorphism *)
-  ; poly : bool
+  ; poly_flags : SortPolyFlags.t
   (** polymorphism *)
   ; typing_flags : Declarations.typing_flags option
   }
@@ -273,28 +271,26 @@ let unfocused = is_last_focus end_of_stack_kind
 
 let unfocus_all p = unfocus end_of_stack_kind p ()
 
-let start ~name ~poly ~sort_poly ?typing_flags sigma goals =
+let start ~name poly_flags ?typing_flags sigma goals =
   let entry, proofview = Proofview.init sigma goals in
   let pr =
     { proofview
     ; entry
     ; focus_stack = []
     ; name
-    ; sort_poly
-    ; poly
+    ; poly_flags
     ; typing_flags
   } in
   _focus end_of_stack () 1 (List.length goals) pr
 
-let dependent_start ~name ~poly ~sort_poly ?typing_flags goals =
+let dependent_start ~name poly_flags ?typing_flags goals =
   let entry, proofview = Proofview.dependent_init goals in
   let pr =
     { proofview
     ; entry
     ; focus_stack = []
     ; name
-    ; sort_poly
-    ; poly
+    ; poly_flags
     ; typing_flags
   } in
   let number_of_goals = List.length (Proofview.initial_goals pr.entry) in
@@ -320,9 +316,9 @@ let run_tactic env tac pr =
     Proofview.Unsafe.tclNEWSHELVED shelf <*>
     Proofview.tclUNIT v
   in
-  let { name; poly; proofview } = pr in
+  let { name; poly_flags; proofview } = pr in
   let (result,proofview,env,status,info_trace) =
-    Proofview.apply ~name ~poly env tac proofview
+    Proofview.apply ~name ~poly_flags env tac proofview
   in
   let sigma = Proofview.return proofview in
   (* cleanup any shelved goals that got defined
@@ -368,13 +364,11 @@ type data =
   (** A representation of the focus stack *)
   ; name : Names.Id.t
   (** The name of the theorem whose proof is being constructed *)
-  ; sort_poly : bool
-  (** Sort Polymorphism *)
-  ; poly : bool
-  (** Universe Polymorphism *)
+  ; poly_flags : SortPolyFlags.t
+  (** Universe and sort polymorphism *)
   }
 
-let data { proofview; focus_stack; entry; name; sort_poly; poly } =
+let data { proofview; focus_stack; entry; name; poly_flags } =
   let goals, sigma = Proofview.proofview proofview in
   (* spiwack: beware, the bottom of the stack is used by [Proof]
      internally, and should not be exposed. *)
@@ -385,7 +379,7 @@ let data { proofview; focus_stack; entry; name; sort_poly; poly } =
   in
   let map (FocusElt (_, _, c)) = Proofview.focus_context sigma c in
   let stack = map_minus_one map focus_stack in
-  { sigma; goals; entry; stack; name; sort_poly; poly }
+  { sigma; goals; entry; stack; name; poly_flags }
 
 let pr_goal e = Pp.(str "GOAL:" ++ int (Evar.repr e))
 
@@ -462,14 +456,14 @@ let solve ?with_end_tac env gi info_lvl tac pr =
 (**********************************************************************)
 (* Shortcut to build a term using tactics *)
 
-let refine_by_tactic ~name ~poly ~sort_poly env sigma ty tac =
+let refine_by_tactic ~name poly_flags env sigma ty tac =
   (* Save the initial side-effects to restore them afterwards. *)
   let eff = Evd.eval_side_effects sigma in
   let old_len = Safe_typing.length_private @@ Evd.seff_private eff in
   (* Save the existing goals *)
   let sigma = Evd.push_future_goals sigma in
   (* Start a proof *)
-  let prf = start ~name ~poly ~sort_poly sigma [env, ty] in
+  let prf = start ~name poly_flags sigma [env, ty] in
   let (prf, _, ()) =
     try run_tactic env tac prf
     with Logic_monad.TacticFailure e as src ->

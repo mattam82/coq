@@ -56,8 +56,7 @@ let w_refine evk rawc env sigma =
       fail_evar = false;
       expand_evars = true;
       program_mode = false;
-      polymorphic = false;
-      sort_polymorphic = false;
+      poly_flags = SortPolyFlags.default;
       undeclared_evars_rr = false;
       unconstrained_sorts = false;
     } in

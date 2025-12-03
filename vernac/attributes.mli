@@ -53,6 +53,7 @@ val raw_attributes : vernac_flags attribute
 
 val sort_polymorphic : bool attribute
 val polymorphic : bool attribute
+val poly_flags : UVars.assumption_or_definition option -> SortPolyFlags.t attribute
 val program : bool attribute
 val template : bool option attribute
 val unfold_fix : bool attribute

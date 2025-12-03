@@ -44,8 +44,7 @@ let with_delayed_uconstr ist c tac =
     fail_evar = false;
     expand_evars = true;
     program_mode = false;
-    polymorphic = false;
-    sort_polymorphic = false;
+    poly_flags = SortPolyFlags.default;
     undeclared_evars_rr = false;
     unconstrained_sorts = false;
  } in
@@ -83,8 +82,7 @@ let constr_flags () = Pretyping.{
   fail_evar = false;
   expand_evars = true;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly_flags = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }

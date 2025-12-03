@@ -32,20 +32,18 @@ let init_setoid () =
   else Rocqlib.check_required_library ["Corelib";"Setoids";"Setoid"]
 
 type rewrite_attributes = {
-  sort_polymorphic : bool;
-  polymorphic : bool;
-  cumulative: bool;
+  poly_flags : SortPolyFlags.t;
   locality : Hints.hint_locality;
 }
 
 let rewrite_attributes =
   let open Attributes.Notations in
-  Attributes.(sort_polymorphic ++ polymorphic ++ cumulative UVars.Definition ++ locality) >>=
-  fun (((sort_polymorphic, polymorphic), cumulative), locality) ->
+  Attributes.(poly_flags (Some UVars.Definition) ++ locality) >>=
+  fun (poly_flags, locality) ->
   let locality =
     if Locality.make_section_locality locality then Hints.Local else SuperGlobal
   in
-  Attributes.Notations.return { sort_polymorphic; polymorphic; cumulative; locality }
+  Attributes.Notations.return { poly_flags; locality }
 
 (** Utility functions *)
 
@@ -71,8 +69,7 @@ let declare_an_instance {CAst.v=n; loc} s args =
 let declare_instance a aeq n s = declare_an_instance n s [a;aeq]
 
 let anew_instance atts binders (name,t) fields =
-  let _id = Classes.new_instance ~poly:atts.polymorphic ~sort_poly:atts.sort_polymorphic ~cumulative:atts.cumulative
-    ~locality:atts.locality
+  let _id = Classes.new_instance ~poly_flags:atts.poly_flags ~locality:atts.locality
     name binders t (true, CAst.make @@ CRecord (fields))
     Hints.empty_hint_info
   in
@@ -149,6 +146,7 @@ let proper_projection env sigma r ty =
 let declare_projection {CAst.v=name; loc} instance_id r =
   let env = Global.env () in
   let poly = Environ.is_polymorphic env r in
+  let poly_flags = SortPolyFlags.make ~level_polymorphic:poly ~sort_polymorphic:false ~cumulative:false in
   let sigma = Evd.from_env env in
   let sigma,c = Evd.fresh_global env sigma r in
   let ty = Retyping.get_type_of env sigma c in
@@ -178,9 +176,9 @@ let declare_projection {CAst.v=name; loc} instance_id r =
   let kind = Decls.(IsDefinition Definition) in
   let impargs, udecl = [], UState.default_sort_poly_decl in
   let cinfo = Declare.CInfo.make ?loc ~name ~impargs ~typ:types () in
-  let info = Declare.Info.make ~kind ~udecl ~poly () in
+  let info = Declare.Info.make ~kind ~udecl ~poly_flags () in
   let _r : GlobRef.t =
-    Declare.declare_definition ~cinfo ~info ~opaque:false ~poly:false ~body sigma
+    Declare.declare_definition ~cinfo ~info ~opaque:false ~body sigma
   in ()
 
 let add_setoid atts binders a aeq t n =
@@ -200,11 +198,11 @@ let add_morphism_as_parameter atts m n : unit =
   let instance_id = add_suffix n "_Proper" in
   let env = Global.env () in
   let evd = Evd.from_env env in
-  let poly = atts.polymorphic in
+  (* let poly = SortPolyFlags.level_polymorphic atts.poly_flags.morphicmorphic in *)
   let kind = Decls.(IsAssumption Logical) in
   let impargs, udecl = [], UState.default_sort_poly_decl in
   let evd, types = Rewrite.Internal.build_morphism_signature env evd m in
-  let evd, pe = Declare.prepare_parameter ~poly ~sort_poly:atts.sort_polymorphic ~cumulative:atts.cumulative ~udecl ~types evd in
+  let evd, pe = Declare.prepare_parameter ~poly_flags:atts.poly_flags ~udecl ~types evd in
   let cst = Declare.declare_constant ?loc:instance_id.loc ~name:instance_id.v ~kind (Declare.ParameterEntry pe) in
   let cst = GlobRef.ConstRef cst in
   Classes.Internal.add_instance
@@ -217,7 +215,6 @@ let add_morphism_interactive atts ~tactic m n : Declare.Proof.t =
   let env = Global.env () in
   let evd = Evd.from_env env in
   let evd, morph = Rewrite.Internal.build_morphism_signature env evd m in
-  let poly = atts.polymorphic in
   let kind = Decls.(IsDefinition Instance) in
   let hook { Declare.Hook.S.dref; _ } = dref |> function
     | GlobRef.ConstRef cst ->
@@ -230,7 +227,7 @@ let add_morphism_interactive atts ~tactic m n : Declare.Proof.t =
   Flags.silently
     (fun () ->
        let cinfo = Declare.CInfo.make ?loc:instance_id.loc ~name:instance_id.v ~typ:morph () in
-       let info = Declare.Info.make ~poly ~cumulative:atts.cumulative ~hook ~kind () in
+       let info = Declare.Info.make ~poly_flags:atts.poly_flags ~hook ~kind () in
        let lemma = Declare.Proof.start ~cinfo ~info evd in
        fst (Declare.Proof.by (Global.env ()) tactic lemma)) ()
 
@@ -244,7 +241,7 @@ let add_morphism atts ~tactic binders m s n =
        [cHole; s; m])
   in
   let _id, lemma = Classes.new_instance_interactive
-      ~locality:atts.locality ~poly:atts.polymorphic ~sort_poly:atts.sort_polymorphic ~cumulative:atts.cumulative
+      ~locality:atts.locality ~poly_flags:atts.poly_flags
       instance_name binders instance_t
       ~tac:tactic ~hook:(declare_projection n instance_id)
       Hints.empty_hint_info None

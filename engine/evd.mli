@@ -626,14 +626,14 @@ val universes : evar_map -> UGraph.t
     [PConstraints.ContextSet.to_context]. *)
 val to_universe_context : evar_map -> UVars.UContext.t
 
-val univ_entry : poly:bool -> ?variances:Entries.variance_declaration_entry -> evar_map -> UState.named_universes_entry
+val univ_entry : poly_flags:SortPolyFlags.t -> ?variances:Entries.variance_declaration_entry -> evar_map -> UState.named_universes_entry
 
-val check_sort_poly_decl : poly:bool -> sort_poly:bool -> cumulative:bool -> kind:UVars.assumption_or_definition ->
+val check_sort_poly_decl : SortPolyFlags.t -> kind:UVars.assumption_or_definition ->
   evar_map -> UState.sort_poly_decl -> UState.named_universes_entry
 
-(** An early check of compatibility of the universe declaration before
+(** An early check of compatibility of the universe declaruation before
     starting to build a declaration interactively *)
-val check_sort_poly_decl_early : poly:bool -> sort_poly:bool -> cumulative:bool ->
+val check_sort_poly_decl_early : SortPolyFlags.t ->
                                  with_obls:bool -> evar_map -> UState.sort_poly_decl -> Constr.t list -> unit
 
 val merge_universe_context : evar_map -> UState.t -> evar_map

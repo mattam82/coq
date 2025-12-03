@@ -1024,19 +1024,19 @@ module Search = struct
     let _, pv = Proofview.init evm [] in
      (* Instance may try to call this before a proof is set up!
        Thus, give_me_the_proof will fail. Beware! *)
-    let name, poly =
+    let name, poly_flags =
       (* try
       *   let Proof.{ name; poly } = Proof.data Proof_global.(give_me_the_proof ()) in
       *   name, poly
       * with | Proof_global.NoCurrentProof -> *)
-       Id.of_string "instance", false
+       Id.of_string "instance", SortPolyFlags.default
     in
     let tac =
       if get_debug () > 1 then Proofview.Trace.record_info_trace tac
       else tac
     in
     let (), pv', _, unsafe, info =
-      try Proofview.apply ~name ~poly env tac pv
+      try Proofview.apply ~name ~poly_flags env tac pv
       with Logic_monad.TacticFailure _ -> raise Not_found
     in
     let () =
@@ -1323,7 +1323,7 @@ let resolve_one_typeclass ?db env sigma concl =
   let entry, pv = Proofview.init sigma [env, concl] in
   let pv =
     let name = Names.Id.of_string "legacy_pe" in
-    match Proofview.apply ~name ~poly:false (Global.env ()) tac pv with
+    match Proofview.apply ~name ~poly_flags:SortPolyFlags.default (Global.env ()) tac pv with
     | (_, final, _, _, _) -> final
     | exception (Logic_monad.TacticFailure (Tacticals.FailError _)) ->
       raise Not_found

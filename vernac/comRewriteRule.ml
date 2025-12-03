@@ -34,35 +34,35 @@ let preprocess_symbols l =
   List.iter (function AddCoercion, (({CAst.loc; _}, _) :: _, _) -> CErrors.user_err ?loc no_coercion_msg | AddCoercion, _ -> assert false | _ -> ()) l;
   udecl, List.concat_map (fun (coe, (idl, c)) -> List.map (fun (id, _) -> id, c) idl) l
 
-let do_symbol ~poly ~sort_poly ~unfold_fix udecl (id, typ) =
+let do_symbol ~poly_flags ~unfold_fix udecl (id, typ) =
   if Dumpglob.dump () then Dumpglob.dump_definition id false "symb";
   let loc = id.CAst.loc in
   let id = id.CAst.v in
   let env = Global.env () in
   let evd, udecl = Constrintern.interp_sort_poly_decl_opt env udecl in
-  let flags = { Pretyping.all_no_fail_flags with polymorphic = poly; sort_polymorphic = sort_poly } in
+  let flags = { Pretyping.all_no_fail_flags with poly_flags } in
   let evd, (typ, impls) =
     Constrintern.(interp_type_evars_impls ~flags ~impls:empty_internalization_env)
       env evd typ
   in
   Pretyping.check_evars_are_solved ~program_mode:false env evd;
   let evd = UnivVariances.register_universe_variances_of_type env evd typ in
-  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
+  let evd = Evd.minimize_universes ~to_type:(not (SortPolyFlags.sort_polymorphic poly_flags)) evd in
   let _qvars, uvars = EConstr.universes_of_constr evd typ in
   let evd = Evd.restrict_universe_context evd uvars in
   let typ = EConstr.to_constr evd typ in
-  let univs = Evd.check_sort_poly_decl ~poly ~sort_poly ~cumulative:false ~kind:UVars.Assumption evd udecl in
+  let univs = Evd.check_sort_poly_decl poly_flags ~kind:UVars.Assumption evd udecl in
   let entry = Declare.symbol_entry ~univs ~unfold_fix typ in
   let kn = Declare.declare_constant ?loc ~name:id ~kind:Decls.IsSymbol (Declare.SymbolEntry entry) in
   let () = Impargs.maybe_declare_manual_implicits false (GlobRef.ConstRef kn) impls in
   let () = Declare.assumption_message id in
   ()
 
-let do_symbols ~poly ~sort_poly ~unfold_fix l =
+let do_symbols ~poly_flags ~unfold_fix l =
   let env = Global.env () in
   if not @@ Environ.rewrite_rules_allowed env then raise Environ.(RewriteRulesNotAllowed Symb);
   let udecl, l = preprocess_symbols l in
-  List.iter (do_symbol ~poly ~sort_poly ~unfold_fix udecl) l
+  List.iter (do_symbol ~poly_flags ~unfold_fix udecl) l
 
 
 
@@ -372,7 +372,7 @@ let warn_rewrite_rules_break_SR =
     Pp.(fun reason ->
         str "This rewrite rule breaks subject reduction" ++ spc() ++ reason)
 
-let interp_rule ~poly ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr option * _ * _) =
+let interp_rule poly_flags (udecl, lhs, rhs: Constrexpr.sort_poly_decl_expr option * _ * _) =
   let env = Global.env () in
   let evd = Evd.from_env env in
 
@@ -428,11 +428,10 @@ let interp_rule ~poly ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_exp
   let lhs = Constrintern.(intern_gen WithoutTypeConstraint env evd lhs) in
   let flags = { Pretyping.no_classes_no_fail_inference_flags with
     undeclared_evars_rr = true; expand_evars = false;
-    solve_unification_constraints = false; polymorphic = poly;
-    sort_polymorphic = sort_poly } in
+    solve_unification_constraints = false; poly_flags } in
   let evd, lhs, typ = Pretyping.understand_tcc_ty ~flags env evd lhs in
   let evd = UnivVariances.register_universe_variances_of env evd ~typ lhs in
-  let evd = Evd.minimize_universes ~to_type:(not sort_poly) evd in
+  let evd = Evd.minimize_universes ~to_type:(not (SortPolyFlags.sort_polymorphic poly_flags)) evd in
   let _qvars, uvars = EConstr.universes_of_constr evd lhs in
   let evd = Evd.restrict_universe_context evd uvars in
   let uctx, uctx' = UState.check_sort_poly_decl_rev (Evd.ustate evd) udecl in
@@ -474,8 +473,7 @@ let interp_rule ~poly ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_exp
   (* The udecl constraints (or, if none, the lhs constraints) must imply those of the rhs *)
   let evd = Evd.set_universe_context evd uctx in
   let rhs = Constrintern.(intern_gen WithoutTypeConstraint env evd rhs) in
-  let flags = { Pretyping.no_classes_no_fail_inference_flags with
-                polymorphic = poly; sort_polymorphic = sort_poly } in
+  let flags = { Pretyping.no_classes_no_fail_inference_flags with poly_flags } in
   let evd', rhs =
     try Pretyping.understand_tcc ~flags env evd ~expected_type:(OfType typ) rhs
     with Pretype_errors.PretypeError (env', evd', e) ->
@@ -484,7 +482,7 @@ let interp_rule ~poly ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_exp
       Pretyping.understand_tcc ~flags env evd rhs
   in
   let evd' = UnivVariances.register_universe_variances_of env evd' rhs in
-  let evd' = Evd.minimize_universes ~to_type:(not sort_poly) evd' in
+  let evd' = Evd.minimize_universes ~to_type:(not (SortPolyFlags.sort_polymorphic poly_flags)) evd' in
   let _qvars', uvars' = EConstr.universes_of_constr evd' rhs in
   let evd' = Evd.restrict_universe_context evd' (Univ.Level.Set.union uvars uvars') in
   let fail pp = warn_rewrite_rules_break_SR ?loc:rhs_loc Pp.(surround (str "universe inconsistency") ++ str"." ++ spc() ++ str "Missing constraints: " ++ pp) in
@@ -549,8 +547,8 @@ let interp_rule ~poly ~sort_poly (udecl, lhs, rhs: Constrexpr.sort_poly_decl_exp
 
   head_symbol, { nvars = (nvars' - 1, nvarqs', nvarus'); lhs_pat = head_umask, elims; rhs }
 
-let do_rules ~poly ~sort_poly id rules =
+let do_rules ~poly_flags id rules =
   let env = Global.env () in
   if not @@ Environ.rewrite_rules_allowed env then raise Environ.(RewriteRulesNotAllowed Rule);
-  let body = { rewrules_rules = List.map (interp_rule ~poly ~sort_poly) rules } in
+  let body = { rewrules_rules = List.map (interp_rule poly_flags) rules } in
   Global.add_rewrite_rules id body

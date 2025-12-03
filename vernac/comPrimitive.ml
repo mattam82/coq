@@ -54,9 +54,12 @@ let do_primitive id udecl prim typopt =
     let evd = Evd.restrict_universe_context evd uvars in
     let typ = EConstr.to_constr evd typ in
     (* TODO check variances *)
-    let univ_entry = Evd.check_sort_poly_decl ~poly:(not (UVars.AbstractContext.is_empty auctx))
-      ~sort_poly:false (* FIXME *)
-      ~cumulative:true (* FIXME *)
-      ~kind:UVars.Assumption evd udecl in
+    let poly_flags =
+      SortPolyFlags.make
+        ~level_polymorphic:(not (UVars.AbstractContext.is_empty auctx))
+        ~sort_polymorphic:false
+        ~cumulative:true (* FIXME, should be a param? *)
+    in
+    let univ_entry = Evd.check_sort_poly_decl poly_flags ~kind:UVars.Assumption evd udecl in
     let entry = Declare.primitive_entry ~types:(typ, univ_entry) prim in
     declare ?loc id entry

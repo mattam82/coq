@@ -138,7 +138,11 @@ let interp_with_decl env base kind = function
     let poly = lookup_polymorphism env base kind fqid in
     let sigma = UnivVariances.register_universe_variances_of env (Evd.from_ctx ectx) c in
     let sigma = Evd.minimize_universes sigma in
-    begin match (UState.check_sort_poly_decl ~poly (* MS: FIXME *) ~sort_poly:false ~cumulative:false ~kind:UVars.Definition
+    let flags =
+      SortPolyFlags.make ~level_polymorphic:poly  (* MS: FIXME *)
+        ~sort_polymorphic:false
+        ~cumulative:false in
+    begin match (UState.check_sort_poly_decl flags ~kind:UVars.Definition
       (Evd.ustate sigma) udecl).universes_entry_universes with
       | UState.Polymorphic_entry (ctx, variances) ->
         let inst, ctx = UVars.abstract_universes ctx in

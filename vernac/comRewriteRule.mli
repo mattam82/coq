@@ -1,10 +1,9 @@
-val do_symbols : poly:bool -> sort_poly:bool -> unfold_fix:bool ->
+val do_symbols : poly_flags:SortPolyFlags.t -> unfold_fix:bool ->
   (Vernacexpr.coercion_flag * ((Names.lident * Constrexpr.sort_poly_decl_expr option) list * Constrexpr.constr_expr)) list
   -> unit
 
 val do_rules :
-  poly:bool ->
-  sort_poly:bool ->
+  poly_flags:SortPolyFlags.t ->
   Names.Id.t ->
   (Constrexpr.sort_poly_decl_expr option * Constrexpr.constr_expr * Constrexpr.constr_expr) list ->
   unit

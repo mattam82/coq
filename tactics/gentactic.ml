@@ -34,8 +34,8 @@ let intern ?(strict=true) env ?(ltacvars=Id.Set.empty) v =
 let interp ?(lfun=Id.Map.empty) v =
   let open Geninterp in
   let open Proofview.Notations in
-  Proofview.tclProofInfo[@ocaml.warning"-3"] >>= fun (_name, poly) ->
-  let ist = { lfun; poly; extra = TacStore.empty } in
+  Proofview.tclProofInfo[@ocaml.warning"-3"] >>= fun (_name, poly_flags) ->
+  let ist = { lfun; poly_flags; extra = TacStore.empty } in
   let Genarg.GenArg (Glbwit tag, v) = v in
   let v = Geninterp.interp tag ist v in
   Ftactic.run v (fun _ -> Proofview.tclUNIT ())

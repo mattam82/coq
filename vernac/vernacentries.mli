@@ -75,9 +75,7 @@ module DefAttributes : sig
 type t = {
   scope : Locality.definition_scope;
   locality : bool option;
-  polymorphic : bool;
-  sort_polymorphic : bool;
-  cumulative : bool;
+  poly_flags : SortPolyFlags.t;
   program : bool;
   user_warns : Globnames.extended_global_reference UserWarn.with_qf option;
   canonical_instance : bool;

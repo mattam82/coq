@@ -101,9 +101,9 @@ let declare_global ~coe ~try_assum_as_instance ~local ~kind ?user_warns ~univs ~
 let declare_axiom ~coe ~local ~kind ?user_warns ~univs ~impargs ~inline ~name typ =
   declare_global ~coe ~try_assum_as_instance:false ~local ~kind:(Decls.IsAssumption kind) ?user_warns ~univs ~impargs ~inline ~name None typ
 
-let interp_assumption ~program_mode ~poly ~sort_poly env sigma impl_env bl c =
-  let flags = { Pretyping.all_no_fail_flags with program_mode; polymorphic = poly; sort_polymorphic = sort_poly } in
-  let sigma, (impls, ((env_bl, ctx), impls1, _locs)) = interp_context_evars ~program_mode ~poly ~sort_poly ~impl_env env sigma bl in
+let interp_assumption ~program_mode ~poly_flags env sigma impl_env bl c =
+  let flags = { Pretyping.all_no_fail_flags with program_mode; poly_flags } in
+  let sigma, (impls, ((env_bl, ctx), impls1, _locs)) = interp_context_evars ~program_mode ~poly_flags ~impl_env env sigma bl in
   let sigma, (ty, impls2) = interp_type_evars_impls ~flags env_bl sigma ~impls c in
   let ty = EConstr.it_mkProd_or_LetIn ty ctx in
   sigma, ty, impls1@impls2
@@ -177,7 +177,7 @@ let find_implicits id ienv =
   with Not_found -> []
 
 
-let local_binders_of_decls ~poly l =
+let local_binders_of_decls ~poly_flags l =
   let coercions, l =
     List.fold_left_map (fun coercions (is_coe,(idl,c)) ->
       let coercions = match is_coe with
@@ -185,7 +185,7 @@ let local_binders_of_decls ~poly l =
         | Vernacexpr.AddCoercion -> List.fold_right (fun id -> Id.Set.add id.CAst.v) idl coercions in
       let make_name id = CAst.make ?loc:id.CAst.loc (Name id.CAst.v) in
       let make_assum idl = Constrexpr.(CLocalAssum (List.map make_name idl,None,Default Glob_term.Explicit,c)) in
-      let decl = if poly then
+      let decl = if SortPolyFlags.level_polymorphic poly_flags then
         (* Separate declarations so that A B : Type puts A and B in different levels. *)
         List.map (fun id -> make_assum [id]) idl
       else
@@ -200,9 +200,9 @@ let find_binding_kind id impls =
     | _ -> None in
   Option.default Explicit (CList.find_map find impls)
 
-let interp_context_gen scope ~program_mode ~poly ~sort_poly ~kind ~autoimp_enable ~coercions env sigma l =
+let interp_context_gen scope ~program_mode poly_flags ~kind ~autoimp_enable ~coercions env sigma l =
   let initial = sigma in
-  let sigma, (ienv, ((env, ctx), impls, locs)) = interp_named_context_evars ~program_mode ~poly ~autoimp_enable env sigma l in
+  let sigma, (ienv, ((env, ctx), impls, locs)) = interp_named_context_evars ~program_mode ~poly_flags ~autoimp_enable env sigma l in
   (* Note, we must use the normalized evar from now on! *)
   let sigma = solve_remaining_evars all_and_fail_flags env ~initial sigma in
   let sigma =
@@ -212,7 +212,7 @@ let interp_context_gen scope ~program_mode ~poly ~sort_poly ~kind ~autoimp_enabl
       | Locality.Global _ -> true, InferCumulativity.Conv
     in
     UnivVariances.register_universe_variances_of_named_context env sigma ~as_types ~cumul_pb ctx in
-  let sigma, ctx = Evarutil.finalize ~to_type:(not sort_poly) ~partial:true sigma @@ fun nf ->
+  let sigma, ctx = Evarutil.finalize ~to_type:(not (SortPolyFlags.sort_polymorphic poly_flags)) ~partial:true sigma @@ fun nf ->
     List.map (NamedDecl.map_constr_het (fun x -> x) nf) ctx
   in
   (* reorder, evar-normalize and add implicit status *)
@@ -228,7 +228,7 @@ let interp_context_gen scope ~program_mode ~poly ~sort_poly ~kind ~autoimp_enabl
   in
   sigma, List.rev ctx
 
-let do_assumptions ~program_mode ~poly ~sort_poly ~cumulative ~scope ~kind ?user_warns ~inline l =
+let do_assumptions ~program_mode ~poly_flags ~scope ~kind ?user_warns ~inline l =
   let sec = Lib.sections_are_opened () in
   if Dumpglob.dump () then begin
     List.iter (fun (_,(idl,_)) ->
@@ -240,9 +240,9 @@ let do_assumptions ~program_mode ~poly ~sort_poly ~cumulative ~scope ~kind ?user
     | Locality.Discharge -> None, process_assumptions_no_udecls l in
   let env = Global.env () in
   let sigma, udecl = interp_sort_poly_decl_opt env udecl in
-  let coercions, ctx = local_binders_of_decls ~poly l in
-  let sigma, ctx = interp_context_gen scope ~program_mode ~poly ~sort_poly ~kind ~autoimp_enable:true ~coercions env sigma ctx in
-  let univs = Evd.check_sort_poly_decl ~poly ~sort_poly ~cumulative ~kind:UVars.Assumption sigma udecl in
+  let coercions, ctx = local_binders_of_decls ~poly_flags l in
+  let sigma, ctx = interp_context_gen scope ~program_mode poly_flags ~kind ~autoimp_enable:true ~coercions env sigma ctx in
+  let univs = Evd.check_sort_poly_decl poly_flags ~kind:UVars.Assumption sigma udecl in
   declare_context ~try_global_assum_as_instance:false ~scope ~univs ?user_warns ~inline ctx
 
 let warn_context_outside_section =
@@ -254,7 +254,7 @@ let warn_context_outside_section =
                           Axiom\" followed by \"Existing Instance\" \
                           for typeclasses.")
 
-let do_context ~program_mode ~poly ~sort_poly ctx =
+let do_context ~program_mode ~poly_flags ctx =
   let sec = Lib.sections_are_opened () in
   if not sec then warn_context_outside_section ();
   if Dumpglob.dump () then begin
@@ -277,8 +277,8 @@ let do_context ~program_mode ~poly ~sort_poly ctx =
     if sec then Discharge
     else Global (if Lib.is_modtype () then ImportDefaultBehavior else ImportNeedQualified)
   in
-  let sigma, ctx = interp_context_gen scope ~program_mode ~poly ~sort_poly ~kind:Context ~autoimp_enable:false ~coercions:Id.Set.empty env sigma ctx in
-  let univs = Evd.univ_entry ~poly sigma in (* No possibility to enforce variances here *)
+  let sigma, ctx = interp_context_gen scope ~program_mode poly_flags ~kind:Context ~autoimp_enable:false ~coercions:Id.Set.empty env sigma ctx in
+  let univs = Evd.univ_entry ~poly_flags sigma in (* No possibility to enforce variances here *)
   declare_context ~try_global_assum_as_instance:true ~scope ~univs ~inline:Declaremods.NoInline ctx
 
 (* API compatibility (used in Elpi) *)
@@ -289,7 +289,10 @@ let interp_context env sigma ctx =
         let decl = (id, Option.map (Vars.subst_vars subst) b, Vars.subst_vars subst t, impl) in
         (id :: subst, decl :: ctx)) 1 ([],[]) ctx)) in
   (* TODO: Double check sort poly flag *)
+  let poly_flags =
+    SortPolyFlags.make ~sort_polymorphic:false ~level_polymorphic:false ~cumulative:false
+  in
   let sigma, ctx = interp_context_gen Locality.Discharge ~program_mode:false
-                     ~poly:false ~sort_poly:false ~kind:Context ~autoimp_enable:false ~coercions:Id.Set.empty env sigma ctx in
+                     poly_flags ~kind:Context ~autoimp_enable:false ~coercions:Id.Set.empty env sigma ctx in
   let ctx = List.map (fun (id,b,t,(impl,_,_,_)) -> (id.CAst.v,b,t,impl)) ctx in
   sigma, reverse_rel_context_of_reverse_named_context ctx

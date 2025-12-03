@@ -1195,8 +1195,11 @@ let make_bl_scheme env handle mind =
   let bl_goal = compute_bl_goal env handle (ind,u) lnamesparrec nparrec in
   let bl_goal = EConstr.of_constr bl_goal in
   let poly = Declareops.inductive_is_polymorphic mib in
+  let poly_flags =
+    SortPolyFlags.make ~level_polymorphic:poly ~sort_polymorphic:false ~cumulative:false
+  in
   let uctx = if poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ctx uctx) bl_goal)) else uctx in
-  let (ans, _, _, _, uctx) = Declare.build_by_tactic ~poly env ~uctx ~typ:bl_goal
+  let (ans, _, _, _, uctx) = Declare.build_by_tactic ~poly_flags env ~uctx ~typ:bl_goal
     (compute_bl_tact handle (ind, EConstr.EInstance.make u) lnamesparrec nparrec)
   in
   ([|ans|], uctx)
@@ -1329,7 +1332,8 @@ let make_lb_scheme env handle mind =
   let lb_goal = EConstr.of_constr lb_goal in
   let poly = Declareops.inductive_is_polymorphic mib in
   let uctx = if poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ctx uctx) lb_goal)) else uctx in
-  let (ans, _, _, _, ctx) = Declare.build_by_tactic ~poly env ~uctx ~typ:lb_goal
+  let poly_flags = SortPolyFlags.make ~level_polymorphic:poly ~sort_polymorphic:false ~cumulative:false in
+  let (ans, _, _, _, ctx) = Declare.build_by_tactic ~poly_flags env ~uctx ~typ:lb_goal
     (compute_lb_tact handle ind lnamesparrec nparrec)
   in
   ([|ans|], ctx)
@@ -1521,8 +1525,9 @@ let make_eq_decidability env handle mind =
     Inductive.inductive_nonrec_rec_paramdecls (mib,u) in
   let dec_goal = EConstr.of_constr (compute_dec_goal env (ind,u) lnamesparrec nparrec) in
   let poly = Declareops.inductive_is_polymorphic mib in
+  let poly_flags = SortPolyFlags.make ~level_polymorphic:poly ~sort_polymorphic:false ~cumulative:false in
   let uctx = if poly then Evd.ustate (fst (Typing.sort_of env (Evd.from_ctx uctx) dec_goal)) else uctx in
-  let (ans, _, _, _, ctx) = Declare.build_by_tactic ~poly env ~uctx
+  let (ans, _, _, _, ctx) = Declare.build_by_tactic ~poly_flags env ~uctx
       ~typ:dec_goal (compute_dec_tact handle (ind,u) lnamesparrec nparrec)
   in
   ([|ans|], ctx)

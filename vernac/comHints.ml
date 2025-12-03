@@ -14,7 +14,7 @@ open Names
 (** (Partial) implementation of the [Hint] command; some more
    functionality still lives in tactics/hints.ml *)
 
-let project_hint ~poly pri l2r r =
+let project_hint ~poly_flags pri l2r r =
   let open EConstr in
   let open Rocqlib in
   let gr = Smartlocate.global_with_alias r in
@@ -51,7 +51,7 @@ let project_hint ~poly pri l2r r =
       (Nametab.basename_of_global gr)
       ("_proj_" ^ if l2r then "l2r" else "r2l")
   in
-  let ctx = Evd.univ_entry ~poly sigma in
+  let ctx = Evd.univ_entry ~poly_flags sigma in
   let c = EConstr.to_constr sigma c in
   let cb =
     Declare.(DefinitionEntry (definition_entry ~univs:ctx ~opaque:false c))
@@ -115,10 +115,12 @@ let interp_hints ~poly h =
     | HintsReferences lhints -> HintsReferences (List.map fr lhints)
   in
   let fp = Constrintern.interp_constr_pattern (Global.env ()) in
+  let poly_flags = SortPolyFlags.make ~sort_polymorphic:false
+                     ~level_polymorphic:poly ~cumulative:false in
   match h with
   | HintsResolve lhints -> HintsResolveEntry (List.map fres lhints)
   | HintsResolveIFF (l2r, lc, n) ->
-    HintsResolveEntry (List.map (project_hint ~poly n l2r) lc)
+    HintsResolveEntry (List.map (project_hint ~poly_flags n l2r) lc)
   | HintsImmediate lhints -> HintsImmediateEntry (List.map fi lhints)
   | HintsUnfold lhints -> HintsUnfoldEntry (List.map fr lhints)
   | HintsTransparency (t, b) -> HintsTransparencyEntry (ft t, b)

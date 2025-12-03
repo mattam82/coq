@@ -96,7 +96,12 @@ let () =
 
 (* Util *)
 let define ~poly ~cumulative ?loc name sigma c types =
-  let univs = Evd.univ_entry ~poly ?variances:(if cumulative then Some Infer_variances else None) sigma in
+  let poly_flags =
+    SortPolyFlags.make ~level_polymorphic:poly
+      ~sort_polymorphic:false
+      ~cumulative
+  in
+  let univs = Evd.univ_entry ~poly_flags ?variances:(if SortPolyFlags.cumulative poly_flags then Some Infer_variances else None) sigma in
   let entry = Declare.definition_entry ~univs ?types c in
   let kind = Decls.(IsDefinition Scheme) in
   let kn = Declare.declare_constant ?loc ~kind ~name (Declare.DefinitionEntry entry) in

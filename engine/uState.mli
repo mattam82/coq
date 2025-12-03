@@ -98,7 +98,7 @@ type named_universes_entry =
   { universes_entry_universes : universes_entry;
     universes_entry_binders : UnivNames.universe_binders }
 
-val univ_entry : poly:bool -> ?variances:Entries.variance_declaration_entry -> t -> named_universes_entry
+val univ_entry : poly_flags:SortPolyFlags.t -> ?variances:Entries.variance_declaration_entry -> t -> named_universes_entry
 (** Pick from {!context} or {!context_set} based on [poly].
   Variances can only be non-empty for the [poly = true] case. *)
 
@@ -273,7 +273,7 @@ val sort_poly_decl_csts : sort_poly_decl -> PConstraints.t
    When polymorphic, the universes corresponding to
    [decl.univdecl_instance] come first in the order defined by that
    list. *)
-val check_sort_poly_decl : poly:bool -> sort_poly:bool -> cumulative:bool -> kind:UVars.assumption_or_definition ->
+val check_sort_poly_decl : SortPolyFlags.t -> kind:UVars.assumption_or_definition ->
   t -> sort_poly_decl -> named_universes_entry
 val check_sort_poly_decl_rev : t -> sort_poly_decl -> t * UVars.UContext.t
 val check_uctx_impl : fail:(Pp.t -> unit) -> t -> t -> unit

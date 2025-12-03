@@ -623,8 +623,8 @@ let solve_remaining_by env sigma holes by =
       | Some evi ->
         let env = Evd.evar_env env evi in
         let ty = Evd.evar_concl evi in
-        let name, poly, sort_poly = Id.of_string "rewrite", false, false in
-        let c, sigma = Proof.refine_by_tactic ~name ~poly ~sort_poly env sigma ty solve_tac in
+        let name, poly_flags = Id.of_string "rewrite", SortPolyFlags.default in
+        let c, sigma = Proof.refine_by_tactic ~name poly_flags env sigma ty solve_tac in
         Evd.define evk c sigma
     in
     List.fold_left solve sigma indep

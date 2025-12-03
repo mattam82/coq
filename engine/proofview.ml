@@ -243,10 +243,10 @@ module Proof = Logical
 type +'a tactic = 'a Proof.t
 
 (** Applies a tactic to the current proofview. *)
-let apply ~name ~poly env t sp =
+let apply ~name ~poly_flags env t sp =
   let open Logic_monad in
   NewProfile.profile "Proofview.apply" (fun () ->
-  let ans = Proof.repr (Proof.run t P.{trace=false; name; poly} (sp,env)) in
+  let ans = Proof.repr (Proof.run t P.{trace=false; name; poly_flags} (sp,env)) in
   let ans = Logic_monad.NonLogical.run ans in
   match ans with
   | Nil (e, info) -> Exninfo.iraise (TacticFailure e, info)
@@ -1066,8 +1066,8 @@ let tclTIME s t =
 
 let tclProofInfo =
   let open Proof in
-  Logical.current >>= fun P.{name; poly} ->
-  tclUNIT (name, poly)
+  Logical.current >>= fun P.{name; poly_flags} ->
+  tclUNIT (name, poly_flags)
 
 (** {7 Unsafe primitives} *)
 
