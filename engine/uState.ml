@@ -495,7 +495,7 @@ type named_universes_entry = universes_entry * UnivNames.universe_binders
 let univ_entry ~poly uctx =
   let (binders, _) = uctx.names in
   let entry =
-    if poly then Polymorphic_entry (context uctx)
+    if SortPolyFlags.is_polymorphic poly then Polymorphic_entry (context uctx)
     else Monomorphic_entry (context_set uctx) in
   entry, binders
 
@@ -1175,7 +1175,7 @@ let check_sort_poly_univ_decl uctx decl =
 let check_sort_poly_decl ~poly uctx decl =
   let (binders, _) = uctx.names in
   let entry =
-    if poly then Polymorphic_entry (check_sort_poly_univ_decl uctx decl)
+    if SortPolyFlags.is_polymorphic poly then Polymorphic_entry (check_sort_poly_univ_decl uctx decl)
     else Monomorphic_entry (check_mono_sort_poly_decl uctx decl) in
   entry, binders
 

@@ -180,7 +180,7 @@ let compute_first_inversion_scheme env sigma ind sort dep_option =
    scheme on sort [sort]. Depending on the value of [dep_option] it will
    build a dependent lemma or a non-dependent one *)
 
-let inversion_scheme ~name ~poly ~sort_poly env sigma t sort dep_option inv_op =
+let inversion_scheme ~name poly env sigma t sort dep_option inv_op =
   let (env,i) = add_prods_sign env sigma t in
   let ind =
     try find_rectype env sigma i
@@ -198,7 +198,7 @@ let inversion_scheme ~name ~poly ~sort_poly env sigma t sort dep_option inv_op =
     user_err
     (str"Computed inversion goal was not closed in initial signature.");
   *)
-  let pf = Proof.start ~name ~poly ~sort_poly (Evd.from_ctx (ustate sigma)) [invEnv,invGoal] in
+  let pf = Proof.start ~name ~poly (Evd.from_ctx (ustate sigma)) [invEnv,invGoal] in
   let pf, _, () = Proof.run_tactic env (tclTHEN intro (onLastHypId inv_op)) pf in
   let pfterm = List.hd (Proof.partial_proof pf) in
   let global_named_context = Global.named_context_val () in
@@ -212,7 +212,7 @@ let inversion_scheme ~name ~poly ~sort_poly env sigma t sort dep_option inv_op =
   end in
   let avoid = ref Id.Set.empty in
   let Proof.{sigma} = Proof.data pf in
-  let sigma = Evd.minimize_universes ~to_type:(not sort_poly) sigma in
+  let sigma = Evd.minimize_universes ~to_type:(not (SortPolyFlags.sort_polymorphic poly)) sigma in
   let rec fill_holes c =
     match EConstr.kind sigma c with
     | Evar (e,args) ->
@@ -228,25 +228,25 @@ let inversion_scheme ~name ~poly ~sort_poly env sigma t sort dep_option inv_op =
   let invProof = it_mkNamedLambda_or_LetIn sigma c !ownSign in
   invProof, sigma
 
-let add_inversion_lemma ~poly ~sort_poly (name:lident) env sigma t sort dep inv_op =
-  let invProof, sigma = inversion_scheme ~name:name.v ~poly ~sort_poly env sigma t sort dep inv_op in
+let add_inversion_lemma ~poly (name:lident) env sigma t sort dep inv_op =
+  let invProof, sigma = inversion_scheme ~name:name.v poly env sigma t sort dep inv_op in
   let cinfo = Declare.CInfo.make ?loc:name.loc ~name:name.v ~typ:None () in
   let info = Declare.Info.make ~poly ~kind:Decls.(IsProof Lemma) () in
   let _ : Names.GlobRef.t =
-    Declare.declare_definition ~cinfo ~info ~opaque:false ~sort_poly:false ~body:invProof sigma
+    Declare.declare_definition ~cinfo ~info ~opaque:false ~body:invProof sigma
   in
   ()
 
 (* inv_op = Inv (derives de complete inv. lemma)
  * inv_op = InvNoThining (derives de semi inversion lemma) *)
 
-let add_inversion_lemma_exn ~poly ~sort_poly na com comsort bool tac =
+let add_inversion_lemma_exn ~poly na com comsort bool tac =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let c, uctx = Constrintern.interp_type env sigma com in
   let sigma = Evd.from_ctx uctx in
   let sigma, sort = Evd.fresh_sort_in_quality ~rigid:univ_rigid sigma comsort in
-  add_inversion_lemma ~poly ~sort_poly na env sigma c sort bool tac
+  add_inversion_lemma ~poly na env sigma c sort bool tac
 
 (* ================================= *)
 (* Applying a given inversion lemma  *)

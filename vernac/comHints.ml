@@ -115,6 +115,8 @@ let interp_hints ~poly h =
     | HintsReferences lhints -> HintsReferences (List.map fr lhints)
   in
   let fp = Constrintern.interp_constr_pattern (Global.env ()) in
+  let poly = SortPolyFlags.make ~sort_polymorphic:false
+                     ~level_polymorphic:poly ~cumulative:false in
   match h with
   | HintsResolve lhints -> HintsResolveEntry (List.map fres lhints)
   | HintsResolveIFF (l2r, lc, n) ->

@@ -146,7 +146,7 @@ let f_loc : Loc.t TacStore.field = TacStore.field "f_loc"
 (* Signature for interpretation: val_interp and interpretation functions *)
 type interp_sign = Geninterp.interp_sign =
   { lfun : value Id.Map.t
-  ; poly : bool
+  ; poly : SortPolyFlags.t
   ; extra : TacStore.t }
 
 let add_extra_trace trace extra = TacStore.set extra f_trace trace
@@ -619,15 +619,14 @@ let constr_flags () = {
   fail_evar = true;
   expand_evars = true;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
 
 (* Interprets a constr; expects evars to be solved *)
 let interp_constr_gen kind ist env sigma c =
-  let flags = { (constr_flags ()) with polymorphic = ist.Geninterp.poly } in
+  let flags = { (constr_flags ()) with poly = ist.Geninterp.poly } in
   interp_gen kind ist false flags env sigma c
 
 let interp_constr = interp_constr_gen WithoutTypeConstraint
@@ -641,8 +640,7 @@ let open_constr_use_classes_flags () = {
   fail_evar = false;
   expand_evars = false;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
@@ -654,8 +652,7 @@ let open_constr_no_classes_flags () = {
   fail_evar = false;
   expand_evars = false;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
@@ -667,8 +664,7 @@ let pure_open_constr_flags = {
   fail_evar = false;
   expand_evars = false;
   program_mode = false;
-  polymorphic = false;
-  sort_polymorphic = false;
+  poly = SortPolyFlags.default;
   undeclared_evars_rr = false;
   unconstrained_sorts = false;
 }
@@ -1074,7 +1070,7 @@ let rec read_match_rule ist env sigma = function
 (* Fully evaluate an untyped constr *)
 let type_uconstr ?(flags = (constr_flags ()))
   ?(expected_type = WithoutTypeConstraint) ist c =
-  let flags = { flags with polymorphic = ist.Geninterp.poly } in
+  let flags = { flags with poly = ist.Geninterp.poly } in
   begin fun env sigma ->
     Pretyping.understand_uconstr ~flags ~expected_type env sigma c
   end
@@ -1969,7 +1965,7 @@ and interp_atomic ist tac : unit Proofview.tactic =
 
 let default_ist () =
   let extra = TacStore.set TacStore.empty f_debug (get_debug ()) in
-  { lfun = Id.Map.empty; poly = false; extra = extra }
+  { lfun = Id.Map.empty; poly = SortPolyFlags.default; extra = extra }
 
 let eval_tactic t =
   if get_debug () <> DebugOff then
@@ -2170,7 +2166,7 @@ let interp_ltac_constr ist c k = Ftactic.run (interp_ltac_constr ist c) k
 (* Backwarding recursive needs of tactic glob/interp/eval functions *)
 
 let () =
-  let eval ?loc ~poly ~sort_poly env sigma tycon (used_ntnvars,tac) =
+  let eval ?loc ~poly env sigma tycon (used_ntnvars,tac) =
     let lfun = GlobEnv.lfun env in
     let () = assert (Id.Set.subset used_ntnvars (Id.Map.domain lfun)) in
     let extra = TacStore.set TacStore.empty f_debug (get_debug ()) in
@@ -2184,7 +2180,7 @@ let () =
     | Some ty -> sigma, ty
     | None -> GlobEnv.new_type_evar env sigma ~src:(loc,Evar_kinds.InternalHole)
     in
-    let (c, sigma) = Proof.refine_by_tactic ~name ~poly ~sort_poly (GlobEnv.renamed_env env) sigma ty tac in
+    let (c, sigma) = Proof.refine_by_tactic ~name ~poly (GlobEnv.renamed_env env) sigma ty tac in
     let j = { Environ.uj_val = c; uj_type = ty } in
     (j, sigma)
   in

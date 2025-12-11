@@ -81,7 +81,7 @@ module Record_decl : sig
     records : Data.t list;
     projections_kind : Decls.definition_object_kind;
     indlocs : DeclareInd.indlocs;
-    sort_poly : bool
+    poly : SortPolyFlags.t
   }
 end
 

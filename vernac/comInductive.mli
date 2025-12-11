@@ -14,9 +14,7 @@ open Constrexpr
 (** {6 Inductive and coinductive types} *)
 
 type flags = {
-  poly : bool;
-  sort_poly : bool;
-  cumulative : bool;
+  poly : SortPolyFlags.t;
   template : bool option;
   finite : Declarations.recursivity_kind;
   mode : Hints.hint_mode list option;
