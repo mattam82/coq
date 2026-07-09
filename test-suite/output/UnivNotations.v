@@ -16,8 +16,9 @@ Check foo Set nat.
 Sort s.
 Axiom S : Univ@{s;Set}.
 
-(* rigid sorts (here global sort) should not match Type but currently do *)
+(* rigid sorts (here global sort) do not match the notation's Univ *)
 Check foo _ S.
+Check # S.
 Fail Check ! S.
 
 Goal True.
@@ -34,7 +35,7 @@ Set Printing Universes.
 (* Printing Universes makes universes not match Type *)
 Check ! nat.
 
-(* global sort still doesn't match Type *)
+(* global sort still doesn't match Type nor Univ *)
 Check foo _ S.
 
 Goal True.
