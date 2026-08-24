@@ -224,14 +224,14 @@ Module Inductives.
   (* α ; u u0 |  *)
   About foo6_prop_rect.
 
-  Definition foo6_Univ_rect (P:foo6 -> Univ)
+  Definition foo6_Type_rect (P:foo6 -> Univ)
     (H : P Foo6)
     (f : foo6@{Type;_})
     : P f
     := match f with Foo6 => H end.
-  (* foo6_Univ_rect@{α ; u u0} : forall P : foo6@{Type ; u} -> Univ@{α ; u0}, P Foo6@{Type ; u} -> forall f : foo6@{Type ; u}, P f *)
+  (* foo6_Type_rect@{α ; u u0} : forall P : foo6@{Type ; u} -> Univ@{α ; u0}, P Foo6@{Type ; u} -> forall f : foo6@{Type ; u}, P f *)
   (* α ; u u0 |  *)
-  About foo6_Univ_rect.
+  About foo6_Type_rect.
 
   Inductive foo7 : Univ := Foo7_1 | Foo7_2.
   About foo7.
@@ -335,31 +335,31 @@ Module Inductives.
   (* α α0 α1 α2 ; u u0 u1 | α2 -> α *)
   About sum_elim.
 
-  Definition sum_sind := sum_elim@{Type Univ Univ SProp;_ _ _}.
-  Definition sum_rect := sum_elim@{Type Univ Univ Univ;_ _ _}.
-  Definition sum_ind := sum_elim@{Type Univ Univ Prop;_ _ _}.
+  Definition sum_sind := sum_elim@{Type Type Type SProp;_ _ _}.
+  Definition sum_rect := sum_elim@{Type Type Type Type;_ _ _}.
+  Definition sum_ind := sum_elim@{Type Type Type Prop;_ _ _}.
 
   Definition or_ind := sum_elim@{Prop Prop Prop Prop;_ _ _}.
   Definition or_sind := sum_elim@{Prop Prop Prop SProp;_ _ _}.
-  Fail Definition or_rect := sum_elim@{Prop Prop Prop Univ;_ _ _}.
+  Fail Definition or_rect := sum_elim@{Prop Prop Prop Type;_ _ _}.
   (* The command has indeed failed with message:
-  The quality constraints are inconsistent: cannot enforce Prop -> Univ because it would identify Univ and Prop which is inconsistent.
-  This is introduced by the constraints Prop -> Univ *)
+  The quality constraints are inconsistent: cannot enforce Prop -> Type because it would identify Univ and Prop which is inconsistent.
+  This is introduced by the constraints Prop -> Type *)
 
-  Definition sumor := sum@{Type Prop Univ;_ _}.
+  Definition sumor := sum@{Type Prop Type;_ _}.
 
-  Definition sumor_sind := sum_elim@{Type Prop Univ SProp;_ _ _}.
-  Definition sumor_rect := sum_elim@{Type Prop Univ Univ;_ _ _}.
-  Definition sumor_ind := sum_elim@{Type Prop Univ Prop;_ _ _}.
+  Definition sumor_sind := sum_elim@{Type Prop Type SProp;_ _ _}.
+  Definition sumor_rect := sum_elim@{Type Prop Type Type;_ _ _}.
+  Definition sumor_ind := sum_elim@{Type Prop Type Prop;_ _ _}.
 
   (* Implicit qualities and constraints are elaborated *)
   Definition idT (A B : Univ) (x : sum A B)
-    : sum@{_ _ Univ; _ _} A B :=
+    : sum@{_ _ Type; _ _} A B :=
     match x with
     | inl a => inl a
     | inr b => inr b
     end.
-  (* α α0 α1 ; u u0 | α -> Univ *)
+  (* α α0 α1 ; u u0 | α -> Type *)
   About idT.
 
   (* Implicit qualities and constraints are elaborated *)
@@ -389,10 +389,10 @@ Module Inductives.
     | inl a => inl a
     | inr b => inr b
     end.
-  (* α α0 α1 α2 ; u u0 | α -> α2 *)
+  (* α α0 α1 α2 ; u u0 | α -> α0 *)
   About idV.
 
-  Fail Compute idV@{Prop Univ Prop Univ;Set Set} (inl I).
+  Fail Compute idV@{Prop Type Prop Type;Set Set} (inl I).
 
   (*********************************************)
   (*                  LIST                     *)
@@ -416,12 +416,12 @@ Module Inductives.
   (* α α0 α1 ; u u0 | α1 -> α *)
   About list_elim.
 
-  Fixpoint list_idT {A : Univ} (l : list A) : list@{_ Univ;_} A :=
+  Fixpoint list_idT {A : Univ} (l : list A) : list@{_ Type;_} A :=
     match l with
     | nil => nil
     | cons x l => cons x (list_idT l)
     end.
-  (* α α0 ; u | α -> Univ *)
+  (* α α0 ; u | α -> Type *)
   About list_idT.
 
   Fixpoint list_idP {A : Univ} (l : list A) : list@{_ Prop;_} A :=
@@ -537,7 +537,7 @@ Module Inductives.
   About Foo.
 
   Check Foo@{Type Prop;}.
-  Fail Check Foo@{Prop Univ;}.
+  Fail Check Foo@{Prop Type;}.
 End Inductives.
 
 Module Records.
@@ -794,7 +794,7 @@ Module Classes.
 End Classes.
 
 Unset Universe Polymorphism.
-Set Collapse Sorts ToUniv.
+Set Collapse Sorts ToType.
 Fail #[universes(collapse_sort_variables=no)]
 Inductive Attr : Univ := attr.
 
