@@ -51,7 +51,7 @@ Minimized universes:
  sort_poly_elab.31 := sort_poly_elab.32+1
 Normalized constraints:
  {sort_poly_elab.32} | U < sort_poly_elab.32 *)
-exfalso@{α ; u} : forall (A : Type@{α ; u}) (_ : False), A
+exfalso@{α ; u} : forall (A : Univ@{α ; u}) (_ : False), A
 (* α ; u |  *)
 
 exfalso is universe polymorphic
@@ -60,7 +60,7 @@ exfalso is transparent
 Expands to: Constant sort_poly_elab.Reduction.exfalso
 Declared in library sort_poly_elab, line 32, characters 13-20
 iter@{α ; u} :
-forall (A : Type@{α ; u}) (_ : forall _ : A, A) (_ : nat) (_ : A), A
+forall (A : Univ@{α ; u}) (_ : forall _ : A, A) (_ : nat) (_ : A), A
 (* α ; u |  *)
 
 iter is universe polymorphic
@@ -68,7 +68,11 @@ Arguments iter A%_type_scope f%_function_scope n%_nat_scope x
 iter is transparent
 Expands to: Constant sort_poly_elab.Reduction.iter
 Declared in library sort_poly_elab, line 39, characters 11-15
-Box@{α α0 ; u} : forall _ : Type@{α ; u}, Type@{α0 ; u}
+File "./output/sort_poly_elab.v", line 54, characters 2-38:
+Warning: Support for Type being interpreted as Univ is deprecated.
+Use "Univ" instead.
+[deprecated-type-sort-poly-interp,deprecated-since-9.3,deprecated,default]
+Box@{α α0 ; u} : forall _ : Univ@{α ; u}, Univ@{α0 ; u}
 (* α α0 ; u |  *)
 
 Box is universe polymorphic
@@ -81,7 +85,7 @@ Arguments Box A%_type_scope
 Expands to: Inductive sort_poly_elab.Conversion.Box
 Declared in library sort_poly_elab, line 54, characters 12-15
 t1@{α α0 ; u} :
-forall (A : Type@{α ; u}) (_ : A) (_ : A), Box@{α α0 ; u} A
+forall (A : Univ@{α ; u}) (_ : A) (_ : A), Box@{α α0 ; u} A
 (* α α0 ; u |  *)
 
 t1 is universe polymorphic
@@ -90,7 +94,7 @@ t1 is transparent
 Expands to: Constant sort_poly_elab.Conversion.t1
 Declared in library sort_poly_elab, line 58, characters 13-15
 t2@{α α0 ; u} :
-forall (A : Type@{α ; u}) (_ : A) (_ : A), Box@{α α0 ; u} A
+forall (A : Univ@{α ; u}) (_ : A) (_ : A), Box@{α α0 ; u} A
 (* α α0 ; u |  *)
 
 t2 is universe polymorphic
@@ -98,7 +102,7 @@ Arguments t2 A%_type_scope x y
 t2 is transparent
 Expands to: Constant sort_poly_elab.Conversion.t2
 Declared in library sort_poly_elab, line 62, characters 13-15
-t1'@{α ; u} : forall (A : Type@{α ; u}) (_ : A) (_ : A), A
+t1'@{α ; u} : forall (A : Univ@{α ; u}) (_ : A) (_ : A), A
 (* α ; u |  *)
 
 t1' is universe polymorphic
@@ -106,7 +110,7 @@ Arguments t1' A%_type_scope x y
 t1' is transparent
 Expands to: Constant sort_poly_elab.Conversion.t1'
 Declared in library sort_poly_elab, line 66, characters 13-16
-t2'@{α ; u} : forall (A : Type@{α ; u}) (_ : A) (_ : A), A
+t2'@{α ; u} : forall (A : Univ@{α ; u}) (_ : A) (_ : A), A
 (* α ; u |  *)
 
 t2' is universe polymorphic
@@ -191,7 +195,7 @@ Minimized universes:
  sort_poly_elab.65 := sort_poly_elab.66
 Normalized constraints:
  {sort_poly_elab.69 sort_poly_elab.67 sort_poly_elab.66} |  *)
-ignore@{α ; u} : forall {A : Type@{α ; u}} (_ : A), unit
+ignore@{α ; u} : forall {A : Univ@{α ; u}} (_ : A), unit
 (* α ; u |  *)
 
 ignore is universe polymorphic
@@ -200,7 +204,7 @@ ignore is transparent
 Expands to: Constant sort_poly_elab.Conversion.ignore
 Declared in library sort_poly_elab, line 91, characters 13-19
 unfold_ignore@{α α0 α1 ; u} :
-forall A : Type@{α1 ; u},
+forall A : Univ@{α1 ; u},
 @eq unit
   (@ignore@{α ; u} (forall (_ : A) (_ : A), Box@{α1 α ; u} A)
      (t1@{α1 α ; u} A))
@@ -222,7 +226,7 @@ Arguments t A%_type_scope x y
 t is transparent
 Expands to: Constant sort_poly_elab.Conversion.t
 Declared in library sort_poly_elab, line 104, characters 13-14
-v@{α ; u} : forall (A : Type@{α ; u}) (_ : bool), A
+v@{α ; u} : forall (A : Univ@{α ; u}) (_ : bool), A
 (* α ; u |  *)
 
 v is universe polymorphic
@@ -232,15 +236,15 @@ Declared in library sort_poly_elab, line 108, characters 8-9
 File "./output/sort_poly_elab.v", line 110, characters 50-51:
 The command has indeed failed with message:
 In environment
-P : forall _ : nat, Type@{α57 ; sort_poly_elab.85}
+P : forall _ : nat, Univ@{α57 ; sort_poly_elab.85}
 x : P (v@{Type ; sort_poly_elab.84} nat true)
 The term "x" has type "P (v@{Type ; sort_poly_elab.84} nat true)"
 while it is expected to have type
  "P (v@{Type ; sort_poly_elab.86} nat false)".
-fun (A : SProp) (P : forall _ : A, Type@{α63 ; sort_poly_elab.91})
+fun (A : SProp) (P : forall _ : A, Univ@{α63 ; sort_poly_elab.91})
   (x : P (v@{SProp ; sort_poly_elab.90} A true)) =>
 x : P (v@{SProp ; sort_poly_elab.92} A false)
-     : forall (A : SProp) (P : forall _ : A, Type@{α63 ; sort_poly_elab.91})
+     : forall (A : SProp) (P : forall _ : A, Univ@{α63 ; sort_poly_elab.91})
          (_ : P (v@{SProp ; sort_poly_elab.90} A true)),
        P (v@{SProp ; sort_poly_elab.92} A false)
 (* {α63}; {sort_poly_elab.92 sort_poly_elab.91 sort_poly_elab.90
@@ -255,7 +259,7 @@ Minimized universes:
  sort_poly_elab.87 := max(sort_poly_elab.88, sort_poly_elab.91+1)
 Normalized constraints:
  {sort_poly_elab.92 sort_poly_elab.91 sort_poly_elab.90 sort_poly_elab.88} |  *)
-zog@{α ; u} : forall _ : Type@{α ; u}, Type@{α ; u}
+zog@{α ; u} : forall _ : Univ@{α ; u}, Univ@{α ; u}
 (* α ; u |  *)
 
 zog is universe polymorphic
@@ -263,7 +267,7 @@ Arguments zog A%_type_scope
 zog is transparent
 Expands to: Constant sort_poly_elab.Inference.zog
 Declared in library sort_poly_elab, line 118, characters 13-16
-zag@{α ; u} : forall _ : Type@{α ; u}, Type@{α ; u}
+zag@{α ; u} : forall _ : Univ@{α ; u}, Univ@{α ; u}
 (* α ; u |  *)
 
 zag is universe polymorphic
@@ -271,7 +275,7 @@ Arguments zag A%_type_scope
 zag is transparent
 Expands to: Constant sort_poly_elab.Inference.zag
 Declared in library sort_poly_elab, line 123, characters 13-16
-zig@{α ; u} : forall _ : Type@{α ; u}, Type@{α ; u}
+zig@{α ; u} : forall _ : Univ@{α ; u}, Univ@{α ; u}
 (* α ; u |  *)
 
 zig is universe polymorphic
@@ -282,12 +286,16 @@ Declared in library sort_poly_elab, line 128, characters 13-16
 File "./output/sort_poly_elab.v", line 133, characters 66-67:
 The command has indeed failed with message:
 In environment
-A : Type@{s ; Set}
-The term "A" has type "Type@{s ; Set}" while it is expected to have type
- "Type@{s' ; Set}"
+A : Univ@{s ; Set}
+The term "A" has type "Univ@{s ; Set}" while it is expected to have type
+ "Univ@{s' ; Set}"
 (universe inconsistency: Cannot enforce Type@{s; Set} <= 
 Type@{s'; Set}).
-implicit@{α ; u} : Type@{α ; u}
+File "./output/sort_poly_elab.v", line 137, characters 2-24:
+Warning: Support for Type being interpreted as Univ is deprecated.
+Use "Univ" instead.
+[deprecated-type-sort-poly-interp,deprecated-since-9.3,deprecated,default]
+implicit@{α ; u} : Univ@{α ; u}
 (* α ; u |  *)
 
 implicit is universe polymorphic
@@ -298,7 +306,7 @@ implicit@{α ; u} may only be eliminated to produce values whose type is in sort
   than the instantiation of α.
 Expands to: Inductive sort_poly_elab.Inductives.implicit
 Declared in library sort_poly_elab, line 137, characters 12-20
-foo1@{α ; u} : Type@{α ; u}
+foo1@{α ; u} : Univ@{α ; u}
 (* α ; u |  *)
 
 foo1 is universe polymorphic
@@ -333,11 +341,15 @@ Arguments foo1_False' x
 foo1_False' is transparent
 Expands to: Constant sort_poly_elab.Inductives.foo1_False'
 Declared in library sort_poly_elab, line 157, characters 13-24
-foo2@{α ; u} : Type@{α ; u+1}
-(* α ; u |  *)
+File "./output/sort_poly_elab.v", line 162, characters 2-40:
+Warning: Support for Type being interpreted as Univ is deprecated.
+Use "Univ" instead.
+[deprecated-type-sort-poly-interp,deprecated-since-9.3,deprecated,default]
+foo2@{α α0 ; u} : Univ@{α ; u+1}
+(* α α0 ; u |  *)
 
 foo2 is universe polymorphic
-foo2@{α ; u} may only be eliminated to produce values whose type is in sort quality α,
+foo2@{α α0 ; u} may only be eliminated to produce values whose type is in sort quality α,
   unless instantiated such that the qualities Prop and Type
   are equal to the instantiation of α, or to qualities smaller
   (SProp <= Prop <= Type, and all variables <= Type)
@@ -348,7 +360,11 @@ File "./output/sort_poly_elab.v", line 165, characters 13-22:
 The command has indeed failed with message:
 The reference foo2_rect was not found in the current environment.
 Did you mean bool_rect, sig2_rect, prod_rect, ex2_rect or bool_rec?
-foo3@{α α0 ; u} : forall _ : Type@{α0 ; u}, Type@{α ; u}
+File "./output/sort_poly_elab.v", line 168, characters 2-41:
+Warning: Support for Type being interpreted as Univ is deprecated.
+Use "Univ" instead.
+[deprecated-type-sort-poly-interp,deprecated-since-9.3,deprecated,default]
+foo3@{α α0 ; u} : forall _ : Univ@{α0 ; u}, Univ@{α ; u}
 (* α α0 ; u |  *)
 
 foo3 is universe polymorphic
@@ -364,7 +380,7 @@ File "./output/sort_poly_elab.v", line 171, characters 13-22:
 The command has indeed failed with message:
 The reference foo3_rect was not found in the current environment.
 Did you mean bool_rect, prod_rect or bool_rec?
-foo5@{α ; u} : forall _ : Type@{α ; u}, Prop
+foo5@{α ; u} : forall _ : Univ@{α ; u}, Prop
 (* α ; u |  *)
 
 foo5 is universe polymorphic
@@ -374,7 +390,7 @@ Arguments foo5 A%_type_scope
 Expands to: Inductive sort_poly_elab.Inductives.foo5
 Declared in library sort_poly_elab, line 174, characters 12-16
 foo5_ind'@{α ; u} :
-forall (A : Type@{α ; u}) (P : Prop) (_ : forall _ : A, P)
+forall (A : Univ@{α ; u}) (P : Prop) (_ : forall _ : A, P)
   (_ : foo5@{α ; u} A),
 P
 (* α ; u |  *)
@@ -385,8 +401,8 @@ foo5_ind' is transparent
 Expands to: Constant sort_poly_elab.Inductives.foo5_ind'
 Declared in library sort_poly_elab, line 178, characters 13-22
 foo5_Prop_rect@{α ; u} :
-forall (A : Prop) (P : forall _ : foo5@{Prop ; Set} A, Type@{α ; u})
-  (_ : forall a : A, P (Foo5@{Prop ; Set} A a)) (f : foo5@{Prop ; Set} A),
+forall (A : Prop) (P : forall _ : foo5@{Type ; Set} A, Univ@{α ; u})
+  (_ : forall a : A, P (Foo5@{Type ; Set} A a)) (f : foo5@{Type ; Set} A),
 P f
 (* α ; u | Prop -> α *)
 
@@ -396,7 +412,7 @@ foo5_Prop_rect is transparent
 Expands to: Constant sort_poly_elab.Inductives.foo5_Prop_rect
 Declared in library sort_poly_elab, line 182, characters 13-27
 foo5_Prop_rect'@{α ; u} :
-forall (A : Prop) (P : forall _ : foo5@{Prop ; Set} A, Type@{α ; u})
+forall (A : Prop) (P : forall _ : foo5@{Prop ; Set} A, Univ@{α ; u})
   (_ : forall a : A, P (Foo5@{Prop ; Set} A a)) (f : foo5@{Prop ; Set} A),
 P f
 (* α ; u |  *)
@@ -406,7 +422,7 @@ Arguments foo5_Prop_rect' A%_type_scope (P H)%_function_scope f
 foo5_Prop_rect' is transparent
 Expands to: Constant sort_poly_elab.Inductives.foo5_Prop_rect'
 Declared in library sort_poly_elab, line 193, characters 13-28
-foo6@{α ; u} : Type@{α ; u}
+foo6@{α ; u} : Univ@{α ; u}
 (* α ; u |  *)
 
 foo6 is universe polymorphic
@@ -423,7 +439,7 @@ The reference foo6_sind was not found in the current environment.
 Did you mean foo5_sind, foo5_ind, bool_sind, prod_sind, or_sind, foo5_ind' or
 bool_ind?
 foo6_rect@{α α0 ; u u0} :
-forall (P : forall _ : foo6@{α ; u}, Type@{α0 ; u0}) 
+forall (P : forall _ : foo6@{α ; u}, Univ@{α0 ; u0}) 
   (_ : P Foo6@{α ; u}) (f : foo6@{α ; u}),
 P f
 (* α α0 ; u u0 | α -> α0 *)
@@ -434,7 +450,7 @@ foo6_rect is transparent
 Expands to: Constant sort_poly_elab.Inductives.foo6_rect
 Declared in library sort_poly_elab, line 209, characters 13-22
 foo6_prop_rect@{α ; u u0} :
-forall (P : forall _ : foo6@{Prop ; u}, Type@{α ; u0})
+forall (P : forall _ : foo6@{Prop ; u}, Univ@{α ; u0})
   (_ : P Foo6@{Prop ; u}) (f : foo6@{Prop ; u}),
 P f
 (* α ; u u0 |  *)
@@ -444,22 +460,22 @@ Arguments foo6_prop_rect P%_function_scope H f
 foo6_prop_rect is transparent
 Expands to: Constant sort_poly_elab.Inductives.foo6_prop_rect
 Declared in library sort_poly_elab, line 218, characters 13-27
-foo6_type_rect@{α ; u u0} :
-forall (P : forall _ : foo6@{Type ; u}, Type@{α ; u0})
+foo6_Univ_rect@{α ; u u0} :
+forall (P : forall _ : foo6@{Type ; u}, Univ@{α ; u0})
   (_ : P Foo6@{Type ; u}) (f : foo6@{Type ; u}),
 P f
 (* α ; u u0 |  *)
 
-foo6_type_rect is universe polymorphic
-Arguments foo6_type_rect P%_function_scope H f
-foo6_type_rect is transparent
-Expands to: Constant sort_poly_elab.Inductives.foo6_type_rect
+foo6_Univ_rect is universe polymorphic
+Arguments foo6_Univ_rect P%_function_scope H f
+foo6_Univ_rect is transparent
+Expands to: Constant sort_poly_elab.Inductives.foo6_Univ_rect
 Declared in library sort_poly_elab, line 227, characters 13-27
-foo7@{α ; } : Type@{α ; Set}
-(* α ;  |  *)
+foo7@{α ; u} : Univ@{α ; u}
+(* α ; u |  *)
 
 foo7 is universe polymorphic
-foo7@{α ; } may only be eliminated to produce values whose type is in sort quality α,
+foo7@{α ; u} may only be eliminated to produce values whose type is in sort quality α,
   unless instantiated such that the quality Type
   is equal to the instantiation of α, or to qualities smaller
   (SProp <= Prop <= Type, and all variables <= Type)
@@ -475,925 +491,8 @@ File "./output/sort_poly_elab.v", line 239, characters 13-21:
 The command has indeed failed with message:
 The reference foo7_ind was not found in the current environment. Did you mean
 foo5_ind, foo5_sind, foo5_ind' or bool_ind?
-foo7_prop_ind@{} :
-forall (P : forall _ : foo7@{Prop ; }, Prop) (_ : P Foo7_1@{Prop ; })
-  (_ : P Foo7_2@{Prop ; }) (f : foo7@{Prop ; }),
-P f
+File "./output/sort_poly_elab.v", line 243, characters 9-13:
+Error: Universe instance length for foo7 is (1 | 0) but should be (1 | 1).
 
-foo7_prop_ind is universe polymorphic
-Arguments foo7_prop_ind P%_function_scope H H' f
-foo7_prop_ind is transparent
-Expands to: Constant sort_poly_elab.Inductives.foo7_prop_ind
-Declared in library sort_poly_elab, line 241, characters 13-26
-foo7_prop_rect@{α ; u} :
-forall (P : forall _ : foo7@{Prop ; }, Type@{α ; u}) 
-  (_ : P Foo7_1@{Prop ; }) (_ : P Foo7_2@{Prop ; }) 
-  (f : foo7@{Prop ; }),
-P f
-(* α ; u | Prop -> α *)
 
-foo7_prop_rect is universe polymorphic
-Arguments foo7_prop_rect P%_function_scope H H' f
-foo7_prop_rect is transparent
-Expands to: Constant sort_poly_elab.Inductives.foo7_prop_rect
-Declared in library sort_poly_elab, line 248, characters 13-27
-sigma@{α α0 α1 ; u u0} :
-forall (A : Type@{α ; u}) (_ : forall _ : A, Type@{α0 ; u0}),
-Type@{α1 ; max(u,u0)}
-(* α α0 α1 ; u u0 |  *)
-
-sigma is universe polymorphic
-sigma@{α α0 α1 ; u u0} may only be eliminated to produce values whose type is in sort quality α1,
-  unless instantiated such that the qualities α, α0 and Prop
-  are equal to the instantiation of α1, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α1.
-Arguments sigma A%_type_scope B%_function_scope
-Expands to: Inductive sort_poly_elab.Inductives.sigma
-Declared in library sort_poly_elab, line 258, characters 12-17
-sigma_srect@{α α0 α1 α2 ; u u0 u1} :
-forall (A : Type@{α0 ; u}) (B : forall _ : A, Type@{α1 ; u0})
-  (P : forall _ : sigma@{α0 α1 α ; u u0} A B, Type@{α2 ; u1})
-  (_ : forall (x : A) (b : B x), P (pair@{α0 α1 α ; u u0} A B x b))
-  (s : sigma@{α0 α1 α ; u u0} A B),
-P s
-(* α α0 α1 α2 ; u u0 u1 | α -> α2 *)
-
-sigma_srect is universe polymorphic
-Arguments sigma_srect A%_type_scope (B P H)%_function_scope s
-sigma_srect is transparent
-Expands to: Constant sort_poly_elab.Inductives.sigma_srect
-Declared in library sort_poly_elab, line 263, characters 13-24
-pr1@{α α0 α1 ; u u0} :
-forall {A : Type@{α1 ; u}} {B : forall _ : A, Type@{α ; u0}}
-  (_ : sigma@{α1 α α0 ; u u0} A B),
-A
-(* α α0 α1 ; u u0 | α0 -> α1 *)
-
-pr1 is universe polymorphic
-Arguments pr1 {A}%_type_scope {B}%_function_scope s
-pr1 is transparent
-Expands to: Constant sort_poly_elab.Inductives.pr1
-Declared in library sort_poly_elab, line 273, characters 13-16
-pr2@{α α0 α1 ; u u0} :
-forall {A : Type@{α1 ; u}} {B : forall _ : A, Type@{α ; u0}}
-  (s : sigma@{α1 α α0 ; u u0} A B),
-B (@pr1@{α α0 α1 ; u u0} A B s)
-(* α α0 α1 ; u u0 | α0 -> α
-                    α0 -> α1 *)
-
-pr2 is universe polymorphic
-Arguments pr2 {A}%_type_scope {B}%_function_scope s
-pr2 is transparent
-Expands to: Constant sort_poly_elab.Inductives.pr2
-Declared in library sort_poly_elab, line 278, characters 13-16
-π2 not a defined object.
-seq@{α ; u} : forall (A : Type@{α ; u}) (_ : A) (_ : A), Prop
-(* α ; u |  *)
-
-seq is universe polymorphic
-Arguments seq A%_type_scope a _
-Expands to: Inductive sort_poly_elab.Inductives.seq
-Declared in library sort_poly_elab, line 293, characters 12-15
-eta@{α α0 α1 ; u u0 u1} :
-forall (A : Type@{α1 ; u0}) (B : forall _ : A, Type@{α ; u1})
-  (s : sigma@{α1 α α0 ; u0 u1} A B),
-seq@{α0 ; u} (sigma@{α1 α α0 ; u0 u1} A B) s
-  (pair@{α1 α α0 ; u0 u1} A B (@pr1@{α α0 α1 ; u0 u1} A B s)
-     (@pr2@{α α0 α1 ; u0 u1} A B s))
-(* α α0 α1 ; u u0 u1 | α0 -> α
-                       α0 -> α1
-                       α0 -> Prop,
-                       u0 <= u
-                       u1 <= u *)
-
-eta is universe polymorphic
-Arguments eta A%_type_scope B%_function_scope s
-eta is opaque
-Expands to: Constant sort_poly_elab.Inductives.eta
-Declared in library sort_poly_elab, line 298, characters 13-16
-sum@{α α0 α1 ; u u0} :
-forall (_ : Type@{α ; u}) (_ : Type@{α0 ; u0}), Type@{α1 ; max(Set,u,u0)}
-(* α α0 α1 ; u u0 |  *)
-
-sum is universe polymorphic
-sum@{α α0 α1 ; u u0} may only be eliminated to produce values whose type is in sort quality α1,
-  unless instantiated such that the qualities α, α0 and Type
-  are equal to the instantiation of α1, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α1.
-Arguments sum (A B)%_type_scope
-Expands to: Inductive sort_poly_elab.Inductives.sum
-Declared in library sort_poly_elab, line 307, characters 12-15
-File "./output/sort_poly_elab.v", line 318, characters 2-297:
-The command has indeed failed with message:
-Elimination constraints are not implied by the ones declared: 
-s0 -> s0'
-sum_elim@{α α0 α1 α2 ; u u0 u1} :
-forall (A : Type@{α0 ; u}) (B : Type@{α1 ; u0})
-  (P : forall _ : sum@{α0 α1 α ; u u0} A B, Type@{α2 ; u1})
-  (_ : forall a : A, P (@inl@{α0 α1 α ; u u0} A B a))
-  (_ : forall b : B, P (@inr@{α0 α1 α ; u u0} A B b))
-  (x : sum@{α0 α1 α ; u u0} A B),
-P x
-(* α α0 α1 α2 ; u u0 u1 | α -> α2 *)
-
-sum_elim is universe polymorphic
-Arguments sum_elim (A B)%_type_scope (P fl fr)%_function_scope x
-sum_elim is transparent
-Expands to: Constant sort_poly_elab.Inductives.sum_elim
-Declared in library sort_poly_elab, line 329, characters 13-21
-File "./output/sort_poly_elab.v", line 344, characters 2-66:
-The command has indeed failed with message:
-The quality constraints are inconsistent: cannot enforce Prop -> Type
-because it would identify Type and Prop which is inconsistent.
-This is introduced by the constraints Prop -> Type
-idT@{α α0 α1 ; u u0} :
-forall (A : Type@{α0 ; u}) (B : Type@{α1 ; u0})
-  (_ : sum@{α0 α1 α ; u u0} A B),
-sum@{α0 α1 Type ; u u0} A B
-(* α α0 α1 ; u u0 | α -> Type *)
-
-idT is universe polymorphic
-Arguments idT (A B)%_type_scope x
-idT is transparent
-Expands to: Constant sort_poly_elab.Inductives.idT
-Declared in library sort_poly_elab, line 356, characters 13-16
-idP@{α α0 α1 ; u u0} :
-forall (A : Type@{α0 ; u}) (B : Type@{α1 ; u0})
-  (_ : sum@{α0 α1 α ; u u0} A B),
-sum@{α0 α1 Prop ; u u0} A B
-(* α α0 α1 ; u u0 | α -> Prop *)
-
-idP is universe polymorphic
-Arguments idP (A B)%_type_scope x
-idP is transparent
-Expands to: Constant sort_poly_elab.Inductives.idP
-Declared in library sort_poly_elab, line 366, characters 13-16
-idS@{α α0 α1 ; u u0} :
-forall (A : Type@{α0 ; u}) (B : Type@{α1 ; u0})
-  (_ : sum@{α0 α1 α ; u u0} A B),
-sum@{α0 α1 SProp ; u u0} A B
-(* α α0 α1 ; u u0 | α -> SProp *)
-
-idS is universe polymorphic
-Arguments idS (A B)%_type_scope x
-idS is transparent
-Expands to: Constant sort_poly_elab.Inductives.idS
-Declared in library sort_poly_elab, line 376, characters 13-16
-idV@{α α0 α1 α2 ; u u0} :
-forall (A : Type@{α1 ; u}) (B : Type@{α2 ; u0})
-  (_ : sum@{α1 α2 α ; u u0} A B),
-sum@{α1 α2 α0 ; u u0} A B
-(* α α0 α1 α2 ; u u0 | α -> α0 *)
-
-idV is universe polymorphic
-Arguments idV (A B)%_type_scope x
-idV is transparent
-Expands to: Constant sort_poly_elab.Inductives.idV
-Declared in library sort_poly_elab, line 386, characters 13-16
-File "./output/sort_poly_elab.v", line 395, characters 2-57:
-The command has indeed failed with message:
-The quality constraints are inconsistent: cannot enforce Prop -> Type
-because it would identify Type and Prop which is inconsistent.
-This is introduced by the constraints Prop -> Type
-list@{α α0 ; u} :
-forall _ : Type@{α ; u}, Type@{α0 ; max(Set,u)}
-(* α α0 ; u |  *)
-
-list is universe polymorphic
-list@{α α0 ; u} may only be eliminated to produce values whose type is in sort quality α0,
-  unless instantiated such that the qualities α and Type
-  are equal to the instantiation of α0, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α0.
-Arguments list A%_type_scope
-Expands to: Inductive sort_poly_elab.Inductives.list
-Declared in library sort_poly_elab, line 400, characters 12-16
-list_elim@{α α0 α1 ; u u0} :
-forall (A : Type@{α0 ; u}) (P : forall _ : list@{α0 α ; u} A, Type@{α1 ; u0})
-  (_ : P (@nil@{α0 α ; u} A))
-  (_ : forall (x : A) (l : list@{α0 α ; u} A) (_ : P l),
-       P (@cons@{α0 α ; u} A x l))
-  (l : list@{α0 α ; u} A),
-P l
-(* α α0 α1 ; u u0 | α -> α1 *)
-
-list_elim is universe polymorphic
-Arguments list_elim A%_type_scope P%_function_scope fn fc%_function_scope l
-list_elim is transparent
-Expands to: Constant sort_poly_elab.Inductives.list_elim
-Declared in library sort_poly_elab, line 408, characters 13-22
-list_idT@{α α0 ; u} :
-forall {A : Type@{α0 ; u}} (_ : list@{α0 α ; u} A), list@{α0 Type ; u} A
-(* α α0 ; u | α -> Type *)
-
-list_idT is universe polymorphic
-Arguments list_idT {A}%_type_scope l
-list_idT is transparent
-Expands to: Constant sort_poly_elab.Inductives.list_idT
-Declared in library sort_poly_elab, line 419, characters 11-19
-list_idP@{α α0 ; u} :
-forall {A : Type@{α0 ; u}} (_ : list@{α0 α ; u} A), list@{α0 Prop ; u} A
-(* α α0 ; u | α -> Prop *)
-
-list_idP is universe polymorphic
-Arguments list_idP {A}%_type_scope l
-list_idP is transparent
-Expands to: Constant sort_poly_elab.Inductives.list_idP
-Declared in library sort_poly_elab, line 427, characters 11-19
-list_idS@{α α0 ; u} :
-forall {A : Type@{α0 ; u}} (_ : list@{α0 α ; u} A), list@{α0 SProp ; u} A
-(* α α0 ; u | α -> SProp *)
-
-list_idS is universe polymorphic
-Arguments list_idS {A}%_type_scope l
-list_idS is transparent
-Expands to: Constant sort_poly_elab.Inductives.list_idS
-Declared in library sort_poly_elab, line 435, characters 11-19
-map@{α α0 α1 α2 ; u u0} :
-forall (A : Type@{α2 ; u}) (B : Type@{α0 ; u0}) (_ : forall _ : A, B)
-  (_ : list@{α2 α ; u} A),
-list@{α0 α1 ; u0} B
-(* α α0 α1 α2 ; u u0 | α -> α1 *)
-
-map is universe polymorphic
-Arguments map (A B)%_type_scope f%_function_scope l
-map is transparent
-Expands to: Constant sort_poly_elab.Inductives.map
-Declared in library sort_poly_elab, line 443, characters 11-14
-False'@{α ; u} : Type@{α ; u}
-(* α ; u |  *)
-
-False' is universe polymorphic
-False'@{α ; u} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the quality SProp
-  is equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Inductives.False'
-Declared in library sort_poly_elab, line 457, characters 12-18
-False'_False@{α ; u} :
-forall _ : False'@{α ; u}, False
-(* α ; u | α -> Prop *)
-
-False'_False is universe polymorphic
-Arguments False'_False x
-False'_False is transparent
-Expands to: Constant sort_poly_elab.Inductives.False'_False
-Declared in library sort_poly_elab, line 461, characters 13-25
-bool@{α ; } : Type@{α ; Set}
-(* α ;  |  *)
-
-bool is universe polymorphic
-bool@{α ; } may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the quality Type
-  is equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Inductives.bool
-Declared in library sort_poly_elab, line 468, characters 12-16
-bool_to_Prop@{α ; } : forall _ : bool@{α ; }, Prop
-(* α ;  | α -> Type *)
-
-bool_to_Prop is universe polymorphic
-Arguments bool_to_Prop b
-bool_to_Prop is transparent
-Expands to: Constant sort_poly_elab.Inductives.bool_to_Prop
-Declared in library sort_poly_elab, line 471, characters 13-25
-bool_to_True_conj@{α ; } :
-forall _ : bool@{α ; }, or True True
-(* α ;  | α -> Prop *)
-
-bool_to_True_conj is universe polymorphic
-Arguments bool_to_True_conj b
-bool_to_True_conj is transparent
-Expands to: Constant sort_poly_elab.Inductives.bool_to_True_conj
-Declared in library sort_poly_elab, line 480, characters 13-30
-bool_to_Prop'@{α ; } : forall _ : bool@{α ; }, Prop
-(* α ;  | α -> Type *)
-
-bool_to_Prop' is universe polymorphic
-Arguments bool_to_Prop' b
-bool_to_Prop' is transparent
-Expands to: Constant sort_poly_elab.Inductives.bool_to_Prop'
-Declared in library sort_poly_elab, line 490, characters 21-34
-File "./output/sort_poly_elab.v", line 502, characters 58-60:
-The command has indeed failed with message:
-The term "tt" has type "unit" while it is expected to have type
- "?P@{b:=true@{Test ; }}"
-(unable to find a well-typed instantiation for "?P": cannot ensure that 
-"Set" is a subtype of "Type@{Test ; sort_poly_elab.350}").
-File "./output/sort_poly_elab.v", line 510, characters 58-66:
-The command has indeed failed with message:
-The term "testctor" has type "testind" while it is expected to have type
- "?P@{b:=true@{Test ; }}"
-(unable to find a well-typed instantiation for "?P": cannot ensure that
-"Type@{Test2 ; Set}" is a subtype of "Type@{Test ; sort_poly_elab.352}").
-match true@{Test ; } return testind'@{Test ; } with
-| true => testctor'@{Test ; }
-| false => testctor'@{Test ; }
-end
-     : testind'@{Test ; }
-(* {sort_poly_elab.354} | Set <= sort_poly_elab.354
-Minimized universes:
- sort_poly_elab.354 := Set
-Normalized constraints:
-  *)
-unit@{α ; u} : Type@{α ; u}
-(* α ; u |  *)
-
-unit is universe polymorphic
-unit@{α ; u} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the quality Prop
-  is equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Inductives.unit
-Declared in library sort_poly_elab, line 518, characters 12-16
-FooNat@{α ; } : Type@{α ; Set}
-(* α ;  |  *)
-
-FooNat is universe polymorphic
-FooNat@{α ; } may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the quality Type
-  is equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Inductives.FooNat
-Declared in library sort_poly_elab, line 526, characters 12-18
-Foo@{α α0 ; } :
-forall _ : FooNat@{α ; }, FooNat@{α0 ; }
-(* α α0 ;  | α -> α0 *)
-
-Foo is universe polymorphic
-Arguments Foo n
-Foo is transparent
-Expands to: Constant sort_poly_elab.Inductives.Foo
-Declared in library sort_poly_elab, line 531, characters 13-16
-Foo@{Type Prop ; }
-     : forall _ : FooNat@{Type ; }, FooNat@{Prop ; }
-(* {} | Type -> Prop
-Normalized constraints:
-  *)
-File "./output/sort_poly_elab.v", line 540, characters 2-30:
-The command has indeed failed with message:
-The quality constraints are inconsistent: cannot enforce Prop -> Type
-because it would identify Type and Prop which is inconsistent.
-This is introduced by the constraints Prop -> Type
-File "./output/sort_poly_elab.v", line 549, characters 2-30:
-The command has indeed failed with message:
-The record R1 could not be defined as a primitive record because it has no
-projections. [non-primitive-record,records,default]
-R2@{α ; u} : forall _ : SProp, Type@{α ; u}
-(* α ; u | α -> SProp *)
-
-R2 is universe polymorphic
-R2 has primitive projections with eta conversion depending on sort instantiation.
-Arguments R2 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R2
-Declared in library sort_poly_elab, line 551, characters 9-11
-R3@{α α0 ; u} :
-forall _ : Type@{α ; u}, Type@{α0 ; u}
-(* α α0 ; u | α0 -> α *)
-
-R3 is universe polymorphic
-R3 has primitive projections with eta conversion depending on sort instantiation.
-Arguments R3 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R3
-Declared in library sort_poly_elab, line 555, characters 9-11
-R4@{s ; } : forall _ : Type@{s ; Set}, Type@{s ; Set}
-(* s ;  |  *)
-
-R4 is universe polymorphic
-R4 has primitive projections with eta conversion.
-Arguments R4 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R4
-Declared in library sort_poly_elab, line 560, characters 9-11
-File "./output/sort_poly_elab.v", line 564, characters 2-49:
-The command has indeed failed with message:
-The record R5 could not be defined as a primitive record because it is
-squashed. [non-primitive-record,records,default]
-R5@{α ; u} : forall _ : Type@{α ; u}, SProp
-(* α ; u | SProp -> α *)
-
-R5 is universe polymorphic
-R5@{α ; u} may only be eliminated to produce values whose type is SProp.
-Arguments R5 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R5
-Declared in library sort_poly_elab, line 566, characters 11-13
-R6@{s ; } : forall _ : Type@{s ; Set}, Set
-(* s ;  |  *)
-
-R6 is universe polymorphic
-R6 has primitive projections with eta conversion.
-Arguments R6 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R6
-Declared in library sort_poly_elab, line 571, characters 9-11
-fun (A : SProp) (x y : R6@{SProp ; } A) =>
-@eq_refl (Conversion.Box@{SProp Type ; sort_poly_elab.365} A)
-  (Conversion.box@{SProp Type ; sort_poly_elab.365} A (R6f1 _ x))
-:
-@eq (Conversion.Box@{SProp Type ; sort_poly_elab.365} A)
-  (Conversion.box@{SProp Type ; sort_poly_elab.365} A (R6f1 _ x))
-  (Conversion.box@{SProp Type ; sort_poly_elab.365} A (R6f1 _ y))
-     : forall (A : SProp) (x y : R6@{SProp ; } A),
-       @eq (Conversion.Box@{SProp Type ; sort_poly_elab.365} A)
-         (Conversion.box@{SProp Type ; sort_poly_elab.365} A (R6f1 _ x))
-         (Conversion.box@{SProp Type ; sort_poly_elab.365} A (R6f1 _ y))
-(* {sort_poly_elab.367 sort_poly_elab.366 sort_poly_elab.365
-    sort_poly_elab.364} |
-     sort_poly_elab.365 <= sort_poly_elab.364
-     sort_poly_elab.365 <= sort_poly_elab.367
-     sort_poly_elab.366 = sort_poly_elab.365
-Minimized universes:
- sort_poly_elab.367 := sort_poly_elab.365
- sort_poly_elab.366 := sort_poly_elab.365
- sort_poly_elab.364 := sort_poly_elab.365
-Normalized constraints:
- {sort_poly_elab.365} |  *)
-File "./output/sort_poly_elab.v", line 577, characters 10-17:
-The command has indeed failed with message:
-In environment
-A : Prop
-x : R6@{α382 ; } A
-y : R6@{α385 ; } A
-The term
- "@eq_refl (Conversion.Box@{α380 Type ; sort_poly_elab.369} A)
-    (Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ x))"
-has type
- "@eq (Conversion.Box@{α380 Type ; sort_poly_elab.369} A)
-    (Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ x))
-    (Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ x))"
-while it is expected to have type
- "@eq (Conversion.Box@{α380 Type ; sort_poly_elab.369} A)
-    (Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ x))
-    (Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ y))"
-(cannot unify "Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ x)"
-and "Conversion.box@{α380 Type ; sort_poly_elab.369} A (R6f1 _ y)").
-File "./output/sort_poly_elab.v", line 579, characters 10-17:
-The command has indeed failed with message:
-In environment
-A : SProp
-x : R6@{SProp ; } A
-y : R6@{SProp ; } A
-The term
- "@eq_refl (Conversion.Box@{Type Type ; sort_poly_elab.373} nat)
-    (Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ x))"
-has type
- "@eq (Conversion.Box@{Type Type ; sort_poly_elab.373} nat)
-    (Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ x))
-    (Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ x))"
-while it is expected to have type
- "@eq (Conversion.Box@{Type Type ; sort_poly_elab.373} nat)
-    (Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ x))
-    (Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ y))"
-(cannot unify "Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ x)"
-and "Conversion.box@{Type Type ; sort_poly_elab.373} nat (R6f2 _ y)").
-R7@{α α0 ; u} :
-forall _ : Type@{α ; u}, Type@{α0 ; max(Set,u)}
-(* α α0 ; u |  *)
-
-R7 is universe polymorphic
-R7@{α α0 ; u} may only be eliminated to produce values whose type is in sort quality α0,
-  unless instantiated such that the qualities α, Prop and Type
-  are equal to the instantiation of α0, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α0.
-Arguments R7 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R7
-Declared in library sort_poly_elab, line 582, characters 38-40
-R7f1@{α α0 ; u} :
-forall (A : Type@{α ; u}) (_ : R7@{α α0 ; u} A), A
-(* α α0 ; u | α0 -> α *)
-
-R7f1 is universe polymorphic
-R7f1 is a projection of R7
-Arguments R7f1 A%_type_scope r
-R7f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R7f1
-Declared in library sort_poly_elab, line 582, characters 55-59
-R7f2@{α α0 ; u} :
-forall (A : Type@{α ; u}) (_ : R7@{α α0 ; u} A), nat
-(* α α0 ; u | α0 -> Type *)
-
-R7f2 is universe polymorphic
-R7f2 is a projection of R7
-Arguments R7f2 A%_type_scope r
-R7f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R7f2
-Declared in library sort_poly_elab, line 582, characters 65-69
-Rsigma@{s ; u v} :
-forall (A : Type@{s ; u}) (_ : forall _ : A, Type@{s ; v}),
-Type@{s ; max(u,v)}
-(* s ; u v |  *)
-
-Rsigma is universe polymorphic
-Rsigma has primitive projections with eta conversion.
-Arguments Rsigma A%_type_scope B%_function_scope
-Expands to: Inductive sort_poly_elab.Records.Rsigma
-Declared in library sort_poly_elab, line 593, characters 9-15
-Rsigma_srect@{α α0 ; u u0 u1} :
-forall (A : Type@{α ; u}) (B : forall _ : A, Type@{α ; u0})
-  (P : forall _ : Rsigma@{α ; u u0} A B, Type@{α0 ; u1})
-  (_ : forall (x : A) (b : B x), P (Rpair@{α ; u u0} A B x b))
-  (s : Rsigma@{α ; u u0} A B),
-P s
-(* α α0 ; u u0 u1 |  *)
-
-Rsigma_srect is universe polymorphic
-Arguments Rsigma_srect A%_type_scope (B P H)%_function_scope s
-Rsigma_srect is transparent
-Expands to: Constant sort_poly_elab.Records.Rsigma_srect
-Declared in library sort_poly_elab, line 598, characters 13-25
-sexists@{α ; u} :
-forall (A : Type@{α ; u}) (_ : forall _ : A, Prop), Prop
-(* α ; u |  *)
-
-sexists is universe polymorphic
-sexists@{α ; u} may only be eliminated to produce values whose type is SProp or Prop,
-  unless instantiated such that the quality α is SProp or Prop.
-Arguments sexists A%_type_scope B%_function_scope
-Expands to: Inductive sort_poly_elab.Records.sexists
-Declared in library sort_poly_elab, line 612, characters 12-19
-sexists_ind@{α410 ; sort_poly_elab.396}
-     : forall (A : Type@{α410 ; sort_poly_elab.396}) 
-         (B : forall _ : A, Prop) (P : Prop)
-         (_ : forall (a : A) (_ : B a), P)
-         (_ : sexists@{α410 ; sort_poly_elab.396} A B),
-       P
-(* {α410}; {sort_poly_elab.396} | 
-Collapsed sorts:
- α410 := Type
-Normalized constraints:
- {sort_poly_elab.396} |  *)
-R8@{α α0 ; u} : Type@{α ; u+1}
-(* α α0 ; u |  *)
-
-R8 is universe polymorphic
-R8@{α α0 ; u} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the qualities α0, Prop and Type
-  are equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Records.R8
-Declared in library sort_poly_elab, line 622, characters 9-11
-R8f1@{α α0 ; u} :
-forall _ : R8@{α α0 ; u}, Type@{α0 ; u}
-(* α α0 ; u | α -> Type *)
-
-R8f1 is universe polymorphic
-R8f1 is a projection of R8
-Arguments R8f1 r
-R8f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R8f1
-Declared in library sort_poly_elab, line 623, characters 4-8
-R8f2@{α α0 ; u} :
-forall r : R8@{α α0 ; u}, R8f1@{α α0 ; u} r
-(* α α0 ; u | α -> α0
-              α -> Type *)
-
-R8f2 is universe polymorphic
-R8f2 is a projection of R8
-Arguments R8f2 r
-R8f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R8f2
-Declared in library sort_poly_elab, line 624, characters 4-8
-R9@{α α0 α1 ; } : Type@{α ; Set}
-(* α α0 α1 ;  |  *)
-
-R9 is universe polymorphic
-R9@{α α0 α1 ; } may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the qualities α0, α1 and Prop
-  are equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Records.R9
-Declared in library sort_poly_elab, line 642, characters 9-11
-R9f1@{α α0 α1 ; } :
-forall _ : R9@{α α0 α1 ; }, bool@{α0 ; }
-(* α α0 α1 ;  | α -> α0 *)
-
-R9f1 is universe polymorphic
-R9f1 is a projection of R9
-Arguments R9f1 r
-R9f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R9f1
-Declared in library sort_poly_elab, line 643, characters 4-8
-R9f2@{α α0 α1 ; } :
-forall _ : R9@{α α0 α1 ; }, bool@{α1 ; }
-(* α α0 α1 ;  | α -> α1 *)
-
-R9f2 is universe polymorphic
-R9f2 is a projection of R9
-Arguments R9f2 r
-R9f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R9f2
-Declared in library sort_poly_elab, line 644, characters 4-8
-R10@{α α0 α1 α2 ; u u0} :
-forall _ : Type@{α0 ; u}, Type@{α ; max(Set,u,u0)}
-(* α α0 α1 α2 ; u u0 |  *)
-
-R10 is universe polymorphic
-R10@{α α0 α1 α2 ; u u0} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the qualities α0, α1, α2 and Prop
-  are equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Arguments R10 A%_type_scope
-Expands to: Inductive sort_poly_elab.Records.R10
-Declared in library sort_poly_elab, line 656, characters 9-12
-R10f1@{α α0 α1 α2 ; u u0} :
-forall (A : Type@{α0 ; u}) (_ : R10@{α α0 α1 α2 ; u u0} A), A
-(* α α0 α1 α2 ; u u0 | α -> α0 *)
-
-R10f1 is universe polymorphic
-R10f1 is a projection of R10
-Arguments R10f1 A%_type_scope r
-R10f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R10f1
-Declared in library sort_poly_elab, line 657, characters 4-9
-R10f2@{α α0 α1 α2 ; u u0} :
-forall (A : Type@{α0 ; u}) (r : R10@{α α0 α1 α2 ; u u0} A),
-@eq@{α0 α1 ; u u0} A (R10f1@{α α0 α1 α2 ; u u0} A r)
-  (R10f1@{α α0 α1 α2 ; u u0} A r)
-(* α α0 α1 α2 ; u u0 | α -> α0
-                       α -> α1 *)
-
-R10f2 is universe polymorphic
-R10f2 is a projection of R10
-Arguments R10f2 A%_type_scope r
-R10f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R10f2
-Declared in library sort_poly_elab, line 658, characters 4-9
-R10f3@{α α0 α1 α2 ; u u0} :
-forall (A : Type@{α0 ; u}) (_ : R10@{α α0 α1 α2 ; u u0} A), bool@{α2 ; }
-(* α α0 α1 α2 ; u u0 | α -> α2 *)
-
-R10f3 is universe polymorphic
-R10f3 is a projection of R10
-Arguments R10f3 A%_type_scope r
-R10f3 is transparent
-Expands to: Constant sort_poly_elab.Records.R10f3
-Declared in library sort_poly_elab, line 659, characters 4-9
-R11@{α α0 α1 α2 α3 α4 α5 ; u} :
-Type@{α ; Set}
-(* α α0 α1 α2 α3 α4 α5 ; u | α0 -> α3
-                             α3 -> Type *)
-
-R11 is universe polymorphic
-R11@{α α0 α1 α2 α3 α4 α5 ; u} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the qualities α3, α4, α5 and Prop
-  are equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Records.R11
-Declared in library sort_poly_elab, line 675, characters 9-12
-R11f1@{α α0 α1 α2 α3 α4 α5 ; u} :
-forall _ : R11@{α α0 α1 α2 α3 α4 α5 ; u}, bool@{α3 ; }
-(* α α0 α1 α2 α3 α4 α5 ; u | α -> α3
-                             α0 -> α3
-                             α3 -> Type *)
-
-R11f1 is universe polymorphic
-R11f1 is a projection of R11
-Arguments R11f1 r
-R11f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R11f1
-Declared in library sort_poly_elab, line 676, characters 4-9
-R11f2@{α α0 α1 α2 α3 α4 α5 ; u} :
-forall r : R11@{α α0 α1 α2 α3 α4 α5 ; u},
-let r0 : R10@{α0 α1 α2 α3 ; Set u} bool@{α1 ; } :=
-  Build_R10@{α0 α1 α2 α3 ; Set u} bool@{α1 ; } true@{α1 ; }
-    (@eq_refl@{α1 α2 ; Set u} bool@{α1 ; } true@{α1 ; })
-    (R11f1@{α α0 α1 α2 α3 α4 α5 ; u} r)
-  in
-match R10f3@{α0 α1 α2 α3 ; Set u} bool@{α1 ; } r0 return Type@{α4 ; Set} with
-| true => bool@{α4 ; }
-| false => bool@{α4 ; }
-end
-(* α α0 α1 α2 α3 α4 α5 ; u | α -> α3
-                             α -> α4
-                             α0 -> α3
-                             α3 -> Type *)
-
-R11f2 is universe polymorphic
-R11f2 is a projection of R11
-Arguments R11f2 r
-R11f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R11f2
-Declared in library sort_poly_elab, line 677, characters 4-9
-R11f3@{α α0 α1 α2 α3 α4 α5 ; u} :
-forall _ : R11@{α α0 α1 α2 α3 α4 α5 ; u}, bool@{α5 ; }
-(* α α0 α1 α2 α3 α4 α5 ; u | α -> α5
-                             α0 -> α3
-                             α3 -> Type *)
-
-R11f3 is universe polymorphic
-R11f3 is a projection of R11
-Arguments R11f3 r
-R11f3 is transparent
-Expands to: Constant sort_poly_elab.Records.R11f3
-Declared in library sort_poly_elab, line 682, characters 4-9
-R12@{α α0 ; } : Type@{α ; Set}
-(* α α0 ;  | α0 -> Type *)
-
-R12 is universe polymorphic
-R12@{α α0 ; } may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the qualities α0, Prop and Type
-  are equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Records.R12
-Declared in library sort_poly_elab, line 701, characters 9-12
-R12f1@{α α0 ; } :
-forall _ : R12@{α α0 ; }, bool@{α0 ; }
-(* α α0 ;  | α -> α0
-             α0 -> Type *)
-
-R12f1 is universe polymorphic
-R12f1 is a projection of R12
-Arguments R12f1 r
-R12f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R12f1
-Declared in library sort_poly_elab, line 702, characters 4-9
-R12f2@{α α0 ; } :
-forall r : R12@{α α0 ; },
-let f' : forall _ : nat, nat :=
-  fix F (n : nat) : nat :=
-    match R12f1@{α α0 ; } r return nat with
-    | true => n
-    | false => O
-    end
-  in
-match f' O return Set with
-| O => bool@{Type ; }
-| S _ => nat
-end
-(* α α0 ;  | α -> α0
-             α -> Type
-             α0 -> Type *)
-
-R12f2 is universe polymorphic
-R12f2 is a projection of R12
-Arguments R12f2 r
-R12f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R12f2
-Declared in library sort_poly_elab, line 703, characters 4-9
-R13@{α α0 α1 α2 ; u u0} :
-Type@{α ; max(Set,u+1,u0+1)}
-(* α α0 α1 α2 ; u u0 | α1 -> Type
-                       α2 -> Type,
-                       u0 <= u *)
-
-R13 is universe polymorphic
-R13@{α α0 α1 α2 ; u u0} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the qualities α0, α1, Prop and Type
-  are equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Records.R13
-Declared in library sort_poly_elab, line 718, characters 9-12
-R13f1@{α α0 α1 α2 ; u u0} :
-forall _ : R13@{α α0 α1 α2 ; u u0}, Type@{α0 ; u}
-(* α α0 α1 α2 ; u u0 | α -> Type
-                       α1 -> Type
-                       α2 -> Type,
-                       u0 <= u *)
-
-R13f1 is universe polymorphic
-R13f1 is a projection of R13
-Arguments R13f1 r
-R13f1 is transparent
-Expands to: Constant sort_poly_elab.Records.R13f1
-Declared in library sort_poly_elab, line 719, characters 4-9
-R13f2@{α α0 α1 α2 ; u u0} :
-forall _ : R13@{α α0 α1 α2 ; u u0}, Type@{α0 ; u0}
-(* α α0 α1 α2 ; u u0 | α -> Type
-                       α1 -> Type
-                       α2 -> Type,
-                       u0 <= u *)
-
-R13f2 is universe polymorphic
-R13f2 is a projection of R13
-Arguments R13f2 r
-R13f2 is transparent
-Expands to: Constant sort_poly_elab.Records.R13f2
-Declared in library sort_poly_elab, line 720, characters 4-9
-R13f3@{α α0 α1 α2 ; u u0} :
-forall _ : R13@{α α0 α1 α2 ; u u0}, bool@{α1 ; }
-(* α α0 α1 α2 ; u u0 | α -> α1
-                       α1 -> Type
-                       α2 -> Type,
-                       u0 <= u *)
-
-R13f3 is universe polymorphic
-R13f3 is a projection of R13
-Arguments R13f3 r
-R13f3 is transparent
-Expands to: Constant sort_poly_elab.Records.R13f3
-Declared in library sort_poly_elab, line 721, characters 4-9
-R13f4@{α α0 α1 α2 ; u u0} :
-forall (r : R13@{α α0 α1 α2 ; u u0}) (b : bool@{α2 ; }),
-match b return Type@{α0 ; u} with
-| true =>
-    match R13f3@{α α0 α1 α2 ; u u0} r return Type@{α0 ; u} with
-    | true => R13f1@{α α0 α1 α2 ; u u0} r
-    | false => R13f2@{α α0 α1 α2 ; u u0} r
-    end
-| false => bool@{α0 ; }
-end
-(* α α0 α1 α2 ; u u0 | α -> α0
-                       α -> α1
-                       α -> Type
-                       α1 -> Type
-                       α2 -> Type,
-                       u0 <= u *)
-
-R13f4 is universe polymorphic
-R13f4 is a projection of R13
-Arguments R13f4 r b
-R13f4 is transparent
-Expands to: Constant sort_poly_elab.Records.R13f4
-Declared in library sort_poly_elab, line 722, characters 4-9
-C1@{α α0 ; u} : forall _ : Type@{α ; u}, Type@{α0 ; u}
-(* α α0 ; u |  *)
-
-C1 is universe polymorphic
-C1@{α α0 ; u} may only be eliminated to produce values whose type is in sort quality α0,
-  unless instantiated such that the qualities α and Prop
-  are equal to the instantiation of α0, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α0.
-Arguments C1 A%_type_scope
-Expands to: Inductive sort_poly_elab.Classes.C1
-Declared in library sort_poly_elab, line 757, characters 8-10
-C1f1@{α α0 ; u} :
-forall {A : Type@{α ; u}} {_ : C1@{α α0 ; u} A}, A
-(* α α0 ; u | α0 -> α *)
-
-C1f1 is universe polymorphic
-C1f1 is a projection of C1
-Arguments C1f1 {A}%_type_scope {C1}
-C1f1 is transparent
-Expands to: Constant sort_poly_elab.Classes.C1f1
-Declared in library sort_poly_elab, line 758, characters 4-8
-C1I1@{α α0 ; u} : C1@{α α0 ; u} unit@{α ; u}
-(* α α0 ; u |  *)
-
-C1I1 is universe polymorphic
-C1I1 is transparent
-Expands to: Constant sort_poly_elab.Classes.C1I1
-Declared in library sort_poly_elab, line 765, characters 11-15
-C1ProgramI1@{α α0 ; u} : C1@{α α0 ; u} unit@{α ; u}
-(* α α0 ; u |  *)
-
-C1ProgramI1 is universe polymorphic
-C1ProgramI1 is transparent
-Expands to: Constant sort_poly_elab.Classes.C1ProgramI1
-Declared in library sort_poly_elab, line 768, characters 19-30
-C1RefineI1@{α α0 ; u} : C1@{α α0 ; u} unit@{α ; u}
-(* α α0 ; u |  *)
-
-C1RefineI1 is universe polymorphic
-C1RefineI1 is transparent
-Expands to: Constant sort_poly_elab.Classes.C1RefineI1
-Declared in library sort_poly_elab, line 775, characters 11-21
-C1InteractiveI1@{α α0 ; u} : C1@{α α0 ; u} unit@{α ; u}
-(* α α0 ; u |  *)
-
-C1InteractiveI1 is universe polymorphic
-C1InteractiveI1 is transparent
-Expands to: Constant sort_poly_elab.Classes.C1InteractiveI1
-Declared in library sort_poly_elab, line 781, characters 11-26
-C1AxiomaticI1@{α α0 ; u} : C1@{α α0 ; u} unit@{α ; u}
-(* α α0 ; u |  *)
-
-C1AxiomaticI1 is universe polymorphic
-Expands to: Constant sort_poly_elab.Classes.C1AxiomaticI1
-Declared in library sort_poly_elab, line 785, characters 9-22
-C1InductiveI1@{α ; u} : Type@{α ; u}
-(* α ; u |  *)
-
-C1InductiveI1 is universe polymorphic
-C1InductiveI1@{α ; u} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the quality Prop
-  is equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Classes.C1InductiveI1
-Declared in library sort_poly_elab, line 789, characters 12-25
-File "./output/sort_poly_elab.v", line 798, characters 0-76:
-The command has indeed failed with message:
-Sort metavariables must be collapsed to Type in universe monomorphic constructions.
-Attr@{α ; u} : Type@{α ; u}
-(* α ; u |  *)
-
-Attr is universe polymorphic
-Attr@{α ; u} may only be eliminated to produce values whose type is in sort quality α,
-  unless instantiated such that the quality Prop
-  is equal to the instantiation of α, or to qualities smaller
-  (SProp <= Prop <= Type, and all variables <= Type)
-  than the instantiation of α.
-Expands to: Inductive sort_poly_elab.Attr
-Declared in library sort_poly_elab, line 802, characters 10-14
+coqc exited with code 1
