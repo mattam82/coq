@@ -185,8 +185,8 @@ Module Inductives.
     : P f
     := match f with Foo5 _ a => H a end.
   (* foo5_Prop_rect@{α ; u} :
-    forall (A : Prop) (P : foo5@{Type ; Set} A -> Univ@{α ; u}),
-    (forall a : A, P (Foo5@{Type ; Set} A a)) -> forall f : foo5@{Type ; Set} A, P f *)
+    forall (A : Prop) (P : foo5@{Prop ; Set} A -> Univ@{α ; u}),
+    (forall a : A, P (Foo5@{Prop ; Set} A a)) -> forall f : foo5@{Prop ; Set} A, P f *)
   (* α ; u | Prop -> α *)
   About foo5_Prop_rect.
 
@@ -233,6 +233,7 @@ Module Inductives.
   (* α ; u u0 |  *)
   About foo6_Type_rect.
 
+  (* foo7's universe is minimized to Set/0 now *)
   Inductive foo7 : Univ := Foo7_1 | Foo7_2.
   About foo7.
   Fail Check foo7_sind.

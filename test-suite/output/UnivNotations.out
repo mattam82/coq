@@ -18,7 +18,7 @@ UnivNotations.25).
 foo Type@{UnivNotations.28} nat
      : Type@{foo.u1}
 (* {UnivNotations.28} | UnivNotations.28 < foo.u0
-                         Set <= UnivNotations.28
+                        Set <= UnivNotations.28
 Normalized constraints:
  {UnivNotations.28} | UnivNotations.28 < foo.u0 *)
 foo Univ@{s ; Set} S
